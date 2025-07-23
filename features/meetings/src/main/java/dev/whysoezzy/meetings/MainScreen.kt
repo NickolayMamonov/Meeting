@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import dev.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.domain.models.Community
 import dev.whysoezzy.domain.models.Meeting
+import dev.whysoezzy.domain.models.SearchResults
 import dev.whysoezzy.meetings.presentation.MainScreenEvent
 import dev.whysoezzy.meetings.presentation.MainScreenUiState
 import dev.whysoezzy.meetings.presentation.MainScreenViewModel
@@ -170,7 +171,7 @@ private fun SuccessContent(
 
 @Composable
 private fun SearchResultsContent(
-    results: dev.whysoezzy.domain.models.SearchResults,
+    results: SearchResults,
     onEventClick: (Meeting) -> Unit,
     onCommunityClick: (Community) -> Unit
 ) {
