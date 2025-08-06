@@ -1,9 +1,13 @@
 package dev.whysoezzy.meet
 
 import android.app.Application
+import dev.whysoezzy.auth.di.authFeatureModule
+import dev.whysoezzy.communities.di.communitiesFeatureModule
+import dev.whysoezzy.data.di.dataModule
 import dev.whysoezzy.domain.di.domainModule
 import dev.whysoezzy.meetings.data.QuickScenarios
 import dev.whysoezzy.meetings.di.mainFeatureModule
+import dev.whysoezzy.profile.di.profileFeatureModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -28,8 +32,12 @@ class MeetApplication : Application() {
             androidLogger(Level.DEBUG)
             androidContext(this@MeetApplication)
             modules(
+                dataModule,
                 domainModule,
-                mainFeatureModule
+                mainFeatureModule,
+                communitiesFeatureModule,
+                authFeatureModule,
+                profileFeatureModule
             )
         }
     }

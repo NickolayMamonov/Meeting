@@ -42,6 +42,9 @@ android {
 
 dependencies {
     implementation(project(":features:meetings"))
+    implementation(project(":features:communities"))
+    implementation(project(":features:auth"))
+    implementation(project(":features:profile"))
     // Feature modules
 
     // Data and Domain modules
@@ -73,4 +76,6 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    implementation(libs.androidx.navigation.compose)
 }
