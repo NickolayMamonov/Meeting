@@ -44,7 +44,8 @@ fun MainScreen(
     viewModel: MainScreenViewModel = koinViewModel(),
     onEventClick: (Meeting) -> Unit = {},
     onCommunityClick: (Community) -> Unit = {},
-    onAdClick: (AdBlock) -> Unit = {}
+    onAdClick: (AdBlock) -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -64,6 +65,7 @@ fun MainScreen(
                     onSearch = { query ->
                         viewModel.onEvent(MainScreenEvent.Search(query))
                     },
+
                 )
 
                 // Content based on state
@@ -85,7 +87,7 @@ fun MainScreen(
                                     )
                                 )
                             },
-                            onAdClick = onAdClick
+                            onAdClick = onAdClick,
                         )
                     }
 
@@ -192,8 +194,14 @@ private fun SearchResultsContent(
                     imageUrl = event.imageUrl,
                     title = event.title,
                     date = event.date,
-                    address = event.address.address,
-                    tags = event.tags.map { UIKitEventCardTag(it.text) },
+                    address = event.address,
+                    tags = event.tags.map {
+                        UIKitEventCardTag(
+                            it.text,
+                            isSelected = false,
+                            isEnabled = true
+                        )
+                    },
                     cardType = UIKitEventCardType.WIDE,
                     onCardClick = { onEventClick(event) },
                     modifier = Modifier
@@ -267,8 +275,14 @@ private fun HeroEventsSection(
                 imageUrl = event.imageUrl,
                 title = event.title,
                 date = event.date,
-                address = event.address.address,
-                tags = event.tags.map { UIKitEventCardTag(it.text) },
+                address = event.address,
+                tags = event.tags.map {
+                    UIKitEventCardTag(
+                        it.text,
+                        isSelected = false,
+                        isEnabled = true
+                    )
+                },
                 cardType = UIKitEventCardType.WIDE,
                 onCardClick = { onEventClick(event) }
             )
@@ -295,8 +309,14 @@ private fun PopularEventsSection(
                     imageUrl = event.imageUrl,
                     title = event.title,
                     date = event.date,
-                    address = event.address.address,
-                    tags = event.tags.map { UIKitEventCardTag(it.text) },
+                    address = event.address,
+                    tags = event.tags.map {
+                        UIKitEventCardTag(
+                            it.text,
+                            isSelected = false,
+                            isEnabled = true
+                        )
+                    },
                     cardType = UIKitEventCardType.COMPACT,
                     onCardClick = { onEventClick(event) }
                 )
@@ -370,8 +390,14 @@ private fun AllEventsSection(
                         imageUrl = item.imageUrl,
                         title = item.title,
                         date = item.date,
-                        address = item.address.address,
-                        tags = item.tags.map { UIKitEventCardTag(it.text) },
+                        address = item.address,
+                        tags = item.tags.map {
+                            UIKitEventCardTag(
+                                it.text,
+                                isSelected = false,
+                                isEnabled = true
+                            )
+                        },
                         cardType = UIKitEventCardType.WIDE,
                         onCardClick = { onEventClick(item) },
                         modifier = Modifier.fillMaxWidth()
