@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import dev.whysoezzy.domain.models.MeetingAddress
 import dev.whysoezzy.uikit.components.avatars.UIKitAvatar
 import dev.whysoezzy.uikit.components.avatars.UIKitAvatarWithInitials
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
@@ -110,10 +111,10 @@ fun CardSection() {
                 imageUrl = "https://picsum.photos/212/148",
                 title = "Android Meetup",
                 date = "10 августа",
-                address = "Кожевенная линия, 40",
+                address = MeetingAddress("ул. Пушкина, 10", 55.7558, 37.6176),
                 tags = listOf(
-                    UIKitEventCardTag("Android", true),
-                    UIKitEventCardTag("Kotlin")
+                    UIKitEventCardTag("Android", isSelected = false, isEnabled = true),
+                    UIKitEventCardTag("Kotlin", isSelected = false, isEnabled = true)
                 ),
                 cardType = UIKitEventCardType.COMPACT
             )

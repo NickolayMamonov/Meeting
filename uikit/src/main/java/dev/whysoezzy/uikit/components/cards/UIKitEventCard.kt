@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import dev.whysoezzy.domain.models.MeetingAddress
 import dev.whysoezzy.uikit.components.tags.UIKitTag
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
 import dev.whysoezzy.uikit.theme.UIKitTheme
@@ -34,7 +35,11 @@ enum class UIKitEventCardType {
 
 data class UIKitEventCardTag(
     val text: String,
-    val isSelected: Boolean = false
+    val isSelected: Boolean,
+    val isEnabled: Boolean,
+    val size: UIKitTagSize = UIKitTagSize.MEDIUM,
+    val modifier: Modifier = Modifier,
+    val onClick: (() -> Unit)? = null
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -43,7 +48,7 @@ fun UIKitEventCard(
     imageUrl: String,
     title: String,
     date: String,
-    address: String,
+    address: MeetingAddress,
     tags: List<UIKitEventCardTag> = emptyList(),
     cardType: UIKitEventCardType = UIKitEventCardType.COMPACT,
     modifier: Modifier = Modifier,
@@ -117,7 +122,7 @@ fun UIKitEventCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = address,
+                text = address.address,
                 style = TypographyTokens.BodyText2,
                 color = colorScheme.neutralWeak,
                 maxLines = 1,
@@ -147,7 +152,8 @@ fun UIKitEventCard(
                     UIKitTag(
                         text = tag.text,
                         size = UIKitTagSize.SMALL,
-                        selected = tag.isSelected
+                        selected = tag.isSelected,
+                        enabled = tag.isEnabled,
                     )
                 }
             }
@@ -160,10 +166,10 @@ fun UIKitEventCard(
 fun UIKitEventCardPreview() {
     UIKitTheme {
         val sampleTags = listOf(
-            UIKitEventCardTag("Android"),
-            UIKitEventCardTag("Design", isSelected = true),
-            UIKitEventCardTag("Kotlin"),
-            UIKitEventCardTag("UI/UX")
+            UIKitEventCardTag("Android", isSelected = true, isEnabled = false),
+            UIKitEventCardTag("Design", isSelected = true, isEnabled = false),
+            UIKitEventCardTag("Kotlin", isSelected = true, isEnabled = false),
+            UIKitEventCardTag("UI/UX", isSelected = true, isEnabled = false)
         )
 
         Column(
@@ -177,7 +183,7 @@ fun UIKitEventCardPreview() {
                 imageUrl = "https://picsum.photos/320/180",
                 title = "This is a wide card with a very long title that should wrap to two lines",
                 date = "10 августа",
-                address = "Кожевенная линия, 40",
+                address = MeetingAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 tags = sampleTags,
                 cardType = UIKitEventCardType.WIDE,
                 onCardClick = { /* handle click */ }
@@ -188,7 +194,7 @@ fun UIKitEventCardPreview() {
                 imageUrl = "https://picsum.photos/212/148",
                 title = "Compact card title",
                 date = "10 августа",
-                address = "Кожевенная линия, 40",
+                address = MeetingAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 tags = sampleTags.take(2),
                 cardType = UIKitEventCardType.COMPACT
             )
@@ -198,7 +204,7 @@ fun UIKitEventCardPreview() {
                 imageUrl = "https://picsum.photos/212/148",
                 title = "Event without tags",
                 date = "10 августа",
-                address = "Кожевенная линия, 40",
+                address = MeetingAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 cardType = UIKitEventCardType.COMPACT
             )
         }
