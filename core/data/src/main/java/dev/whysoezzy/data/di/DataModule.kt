@@ -8,9 +8,11 @@ import dev.whysoezzy.data.remote.api.UserApi
 import dev.whysoezzy.data.repository.AdBlockRepositoryImpl
 import dev.whysoezzy.data.repository.CommunitiesRepositoryImpl
 import dev.whysoezzy.data.repository.MeetingsRepositoryImpl
+import dev.whysoezzy.data.repository.UserRepositoryImpl
 import dev.whysoezzy.domain.repository.AdBlockRepository
 import dev.whysoezzy.domain.repository.CommunitiesRepository
 import dev.whysoezzy.domain.repository.MeetingsRepository
+import dev.whysoezzy.domain.repository.UserRepository
 import org.koin.dsl.module
 
 val dataModule = module {
@@ -28,4 +30,5 @@ val dataModule = module {
     single<MeetingsRepository> { MeetingsRepositoryImpl(get(), get()) }
     single<CommunitiesRepository> { CommunitiesRepositoryImpl() }
     single<AdBlockRepository> { AdBlockRepositoryImpl() }
+    single<UserRepository> { UserRepositoryImpl() }
 }
