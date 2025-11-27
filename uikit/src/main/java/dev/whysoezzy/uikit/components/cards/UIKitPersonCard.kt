@@ -43,13 +43,13 @@ fun UIKitPersonCard(
         modifier = modifier
             .clip(RoundedCornerShape(BorderRadiusTokens.L))
             .then(
-                onCardClick?.let { 
+                onCardClick?.let {
                     Modifier.clickable { it() }
                 } ?: Modifier
             )
             .padding(SpacingTokens.M)
-            .width(64.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .width(68.dp),
+        horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
     ) {
         // Avatar
@@ -91,21 +91,21 @@ fun UIKitPersonCardPreview() {
         ) {
             // Simple card
             UIKitPersonCard(
-                name = "John Doe",
+                name = "John",
                 role = "Designer",
                 imageUrl = "https://picsum.photos/200"
             )
 
             // Card with long name
             UIKitPersonCard(
-                name = "John Doe with a very long name",
+                name = "John",
                 role = "UX Designer",
                 imageUrl = "https://picsum.photos/201"
             )
 
             // Interactive card
             UIKitPersonCard(
-                name = "Jane Smith",
+                name = "Jane",
                 role = "Developer",
                 imageUrl = "https://picsum.photos/202",
                 isTagSelected = isTagSelected,
@@ -115,7 +115,7 @@ fun UIKitPersonCardPreview() {
 
             // Card without image
             UIKitPersonCard(
-                name = "Alex Johnson",
+                name = "Alex",
                 role = "Manager",
                 imageUrl = ""
             )

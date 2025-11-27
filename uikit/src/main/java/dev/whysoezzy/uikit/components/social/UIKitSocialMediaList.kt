@@ -19,7 +19,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.whysoezzy.domain.models.SocialMedia
+import dev.whysoezzy.domain.models.SocialMediaInfo
+import dev.whysoezzy.domain.models.SocialMediaType
 import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.text.TextMetadata2
 import dev.whysoezzy.uikit.theme.UIKitTheme
@@ -28,35 +29,35 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 @Composable
 fun UIKitSocialMediaList(
-    socialMedias: Map<SocialMedia, String>,
+    socialMedias: List<SocialMediaInfo>,
     modifier: Modifier = Modifier,
-    onSocialMediaClick: (SocialMedia, String) -> Unit = { _, _ -> }
+    onSocialMediaClick: (String) -> Unit = { }
 ) {
-    LazyRow(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
-    ) {
-        items(socialMedias.entries.toList()) { (socialMedia, url) ->
-            UIKitSocialMediaItem(
-                socialMedia = socialMedia,
-                url = url,
-                onClick = { onSocialMediaClick(socialMedia, url) }
-            )
+    if (socialMedias.isNotEmpty()) {
+        LazyRow(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        ) {
+            items(socialMedias) { socialMedia ->
+                UIKitSocialMediaItem(
+                    socialMediaInfo = socialMedia,
+                    onClick = { onSocialMediaClick(socialMedia.url) }
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun UIKitSocialMediaItem(
-    socialMedia: SocialMedia,
-    url: String,
+    socialMediaInfo: SocialMediaInfo,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(BorderRadiusTokens.S))
-            .background(getSocialMediaColor(socialMedia).copy(alpha = 0.1f))
+            .background(getSocialMediaColor(socialMediaInfo.type).copy(alpha = 0.1f))
             .clickable { onClick() }
             .padding(
                 horizontal = SpacingTokens.S,
@@ -66,38 +67,47 @@ private fun UIKitSocialMediaItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            painter = getSocialMediaIcon(socialMedia),
-            contentDescription = getSocialMediaName(socialMedia),
-            tint = getSocialMediaColor(socialMedia),
+            painter = getSocialMediaIcon(socialMediaInfo.type),
+            contentDescription = getSocialMediaName(socialMediaInfo.type),
+            tint = getSocialMediaColor(socialMediaInfo.type),
             modifier = Modifier.size(16.dp)
         )
 
         TextMetadata2(
-            text = getSocialMediaName(socialMedia),
-            color = getSocialMediaColor(socialMedia)
+            text = socialMediaInfo.username,
+            color = getSocialMediaColor(socialMediaInfo.type)
         )
     }
 }
 
 @Composable
-private fun getSocialMediaIcon(socialMedia: SocialMedia): Painter {
-    return when (socialMedia) {
-        SocialMedia.TELEGRAM -> painterResource(R.drawable.telegram_logo)
-        SocialMedia.HABR -> painterResource(R.drawable.habr_icon)
+private fun getSocialMediaIcon(socialMediaType: SocialMediaType): Painter {
+    return when (socialMediaType) {
+        SocialMediaType.TELEGRAM -> painterResource(R.drawable.telegram_logo)
+        SocialMediaType.HABR -> painterResource(R.drawable.habr_icon)
+        else -> painterResource(R.drawable.telegram_logo) // fallback
     }
 }
 
-private fun getSocialMediaColor(socialMedia: SocialMedia): Color {
-    return when (socialMedia) {
-        SocialMedia.TELEGRAM -> Color(0xFF0088CC)
-        SocialMedia.HABR -> Color(0xFF77A2B6)
+private fun getSocialMediaColor(socialMediaType: SocialMediaType): Color {
+    return when (socialMediaType) {
+        SocialMediaType.TELEGRAM -> Color(0xFF0088CC)
+        SocialMediaType.HABR -> Color(0xFF77A2B6)
+        SocialMediaType.GITHUB -> Color(0xFF333333)
+        SocialMediaType.LINKEDIN -> Color(0xFF0077B5)
+        SocialMediaType.TWITTER -> Color(0xFF1DA1F2)
+        SocialMediaType.INSTAGRAM -> Color(0xFFE4405F)
     }
 }
 
-private fun getSocialMediaName(socialMedia: SocialMedia): String {
-    return when (socialMedia) {
-        SocialMedia.TELEGRAM -> "Telegram"
-        SocialMedia.HABR -> "Habr"
+private fun getSocialMediaName(socialMediaType: SocialMediaType): String {
+    return when (socialMediaType) {
+        SocialMediaType.TELEGRAM -> "Telegram"
+        SocialMediaType.HABR -> "Habr"
+        SocialMediaType.GITHUB -> "GitHub"
+        SocialMediaType.LINKEDIN -> "LinkedIn"
+        SocialMediaType.TWITTER -> "Twitter"
+        SocialMediaType.INSTAGRAM -> "Instagram"
     }
 }
 
@@ -106,9 +116,22 @@ private fun getSocialMediaName(socialMedia: SocialMedia): String {
 private fun UIKitSocialMediaListPreview() {
     UIKitTheme {
         UIKitSocialMediaList(
-            socialMedias = mapOf(
-                SocialMedia.TELEGRAM to "@username",
-                SocialMedia.HABR to "habr.com/username",
+            socialMedias = listOf(
+                SocialMediaInfo(
+                    type = SocialMediaType.TELEGRAM,
+                    url = "https://t.me/username",
+                    username = "@username"
+                ),
+                SocialMediaInfo(
+                    type = SocialMediaType.HABR,
+                    url = "https://habr.com/users/username",
+                    username = "username"
+                ),
+                SocialMediaInfo(
+                    type = SocialMediaType.GITHUB,
+                    url = "https://github.com/username",
+                    username = "username"
+                )
             )
         )
     }
