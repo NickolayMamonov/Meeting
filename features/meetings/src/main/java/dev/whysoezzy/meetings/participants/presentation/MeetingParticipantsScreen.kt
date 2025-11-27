@@ -3,32 +3,40 @@ package dev.whysoezzy.meetings.participants.presentation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import dev.whysoezzy.domain.models.Person
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
+import dev.whysoezzy.uikit.components.cards.UIKitPersonCard
 import dev.whysoezzy.uikit.components.text.TextHeading1
+import dev.whysoezzy.uikit.components.text.TextMetadata2
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeetingParticipantsScreen(
     meetingId: Long,
@@ -42,7 +50,25 @@ fun MeetingParticipantsScreen(
         viewModel.onEvent(MeetingParticipantsEvent.LoadParticipants(meetingId))
     }
 
-    Scaffold { paddingValues ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = when (uiState) {
+                            is MeetingParticipantsUiState.Success -> (uiState as MeetingParticipantsUiState.Success).meetingTitle
+                            else -> "Участники"
+                        }
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackPressed) {
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Назад")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
         when (uiState) {
             is MeetingParticipantsUiState.Loading -> {
                 LoadingContent(modifier = Modifier.padding(paddingValues))
@@ -51,7 +77,9 @@ fun MeetingParticipantsScreen(
             is MeetingParticipantsUiState.Success -> {
                 ParticipantsContent(
                     participants = (uiState as MeetingParticipantsUiState.Success).participants,
-                    onBackPressed = onBackPressed,
+                    onParticipantClick = { participantId ->
+                        viewModel.onEvent(MeetingParticipantsEvent.NavigateToProfile(participantId))
+                    },
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -60,11 +88,7 @@ fun MeetingParticipantsScreen(
                 ErrorContent(
                     message = (uiState as MeetingParticipantsUiState.Error).message,
                     onRetry = {
-                        viewModel.onEvent(
-                            MeetingParticipantsEvent.LoadParticipants(
-                                meetingId
-                            )
-                        )
+                        viewModel.onEvent(MeetingParticipantsEvent.LoadParticipants(meetingId))
                     },
                     onBackPressed = onBackPressed,
                     modifier = Modifier.padding(paddingValues)
@@ -86,101 +110,75 @@ private fun LoadingContent(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ParticipantsContent(
-    participants: List<Participant>,
-    onBackPressed: () -> Unit,
+    participants: List<Person>,
+    onParticipantClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(SpacingTokens.L)
+            .padding(horizontal = SpacingTokens.L),
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
     ) {
-        TextHeading1(
-            text = "Участники встречи",
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // Header
+        item {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+            ) {
+                TextHeading1(
+                    text = "Участники",
+                    textAlign = TextAlign.Start
+                )
 
-        Text(
-            text = "Всего участников: ${participants.size}",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(vertical = SpacingTokens.M)
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
-        ) {
-            items(participants) { participant ->
-                ParticipantCard(
-                    participant = participant,
-                    modifier = Modifier.fillMaxWidth()
+                TextMetadata2(
+                    text = "Всего участников: ${participants.size}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
 
-            if (participants.isEmpty()) {
-                item {
+        // Participants Grid
+        item {
+            if (participants.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
+                    maxItemsInEachRow = 3
+                ) {
+                    participants.forEach { participant ->
+                        UIKitPersonCard(
+                            name = "${participant.name}",
+                            role = participant.bio ?: "Участник",
+                            imageUrl = participant.avatar,
+                            onCardClick = { onParticipantClick(participant.id) }
+                        )
+                    }
+                }
+            } else {
+                // Empty state
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(SpacingTokens.XL),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         text = "Пока нет участников",
                         style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(SpacingTokens.L)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
         }
 
-        UIKitButton(
-            text = "Назад",
-            onClick = onBackPressed,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
-private fun ParticipantCard(
-    participant: Participant,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(SpacingTokens.M),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
-        ) {
-            // Avatar placeholder
-            Text(
-                text = participant.name.first().toString(),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier
-                    .padding(SpacingTokens.S)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = participant.name,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = if (participant.isHost) FontWeight.Bold else FontWeight.Normal
-                    )
-                )
-
-                if (participant.isHost) {
-                    Text(
-                        text = "Организатор",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+        // Bottom spacer
+        item {
+            Box(modifier = Modifier.padding(SpacingTokens.L))
         }
     }
 }
@@ -223,14 +221,30 @@ private fun ErrorContent(
 @Composable
 private fun MeetingParticipantsScreenPreview() {
     UIKitTheme {
-        ParticipantsContent(
-            participants = listOf(
-                Participant(1, "Иван Петров", isHost = true),
-                Participant(2, "Мария Сидорова"),
-                Participant(3, "Алексей Кузнецов"),
-                Participant(4, "Елена Васильева")
+        val mockParticipants = listOf(
+            Person(1, "Анна", "Иванова", "https://picsum.photos/100/100?random=1", "UX Designer"),
+            Person(2, "Петр", "Петров", "https://picsum.photos/100/100?random=2", "Android Dev"),
+            Person(
+                3,
+                "Мария",
+                "Сидорова",
+                "https://picsum.photos/100/100?random=3",
+                "Product Manager"
             ),
-            onBackPressed = { }
+            Person(4, "Алексей", "Козлов", "https://picsum.photos/100/100?random=4", "Аналитик"),
+            Person(5, "Ольга", "Новикова", "https://picsum.photos/100/100?random=5", "QA Engineer"),
+            Person(
+                6,
+                "Дмитрий",
+                "Кузнецов",
+                "https://picsum.photos/100/100?random=6",
+                "Backend Dev"
+            )
+        )
+        
+        ParticipantsContent(
+            participants = mockParticipants,
+            onParticipantClick = { }
         )
     }
 }

@@ -2,6 +2,7 @@ package dev.whysoezzy.meetings.participants.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.whysoezzy.domain.models.Person
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +17,9 @@ class MeetingParticipantsViewModel : ViewModel() {
     fun onEvent(event: MeetingParticipantsEvent) {
         when (event) {
             is MeetingParticipantsEvent.LoadParticipants -> loadParticipants(event.meetingId)
+            is MeetingParticipantsEvent.NavigateToProfile -> {
+                // Навигация к профилю
+            }
         }
     }
 
@@ -26,16 +30,73 @@ class MeetingParticipantsViewModel : ViewModel() {
             try {
                 // Mock data for now
                 val mockParticipants = listOf(
-                    Participant(1, "Иван Петров", isHost = true),
-                    Participant(2, "Мария Сидорова"),
-                    Participant(3, "Алексей Кузнецов"),
-                    Participant(4, "Елена Васильева"),
-                    Participant(5, "Дмитрий Николаев"),
-                    Participant(6, "Анна Соколова"),
-                    Participant(7, "Максим Орлов")
+                    Person(
+                        1,
+                        "Анна",
+                        "Иванова",
+                        "https://picsum.photos/100/100?random=1",
+                        "Дизайнер"
+                    ),
+                    Person(
+                        2,
+                        "Петр",
+                        "Петров",
+                        "https://picsum.photos/100/100?random=2",
+                        "Android разработчик"
+                    ),
+                    Person(
+                        3,
+                        "Мария",
+                        "Сидорова",
+                        "https://picsum.photos/100/100?random=3",
+                        "Product Manager"
+                    ),
+                    Person(
+                        4,
+                        "Алексей",
+                        "Козлов",
+                        "https://picsum.photos/100/100?random=4",
+                        "Аналитик"
+                    ),
+                    Person(
+                        5,
+                        "Ольга",
+                        "Новикова",
+                        "https://picsum.photos/100/100?random=5",
+                        "QA Engineer"
+                    ),
+                    Person(
+                        6,
+                        "Дмитрий",
+                        "Кузнецов",
+                        "https://picsum.photos/100/100?random=6",
+                        "UX Designer"
+                    ),
+                    Person(
+                        7,
+                        "Елена",
+                        "Федорова",
+                        "https://picsum.photos/100/100?random=7",
+                        "Backend Dev"
+                    ),
+                    Person(
+                        8,
+                        "Максим",
+                        "Орлов",
+                        "https://picsum.photos/100/100?random=8",
+                        "DevOps"
+                    ),
+                    Person(
+                        9,
+                        "Наталья",
+                        "Ковалева",
+                        "https://picsum.photos/100/100?random=9",
+                        "Team Lead"
+                    )
                 )
 
                 _uiState.value = MeetingParticipantsUiState.Success(
+                    meetingTitle = "Встреча разработчиков #$meetingId",
                     participants = mockParticipants
                 )
             } catch (e: Exception) {

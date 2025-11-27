@@ -31,7 +31,7 @@ object MockData {
     val heroEvents = listOf(
         Meeting(
             id = 1L,
-            imageUrl = "https://picsum.photos/400/250?random=1",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "Android Dev Summit 2025",
             description = "Главное событие года для Android разработчиков. Новейшие технологии, лучшие практики и networking с экспертами.",
             time = System.currentTimeMillis() + 86400000, // завтра
@@ -63,7 +63,7 @@ object MockData {
         ),
         Meeting(
             id = 2L,
-            imageUrl = "https://picsum.photos/400/250?random=2",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "Kotlin Multiplatform Workshop",
             description = "Практический workshop по созданию мультиплатформенных приложений. Изучаем KMP от основ до продвинутых техник.",
             time = System.currentTimeMillis() + 172800000, // через 2 дня
@@ -95,7 +95,7 @@ object MockData {
         ),
         Meeting(
             id = 3L,
-            imageUrl = "https://picsum.photos/400/250?random=3",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "UI/UX для мобильных приложений",
             description = "Современные подходы к дизайну интерфейсов. Разбираем тренды 2025 года и создаем пользовательский опыт мирового уровня.",
             time = System.currentTimeMillis() + 259200000, // через 3 дня
@@ -131,7 +131,7 @@ object MockData {
     val popularEvents = listOf(
         Meeting(
             id = 4L,
-            imageUrl = "https://picsum.photos/300/180?random=4",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "React Native vs Flutter",
             description = "Сравнительный анализ популярных кроссплатформенных решений",
             time = System.currentTimeMillis() + 345600000, // через 4 дня
@@ -178,13 +178,13 @@ object MockData {
                 name = "Сергей",
                 surname = "Бэкендов",
                 description = "Senior Backend Developer",
-                imageUrl = "https://picsum.photos/100/100?random=14"
+                imageUrl = "https://picsum.photos/300/180?random=5"
             ),
             communityHost = CommunityHost(
                 id = 5L,
                 title = "Kotlin Server Side",
                 description = "Сообщество серверных Kotlin разработчиков",
-                imageUrl = "https://picsum.photos/100/100?random=24",
+                imageUrl = "https://picsum.photos/300/180?random=5",
                 meetingsInfo = emptyList()
             ),
             participants = emptyList(),
@@ -285,7 +285,7 @@ object MockData {
     val allEvents = listOf(
         Meeting(
             id = 7L,
-            imageUrl = "https://picsum.photos/400/200?random=7",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "Jetpack Compose Performance",
             description = "Оптимизация производительности в Compose приложениях. Разбираем частые ошибки и лучшие практики.",
             time = System.currentTimeMillis() + 604800000, // через неделю
@@ -317,7 +317,7 @@ object MockData {
         ),
         Meeting(
             id = 8L,
-            imageUrl = "https://picsum.photos/400/200?random=8",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "Coroutines и Flow в деталях",
             description = "Глубокое погружение в асинхронное программирование на Kotlin. Продвинутые паттерны и кейсы.",
             time = System.currentTimeMillis() + 691200000, // через 8 дней
@@ -349,7 +349,7 @@ object MockData {
         ),
         Meeting(
             id = 9L,
-            imageUrl = "https://picsum.photos/400/200?random=9",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "Machine Learning на мобильных устройствах",
             description = "TensorFlow Lite, Core ML и ML Kit. Интеграция машинного обучения в мобильные приложения.",
             time = System.currentTimeMillis() + 777600000, // через 9 дней
@@ -381,7 +381,7 @@ object MockData {
         ),
         Meeting(
             id = 10L,
-            imageUrl = "https://picsum.photos/400/200?random=10",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "Security в Android приложениях",
             description = "Современные подходы к безопасности мобильных приложений. OWASP Mobile Top 10 и защита от угроз.",
             time = System.currentTimeMillis() + 864000000, // через 10 дней
@@ -413,7 +413,7 @@ object MockData {
         ),
         Meeting(
             id = 11L,
-            imageUrl = "https://picsum.photos/400/200?random=11",
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "React Native для Android разработчиков",
             description = "Переход с нативной Android разработки на React Native. Сходства, различия и подводные камни.",
             time = System.currentTimeMillis() + 950400000, // через 11 дней
@@ -445,7 +445,775 @@ object MockData {
         ),
         Meeting(
             id = 12L,
-            imageUrl = "https://picsum.photos/400/200?random=12",
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Архитектура крупных Android проектов",
+            description = "Clean Architecture, модульность и масштабирование. Опыт команды разработки приложения с миллионной аудиторией.",
+            time = System.currentTimeMillis() + 1036800000, // через 12 дней
+            address = MeetingAddress(
+                address = "Avito, ул. Карамышевская наб. 44",
+                latitude = 55.7575,
+                longitude = 37.5031
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 12L,
+                name = "Константин",
+                surname = "Архитектов",
+                description = "Principal Android Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=21"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "14 августа",
+            capacity = 100
+        ),
+        Meeting(
+            id = 7L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Jetpack Compose Performance",
+            description = "Оптимизация производительности в Compose приложениях. Разбираем частые ошибки и лучшие практики.",
+            time = System.currentTimeMillis() + 604800000, // через неделю
+            address = MeetingAddress(
+                address = "Google Developer Space, ул. Большая Дмитровка 32",
+                latitude = 55.7611,
+                longitude = 37.6208
+            ),
+            tags = listOf(mockTags[0], mockTags[2]), // Android, Compose
+            personHost = PersonHost(
+                id = 7L,
+                name = "Роман",
+                surname = "Перформансов",
+                description = "Android Performance Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=16"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "9 августа",
+            capacity = 90
+        ),
+        Meeting(
+            id = 8L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Coroutines и Flow в деталях",
+            description = "Глубокое погружение в асинхронное программирование на Kotlin. Продвинутые паттерны и кейсы.",
+            time = System.currentTimeMillis() + 691200000, // через 8 дней
+            address = MeetingAddress(
+                address = "JetBrains Office, ул. Вавилова 19",
+                latitude = 55.7047,
+                longitude = 37.5616
+            ),
+            tags = listOf(mockTags[1]), // Kotlin
+            personHost = PersonHost(
+                id = 8L,
+                name = "Игорь",
+                surname = "Асинхронов",
+                description = "Kotlin Coroutines Expert",
+                imageUrl = "https://picsum.photos/100/100?random=17"
+            ),
+            communityHost = CommunityHost(
+                id = 2L,
+                title = "Kotlin User Group Moscow",
+                description = "Сообщество энтузиастов языка Kotlin",
+                imageUrl = "https://picsum.photos/100/100?random=21",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "10 августа",
+            capacity = 40
+        ),
+        Meeting(
+            id = 9L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Machine Learning на мобильных устройствах",
+            description = "TensorFlow Lite, Core ML и ML Kit. Интеграция машинного обучения в мобильные приложения.",
+            time = System.currentTimeMillis() + 777600000, // через 9 дней
+            address = MeetingAddress(
+                address = "Samsung AI Center, ул. Дубининская 90",
+                latitude = 55.7167,
+                longitude = 37.6346
+            ),
+            tags = listOf(mockTags[0], mockTags[4], mockTags[7]), // Android, iOS, Data Science
+            personHost = PersonHost(
+                id = 9L,
+                name = "Анастасия",
+                surname = "Машинова",
+                description = "ML Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=18"
+            ),
+            communityHost = CommunityHost(
+                id = 7L,
+                title = "Mobile ML Community",
+                description = "Сообщество специалистов по ML в мобильной разработке",
+                imageUrl = "https://picsum.photos/100/100?random=26",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "11 августа",
+            capacity = 60
+        ),
+        Meeting(
+            id = 10L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Security в Android приложениях",
+            description = "Современные подходы к безопасности мобильных приложений. OWASP Mobile Top 10 и защита от угроз.",
+            time = System.currentTimeMillis() + 864000000, // через 10 дней
+            address = MeetingAddress(
+                address = "Kaspersky Lab, ул. Беговая 3А",
+                latitude = 55.7825,
+                longitude = 37.5515
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 10L,
+                name = "Виктор",
+                surname = "Безопасов",
+                description = "Mobile Security Expert",
+                imageUrl = "https://picsum.photos/100/100?random=19"
+            ),
+            communityHost = CommunityHost(
+                id = 8L,
+                title = "Mobile Security Moscow",
+                description = "Сообщество специалистов по мобильной безопасности",
+                imageUrl = "https://picsum.photos/100/100?random=27",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "12 августа",
+            capacity = 55
+        ),
+        Meeting(
+            id = 11L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "React Native для Android разработчиков",
+            description = "Переход с нативной Android разработки на React Native. Сходства, различия и подводные камни.",
+            time = System.currentTimeMillis() + 950400000, // через 11 дней
+            address = MeetingAddress(
+                address = "Facebook Office Moscow, ул. Кузнецкий мост 21/5",
+                latitude = 55.7606,
+                longitude = 37.6245
+            ),
+            tags = listOf(mockTags[0], mockTags[4]), // Android, iOS
+            personHost = PersonHost(
+                id = 11L,
+                name = "Алексей",
+                surname = "Реактивный",
+                description = "React Native Team Lead",
+                imageUrl = "https://picsum.photos/100/100?random=20"
+            ),
+            communityHost = CommunityHost(
+                id = 4L,
+                title = "Mobile Development Moscow",
+                description = "Сообщество мобильных разработчиков",
+                imageUrl = "https://picsum.photos/100/100?random=23",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "13 августа",
+            capacity = 75
+        ),
+        Meeting(
+            id = 12L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Архитектура крупных Android проектов",
+            description = "Clean Architecture, модульность и масштабирование. Опыт команды разработки приложения с миллионной аудиторией.",
+            time = System.currentTimeMillis() + 1036800000, // через 12 дней
+            address = MeetingAddress(
+                address = "Avito, ул. Карамышевская наб. 44",
+                latitude = 55.7575,
+                longitude = 37.5031
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 12L,
+                name = "Константин",
+                surname = "Архитектов",
+                description = "Principal Android Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=21"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "14 августа",
+            capacity = 100
+        ),
+        Meeting(
+            id = 7L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Jetpack Compose Performance",
+            description = "Оптимизация производительности в Compose приложениях. Разбираем частые ошибки и лучшие практики.",
+            time = System.currentTimeMillis() + 604800000, // через неделю
+            address = MeetingAddress(
+                address = "Google Developer Space, ул. Большая Дмитровка 32",
+                latitude = 55.7611,
+                longitude = 37.6208
+            ),
+            tags = listOf(mockTags[0], mockTags[2]), // Android, Compose
+            personHost = PersonHost(
+                id = 7L,
+                name = "Роман",
+                surname = "Перформансов",
+                description = "Android Performance Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=16"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "9 августа",
+            capacity = 90
+        ),
+        Meeting(
+            id = 8L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Coroutines и Flow в деталях",
+            description = "Глубокое погружение в асинхронное программирование на Kotlin. Продвинутые паттерны и кейсы.",
+            time = System.currentTimeMillis() + 691200000, // через 8 дней
+            address = MeetingAddress(
+                address = "JetBrains Office, ул. Вавилова 19",
+                latitude = 55.7047,
+                longitude = 37.5616
+            ),
+            tags = listOf(mockTags[1]), // Kotlin
+            personHost = PersonHost(
+                id = 8L,
+                name = "Игорь",
+                surname = "Асинхронов",
+                description = "Kotlin Coroutines Expert",
+                imageUrl = "https://picsum.photos/100/100?random=17"
+            ),
+            communityHost = CommunityHost(
+                id = 2L,
+                title = "Kotlin User Group Moscow",
+                description = "Сообщество энтузиастов языка Kotlin",
+                imageUrl = "https://picsum.photos/100/100?random=21",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "10 августа",
+            capacity = 40
+        ),
+        Meeting(
+            id = 9L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Machine Learning на мобильных устройствах",
+            description = "TensorFlow Lite, Core ML и ML Kit. Интеграция машинного обучения в мобильные приложения.",
+            time = System.currentTimeMillis() + 777600000, // через 9 дней
+            address = MeetingAddress(
+                address = "Samsung AI Center, ул. Дубининская 90",
+                latitude = 55.7167,
+                longitude = 37.6346
+            ),
+            tags = listOf(mockTags[0], mockTags[4], mockTags[7]), // Android, iOS, Data Science
+            personHost = PersonHost(
+                id = 9L,
+                name = "Анастасия",
+                surname = "Машинова",
+                description = "ML Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=18"
+            ),
+            communityHost = CommunityHost(
+                id = 7L,
+                title = "Mobile ML Community",
+                description = "Сообщество специалистов по ML в мобильной разработке",
+                imageUrl = "https://picsum.photos/100/100?random=26",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "11 августа",
+            capacity = 60
+        ),
+        Meeting(
+            id = 10L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Security в Android приложениях",
+            description = "Современные подходы к безопасности мобильных приложений. OWASP Mobile Top 10 и защита от угроз.",
+            time = System.currentTimeMillis() + 864000000, // через 10 дней
+            address = MeetingAddress(
+                address = "Kaspersky Lab, ул. Беговая 3А",
+                latitude = 55.7825,
+                longitude = 37.5515
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 10L,
+                name = "Виктор",
+                surname = "Безопасов",
+                description = "Mobile Security Expert",
+                imageUrl = "https://picsum.photos/100/100?random=19"
+            ),
+            communityHost = CommunityHost(
+                id = 8L,
+                title = "Mobile Security Moscow",
+                description = "Сообщество специалистов по мобильной безопасности",
+                imageUrl = "https://picsum.photos/100/100?random=27",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "12 августа",
+            capacity = 55
+        ),
+        Meeting(
+            id = 11L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "React Native для Android разработчиков",
+            description = "Переход с нативной Android разработки на React Native. Сходства, различия и подводные камни.",
+            time = System.currentTimeMillis() + 950400000, // через 11 дней
+            address = MeetingAddress(
+                address = "Facebook Office Moscow, ул. Кузнецкий мост 21/5",
+                latitude = 55.7606,
+                longitude = 37.6245
+            ),
+            tags = listOf(mockTags[0], mockTags[4]), // Android, iOS
+            personHost = PersonHost(
+                id = 11L,
+                name = "Алексей",
+                surname = "Реактивный",
+                description = "React Native Team Lead",
+                imageUrl = "https://picsum.photos/100/100?random=20"
+            ),
+            communityHost = CommunityHost(
+                id = 4L,
+                title = "Mobile Development Moscow",
+                description = "Сообщество мобильных разработчиков",
+                imageUrl = "https://picsum.photos/100/100?random=23",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "13 августа",
+            capacity = 75
+        ),
+        Meeting(
+            id = 12L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Архитектура крупных Android проектов",
+            description = "Clean Architecture, модульность и масштабирование. Опыт команды разработки приложения с миллионной аудиторией.",
+            time = System.currentTimeMillis() + 1036800000, // через 12 дней
+            address = MeetingAddress(
+                address = "Avito, ул. Карамышевская наб. 44",
+                latitude = 55.7575,
+                longitude = 37.5031
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 12L,
+                name = "Константин",
+                surname = "Архитектов",
+                description = "Principal Android Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=21"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "14 августа",
+            capacity = 100
+        ),
+        Meeting(
+            id = 7L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Jetpack Compose Performance",
+            description = "Оптимизация производительности в Compose приложениях. Разбираем частые ошибки и лучшие практики.",
+            time = System.currentTimeMillis() + 604800000, // через неделю
+            address = MeetingAddress(
+                address = "Google Developer Space, ул. Большая Дмитровка 32",
+                latitude = 55.7611,
+                longitude = 37.6208
+            ),
+            tags = listOf(mockTags[0], mockTags[2]), // Android, Compose
+            personHost = PersonHost(
+                id = 7L,
+                name = "Роман",
+                surname = "Перформансов",
+                description = "Android Performance Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=16"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "9 августа",
+            capacity = 90
+        ),
+        Meeting(
+            id = 8L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Coroutines и Flow в деталях",
+            description = "Глубокое погружение в асинхронное программирование на Kotlin. Продвинутые паттерны и кейсы.",
+            time = System.currentTimeMillis() + 691200000, // через 8 дней
+            address = MeetingAddress(
+                address = "JetBrains Office, ул. Вавилова 19",
+                latitude = 55.7047,
+                longitude = 37.5616
+            ),
+            tags = listOf(mockTags[1]), // Kotlin
+            personHost = PersonHost(
+                id = 8L,
+                name = "Игорь",
+                surname = "Асинхронов",
+                description = "Kotlin Coroutines Expert",
+                imageUrl = "https://picsum.photos/100/100?random=17"
+            ),
+            communityHost = CommunityHost(
+                id = 2L,
+                title = "Kotlin User Group Moscow",
+                description = "Сообщество энтузиастов языка Kotlin",
+                imageUrl = "https://picsum.photos/100/100?random=21",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "10 августа",
+            capacity = 40
+        ),
+        Meeting(
+            id = 9L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Machine Learning на мобильных устройствах",
+            description = "TensorFlow Lite, Core ML и ML Kit. Интеграция машинного обучения в мобильные приложения.",
+            time = System.currentTimeMillis() + 777600000, // через 9 дней
+            address = MeetingAddress(
+                address = "Samsung AI Center, ул. Дубининская 90",
+                latitude = 55.7167,
+                longitude = 37.6346
+            ),
+            tags = listOf(mockTags[0], mockTags[4], mockTags[7]), // Android, iOS, Data Science
+            personHost = PersonHost(
+                id = 9L,
+                name = "Анастасия",
+                surname = "Машинова",
+                description = "ML Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=18"
+            ),
+            communityHost = CommunityHost(
+                id = 7L,
+                title = "Mobile ML Community",
+                description = "Сообщество специалистов по ML в мобильной разработке",
+                imageUrl = "https://picsum.photos/100/100?random=26",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "11 августа",
+            capacity = 60
+        ),
+        Meeting(
+            id = 10L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Security в Android приложениях",
+            description = "Современные подходы к безопасности мобильных приложений. OWASP Mobile Top 10 и защита от угроз.",
+            time = System.currentTimeMillis() + 864000000, // через 10 дней
+            address = MeetingAddress(
+                address = "Kaspersky Lab, ул. Беговая 3А",
+                latitude = 55.7825,
+                longitude = 37.5515
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 10L,
+                name = "Виктор",
+                surname = "Безопасов",
+                description = "Mobile Security Expert",
+                imageUrl = "https://picsum.photos/100/100?random=19"
+            ),
+            communityHost = CommunityHost(
+                id = 8L,
+                title = "Mobile Security Moscow",
+                description = "Сообщество специалистов по мобильной безопасности",
+                imageUrl = "https://picsum.photos/100/100?random=27",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "12 августа",
+            capacity = 55
+        ),
+        Meeting(
+            id = 11L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "React Native для Android разработчиков",
+            description = "Переход с нативной Android разработки на React Native. Сходства, различия и подводные камни.",
+            time = System.currentTimeMillis() + 950400000, // через 11 дней
+            address = MeetingAddress(
+                address = "Facebook Office Moscow, ул. Кузнецкий мост 21/5",
+                latitude = 55.7606,
+                longitude = 37.6245
+            ),
+            tags = listOf(mockTags[0], mockTags[4]), // Android, iOS
+            personHost = PersonHost(
+                id = 11L,
+                name = "Алексей",
+                surname = "Реактивный",
+                description = "React Native Team Lead",
+                imageUrl = "https://picsum.photos/100/100?random=20"
+            ),
+            communityHost = CommunityHost(
+                id = 4L,
+                title = "Mobile Development Moscow",
+                description = "Сообщество мобильных разработчиков",
+                imageUrl = "https://picsum.photos/100/100?random=23",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "13 августа",
+            capacity = 75
+        ),
+        Meeting(
+            id = 12L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Архитектура крупных Android проектов",
+            description = "Clean Architecture, модульность и масштабирование. Опыт команды разработки приложения с миллионной аудиторией.",
+            time = System.currentTimeMillis() + 1036800000, // через 12 дней
+            address = MeetingAddress(
+                address = "Avito, ул. Карамышевская наб. 44",
+                latitude = 55.7575,
+                longitude = 37.5031
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 12L,
+                name = "Константин",
+                surname = "Архитектов",
+                description = "Principal Android Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=21"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "14 августа",
+            capacity = 100
+        ),
+        Meeting(
+            id = 7L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Jetpack Compose Performance",
+            description = "Оптимизация производительности в Compose приложениях. Разбираем частые ошибки и лучшие практики.",
+            time = System.currentTimeMillis() + 604800000, // через неделю
+            address = MeetingAddress(
+                address = "Google Developer Space, ул. Большая Дмитровка 32",
+                latitude = 55.7611,
+                longitude = 37.6208
+            ),
+            tags = listOf(mockTags[0], mockTags[2]), // Android, Compose
+            personHost = PersonHost(
+                id = 7L,
+                name = "Роман",
+                surname = "Перформансов",
+                description = "Android Performance Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=16"
+            ),
+            communityHost = CommunityHost(
+                id = 1L,
+                title = "Android Developers Moscow",
+                description = "Крупнейшее сообщество Android разработчиков в Москве",
+                imageUrl = "https://picsum.photos/100/100?random=20",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "9 августа",
+            capacity = 90
+        ),
+        Meeting(
+            id = 8L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Coroutines и Flow в деталях",
+            description = "Глубокое погружение в асинхронное программирование на Kotlin. Продвинутые паттерны и кейсы.",
+            time = System.currentTimeMillis() + 691200000, // через 8 дней
+            address = MeetingAddress(
+                address = "JetBrains Office, ул. Вавилова 19",
+                latitude = 55.7047,
+                longitude = 37.5616
+            ),
+            tags = listOf(mockTags[1]), // Kotlin
+            personHost = PersonHost(
+                id = 8L,
+                name = "Игорь",
+                surname = "Асинхронов",
+                description = "Kotlin Coroutines Expert",
+                imageUrl = "https://picsum.photos/100/100?random=17"
+            ),
+            communityHost = CommunityHost(
+                id = 2L,
+                title = "Kotlin User Group Moscow",
+                description = "Сообщество энтузиастов языка Kotlin",
+                imageUrl = "https://picsum.photos/100/100?random=21",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = true,
+            date = "10 августа",
+            capacity = 40
+        ),
+        Meeting(
+            id = 9L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Machine Learning на мобильных устройствах",
+            description = "TensorFlow Lite, Core ML и ML Kit. Интеграция машинного обучения в мобильные приложения.",
+            time = System.currentTimeMillis() + 777600000, // через 9 дней
+            address = MeetingAddress(
+                address = "Samsung AI Center, ул. Дубининская 90",
+                latitude = 55.7167,
+                longitude = 37.6346
+            ),
+            tags = listOf(mockTags[0], mockTags[4], mockTags[7]), // Android, iOS, Data Science
+            personHost = PersonHost(
+                id = 9L,
+                name = "Анастасия",
+                surname = "Машинова",
+                description = "ML Engineer",
+                imageUrl = "https://picsum.photos/100/100?random=18"
+            ),
+            communityHost = CommunityHost(
+                id = 7L,
+                title = "Mobile ML Community",
+                description = "Сообщество специалистов по ML в мобильной разработке",
+                imageUrl = "https://picsum.photos/100/100?random=26",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "11 августа",
+            capacity = 60
+        ),
+        Meeting(
+            id = 10L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "Security в Android приложениях",
+            description = "Современные подходы к безопасности мобильных приложений. OWASP Mobile Top 10 и защита от угроз.",
+            time = System.currentTimeMillis() + 864000000, // через 10 дней
+            address = MeetingAddress(
+                address = "Kaspersky Lab, ул. Беговая 3А",
+                latitude = 55.7825,
+                longitude = 37.5515
+            ),
+            tags = listOf(mockTags[0]), // Android
+            personHost = PersonHost(
+                id = 10L,
+                name = "Виктор",
+                surname = "Безопасов",
+                description = "Mobile Security Expert",
+                imageUrl = "https://picsum.photos/100/100?random=19"
+            ),
+            communityHost = CommunityHost(
+                id = 8L,
+                title = "Mobile Security Moscow",
+                description = "Сообщество специалистов по мобильной безопасности",
+                imageUrl = "https://picsum.photos/100/100?random=27",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "12 августа",
+            capacity = 55
+        ),
+        Meeting(
+            id = 11L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
+            title = "React Native для Android разработчиков",
+            description = "Переход с нативной Android разработки на React Native. Сходства, различия и подводные камни.",
+            time = System.currentTimeMillis() + 950400000, // через 11 дней
+            address = MeetingAddress(
+                address = "Facebook Office Moscow, ул. Кузнецкий мост 21/5",
+                latitude = 55.7606,
+                longitude = 37.6245
+            ),
+            tags = listOf(mockTags[0], mockTags[4]), // Android, iOS
+            personHost = PersonHost(
+                id = 11L,
+                name = "Алексей",
+                surname = "Реактивный",
+                description = "React Native Team Lead",
+                imageUrl = "https://picsum.photos/100/100?random=20"
+            ),
+            communityHost = CommunityHost(
+                id = 4L,
+                title = "Mobile Development Moscow",
+                description = "Сообщество мобильных разработчиков",
+                imageUrl = "https://picsum.photos/100/100?random=23",
+                meetingsInfo = emptyList()
+            ),
+            participants = emptyList(),
+            meetingStatus = MeetingStatus.ACTIVE,
+            isUserInParticipants = false,
+            date = "13 августа",
+            capacity = 75
+        ),
+        Meeting(
+            id = 12L,
+            imageUrl = "https://picsum.photos/300/180?random=5",
             title = "Архитектура крупных Android проектов",
             description = "Clean Architecture, модульность и масштабирование. Опыт команды разработки приложения с миллионной аудиторией.",
             time = System.currentTimeMillis() + 1036800000, // через 12 дней
@@ -487,18 +1255,21 @@ object MockData {
                 CommunityInfo(
                     id = 9L,
                     title = "Flutter Moscow",
+                    description = "Сообщество энтузиастов языка Kotlin",
                     imageUrl = "https://picsum.photos/120/120?random=35",
                     tags = listOf(mockTags[0]),
                 ),
                 CommunityInfo(
                     id = 10L,
                     title = "iOS Developers Moscow",
+                    description = "Сообщество энтузиастов языка Kotlin",
                     imageUrl = "https://picsum.photos/120/120?random=36",
                     tags = listOf(mockTags[0]),
                 ),
                 CommunityInfo(
                     id = 11L,
                     title = "Backend Moscow",
+                    description = "Сообщество энтузиастов языка Kotlin",
                     imageUrl = "https://picsum.photos/120/120?random=37",
                     tags = listOf(mockTags[0]),
                 )
@@ -537,12 +1308,14 @@ object MockData {
                     id = 12L,
                     title = "Women in Tech Moscow",
                     imageUrl = "https://picsum.photos/120/120?random=38",
+                    description = "Сообщество энтузиастов языка Kotlin",
                     tags = listOf(mockTags[0]),
                 ),
                 CommunityInfo(
                     id = 13L,
                     title = "Startup Founders Moscow",
                     imageUrl = "https://picsum.photos/120/120?random=39",
+                    description = "Сообщество энтузиастов языка Kotlin",
                     tags = listOf(mockTags[0]),
                 )
             )
