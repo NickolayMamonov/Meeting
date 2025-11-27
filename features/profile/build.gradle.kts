@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "dev.whysoezzy.profile"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         minSdk = 30
