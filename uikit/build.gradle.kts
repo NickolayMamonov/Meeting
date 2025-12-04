@@ -45,7 +45,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.lifecycle.runtime.compose.android)
+//    implementation(libs.androidx.lifecycle.runtime.compose.android)
 
     // Core Android
     implementation(libs.androidx.core.ktx)
@@ -53,10 +53,10 @@ dependencies {
     implementation(libs.androidx.activity.compose)
 
     // Additional UI libraries
-    implementation(libs.coil)
-    implementation(libs.lottie)
-    implementation(libs.lottie.compose)
-
+//    implementation(libs.coil)
+//    implementation(libs.lottie)
+//    implementation(libs.lottie.compose)
+//
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
