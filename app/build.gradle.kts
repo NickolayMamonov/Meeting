@@ -41,7 +41,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":features:meetings"))
+    implementation(project(":features:meetings:presentation"))
     implementation(project(":features:communities"))
     implementation(project(":features:auth"))
     implementation(project(":features:profile"))
