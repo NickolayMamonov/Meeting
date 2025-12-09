@@ -4,9 +4,10 @@ import java.time.Instant.ofEpochMilli
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 object DateUtils {
-    private val dateFormatter = DateTimeFormatter.ofPattern("dd MMMM")
+    private val dateFormatter = DateTimeFormatter.ofPattern("dd MMMM", Locale.getDefault())
 
     fun formatDate(dateTime: LocalDateTime): String {
         return dateTime.format(dateFormatter)
