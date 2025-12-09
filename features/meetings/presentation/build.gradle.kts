@@ -39,10 +39,9 @@ android {
 dependencies {
     // UIKit
     implementation(project(":uikit"))
-    implementation(project(":core:domain"))
-    implementation(project(":core:data"))
-    
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation(project(":core:common"))
+    implementation(project(":features:meetings:domain"))
+    implementation(project(":features:meetings:data"))
 
     // Koin for DI
     implementation(platform(libs.koin.bom))

@@ -12,13 +12,16 @@ navigationCompose = "2.8.5"
 appcompat = "1.7.0"
 material = "1.12.0"
 jetbrainsKotlinJvm = "2.0.0"
-kotlinxCoroutinesCore = "1.6.4"
+kotlinxCoroutines = "1.6.4"
 coil = "2.7.0"
 retrofit = "2.11.0"
 timber = "5.0.1"
 lottie = "5.2.0"
 koin-bom = "3.5.6"
 ksp = "2.0.0-1.0.22"
+ktor = "3.0.2"
+securityCrypto = "1.1.0-alpha06"
+desugarJdkLibs = "2.0.4"
 
 
 [libraries]
@@ -42,7 +45,8 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "retrofit" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
@@ -53,6 +57,20 @@ koin-bom = { module = "io.insert-koin:koin-bom", version.ref = "koin-bom" }
 koin-core = { module = "io.insert-koin:koin-core" }
 koin-android = { module = "io.insert-koin:koin-android" }
 koin-compose = { module = "io.insert-koin:koin-androidx-compose" }
+
+# Ktor Client
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-gson = { module = "io.ktor:ktor-serialization-gson", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
+
+# Security
+androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
+
+# Desugaring
+desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

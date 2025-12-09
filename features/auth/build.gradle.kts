@@ -39,8 +39,8 @@ android {
 dependencies {
     // UIKit
     implementation(project(":uikit"))
-    implementation(project(":core:domain"))
-    implementation(project(":core:data"))
+    implementation(project(":core:auth"))
+    implementation(project(":core:common"))
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
