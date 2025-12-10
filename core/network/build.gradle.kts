@@ -17,10 +17,10 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String","BASE_URL","\"http://10.0.2.2:8080/api/v1\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/v1\"")
         }
         release {
-            buildConfigField("String","BASE_URL","\"http://10.0.2.2:8080/api/v1\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/v1\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -36,7 +36,7 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-    buildFeatures{
+    buildFeatures {
         buildConfig = true
     }
 }
@@ -52,7 +52,7 @@ dependencies {
 
     implementation(project(":core:common"))
 
-    // Desugaring для LocalDateTime
+    // Desugaring for LocalDateTime
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // Android
