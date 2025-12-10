@@ -13,7 +13,6 @@ import com.whysoezzy.network.KtorNetworkModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
-import org.koin.dsl.single
 
 val authModule = module {
     single { TokenManager(androidContext()) }
@@ -48,5 +47,4 @@ val authModule = module {
     factory { RegisterUserUseCase(get()) }
     factory { LogoutUseCase(get()) }
     factory { IsLoggedInUseCase(get()) }
-
 }

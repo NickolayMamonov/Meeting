@@ -13,5 +13,4 @@ class SendSmsUseCase(
 
         return authRepository.sendSmsCode(phoneNumber)
     }
-
 }
