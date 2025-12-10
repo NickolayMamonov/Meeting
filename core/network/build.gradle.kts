@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -15,7 +16,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String","BASE_URL","\"http://10.0.2.2:8080/api/v1\"")
+        }
         release {
+            buildConfigField("String","BASE_URL","\"http://10.0.2.2:8080/api/v1\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -31,17 +36,19 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    buildFeatures{
+        buildConfig = true
+    }
 }
 
 dependencies {
     api(libs.ktor.client.core)
     api(libs.ktor.client.android)
     api(libs.ktor.client.content.negotiation)
-    api(libs.ktor.serialization.gson)
+    api(libs.ktor.serialization.json)
+    api(libs.kotlinx.serialization.json)
     api(libs.ktor.client.logging)
     api(libs.ktor.client.auth)
-
-//    api("com.google.code.gson:gson:2.10.1")
 
     implementation(project(":core:common"))
 

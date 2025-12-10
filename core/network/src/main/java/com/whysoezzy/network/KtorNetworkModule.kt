@@ -1,0 +1,98 @@
+package com.whysoezzy.network
+
+import android.util.Log
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.android.Android
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.auth.Auth
+import io.ktor.client.plugins.auth.providers.BearerTokens
+import io.ktor.client.plugins.auth.providers.bearer
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+
+interface TokenProvider {
+    fun getAccessToken(): String?
+    fun getRefreshToken(): String?
+}
+
+object KtorNetworkModule {
+
+    fun provideHttpClient(
+        tokenProvider: TokenProvider? = null,
+        onRefreshToken: (suspend () -> Pair<String, String>?)? = null
+    ): HttpClient {
+        return HttpClient(Android) {
+            defaultRequest {
+                url(BuildConfig.BASE_URL)
+            }
+
+            install(HttpTimeout) {
+                requestTimeoutMillis = 30_000
+                connectTimeoutMillis = 30_000
+                socketTimeoutMillis = 30_000
+            }
+
+            install(ContentNegotiation) {
+                json(
+                    Json {
+                        prettyPrint = true
+                        isLenient = true
+                        ignoreUnknownKeys = true
+                        coerceInputValues = true
+                        encodeDefaults = true
+                    }
+                )
+            }
+
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) {
+                        Log.d("KtorClient", message)
+                    }
+
+                }
+                level = LogLevel.ALL
+            }
+
+            if (tokenProvider != null && onRefreshToken != null) {
+                install(Auth) {
+                    bearer {
+                        loadTokens {
+                            val accessToken = tokenProvider.getAccessToken()
+                            val refreshToken = tokenProvider.getRefreshToken()
+
+                            if (accessToken != null && refreshToken != null) {
+                                BearerTokens(
+                                    accessToken = accessToken,
+                                    refreshToken = refreshToken
+                                )
+                            } else {
+                                null
+                            }
+                        }
+
+                        refreshTokens {
+                            try {
+                                val tokens = onRefreshToken()
+
+                                tokens?.let {
+                                    BearerTokens(
+                                        accessToken = it.first,
+                                        refreshToken = it.second
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
