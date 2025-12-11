@@ -19,8 +19,8 @@ class MeetingMapper {
             imageUrl = dto.imageUrl,
             title = dto.title,
             description = dto.description,
-            time = dto.meetingTime,
-            date = dto.meetingDate,
+            time = dto.time,
+            date = dto.date,
             address = MeetingAddress(
                 address = dto.address.address,
                 latitude = dto.address.latitude,
