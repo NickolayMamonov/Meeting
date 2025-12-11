@@ -1,6 +1,5 @@
 package com.whysoezzy.data.mapper
 
-import com.whysoezzy.common.utils.DateUtils
 import com.whysoezzy.data.dto.MeetingDto
 import com.whysoezzy.domain.models.CommunityHost
 import com.whysoezzy.domain.models.Meeting
@@ -11,21 +10,17 @@ import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.TagState
-import java.time.LocalDateTime
 
 class MeetingMapper {
 
     fun toDomain(dto: MeetingDto): Meeting {
-        val meetingDateTime = LocalDateTime.parse(dto.meetingTime)
-        val timestamp = DateUtils.toTimestamp(meetingDateTime)
-        val formattedDate = DateUtils.formatDate(meetingDateTime)
-
         return Meeting(
             id = dto.id,
             imageUrl = dto.imageUrl,
             title = dto.title,
             description = dto.description,
-            time = timestamp,
+            time = dto.meetingTime,
+            date = dto.meetingDate,
             address = MeetingAddress(
                 address = dto.address.address,
                 latitude = dto.address.latitude,
@@ -55,7 +50,7 @@ class MeetingMapper {
                         id = infoDto.id,
                         title = infoDto.title,
                         imageUrl = infoDto.imageUrl,
-                        time = DateUtils.toTimestamp(infoDto.dateTime),
+                        time = infoDto.time,
                         tags = infoDto.tags.map { tag ->
                             MeetingTag(
                                 id = tag.id,
@@ -64,7 +59,7 @@ class MeetingMapper {
                             )
                         },
                         address = infoDto.address,
-                        meetingStatus = mapMeetingStatus(dto.meetingStatus),
+                        meetingStatus = mapMeetingStatus(infoDto.status),
                     )
                 }
             ),
@@ -79,7 +74,6 @@ class MeetingMapper {
             },
             meetingStatus = mapMeetingStatus(dto.meetingStatus),
             isUserInParticipants = dto.isUserInParticipants,
-            date = formattedDate,
             capacity = dto.capacity ?: 0
         )
     }

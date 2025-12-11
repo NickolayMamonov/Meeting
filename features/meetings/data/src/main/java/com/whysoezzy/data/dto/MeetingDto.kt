@@ -9,7 +9,7 @@ data class MeetingDto(
     @SerialName("image_url") val imageUrl: String,
     @SerialName("title") val title: String,
     @SerialName("description") val description: String,
-    @SerialName("meeting_time") val meetingTime: String,
+    @SerialName("meeting_time") val meetingTime: Long,
     @SerialName("meeting_date") val meetingDate: String,
     @SerialName("address") val address: MeetingAddressDto,
     @SerialName("tags") val tags: List<MeetingTagDto>,

@@ -27,7 +27,7 @@ class MeetingsApiImpl(private val client: HttpClient) {
     }
 
     suspend fun searchEvents(query: String): List<MeetingDto> {
-        return client.get("meeting/search") {
+        return client.get("meetings/search") {
             parameter("query", query)
         }.body()
     }
