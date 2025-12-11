@@ -22,8 +22,6 @@ dependencyResolutionManagement {
 rootProject.name = "Meet"
 include(":app")
 include(":uikit")
-include(":core:data")
-include(":core:domain")
 include(":core:common")
 include(":core:network")
 include(":core:auth")

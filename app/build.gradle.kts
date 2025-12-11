@@ -41,20 +41,29 @@ android {
 }
 
 dependencies {
-    implementation(project(":features:meetings:presentation"))
-    implementation(project(":features:communities:presentation"))
-    implementation(project(":features:auth"))
-    implementation(project(":features:profile:presentation"))
-    // Feature modules
 
-    // Data and Domain modules
-    implementation(project(":core:data"))
-    implementation(project(":core:domain"))
-    
-    // UIKit module
+    implementation(project(":core:common"))
+    implementation(project(":core:network"))
+    implementation(project(":core:auth"))
+
+    implementation(project(":features:meetings:data"))
+    implementation(project(":features:meetings:domain"))
+    implementation(project(":features:meetings:presentation"))
+
+    implementation(project(":features:communities:data"))
+    implementation(project(":features:communities:domain"))
+    implementation(project(":features:communities:presentation"))
+
+    implementation(project(":features:profile:data"))
+    implementation(project(":features:profile:domain"))
+    implementation(project(":features:profile:presentation"))
+
+
+    implementation(project(":features:auth"))
+
     implementation(project(":uikit"))
 
-    // Koin for DI
+
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.android)
