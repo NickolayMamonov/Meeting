@@ -1,6 +1,5 @@
 package com.whysoezzy.data.mapper
 
-import com.whysoezzy.common.utils.DateUtils
 import com.whysoezzy.data.dto.CommunityInfoDto
 import com.whysoezzy.data.dto.MeetingInfoDto
 import com.whysoezzy.data.dto.TagDto
@@ -10,8 +9,6 @@ import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.SocialMedia
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
-import java.time.LocalDateTime
-import kotlin.collections.mapKeys
 
 class UserMapper {
     fun toDomain(dto: UserDto): User {
@@ -41,7 +38,6 @@ class UserMapper {
                 )
             },
             participatingMeetings = dto.participatingMeetings.map { meetingDto ->
-
                 MeetingInfo(
                     id = meetingDto.id,
                     title = meetingDto.name,
