@@ -1,5 +1,7 @@
 package dev.whysoezzy.profile.details.presentation
 
+import com.whysoezzy.domain.models.CommunityInfo
+import com.whysoezzy.domain.models.MeetingInfo
 import dev.whysoezzy.domain.models.CommunityInfo
 import dev.whysoezzy.domain.models.MeetingInfo
 import dev.whysoezzy.domain.models.SocialMediaInfo
