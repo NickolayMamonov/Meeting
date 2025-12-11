@@ -44,7 +44,7 @@ dependencies {
     implementation(project(":features:meetings:presentation"))
     implementation(project(":features:communities:presentation"))
     implementation(project(":features:auth"))
-    implementation(project(":features:profile"))
+    implementation(project(":features:profile:presentation"))
     // Feature modules
 
     // Data and Domain modules
