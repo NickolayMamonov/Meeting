@@ -1,0 +1,13 @@
+package com.whysoezzy.data.dto
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class PersonHostDto(
+    @SerialName("id") val id: Long,
+    @SerialName("name") val name: String,
+    @SerialName("surname") val surname: String,
+    @SerialName("description") val description: String,
+    @SerialName("image_url") val imageUrl: String
+)
