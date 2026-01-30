@@ -1,6 +1,6 @@
 package dev.whysoezzy.meetings.participants.presentation
 
-import dev.whysoezzy.domain.models.Person
+import com.whysoezzy.domain.models.Person
 
 sealed class MeetingParticipantsUiState {
     object Loading : MeetingParticipantsUiState()

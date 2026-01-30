@@ -9,5 +9,5 @@ data class PersonHostDto(
     @SerialName("name") val name: String,
     @SerialName("surname") val surname: String,
     @SerialName("description") val description: String,
-    @SerialName("image_url") val imageUrl: String
+    @SerialName("imageUrl") val imageUrl: String
 )

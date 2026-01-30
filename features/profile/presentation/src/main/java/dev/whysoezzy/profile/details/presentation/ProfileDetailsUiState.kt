@@ -1,12 +1,11 @@
 package dev.whysoezzy.profile.details.presentation
 
-import com.whysoezzy.domain.models.CommunityInfo
-import com.whysoezzy.domain.models.MeetingInfo
-import dev.whysoezzy.domain.models.CommunityInfo
-import dev.whysoezzy.domain.models.MeetingInfo
-import dev.whysoezzy.domain.models.SocialMediaInfo
 
-sealed class ProfileDetailsUiState {
+import dev.whysoezzy.uikit.models.UIKitCommunityInfo
+import dev.whysoezzy.uikit.models.UIKitMeetingInfo
+import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
+
+sealed class  ProfileDetailsUiState {
     object Loading : ProfileDetailsUiState()
     data class Success(
         val userId: Long,
@@ -16,9 +15,9 @@ sealed class ProfileDetailsUiState {
         val description: String,
         val avatarUrl: String?,
         val isOwnProfile: Boolean,
-        val socialMedias: List<SocialMediaInfo>,
-        val userMeetings: List<MeetingInfo>,
-        val userCommunities: List<CommunityInfo>,
+        val socialMedias: List<UIKitSocialMediaInfo>,
+        val userMeetings: List<UIKitMeetingInfo>,
+        val userCommunities: List<UIKitCommunityInfo>,
         val subscribedCommunityIds: Set<Long> = emptySet()
     ) : ProfileDetailsUiState()
 

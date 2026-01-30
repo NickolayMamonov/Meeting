@@ -8,6 +8,6 @@ data class PersonDto(
     @SerialName("id") val id: Long,
     @SerialName("name") val name: String,
     @SerialName("surname") val surname: String,
-    @SerialName("avatar") val avatar: String,
-    @SerialName("bio") val bio: String?
+    @SerialName("imageUrl") val imageUrl: String?,
+    @SerialName("bio") val bio: String? = null
 )

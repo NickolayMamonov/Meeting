@@ -8,8 +8,8 @@ data class CommunityDto(
     @SerialName("id") val id: Long,
     @SerialName("name") val name: String,
     @SerialName("description") val description: String,
-    @SerialName("image_url") val imageUrl: String,
-    @SerialName("subscribers_count") val subscribersCount: Int,
-    @SerialName("is_subscribed") val isSubscribed: Boolean,
+    @SerialName("imageUrl") val imageUrl: String,
+    @SerialName("subscribersCount") val subscribersCount: Int,
+    @SerialName("isSubscribed") val isSubscribed: Boolean,
     @SerialName("tags") val tags: List<TagDto>
 )

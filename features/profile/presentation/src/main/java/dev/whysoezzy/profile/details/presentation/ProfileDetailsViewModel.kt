@@ -2,21 +2,24 @@ package dev.whysoezzy.profile.details.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.whysoezzy.domain.models.CommunityInfo
-import dev.whysoezzy.domain.models.MeetingInfo
-import dev.whysoezzy.domain.models.MeetingStatus
-import dev.whysoezzy.domain.models.MeetingTag
-import dev.whysoezzy.domain.models.SocialMediaInfo
-import dev.whysoezzy.domain.models.SocialMediaType
-import dev.whysoezzy.domain.models.TagState
-import dev.whysoezzy.profile.domain.usecase.GetUserProfileUseCase
+import com.whysoezzy.domain.models.CommunityInfo
+import com.whysoezzy.domain.models.MeetingInfo
+import com.whysoezzy.domain.models.MeetingStatus
+import com.whysoezzy.domain.models.MeetingTag
+import com.whysoezzy.domain.models.SocialMediaInfo
+import com.whysoezzy.domain.models.SocialMediaType
+import com.whysoezzy.domain.models.TagState
+import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
+import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
+import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
+import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ProfileDetailsViewModel(
-    private val getUserProfileUseCase: GetUserProfileUseCase
+    private val getUserProfileUseCase: GetCurrentUserUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ProfileDetailsUiState>(ProfileDetailsUiState.Loading)
@@ -106,14 +109,22 @@ class ProfileDetailsViewModel(
                             name = user.name,
                             surname = user.surname,
                             email = user.email,
-                            description = user.description.ifBlank {
+                            description = user.bio.ifBlank {
                                 "Senior Android Developer в крутой компании. Люблю изучать новые технологии и делиться знаниями с сообществом."
                             },
-                            avatarUrl = user.imageUrl,
+                            avatarUrl = user.avatar,
                             isOwnProfile = userId == null, // null означает собственный профиль
-                            socialMedias = mockSocialMedias,
-                            userMeetings = mockMeetings,
-                            userCommunities = mockCommunities,
+                            socialMedias = mockSocialMedias.map { it.toUIKitSocialMediaInfo() },
+                            userMeetings = mockMeetings.map { it.toUIKitMeetingInfo() },
+                            userCommunities = mockCommunities.toUIKitCommunityInfoList(
+                                subscribedIds = setOf(1, 2),
+                                onSubscribeClick = { communityId, isSubscribed ->
+                                    handleToggleCommunitySubscription(communityId, isSubscribed)
+                                },
+                                onCardClick = { communityId ->
+                                    handleNavigateToCommunity(communityId)
+                                }
+                            ),
                             subscribedCommunityIds = setOf(1, 2) // Mock данные подписок
                         )
                     }

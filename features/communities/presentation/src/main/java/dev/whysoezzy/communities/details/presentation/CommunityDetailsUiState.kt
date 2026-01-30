@@ -1,27 +1,21 @@
 package dev.whysoezzy.communities.details.presentation
 
-import dev.whysoezzy.domain.models.MeetingInfo
-import dev.whysoezzy.domain.models.MeetingTag
-import dev.whysoezzy.domain.models.Person
+import com.whysoezzy.domain.models.MeetingInfo
+import com.whysoezzy.domain.models.MeetingTag
+import com.whysoezzy.domain.models.Person
+
 
 sealed class CommunityDetailsUiState {
     object Loading : CommunityDetailsUiState()
     data class Success(
-        // Основная информация о сообществе
         val communityId: Long,
         val imageUrl: String,
         val title: String,
         val tags: List<MeetingTag>,
         val description: String,
         val isSubscribed: Boolean,
-
-        // Участники сообщества
         val subscribers: List<Person>,
-
-        // Активные встречи
         val activeMeetings: List<MeetingInfo>,
-
-        // Прошедшие встречи
         val pastMeetings: List<MeetingInfo>
     ) : CommunityDetailsUiState()
 

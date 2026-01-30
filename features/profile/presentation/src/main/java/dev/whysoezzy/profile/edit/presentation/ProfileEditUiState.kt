@@ -1,7 +1,8 @@
 package dev.whysoezzy.profile.edit.presentation
 
-import dev.whysoezzy.domain.models.MeetingTag
-import dev.whysoezzy.domain.models.SocialMedia
+import com.whysoezzy.domain.models.MeetingTag
+import com.whysoezzy.domain.models.SocialMediaType
+
 
 data class ProfileEditUiState(
     val name: String = "",
@@ -11,7 +12,7 @@ data class ProfileEditUiState(
     val email: String = "",
     val imageUrl: String = "",
     val interests: List<MeetingTag> = emptyList(),
-    val socialMedias: Map<SocialMedia, String> = emptyMap(),
+    val socialMedias: Map<SocialMediaType, String> = emptyMap(),
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,

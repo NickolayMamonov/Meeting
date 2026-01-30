@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import dev.whysoezzy.domain.models.MeetingAddress
 import dev.whysoezzy.uikit.components.avatars.UIKitAvatar
 import dev.whysoezzy.uikit.components.avatars.UIKitAvatarWithInitials
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
@@ -43,6 +42,7 @@ import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.toggles.UIKitToggle
+import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
@@ -111,7 +111,7 @@ fun CardSection() {
                 imageUrl = "https://picsum.photos/212/148",
                 title = "Android Meetup",
                 date = "10 августа",
-                address = MeetingAddress("ул. Пушкина, 10", 55.7558, 37.6176),
+                address = UIKitAddress("ул. Пушкина, 10", 55.7558, 37.6176),
                 tags = listOf(
                     UIKitEventCardTag("Android", isSelected = false, isEnabled = true),
                     UIKitEventCardTag("Kotlin", isSelected = false, isEnabled = true)
@@ -211,8 +211,11 @@ fun SearchSection() {
         )
 
         UIKitSearchBar(
-            placeholder = "Search in app...",
-            onSearch = { }
+            query = "test",
+            onQueryChange = {},
+            placeholder = "Поиск встреч и сообществ",
+            onProfileClick = {  },
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }

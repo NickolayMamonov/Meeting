@@ -17,19 +17,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.whysoezzy.domain.models.Person
 import dev.whysoezzy.uikit.components.avatars.UIKitAvatar
 import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.text.TextMetadata2
+import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 @Composable
 fun UIKitUserList(
-    users: List<Person>,
+    users: List<UIKitPerson>,
     modifier: Modifier = Modifier,
-    onUserClick: (Person) -> Unit = {}
+    onUserClick: (UIKitPerson) -> Unit = {}
 ) {
     LazyColumn(
         modifier = modifier,
@@ -46,7 +46,7 @@ fun UIKitUserList(
 
 @Composable
 private fun UIKitUserListItem(
-    user: Person,
+    user: UIKitPerson,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -75,9 +75,9 @@ private fun UIKitUserListItem(
                     color = ColorTokens.NeutralDark
                 )
 
-                if (user.bio?.isNotEmpty() == true) {
+                if (user.description.isNotEmpty()) {
                     TextMetadata2(
-                        text = user.bio.orEmpty(),
+                        text = user.description.orEmpty(),
                         color = ColorTokens.NeutralWeak
                     )
                 }
@@ -97,26 +97,26 @@ private fun UIKitUserListPreview() {
     UIKitTheme {
         UIKitUserList(
             users = listOf(
-                Person(
+                UIKitPerson(
                     id = 1,
                     name = "Иван",
                     surname = "Петров",
                     avatar = "",
-                    bio = "Android разработчик"
+                    description = "Android разработчик"
                 ),
-                Person(
+                UIKitPerson(
                     id = 2,
                     name = "Мария",
                     surname = "Сидорова",
                     avatar = "",
-                    bio = "UI/UX дизайнер"
+                    description = "UI/UX дизайнер"
                 ),
-                Person(
+                UIKitPerson(
                     id = 3,
                     name = "Александр",
                     surname = "Козлов",
                     avatar = "",
-                    bio = ""
+                    description = ""
                 )
             )
         )

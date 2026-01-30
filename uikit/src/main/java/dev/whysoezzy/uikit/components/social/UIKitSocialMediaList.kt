@@ -19,17 +19,18 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.whysoezzy.domain.models.SocialMediaInfo
-import dev.whysoezzy.domain.models.SocialMediaType
+
 import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.text.TextMetadata2
+import dev.whysoezzy.uikit.models.UIKitSocialMedia
+import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 @Composable
 fun UIKitSocialMediaList(
-    socialMedias: List<SocialMediaInfo>,
+    socialMedias: List<UIKitSocialMediaInfo>,
     modifier: Modifier = Modifier,
     onSocialMediaClick: (String) -> Unit = { }
 ) {
@@ -50,7 +51,7 @@ fun UIKitSocialMediaList(
 
 @Composable
 private fun UIKitSocialMediaItem(
-    socialMediaInfo: SocialMediaInfo,
+    socialMediaInfo: UIKitSocialMediaInfo,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
@@ -81,33 +82,29 @@ private fun UIKitSocialMediaItem(
 }
 
 @Composable
-private fun getSocialMediaIcon(socialMediaType: SocialMediaType): Painter {
+private fun getSocialMediaIcon(socialMediaType: UIKitSocialMedia): Painter {
     return when (socialMediaType) {
-        SocialMediaType.TELEGRAM -> painterResource(R.drawable.telegram_logo)
-        SocialMediaType.HABR -> painterResource(R.drawable.habr_icon)
+        UIKitSocialMedia.TELEGRAM -> painterResource(R.drawable.telegram_logo)
+        UIKitSocialMedia.HABR -> painterResource(R.drawable.habr_icon)
         else -> painterResource(R.drawable.telegram_logo) // fallback
     }
 }
 
-private fun getSocialMediaColor(socialMediaType: SocialMediaType): Color {
+private fun getSocialMediaColor(socialMediaType: UIKitSocialMedia): Color {
     return when (socialMediaType) {
-        SocialMediaType.TELEGRAM -> Color(0xFF0088CC)
-        SocialMediaType.HABR -> Color(0xFF77A2B6)
-        SocialMediaType.GITHUB -> Color(0xFF333333)
-        SocialMediaType.LINKEDIN -> Color(0xFF0077B5)
-        SocialMediaType.TWITTER -> Color(0xFF1DA1F2)
-        SocialMediaType.INSTAGRAM -> Color(0xFFE4405F)
+        UIKitSocialMedia.TELEGRAM -> Color(0xFF0088CC)
+        UIKitSocialMedia.HABR -> Color(0xFF77A2B6)
+        UIKitSocialMedia.GITHUB -> Color(0xFF333333)
+        UIKitSocialMedia.LINKEDIN -> Color(0xFF0077B5)
     }
 }
 
-private fun getSocialMediaName(socialMediaType: SocialMediaType): String {
+private fun getSocialMediaName(socialMediaType: UIKitSocialMedia): String {
     return when (socialMediaType) {
-        SocialMediaType.TELEGRAM -> "Telegram"
-        SocialMediaType.HABR -> "Habr"
-        SocialMediaType.GITHUB -> "GitHub"
-        SocialMediaType.LINKEDIN -> "LinkedIn"
-        SocialMediaType.TWITTER -> "Twitter"
-        SocialMediaType.INSTAGRAM -> "Instagram"
+        UIKitSocialMedia.TELEGRAM -> "Telegram"
+        UIKitSocialMedia.HABR -> "Habr"
+        UIKitSocialMedia.GITHUB -> "GitHub"
+        UIKitSocialMedia.LINKEDIN -> "LinkedIn"
     }
 }
 
@@ -117,18 +114,18 @@ private fun UIKitSocialMediaListPreview() {
     UIKitTheme {
         UIKitSocialMediaList(
             socialMedias = listOf(
-                SocialMediaInfo(
-                    type = SocialMediaType.TELEGRAM,
+                UIKitSocialMediaInfo(
+                    type = UIKitSocialMedia.TELEGRAM,
                     url = "https://t.me/username",
                     username = "@username"
                 ),
-                SocialMediaInfo(
-                    type = SocialMediaType.HABR,
+                UIKitSocialMediaInfo(
+                    type = UIKitSocialMedia.HABR,
                     url = "https://habr.com/users/username",
                     username = "username"
                 ),
-                SocialMediaInfo(
-                    type = SocialMediaType.GITHUB,
+                UIKitSocialMediaInfo(
+                    type = UIKitSocialMedia.GITHUB,
                     url = "https://github.com/username",
                     username = "username"
                 )

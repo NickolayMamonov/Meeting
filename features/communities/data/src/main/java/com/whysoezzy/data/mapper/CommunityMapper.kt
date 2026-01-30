@@ -28,7 +28,7 @@ class CommunityMapper {
     fun communityInfoToDomain(dto: CommunityInfoDto): CommunityInfo {
         return CommunityInfo(
             id = dto.id,
-            name = dto.name,
+            title = dto.name,
             imageUrl = dto.imageUrl
         )
     }

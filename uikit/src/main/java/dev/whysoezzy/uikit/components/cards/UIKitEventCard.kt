@@ -20,9 +20,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import dev.whysoezzy.domain.models.MeetingAddress
 import dev.whysoezzy.uikit.components.tags.UIKitTag
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
+import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -48,7 +48,7 @@ fun UIKitEventCard(
     imageUrl: String,
     title: String,
     date: String,
-    address: MeetingAddress,
+    address: UIKitAddress,
     tags: List<UIKitEventCardTag> = emptyList(),
     cardType: UIKitEventCardType = UIKitEventCardType.COMPACT,
     modifier: Modifier = Modifier,
@@ -183,7 +183,7 @@ fun UIKitEventCardPreview() {
                 imageUrl = "https://picsum.photos/320/180",
                 title = "This is a wide card with a very long title that should wrap to two lines",
                 date = "10 августа",
-                address = MeetingAddress("Кожевенная линия, 40", 49.3345, 55.1234),
+                address = UIKitAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 tags = sampleTags,
                 cardType = UIKitEventCardType.WIDE,
                 onCardClick = { /* handle click */ }
@@ -194,7 +194,7 @@ fun UIKitEventCardPreview() {
                 imageUrl = "https://picsum.photos/212/148",
                 title = "Compact card title",
                 date = "10 августа",
-                address = MeetingAddress("Кожевенная линия, 40", 49.3345, 55.1234),
+                address = UIKitAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 tags = sampleTags.take(2),
                 cardType = UIKitEventCardType.COMPACT
             )
@@ -204,7 +204,7 @@ fun UIKitEventCardPreview() {
                 imageUrl = "https://picsum.photos/212/148",
                 title = "Event without tags",
                 date = "10 августа",
-                address = MeetingAddress("Кожевенная линия, 40", 49.3345, 55.1234),
+                address = UIKitAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 cardType = UIKitEventCardType.COMPACT
             )
         }

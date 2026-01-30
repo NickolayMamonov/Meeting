@@ -23,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,14 +39,14 @@ import dev.whysoezzy.uikit.tokens.TypographyTokens
 
 @Composable
 fun UIKitSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     backgroundColor: Color? = null,
     placeholder: String = "Search",
-    onSearch: (String) -> Unit = {},
     onProfileClick: (() -> Unit)? = null
 ) {
     val colorScheme = UIKitTheme.colors
-    var searchText by rememberSaveable { mutableStateOf("") }
     var isActive by remember { mutableStateOf(false) }
 
     val bgColor = backgroundColor ?: colorScheme.neutralSecondaryBackground
@@ -63,11 +62,8 @@ fun UIKitSearchBar(
     ) {
         // Search field
         BasicTextField(
-            value = searchText,
-            onValueChange = { newValue ->
-                searchText = newValue
-                onSearch(newValue)
-            },
+            value = query,
+            onValueChange = onQueryChange,
             singleLine = true,
             textStyle = TypographyTokens.BodyText1.copy(color = colorScheme.neutralBody),
             cursorBrush = SolidColor(colorScheme.brandDefault),
@@ -92,12 +88,12 @@ fun UIKitSearchBar(
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = "Search",
-                        tint = if (searchText.isEmpty()) contentColor else activeContentColor,
+                        tint = if (query.isEmpty()) contentColor else activeContentColor,
                         modifier = Modifier.padding(end = SpacingTokens.S)
                     )
 
                     Box(modifier = Modifier.weight(1f)) {
-                        if (searchText.isEmpty()) {
+                        if (query.isEmpty()) {
                             Text(
                                 text = placeholder,
                                 style = TypographyTokens.BodyText1,
@@ -140,6 +136,9 @@ fun UIKitSearchBar(
 @Composable
 fun UIKitSearchBarPreview() {
     UIKitTheme {
+        var searchQuery1 by remember { mutableStateOf("") }
+        var searchQuery2 by remember { mutableStateOf("") }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -147,21 +146,19 @@ fun UIKitSearchBarPreview() {
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             UIKitSearchBar(
+                query = searchQuery1,
+                onQueryChange = { searchQuery1 = it },
                 placeholder = "Search events...",
-                onSearch = { query ->
-                    // Handle search
-                },
                 onProfileClick = {
                     // Handle profile click
                 }
             )
 
             UIKitSearchBar(
+                query = searchQuery2,
+                onQueryChange = { searchQuery2 = it },
                 placeholder = "Search without profile",
-                backgroundColor = UIKitTheme.colors.brandBackground,
-                onSearch = { query ->
-                    // Handle search
-                }
+                backgroundColor = UIKitTheme.colors.brandBackground
             )
         }
     }

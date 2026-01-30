@@ -1,41 +1,30 @@
 package dev.whysoezzy.meetings.details.presentation
 
-import dev.whysoezzy.domain.models.CommunityHost
-import dev.whysoezzy.domain.models.MeetingAddress
-import dev.whysoezzy.domain.models.MeetingInfo
-import dev.whysoezzy.domain.models.MeetingTag
-import dev.whysoezzy.domain.models.Person
-import dev.whysoezzy.domain.models.PersonHost
+import dev.whysoezzy.uikit.models.UIKitAddress
+import dev.whysoezzy.uikit.models.UIKitCommunityHost
+import dev.whysoezzy.uikit.models.UIKitMeetingInfo
+import dev.whysoezzy.uikit.models.UIKitMeetingTag
+import dev.whysoezzy.uikit.models.UIKitPerson
+import dev.whysoezzy.uikit.models.UIKitPersonHost
 
 sealed class MeetingDetailsUiState {
     object Loading : MeetingDetailsUiState()
 
     data class Success(
-        // Основная информация о встрече
         val meetingId: Long,
         val imageUrl: String,
         val title: String,
         val dateTime: String,
-        val address: MeetingAddress,
-        val tags: List<MeetingTag>,
+        val address: UIKitAddress,
+        val tags: List<UIKitMeetingTag>,
         val description: String,
-
-        // Ведущий мероприятия
-        val host: PersonHost,
-
-        // Карта с ближайшим метро
+        val host: UIKitPersonHost,
         val nearestMetro: String,
-
-        // Участники
-        val participants: List<Person>,
+        val participants: List<UIKitPerson>,
         val isUserJoined: Boolean,
         val totalPlaces: Int,
-
-        // Организатор-сообщество
-        val community: CommunityHost,
-
-        // Другие встречи сообщества
-        val otherMeetings: List<MeetingInfo>
+        val community: UIKitCommunityHost,
+        val otherMeetings: List<UIKitMeetingInfo>
     ) : MeetingDetailsUiState()
 
     data class Error(val message: String) : MeetingDetailsUiState()

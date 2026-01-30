@@ -17,10 +17,10 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/v1\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080\"")
         }
         release {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/v1\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -29,12 +29,11 @@ android {
         }
     }
     compileOptions {
-        isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "21"
     }
     buildFeatures {
         buildConfig = true
@@ -46,10 +45,11 @@ dependencies {
     api(libs.ktor.client.android)
     api(libs.ktor.client.content.negotiation)
     api(libs.ktor.serialization.json)
-    api(libs.kotlinx.serialization.json)
     api(libs.ktor.client.logging)
     api(libs.ktor.client.auth)
+    implementation("io.ktor:ktor-client-okhttp:3.0.2")
 
+    api(libs.kotlinx.serialization.json)
     implementation(project(":core:common"))
 
     // Desugaring for LocalDateTime

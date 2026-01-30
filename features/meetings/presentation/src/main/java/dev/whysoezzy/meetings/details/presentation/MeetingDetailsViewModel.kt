@@ -2,14 +2,16 @@ package dev.whysoezzy.meetings.details.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.whysoezzy.domain.models.CommunityHost
-import dev.whysoezzy.domain.models.MeetingAddress
-import dev.whysoezzy.domain.models.MeetingInfo
-import dev.whysoezzy.domain.models.MeetingStatus
-import dev.whysoezzy.domain.models.MeetingTag
-import dev.whysoezzy.domain.models.Person
-import dev.whysoezzy.domain.models.PersonHost
-import dev.whysoezzy.domain.models.TagState
+import com.whysoezzy.domain.models.CommunityHost
+import com.whysoezzy.domain.models.MeetingAddress
+import com.whysoezzy.domain.models.MeetingInfo
+import com.whysoezzy.domain.models.MeetingStatus
+import com.whysoezzy.domain.models.MeetingTag
+import com.whysoezzy.domain.models.Person
+import com.whysoezzy.domain.models.PersonHost
+import com.whysoezzy.domain.models.TagState
+import dev.whysoezzy.meetings.mappers.toUIKit
+import dev.whysoezzy.meetings.mappers.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,28 +117,28 @@ class MeetingDetailsViewModel : ViewModel() {
                         address = "ул. Тверская, 15, офис 301",
                         latitude = 55.7558,
                         longitude = 37.6176
-                    ),
-                    tags = mockTags,
-                    description = "Обсуждение новых технологий и подходов в разработке мобильных приложений. Мы обсудим лучшие практики, новые библиотеки и инструменты для эффективной разработки.",
+                    ).toUIKit(),
+                    tags = mockTags.toUIKitMeetingTags(),
+                    description = "Обсуждение новых технологий...",
                     host = PersonHost(
                         id = 1,
                         name = "Александр",
                         surname = "Петров",
                         description = "Senior Android Developer",
                         imageUrl = "https://picsum.photos/200/200?random=host$meetingId"
-                    ),
+                    ).toUIKitPersonHost(),
                     nearestMetro = "М. Охотный ряд",
-                    participants = mockParticipants,
+                    participants = mockParticipants.map { it.toUIKit() },
                     isUserJoined = false,
                     totalPlaces = 30,
                     community = CommunityHost(
                         id = 1,
                         title = "Android Developers Moscow",
-                        description = "Сообщество разработчиков Android в Москве. Мы организуем регулярные встречи, мастер-классы и конференции.",
+                        description = "Сообщество разработчиков...",
                         imageUrl = "https://picsum.photos/300/300?random=community$meetingId",
                         meetingsInfo = mockOtherMeetings
-                    ),
-                    otherMeetings = mockOtherMeetings
+                    ).toUIKitCommunityHost(),
+                    otherMeetings = mockOtherMeetings.toUIKitMeetingInfoList()
                 )
             } catch (e: Exception) {
                 _uiState.value = MeetingDetailsUiState.Error(

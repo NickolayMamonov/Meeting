@@ -28,14 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import dev.whysoezzy.domain.models.CommunityHost
-import dev.whysoezzy.domain.models.MeetingAddress
-import dev.whysoezzy.domain.models.MeetingInfo
-import dev.whysoezzy.domain.models.MeetingStatus
-import dev.whysoezzy.domain.models.MeetingTag
-import dev.whysoezzy.domain.models.Person
-import dev.whysoezzy.domain.models.PersonHost
-import dev.whysoezzy.domain.models.TagState
 import dev.whysoezzy.uikit.components.blocks.UIKitAddressMapBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitCommunityBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitParticipantsBlock
@@ -52,9 +44,18 @@ import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.topbar.BackShareTopBar
+import dev.whysoezzy.uikit.models.UIKitAddress
+import dev.whysoezzy.uikit.models.UIKitCommunityHost
+import dev.whysoezzy.uikit.models.UIKitMeetingInfo
+import dev.whysoezzy.uikit.models.UIKitMeetingStatus
+import dev.whysoezzy.uikit.models.UIKitMeetingTag
+import dev.whysoezzy.uikit.models.UIKitPerson
+import dev.whysoezzy.uikit.models.UIKitPersonHost
+import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+import kotlin.collections.take
 
 @Composable
 fun MeetingDetailsScreen(
@@ -331,13 +332,17 @@ private fun MeetingContent(
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,
-                            date = "В разработке", // Здесь нужно форматировать meeting.time
-                            address = MeetingAddress(meeting.address, 0.0, 0.0),
+                            date = meeting.date,
+                            address = UIKitAddress(
+                                address = meeting.address,
+                                latitude = 0.0,
+                                longitude = 0.0
+                            ),
                             tags = meeting.tags.map { tag ->
                                 UIKitEventCardTag(
                                     text = tag.text,
-                                    isSelected = false,
-                                    isEnabled = false
+                                    isSelected = tag.state == UIKitTagState.SELECTED,
+                                    isEnabled = tag.state != UIKitTagState.DISABLED
                                 )
                             },
                             cardType = UIKitEventCardType.COMPACT,
@@ -393,26 +398,26 @@ private fun ErrorContent(
 private fun MeetingDetailsScreenPreview() {
     UIKitTheme {
         val mockTags = listOf(
-            MeetingTag(1, "Android", TagState.ACTIVE),
-            MeetingTag(2, "Kotlin", TagState.ACTIVE),
-            MeetingTag(3, "Design", TagState.ACTIVE)
+            UIKitMeetingTag(1, "Android", UIKitTagState.ACTIVE),
+            UIKitMeetingTag(2, "Kotlin", UIKitTagState.ACTIVE),
+            UIKitMeetingTag(3, "Design", UIKitTagState.ACTIVE)
         )
 
         val mockParticipants = listOf(
-            Person(1, "Анна", "Иванова", "https://picsum.photos/100/100?random=1", "Дизайнер"),
-            Person(2, "Петр", "Петров", "https://picsum.photos/100/100?random=2", "Разработчик"),
-            Person(3, "Мария", "Сидорова", "https://picsum.photos/100/100?random=3", "PM")
+            UIKitPerson(1, "Анна", "Иванова", "https://picsum.photos/100/100?random=1", "Дизайнер"),
+            UIKitPerson(2, "Петр", "Петров", "https://picsum.photos/100/100?random=2", "Разработчик"),
+            UIKitPerson(3, "Мария", "Сидорова", "https://picsum.photos/100/100?random=3", "PM")
         )
 
         val mockOtherMeetings = listOf(
-            MeetingInfo(
+            UIKitMeetingInfo(
                 id = 100,
                 imageUrl = "https://picsum.photos/212/148?random=100",
                 title = "Мастер-класс по Jetpack Compose",
+                date = "20 декабря 2024, 18:00",
                 address = "ул. Пушкина, 10",
                 tags = mockTags.take(2),
-                time = System.currentTimeMillis(),
-                meetingStatus = MeetingStatus.ACTIVE
+                meetingStatus = UIKitMeetingStatus.ACTIVE
             )
         )
 
@@ -422,14 +427,14 @@ private fun MeetingDetailsScreenPreview() {
                 imageUrl = "https://picsum.photos/800/400",
                 title = "Встреча разработчиков Android",
                 dateTime = "15 декабря 2024, 19:00",
-                address = MeetingAddress(
+                address = UIKitAddress(
                     address = "ул. Тверская, 15, офис 301",
                     latitude = 55.7558,
                     longitude = 37.6176
                 ),
                 tags = mockTags,
-                description = "Обсуждение новых технологий и подходов в разработке мобильных приложений. Мы обсудим лучшие практики, новые библиотеки и инструменты для эффективной разработки.",
-                host = PersonHost(
+                description = "Обсуждение новых технологий...",
+                host = UIKitPersonHost(
                     id = 1,
                     name = "Александр",
                     surname = "Петров",
@@ -440,10 +445,10 @@ private fun MeetingDetailsScreenPreview() {
                 participants = mockParticipants,
                 isUserJoined = false,
                 totalPlaces = 30,
-                community = CommunityHost(
+                community = UIKitCommunityHost(
                     id = 1,
                     title = "Android Developers Moscow",
-                    description = "Сообщество разработчиков Android в Москве. Мы организуем регулярные встречи, мастер-классы и конференции.",
+                    description = "Сообщество разработчиков...",
                     imageUrl = "https://picsum.photos/300/300?random=community",
                     meetingsInfo = mockOtherMeetings
                 ),
