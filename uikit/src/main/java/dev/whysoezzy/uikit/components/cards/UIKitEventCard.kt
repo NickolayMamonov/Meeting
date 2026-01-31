@@ -104,26 +104,24 @@ fun UIKitEventCard(
             overflow = TextOverflow.Ellipsis,
         )
 
-        Row(
-            modifier = modifier.fillMaxWidth()
-        ) {
+        Row{
             Text(
                 text = date,
-                style = TypographyTokens.BodyText2,
+                style = TypographyTokens.Metadata1,
                 color = colorScheme.neutralWeak,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = " · ",
-                style = TypographyTokens.BodyText2,
+                style = TypographyTokens.Metadata1,
                 color = colorScheme.neutralWeak,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = address.address,
-                style = TypographyTokens.BodyText2,
+                style = TypographyTokens.Metadata1,
                 color = colorScheme.neutralWeak,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

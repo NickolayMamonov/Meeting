@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -42,11 +43,13 @@ import dev.whysoezzy.uikit.components.cards.UIKitEventCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
 import dev.whysoezzy.uikit.components.search.UIKitSearchBar
+import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitTagState
+import dev.whysoezzy.uikit.theme.UIKitTheme
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -124,15 +127,18 @@ private fun MainScreenTopBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .padding(start = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "Встречи",
-                style = MaterialTheme.typography.headlineLarge
+            UIKitSearchBar(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                placeholder = "Поиск встреч и сообществ",
+                onProfileClick = {},
+                onCancelClick = {}
             )
             IconButton(onClick = onProfileClick) {
                 Icon(
@@ -141,16 +147,6 @@ private fun MainScreenTopBar(
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Используем UIKit компонент для поиска
-        UIKitSearchBar(
-            query = searchQuery,
-            onQueryChange = onSearchQueryChange,
-            placeholder = "Поиск встреч и сообществ",
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
@@ -180,14 +176,6 @@ private fun MainScreenContent(
     ) {
         if (heroMeetings.isNotEmpty()) {
             item {
-                Text(
-                    text = "Главные события",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-
-            item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -211,7 +199,6 @@ private fun MainScreenContent(
                             },
                             cardType = UIKitEventCardType.WIDE,
                             onCardClick = { onMeetingClick(meeting.id) },
-                            modifier = Modifier.width(320.dp)
                         )
                     }
                 }
@@ -223,13 +210,9 @@ private fun MainScreenContent(
         // Секция категорий (фильтры)
         if (categories.isNotEmpty()) {
             item {
-                Text(
-                    text = "Категории",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
+                TextHeading2(text = "Категории",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
-
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -251,11 +234,8 @@ private fun MainScreenContent(
         // Секция популярных встреч
         if (popularMeetings.isNotEmpty()) {
             item {
-                Text(
-                    text = "Популярные встречи",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
+                TextHeading2(text = "Ближайшие встречи",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
 
             item {
@@ -282,7 +262,6 @@ private fun MainScreenContent(
                             },
                             cardType = UIKitEventCardType.COMPACT,
                             onCardClick = { onMeetingClick(meeting.id) },
-                            modifier = Modifier.width(280.dp)
                         )
                     }
                 }
@@ -333,11 +312,8 @@ private fun MainScreenContent(
 
         // Секция всех встреч
         item {
-            Text(
-                text = "Все встречи",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+            TextHeading2(text = "Все встречи",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
 
         items(allMeetings) { meeting ->
@@ -357,7 +333,7 @@ private fun MainScreenContent(
                         isEnabled = tag.state != UIKitTagState.DISABLED
                     )
                 },
-                cardType = UIKitEventCardType.COMPACT,
+                cardType = UIKitEventCardType.WIDE,
                 onCardClick = { onMeetingClick(meeting.id) },
                 modifier = Modifier
                     .fillMaxWidth()
