@@ -125,7 +125,7 @@ fun UIKitSearchBar(
                                 contentDescription = "Clear",
                                 tint = contentColor,
                                 modifier = Modifier
-                                    .size(20.dp) // Размер иконки
+                                    .size(20.dp)
                                     .clickable { onQueryChange("") }
                             )
                         }
@@ -151,10 +151,8 @@ fun UIKitSearchBar(
                 if (query.isEmpty()) {
                     Box(
                         modifier = Modifier
-//                            .padding(horizontal = 12.dp)
                             .clip(CircleShape)
-                            .clickable { onProfileClick() }
-                        ,
+                            .clickable { onProfileClick() },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
