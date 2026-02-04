@@ -2,16 +2,17 @@ package dev.whysoezzy.profile.edit.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.whysoezzy.domain.models.User
-import dev.whysoezzy.profile.domain.usecase.GetUserProfileUseCase
-import dev.whysoezzy.profile.domain.usecase.UpdateUserProfileUseCase
+import com.whysoezzy.domain.models.User
+import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
+import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ProfileEditViewModel(
-    private val getUserProfileUseCase: GetUserProfileUseCase,
+    private val getUserProfileUseCase: GetCurrentUserUseCase,
     private val updateUserProfileUseCase: UpdateUserProfileUseCase
 ) : ViewModel() {
 
@@ -48,11 +49,11 @@ class ProfileEditViewModel(
                             name = user.name,
                             surname = user.surname,
                             city = user.city,
-                            description = user.description,
+                            description = user.bio,
                             email = user.email,
-                            imageUrl = user.imageUrl,
+                            imageUrl = user.avatar,
                             interests = user.interests,
-                            socialMedias = user.socialMedias,
+                            socialMedias = user.socialMedia,
                             isLoading = false
                         )
                     }
@@ -175,11 +176,11 @@ class ProfileEditViewModel(
                     name = currentState.name,
                     surname = currentState.surname,
                     city = currentState.city,
-                    description = currentState.description,
+                    bio = currentState.description,
                     email = currentState.email,
-                    imageUrl = currentState.imageUrl,
+                    avatar = currentState.imageUrl,
                     interests = currentState.interests,
-                    socialMedias = currentState.socialMedias
+                    socialMedia = currentState.socialMedias
                 )
 
                 updateUserProfileUseCase(updatedUser)

@@ -30,45 +30,43 @@ class MeetingMapper {
                 MeetingTag(
                     id = tagDto.id,
                     text = tagDto.text,
-                    state = mapTagState(tagDto.state)
+                    state = TagState.ACTIVE  // По умолчанию ACTIVE, т.к. state больше не приходит
                 )
             },
-            personHost = PersonHost(
-                id = dto.personHost.id,
-                name = dto.personHost.name,
-                surname = dto.personHost.surname,
-                description = dto.personHost.description,
-                imageUrl = dto.personHost.imageUrl
-            ),
-            communityHost = CommunityHost(
-                id = dto.communityHost.id,
-                title = dto.communityHost.title,
-                description = dto.communityHost.description,
-                imageUrl = dto.communityHost.imageUrl,
-                meetingsInfo = dto.communityHost.meetingsInfo.map { infoDto ->
-                    MeetingInfo(
-                        id = infoDto.id,
-                        title = infoDto.title,
-                        imageUrl = infoDto.imageUrl,
-                        time = infoDto.time,
-                        tags = infoDto.tags.map { tag ->
-                            MeetingTag(
-                                id = tag.id,
-                                text = tag.text,
-                                state = mapTagState(tag.state)
-                            )
-                        },
-                        address = infoDto.address,
-                        meetingStatus = mapMeetingStatus(infoDto.status),
-                    )
-                }
-            ),
+            personHost = dto.personHost?.let { personHostDto ->
+                PersonHost(
+                    id = personHostDto.id,
+                    name = personHostDto.name,
+                    surname = personHostDto.surname,
+                    description = personHostDto.description,
+                    imageUrl = personHostDto.imageUrl
+                )
+            } as PersonHost,
+            communityHost = dto.communityHost?.let { communityHostDto ->
+                CommunityHost(
+                    id = communityHostDto.id,
+                    title = communityHostDto.title,
+                    description = communityHostDto.description,
+                    imageUrl = communityHostDto.imageUrl,
+                    meetingsInfo = communityHostDto.meetingsInfo.map { infoDto ->
+                        MeetingInfo(
+                            id = infoDto.id,
+                            title = infoDto.title,
+                            imageUrl = infoDto.imageUrl,
+                            time = 0L,  // Упрощенный MeetingInfoDto не содержит time
+                            tags = emptyList(),  // Упрощенный MeetingInfoDto не содержит tags
+                            address = "",  // Упрощенный MeetingInfoDto не содержит address
+                            meetingStatus = MeetingStatus.ACTIVE,  // Упрощенный MeetingInfoDto не содержит status
+                        )
+                    }
+                )
+            } as CommunityHost,
             participants = dto.participants.map { personDto ->
                 Person(
                     id = personDto.id,
                     name = personDto.name,
                     surname = personDto.surname,
-                    avatar = personDto.avatar,
+                    avatar = personDto.imageUrl ?: "",  // Используем imageUrl вместо avatar
                     bio = personDto.bio ?: ""
                 )
             },
@@ -78,25 +76,14 @@ class MeetingMapper {
         )
     }
 
-    private fun mapTagState(state: String): TagState {
-        return when (state.lowercase().trim()) {
-            "active" -> TagState.ACTIVE
-            "inactive" -> TagState.INACTIVE
-            "selected" -> TagState.SELECTED
-            "disabled" -> TagState.DISABLED
-            "pressed" -> TagState.SELECTED
-            "not_pressed" -> TagState.ACTIVE
-            else -> TagState.ACTIVE
-        }
-    }
-
     private fun mapMeetingStatus(status: String): MeetingStatus {
-        return when (status.lowercase().trim()) {
-            "active" -> MeetingStatus.ACTIVE
-            "completed" -> MeetingStatus.COMPLETED
-            "cancelled" -> MeetingStatus.CANCELLED
-            "full" -> MeetingStatus.FULL
-            "draft" -> MeetingStatus.DRAFT
+        return when (status.uppercase().trim()) {
+            "ACTIVE" -> MeetingStatus.ACTIVE
+            "COMPLETED" -> MeetingStatus.COMPLETED
+            "CANCELLED" -> MeetingStatus.CANCELLED
+            "FINISHED" -> MeetingStatus.COMPLETED  // Сервер отправляет FINISHED
+            "FULL" -> MeetingStatus.FULL
+            "DRAFT" -> MeetingStatus.DRAFT
             else -> MeetingStatus.ACTIVE
         }
     }

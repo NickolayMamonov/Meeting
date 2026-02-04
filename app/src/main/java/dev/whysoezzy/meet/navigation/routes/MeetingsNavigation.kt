@@ -11,14 +11,11 @@ import dev.whysoezzy.meetings.participants.presentation.MeetingParticipantsScree
 fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
     composable(MeetRoute.Main.route) {
         MainScreen(
-            onEventClick = { meeting ->
-                navController.navigate(MeetRoute.MeetingDetails.createRoute(meeting.id))
+            onMeetingClick = { meetingId ->
+                navController.navigate(MeetRoute.MeetingDetails.createRoute(meetingId))
             },
-            onCommunityClick = { community ->
-                navController.navigate(MeetRoute.CommunityDetails.createRoute(community.id))
-            },
-            onAdClick = { adBlock ->
-                // Handle ad click if needed
+            onCommunityClick = { communityId ->
+                navController.navigate(MeetRoute.CommunityDetails.createRoute(communityId))
             },
             onProfileClick = {
                 navController.navigate(MeetRoute.Profile.route)

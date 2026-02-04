@@ -27,7 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import dev.whysoezzy.domain.models.Person
+import com.whysoezzy.domain.models.Person
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.cards.UIKitPersonCard
 import dev.whysoezzy.uikit.components.text.TextHeading1
@@ -41,7 +41,6 @@ import org.koin.androidx.compose.koinViewModel
 fun MeetingParticipantsScreen(
     meetingId: Long,
     onBackPressed: () -> Unit,
-    modifier: Modifier = Modifier,
     viewModel: MeetingParticipantsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -151,8 +150,8 @@ private fun ParticipantsContent(
                 ) {
                     participants.forEach { participant ->
                         UIKitPersonCard(
-                            name = "${participant.name}",
-                            role = participant.bio ?: "Участник",
+                            name = participant.name,
+                            role = participant.bio,
                             imageUrl = participant.avatar,
                             onCardClick = { onParticipantClick(participant.id) }
                         )

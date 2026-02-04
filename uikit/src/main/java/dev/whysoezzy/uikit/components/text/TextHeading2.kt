@@ -15,7 +15,7 @@ fun TextHeading2(
     modifier: Modifier = Modifier,
     text: String,
     color: Color = Color.Unspecified,
-    fontWeight: FontWeight = FontWeight.Normal,
+    fontWeight: FontWeight = FontWeight.SemiBold,
     overflow: TextOverflow = TextOverflow.Clip,
     maxLines: Int = Int.MAX_VALUE,
     lineHeight: TextUnit = TextUnit.Unspecified,

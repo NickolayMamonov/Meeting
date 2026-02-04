@@ -25,11 +25,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "21"
     }
     buildFeatures {
         compose = true
@@ -40,8 +40,8 @@ dependencies {
     // UIKit
     implementation(project(":uikit"))
     implementation(project(":core:common"))
+    implementation(project(":core:domain"))
     implementation(project(":features:meetings:domain"))
-    implementation(project(":features:meetings:data"))
 
     // Koin for DI
     implementation(platform(libs.koin.bom))

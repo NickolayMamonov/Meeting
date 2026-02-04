@@ -1,0 +1,256 @@
+package dev.whysoezzy.profile.mappers
+
+import com.whysoezzy.domain.models.CommunityHost
+import com.whysoezzy.domain.models.CommunityInfo
+import com.whysoezzy.domain.models.MeetingInfo
+import com.whysoezzy.domain.models.MeetingStatus
+import com.whysoezzy.domain.models.MeetingTag
+import com.whysoezzy.domain.models.Person
+import com.whysoezzy.domain.models.PersonHost
+import com.whysoezzy.domain.models.SocialMediaInfo
+import com.whysoezzy.domain.models.SocialMediaType
+import com.whysoezzy.domain.models.TagState
+import com.whysoezzy.domain.models.User
+import dev.whysoezzy.profile.details.presentation.ProfileDetailsUiState
+import dev.whysoezzy.uikit.models.UIKitMeetingInfo
+import dev.whysoezzy.uikit.models.UIKitMeetingTag
+import dev.whysoezzy.uikit.models.UIKitMeetingStatus
+import dev.whysoezzy.uikit.models.UIKitTagState
+import dev.whysoezzy.uikit.models.UIKitAddress
+import dev.whysoezzy.uikit.models.UIKitCommunity
+import dev.whysoezzy.uikit.models.UIKitPerson
+import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
+import dev.whysoezzy.uikit.models.UIKitCommunityHost
+import dev.whysoezzy.uikit.models.UIKitCommunityInfo
+import dev.whysoezzy.uikit.models.UIKitPersonHost
+import dev.whysoezzy.uikit.models.UIKitSocialMedia
+import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
+import java.text.SimpleDateFormat
+import java.util.*
+
+fun TagState.toUIKitTagState(): UIKitTagState = when (this) {
+    TagState.ACTIVE -> UIKitTagState.ACTIVE
+    TagState.INACTIVE -> UIKitTagState.INACTIVE
+    TagState.SELECTED -> UIKitTagState.SELECTED
+    TagState.DISABLED -> UIKitTagState.DISABLED
+}
+
+fun MeetingStatus.toUIKitMeetingStatus(): UIKitMeetingStatus = when (this) {
+    MeetingStatus.ACTIVE -> UIKitMeetingStatus.ACTIVE
+    MeetingStatus.COMPLETED -> UIKitMeetingStatus.COMPLETED
+    MeetingStatus.CANCELLED -> UIKitMeetingStatus.CANCELLED
+    MeetingStatus.FULL -> UIKitMeetingStatus.FULL
+    MeetingStatus.DRAFT -> UIKitMeetingStatus.DRAFT
+}
+
+fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag {
+    return UIKitMeetingTag(
+        id = id,
+        text = text,
+        state = state.toUIKitTagState()
+    )
+}
+
+fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> {
+    return filterNotNull().map { it.toUIKitMeetingTag() }
+}
+
+
+
+fun MeetingTag.toUIKitEventCardTag(
+    isSelected: Boolean = state == TagState.SELECTED,
+    isEnabled: Boolean = state != TagState.DISABLED
+): UIKitEventCardTag {
+    return UIKitEventCardTag(
+        text = text,
+        isSelected = isSelected,
+        isEnabled = isEnabled
+    )
+}
+
+fun MeetingInfo.toUIKitAddress(): UIKitAddress {
+    return UIKitAddress(
+        address = address ?: "",
+        latitude = 0.0,
+        longitude = 0.0
+    )
+}
+
+fun Person.toUIKitPerson(): UIKitPerson {
+    return UIKitPerson(
+        id = id,
+        name = name,
+        surname = surname,
+        avatar = avatar,
+        description = bio
+    )
+}
+
+fun CommunityInfo.toUIKitCommunity(): UIKitCommunity {
+    return UIKitCommunity(
+        id = id,
+        name = title,
+        description = description ?: "",
+        imageUrl = imageUrl
+    )
+}
+
+fun SocialMediaType.toUIKitSocialMedia(): UIKitSocialMedia = when (this) {
+    SocialMediaType.TELEGRAM -> UIKitSocialMedia.TELEGRAM
+    SocialMediaType.HABR -> UIKitSocialMedia.HABR
+    SocialMediaType.LINKEDIN -> UIKitSocialMedia.LINKEDIN
+    SocialMediaType.GITHUB -> UIKitSocialMedia.GITHUB
+}
+
+fun SocialMediaInfo.toUIKitSocialMediaInfo(): UIKitSocialMediaInfo {
+    return UIKitSocialMediaInfo(
+        type = type.toUIKitSocialMedia(),
+        url = url,
+        username = username
+    )
+}
+
+fun Map<SocialMediaType, String>.toUIKitSocialMediaInfoList(): List<UIKitSocialMediaInfo> {
+    return map { (type, url) ->
+        UIKitSocialMediaInfo(
+            type = type.toUIKitSocialMedia(),
+            url = url,
+            username = extractUsername(url) // вспомогательная функция
+        )
+    }
+}
+
+fun CommunityInfo.toUIKitCommunityInfo(
+    isSubscribed: Boolean = false,
+    onSubscribeClick: (Boolean) -> Unit = {},
+    onCardClick: (() -> Unit)? = null
+): UIKitCommunityInfo {
+    return UIKitCommunityInfo(
+        id = id,
+        title = title,
+        imageUrl = imageUrl,
+        isSubscribed = isSubscribed,
+        onSubscribeClick = onSubscribeClick,
+        onCardClick = onCardClick
+    )
+}
+
+fun List<CommunityInfo>.toUIKitCommunityInfoList(
+    subscribedIds: Set<Long> = emptySet(),
+    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
+    onCardClick: ((Long) -> Unit)? = null
+): List<UIKitCommunityInfo> {
+    return map { community ->
+        community.toUIKitCommunityInfo(
+            isSubscribed = subscribedIds.contains(community.id),
+            onSubscribeClick = { isSubscribed ->
+                onSubscribeClick(community.id, isSubscribed)
+            },
+            onCardClick = onCardClick?.let { { it(community.id) } }
+        )
+    }
+}
+
+fun User.toProfileUiState(
+    isOwnProfile: Boolean,
+    subscribedCommunityIds: Set<Long>,
+    onCommunitySubscribe: (Long, Boolean) -> Unit,
+    onCommunityClick: (Long) -> Unit,
+    onMeetingClick: (Long) -> Unit
+): ProfileDetailsUiState.Success {
+    return ProfileDetailsUiState.Success(
+        userId = id,
+        name = name,
+        surname = surname,
+        email = email,
+        description = bio,
+        avatarUrl = avatar,
+        isOwnProfile = isOwnProfile,
+        socialMedias = socialMedia.toUIKitSocialMediaInfoList(),
+        userMeetings = participatingMeetings.map { it.toUIKitMeetingInfo() },
+        userCommunities = subscribedCommunities.toUIKitCommunityInfoList(
+            subscribedIds = subscribedCommunityIds,
+            onSubscribeClick = onCommunitySubscribe,
+            onCardClick = onCommunityClick
+        ),
+        subscribedCommunityIds = subscribedCommunityIds
+    )
+}
+
+private fun extractUsername(url: String): String {
+    return url.substringAfterLast('/').substringBefore('?')
+}
+
+fun formatDateTime(timestamp: Long): String {
+    val formatter = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
+    return formatter.format(Date(timestamp))
+}
+
+fun formatDate(timestamp: Long): String {
+    val formatter = SimpleDateFormat("dd MMMM", Locale("ru"))
+    return formatter.format(Date(timestamp))
+}
+
+fun formatTime(timestamp: Long): String {
+    val formatter = SimpleDateFormat("HH:mm", Locale("ru"))
+    return formatter.format(Date(timestamp))
+}
+
+
+
+fun List<MeetingTag?>.toUIKitEventCardTags(
+    isSelected: Boolean = false,
+    isEnabled: Boolean = true
+): List<UIKitEventCardTag> {
+    return filterNotNull().map { tag ->
+        tag.toUIKitEventCardTag(
+            isSelected = isSelected || tag.state == TagState.SELECTED,
+            isEnabled = isEnabled && tag.state != TagState.DISABLED
+        )
+    }
+}
+
+fun List<Person>.toUIKitPersons(): List<UIKitPerson> {
+    return map { it.toUIKitPerson() }
+}
+
+fun List<CommunityInfo>.toUIKitCommunities(): List<UIKitCommunity> {
+    return map { it.toUIKitCommunity() }
+}
+
+fun PersonHost.toUIKitPersonHost(): UIKitPersonHost {
+    return UIKitPersonHost(
+        id = id,
+        name = name,
+        surname = surname,
+        description = description,
+        imageUrl = imageUrl
+    )
+}
+
+fun CommunityHost.toUIKitCommunityHost(): UIKitCommunityHost {
+    return UIKitCommunityHost(
+        id = id,
+        title = title,
+        description = description,
+        imageUrl = imageUrl,
+        meetingsInfo = meetingsInfo.map { it.toUIKitMeetingInfo() }
+    )
+}
+
+fun MeetingInfo.toUIKitMeetingInfo(): UIKitMeetingInfo {
+    return UIKitMeetingInfo(
+        id = id,
+        title = title,
+        imageUrl = imageUrl,
+        date = formatDateTime(time),
+        address = address ?: "",
+        tags = tags.toUIKitMeetingTags(),
+        meetingStatus = meetingStatus?.toUIKitMeetingStatus()
+    )
+}
+
+// List маппер для встреч
+fun List<MeetingInfo>.toUIKitMeetingInfoList(): List<UIKitMeetingInfo> {
+    return map { it.toUIKitMeetingInfo() }
+}

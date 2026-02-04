@@ -25,11 +25,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "21"
     }
     buildFeatures {
         compose = true
@@ -42,7 +42,7 @@ dependencies {
     implementation(project(":features:communities:domain"))
     implementation(project(":features:communities:data"))
     implementation(project(":core:common"))
-
+    implementation(project(":core:domain"))
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // Koin for DI

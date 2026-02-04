@@ -2,12 +2,14 @@ package com.whysoezzy.data.mapper
 
 import com.whysoezzy.data.dto.CommunityInfoDto
 import com.whysoezzy.data.dto.MeetingInfoDto
-import com.whysoezzy.data.dto.TagDto
+import com.whysoezzy.data.dto.MeetingTagDto
 import com.whysoezzy.data.dto.UserDto
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
-import com.whysoezzy.domain.models.SocialMedia
-import com.whysoezzy.domain.models.Tag
+import com.whysoezzy.domain.models.MeetingStatus
+import com.whysoezzy.domain.models.MeetingTag
+import com.whysoezzy.domain.models.SocialMediaType
+import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.models.User
 
 class UserMapper {
@@ -16,15 +18,16 @@ class UserMapper {
             id = dto.id,
             name = dto.name,
             surname = dto.surname,
-            email = dto.email,
+            email = dto.email ?: "",
             city = dto.city,
-            avatar = dto.avatar,
+            avatar = dto.avatar ?: "",
             phone = dto.phone,
             bio = dto.bio,
             interests = dto.interests.map { tagDto ->
-                Tag(
+                MeetingTag(
                     id = tagDto.id,
-                    name = tagDto.name
+                    text = tagDto.text,
+                    state = TagState.ACTIVE
                 )
             },
             socialMedia = dto.socialMedia.mapKeys { (key, _) ->
@@ -33,16 +36,19 @@ class UserMapper {
             subscribedCommunities = dto.subscribedCommunities.map { communityDto ->
                 CommunityInfo(
                     id = communityDto.id,
-                    name = communityDto.name,
+                    title = communityDto.name,
                     imageUrl = communityDto.imageUrl
                 )
             },
             participatingMeetings = dto.participatingMeetings.map { meetingDto ->
                 MeetingInfo(
                     id = meetingDto.id,
-                    title = meetingDto.name,
+                    title = meetingDto.title,
                     imageUrl = meetingDto.imageUrl,
-                    dateTime = meetingDto.dateTime
+                    time = 0L,
+                    tags = emptyList(),
+                    address = "",
+                    meetingStatus = MeetingStatus.ACTIVE
                 )
             }
         )
@@ -53,15 +59,15 @@ class UserMapper {
             id = user.id,
             name = user.name,
             surname = user.surname,
-            email = user.email,
+            email = user.email.takeIf { it.isNotEmpty() },
             city = user.city,
-            avatar = user.avatar,
+            avatar = user.avatar.takeIf { it.isNotEmpty() },
             phone = user.phone,
             bio = user.bio,
             interests = user.interests.map { tag ->
-                TagDto(
+                MeetingTagDto(
                     id = tag.id,
-                    name = tag.name
+                    text = tag.text
                 )
             },
             socialMedia = user.socialMedia.mapKeys { (key, _) ->
@@ -70,32 +76,32 @@ class UserMapper {
             subscribedCommunities = user.subscribedCommunities.map { community ->
                 CommunityInfoDto(
                     id = community.id,
-                    name = community.name,
+                    name = community.title,
                     imageUrl = community.imageUrl
                 )
             },
             participatingMeetings = user.participatingMeetings.map { meeting ->
                 MeetingInfoDto(
                     id = meeting.id,
-                    name = meeting.title,
+                    title = meeting.title,
                     imageUrl = meeting.imageUrl,
-                    dateTime = meeting.dateTime
+                    date = ""
                 )
             }
         )
     }
 
-    private fun mapSocialMedia(platform: String): SocialMedia {
-        return when (platform.uppercase()) {
-            "TELEGRAM" -> SocialMedia.TELEGRAM
-            "HABR" -> SocialMedia.HABR
-            "GITHUB" -> SocialMedia.GITHUB
-            "LINKEDIN" -> SocialMedia.LINKEDIN
-            else -> SocialMedia.TELEGRAM
+    private fun mapSocialMedia(platform: String): SocialMediaType {
+        return when (platform.lowercase()) {
+            "telegram" -> SocialMediaType.TELEGRAM
+            "habr" -> SocialMediaType.HABR
+            "github" -> SocialMediaType.GITHUB
+            "linkedin" -> SocialMediaType.LINKEDIN
+            else -> SocialMediaType.TELEGRAM
         }
     }
 
-    private fun mapSocialMediaToString(platform: SocialMedia): String {
-        return platform.name
+    private fun mapSocialMediaToString(platform: SocialMediaType): String {
+        return platform.name.lowercase()
     }
 }

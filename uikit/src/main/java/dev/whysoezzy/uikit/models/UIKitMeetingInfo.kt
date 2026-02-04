@@ -1,0 +1,11 @@
+package dev.whysoezzy.uikit.models
+
+data class UIKitMeetingInfo(
+    val id: Long,
+    val title: String,
+    val imageUrl: String,
+    val date: String,
+    val address: String,
+    val tags: List<UIKitMeetingTag>,
+    val meetingStatus: UIKitMeetingStatus? = null
+)

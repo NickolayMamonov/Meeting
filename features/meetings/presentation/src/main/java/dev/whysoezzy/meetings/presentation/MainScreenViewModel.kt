@@ -2,9 +2,10 @@ package dev.whysoezzy.meetings.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.whysoezzy.domain.usecase.GetMainScreenDataUseCase
-import dev.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
-import dev.whysoezzy.domain.usecase.SearchUseCase
+import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
+import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
+import com.whysoezzy.domain.usecase.SearchUseCase
+import dev.whysoezzy.meetings.mappers.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,8 @@ class MainScreenViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val _subscribedCommunityIds = MutableStateFlow<Set<Long>>(emptySet())
+
     init {
         loadMainScreenData()
     }
@@ -31,7 +34,7 @@ class MainScreenViewModel(
             is MainScreenEvent.LoadData -> loadMainScreenData()
             is MainScreenEvent.Search -> performSearch(event.query)
             is MainScreenEvent.CommunitySubscriptionChanged -> {
-                manageCommunitySubscription(event.communityId, event.isSubscribed)
+                toggleCommunitySubscription(event.communityId, event.isSubscribed)
             }
             is MainScreenEvent.Retry -> loadMainScreenData()
         }
@@ -43,7 +46,22 @@ class MainScreenViewModel(
 
             getMainScreenDataUseCase()
                 .onSuccess { data ->
-                    _uiState.value = MainScreenUiState.Success(data)
+                    // ✅ Мапим List<Meeting> → List<UIKitMeetingInfo>
+                    _uiState.value = MainScreenUiState.Success(
+                        heroMeetings = data.heroMeetings.toUIKitMeetingInfos(),
+                        popularMeetings = data.popularMeetings.toUIKitMeetingInfos(),
+                        allMeetings = data.allMeetings.toUIKitMeetingInfos(),
+                        categories = data.categories.toUIKitMeetingTags(),
+                        communities = data.communities.toUIKitCommunityInfoList(
+                            subscribedIds = _subscribedCommunityIds.value,
+                            onSubscribeClick = { communityId, isSubscribed ->
+                                toggleCommunitySubscription(communityId, isSubscribed)
+                            },
+                            onCardClick = { communityId ->
+                                // TODO: Навигация к сообществу
+                            }
+                        )
+                    )
                 }
                 .onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
@@ -65,8 +83,20 @@ class MainScreenViewModel(
             _uiState.value = MainScreenUiState.Loading
 
             searchUseCase(query)
-                .onSuccess { searchResults ->
-                    _uiState.value = MainScreenUiState.SearchResults(searchResults)
+                .onSuccess { searchData ->
+                    // ✅ Мапим List<Meeting> → List<UIKitMeetingInfo>
+                    _uiState.value = MainScreenUiState.SearchResults(
+                        meetings = searchData.meetings.toUIKitMeetingInfos(),
+                        communities = searchData.communities.toUIKitCommunityInfoList(
+                            subscribedIds = _subscribedCommunityIds.value,
+                            onSubscribeClick = { communityId, isSubscribed ->
+                                toggleCommunitySubscription(communityId, isSubscribed)
+                            },
+                            onCardClick = { communityId ->
+                                // TODO: Навигация к сообществу
+                            }
+                        )
+                    )
                 }
                 .onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
@@ -76,13 +106,34 @@ class MainScreenViewModel(
         }
     }
 
-    private fun manageCommunitySubscription(communityId: Long, isSubscribed: Boolean) {
-        viewModelScope.launch {
-            manageCommunitySubscriptionUseCase(communityId, isSubscribed)
-                .onSuccess {
-                    loadMainScreenData()
+    private fun toggleCommunitySubscription(communityId: Long, isSubscribed: Boolean) {
+        _subscribedCommunityIds.value = if (isSubscribed) {
+            _subscribedCommunityIds.value + communityId
+        } else {
+            _subscribedCommunityIds.value - communityId
+        }
+
+        val currentState = _uiState.value
+        if (currentState is MainScreenUiState.Success) {
+            _uiState.value = currentState.copy(
+                communities = currentState.communities.map { community ->
+                    if (community.id == communityId) {
+                        community.copy(isSubscribed = isSubscribed)
+                    } else {
+                        community
+                    }
                 }
+            )
+        }
+
+       viewModelScope.launch {
+            manageCommunitySubscriptionUseCase(communityId, isSubscribed)
                 .onFailure { exception ->
+                    _subscribedCommunityIds.value = if (isSubscribed) {
+                        _subscribedCommunityIds.value - communityId
+                    } else {
+                        _subscribedCommunityIds.value + communityId
+                    }
                     println("Failed to manage subscription: ${exception.message}")
                 }
         }

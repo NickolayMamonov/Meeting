@@ -6,6 +6,7 @@ import com.whysoezzy.data.di.meetingsModule
 import com.whysoezzy.data.di.profileModule
 import dev.whysoezzy.auth.di.authFeatureModule
 import dev.whysoezzy.auth.di.authModule
+import dev.whysoezzy.meetings.di.mainFeatureModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -24,8 +25,8 @@ class MeetApplication : Application() {
                 authFeatureModule,
                 meetingsModule,
                 communitiesModule,
-                profileModule
-
+                profileModule,
+                mainFeatureModule
             )
         }
     }

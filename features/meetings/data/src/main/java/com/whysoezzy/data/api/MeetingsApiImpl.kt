@@ -1,6 +1,8 @@
 package com.whysoezzy.data.api
 
+import com.whysoezzy.data.dto.ApiResponse
 import com.whysoezzy.data.dto.MeetingDto
+import com.whysoezzy.data.dto.TagDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -12,11 +14,15 @@ import io.ktor.http.contentType
 
 class MeetingsApiImpl(private val client: HttpClient) {
     suspend fun getHeroEvents(): List<MeetingDto> {
-        return client.get("meetings/hero").body()
+        return client.get("meetings/main").body()
     }
 
     suspend fun getPopularEvents(): List<MeetingDto> {
         return client.get("meetings/popular").body()
+    }
+
+    suspend fun getTags(): ApiResponse<List<TagDto>> {
+        return client.get("/api/v1/tags").body()
     }
 
     suspend fun getAllEvents(page: Int = 0, limit: Int = 20): List<MeetingDto> {
