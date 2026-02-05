@@ -3,13 +3,15 @@ package com.whysoezzy.data.repository
 import android.util.Log
 import com.whysoezzy.data.api.MeetingsApiImpl
 import com.whysoezzy.data.mapper.MeetingMapper
+import com.whysoezzy.data.mapper.toDomain
+import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.repository.MeetingsRepository
 import com.whysoezzy.network.safeApiCall
 
 class MeetingsRepositoryImpl(
     private val meetingsApi: MeetingsApiImpl,
-    private val meetingMapper: MeetingMapper
+    private val meetingMapper: MeetingMapper,
 ) : MeetingsRepository {
     override suspend fun getHeroEvents(): Result<List<Meeting>> {
         return safeApiCall {
@@ -79,6 +81,13 @@ class MeetingsRepositoryImpl(
         return safeApiCall {
             val response = meetingsApi.getEventsByCommunity(communityId = communityId)
             response.map { meetingMapper.toDomain(it) }
+        }
+    }
+
+    override suspend fun getAdBlocks(): Result<List<AdBlock>> {
+        return safeApiCall {
+            val response = meetingsApi.getAdBlocks()
+            response.map { it.toDomain() }
         }
     }
 }

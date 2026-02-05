@@ -1,5 +1,7 @@
 package com.whysoezzy.data.api
 
+import com.whysoezzy.data.dto.AdBlockDto
+import com.whysoezzy.data.dto.AdBlockResponseDto
 import com.whysoezzy.data.dto.ApiResponse
 import com.whysoezzy.data.dto.MeetingDto
 import com.whysoezzy.data.dto.TagDto
@@ -21,9 +23,7 @@ class MeetingsApiImpl(private val client: HttpClient) {
         return client.get("meetings/popular").body()
     }
 
-    suspend fun getTags(): ApiResponse<List<TagDto>> {
-        return client.get("/api/v1/tags").body()
-    }
+
 
     suspend fun getAllEvents(page: Int = 0, limit: Int = 20): List<MeetingDto> {
         return client.get("meetings") {
@@ -63,4 +63,9 @@ class MeetingsApiImpl(private val client: HttpClient) {
     suspend fun getEventsByCommunity(communityId: Long): List<MeetingDto> {
         return client.get("communities/$communityId/meetings").body()
     }
+
+    suspend fun getAdBlocks(): List<AdBlockResponseDto> {
+        return client.get("/api/ads").body()
+    }
+
 }

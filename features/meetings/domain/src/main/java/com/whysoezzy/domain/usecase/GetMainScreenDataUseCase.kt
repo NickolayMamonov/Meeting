@@ -13,7 +13,7 @@ class GetMainScreenDataUseCase(
             val heroMeetings = getHeroMeetingsUseCase().getOrThrow()
             val popularMeetings = getPopularMeetingsUseCase().getOrThrow()
             val allMeetings = meetingsRepository.getAllEvents().getOrThrow()
-
+            val adBlocks = meetingsRepository.getAdBlocks().getOrNull() ?: emptyList()
             // TODO: получить категории и сообщества
 
             Result.success(
@@ -22,7 +22,8 @@ class GetMainScreenDataUseCase(
                     popularMeetings = popularMeetings,
                     allMeetings = allMeetings,
                     categories = emptyList(),
-                    communities = emptyList()
+                    communities = emptyList(),
+                    adBlocks = adBlocks
                 )
             )
         } catch (e: Exception) {
