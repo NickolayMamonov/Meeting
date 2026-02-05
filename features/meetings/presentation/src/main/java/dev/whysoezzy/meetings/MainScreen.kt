@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -35,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.meetings.presentation.MainScreenEvent
 import dev.whysoezzy.meetings.presentation.MainScreenUiState
 import dev.whysoezzy.meetings.presentation.MainScreenViewModel
@@ -49,7 +49,6 @@ import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitTagState
-import dev.whysoezzy.uikit.theme.UIKitTheme
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -90,6 +89,7 @@ fun MainScreen(
                         allMeetings = state.allMeetings,
                         categories = state.categories,
                         communities = state.communities,
+                        adBlocks = state.adBlocks,
                         onMeetingClick = onMeetingClick,
                         onCommunityClick = onCommunityClick
                     )
@@ -167,6 +167,7 @@ private fun MainScreenContent(
     allMeetings: List<UIKitMeetingInfo>,
     categories: List<UIKitMeetingTag>,
     communities: List<UIKitCommunityInfo>,
+    adBlocks: List<AdBlock>,
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit
 ) {
@@ -316,29 +317,47 @@ private fun MainScreenContent(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
 
-        items(allMeetings) { meeting ->
-            UIKitEventCard(
-                imageUrl = meeting.imageUrl,
-                title = meeting.title,
-                date = meeting.date,
-                address = UIKitAddress(
-                    address = meeting.address,
-                    latitude = 0.0,
-                    longitude = 0.0
-                ),
-                tags = meeting.tags.map { tag ->
-                    UIKitEventCardTag(
-                        text = tag.text,
-                        isSelected = tag.state == UIKitTagState.SELECTED,
-                        isEnabled = tag.state != UIKitTagState.DISABLED
+        val meetingsWithAds = buildMeetingsWithAdsList(allMeetings, adBlocks)
+
+        items(meetingsWithAds.size) { index ->
+            val item = meetingsWithAds[index]
+
+            when (item) {
+                is MeetingOrAd.Meeting -> {
+                    UIKitEventCard(
+                        imageUrl = item.meeting.imageUrl,
+                        title = item.meeting.title,
+                        date = item.meeting.date,
+                        address = UIKitAddress(
+                            address = item.meeting.address,
+                            latitude = 0.0,
+                            longitude = 0.0
+                        ),
+                        tags = item.meeting.tags.map { tag ->
+                            UIKitEventCardTag(
+                                text = tag.text,
+                                isSelected = tag.state == UIKitTagState.SELECTED,
+                                isEnabled = tag.state != UIKitTagState.DISABLED
+                            )
+                        },
+                        cardType = UIKitEventCardType.WIDE,
+                        onCardClick = { onMeetingClick(item.meeting.id) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
                     )
-                },
-                cardType = UIKitEventCardType.WIDE,
-                onCardClick = { onMeetingClick(meeting.id) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            )
+                }
+
+                is MeetingOrAd.Ad -> {
+                    AdBlockComponent(
+                        adBlock = item.adBlock,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        onAdClick = {}
+                    )
+                }
+            }
         }
     }
 }
@@ -467,4 +486,28 @@ private fun ErrorContent(
             }
         }
     }
+}
+
+private sealed class MeetingOrAd {
+    data class Meeting(val meeting: UIKitMeetingInfo) : MeetingOrAd()
+    data class Ad(val adBlock: AdBlock) : MeetingOrAd()
+}
+
+private fun buildMeetingsWithAdsList(
+    meetings: List<UIKitMeetingInfo>,
+    adBlocks: List<AdBlock>
+): List<MeetingOrAd> {
+    val result = mutableListOf<MeetingOrAd>()
+    var adIndex = 0
+
+    meetings.forEachIndexed { index, meeting ->
+        result.add(MeetingOrAd.Meeting(meeting))
+
+        if ((index + 1) % 3 == 0 && adIndex < adBlocks.size) {
+            result.add(MeetingOrAd.Ad(adBlocks[adIndex]))
+            adIndex++
+        }
+    }
+
+    return result
 }

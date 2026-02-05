@@ -8,7 +8,7 @@ import dev.whysoezzy.uikit.models.UIKitTag
 
 fun CommunityInfo.toUIKit() = UIKitCommunity(
     id = id,
-    name = title,
+    name = name,
     description = description ?: "",
     imageUrl = imageUrl
 )

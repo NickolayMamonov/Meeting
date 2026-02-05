@@ -67,24 +67,27 @@ class MeetingDetailsViewModel : ViewModel() {
                         "Анна",
                         "Иванова",
                         "https://picsum.photos/100/100?random=1",
-                        "Дизайнер"
+                        "Дизайнер",
+                        "Дизайн"
                     ),
                     Person(
                         2,
                         "Петр",
                         "Петров",
                         "https://picsum.photos/100/100?random=2",
-                        "Разработчик"
+                        "Разработчик",
+                        "Разработка"
                     ),
-                    Person(3, "Мария", "Сидорова", "https://picsum.photos/100/100?random=3", "PM"),
+                    Person(3, "Мария", "Сидорова", "https://picsum.photos/100/100?random=3", "PM","Разработка"),
                     Person(
                         4,
                         "Алексей",
                         "Козлов",
                         "https://picsum.photos/100/100?random=4",
-                        "Аналитик"
+                        "Аналитик",
+                        "Аналитика"
                     ),
-                    Person(5, "Ольга", "Новикова", "https://picsum.photos/100/100?random=5", "QA")
+                    Person(5, "Ольга", "Новикова", "https://picsum.photos/100/100?random=5", "QA","Тестирование")
                 )
 
                 val mockOtherMeetings = listOf(

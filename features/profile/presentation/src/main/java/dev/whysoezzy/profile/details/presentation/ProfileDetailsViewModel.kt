@@ -90,17 +90,17 @@ class ProfileDetailsViewModel(
                         val mockCommunities = listOf(
                             CommunityInfo(
                                 id = 1,
-                                title = "Android Developers Moscow",
+                                name = "Android Developers Moscow",
                                 description = "Сообщество разработчиков Android в Москве",
                                 imageUrl = "https://picsum.photos/300/300?random=1",
-                                membersCount = 1250
+                                subscribersCount = 1250
                             ),
                             CommunityInfo(
                                 id = 2,
-                                title = "Kotlin User Group",
+                                name = "Kotlin User Group",
                                 description = "Kotlin enthusiasts",
                                 imageUrl = "https://picsum.photos/300/300?random=2",
-                                membersCount = 890
+                                subscribersCount = 890
                             )
                         )
 

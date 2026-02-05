@@ -1,6 +1,9 @@
-package com.whysoezzy.domain.models
+package com.whysoezzy.data.dto
 
-data class Person(
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class UserInfoDto(
     val id: Long,
     val name: String,
     val surname: String,

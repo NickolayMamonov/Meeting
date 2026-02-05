@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class CommunityInfoDto(
-    @SerialName("id") val id: Long,
-    @SerialName("name") val name: String,
-    @SerialName("image_url") val imageUrl: String
+    val id: Long,
+    val name: String,
+    val description: String? = null,
+    val imageUrl: String,
+    val subscribersCount: Int? = null
 )

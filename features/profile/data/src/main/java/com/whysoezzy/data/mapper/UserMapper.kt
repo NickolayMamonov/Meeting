@@ -36,8 +36,10 @@ class UserMapper {
             subscribedCommunities = dto.subscribedCommunities.map { communityDto ->
                 CommunityInfo(
                     id = communityDto.id,
-                    title = communityDto.name,
-                    imageUrl = communityDto.imageUrl
+                    name = communityDto.name,
+                    description = communityDto.description ?: "",
+                    imageUrl = communityDto.imageUrl,
+                    subscribersCount = communityDto.subscribersCount ?: 0
                 )
             },
             participatingMeetings = dto.participatingMeetings.map { meetingDto ->
@@ -76,8 +78,10 @@ class UserMapper {
             subscribedCommunities = user.subscribedCommunities.map { community ->
                 CommunityInfoDto(
                     id = community.id,
-                    name = community.title,
-                    imageUrl = community.imageUrl
+                    name = community.name,
+                    description = community.description,
+                    imageUrl = community.imageUrl,
+                    subscribersCount = community.subscribersCount
                 )
             },
             participatingMeetings = user.participatingMeetings.map { meeting ->

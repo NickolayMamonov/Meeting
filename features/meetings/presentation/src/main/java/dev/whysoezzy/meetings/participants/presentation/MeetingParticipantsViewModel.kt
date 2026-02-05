@@ -35,63 +35,72 @@ class MeetingParticipantsViewModel : ViewModel() {
                         "Анна",
                         "Иванова",
                         "https://picsum.photos/100/100?random=1",
-                        "Дизайнер"
+                        "Дизайнер",
+                        "Дизайн"
                     ),
                     Person(
                         2,
                         "Петр",
                         "Петров",
                         "https://picsum.photos/100/100?random=2",
-                        "Android разработчик"
+                        "Android разработчик",
+                        "Разработка"
                     ),
                     Person(
                         3,
                         "Мария",
                         "Сидорова",
                         "https://picsum.photos/100/100?random=3",
-                        "Product Manager"
+                        "Product Manager",
+                        "Разработка"
                     ),
                     Person(
                         4,
                         "Алексей",
                         "Козлов",
                         "https://picsum.photos/100/100?random=4",
-                        "Аналитик"
+                        "Аналитик",
+                        "Аналитика"
                     ),
                     Person(
                         5,
                         "Ольга",
                         "Новикова",
                         "https://picsum.photos/100/100?random=5",
-                        "QA Engineer"
+                        "QA Engineer",
+                        "Тестирование"
                     ),
                     Person(
                         6,
                         "Дмитрий",
                         "Кузнецов",
                         "https://picsum.photos/100/100?random=6",
-                        "UX Designer"
+                        "UX Designer",
+                        "Дизайн"
                     ),
                     Person(
                         7,
                         "Елена",
                         "Федорова",
                         "https://picsum.photos/100/100?random=7",
-                        "Backend Dev"
+                        "Backend Dev",
+                        "Разработка"
                     ),
                     Person(
                         8,
                         "Максим",
                         "Орлов",
                         "https://picsum.photos/100/100?random=8",
-                        "DevOps"
+                        "DevOps",
+                        "Разработка"
                     ),
                     Person(
                         9,
                         "Наталья",
                         "Ковалева",
                         "https://picsum.photos/100/100?random=9",
-                        "Team Lead"
+                        "Team Lead",
+                        "Разработка"
                     )
                 )
 

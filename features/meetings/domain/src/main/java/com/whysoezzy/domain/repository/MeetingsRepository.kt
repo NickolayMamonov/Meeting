@@ -1,5 +1,6 @@
 package com.whysoezzy.domain.repository
 
+import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.Meeting
 
 interface MeetingsRepository {
@@ -13,4 +14,6 @@ interface MeetingsRepository {
     suspend fun getUserMeetings(): Result<List<Meeting>>
     suspend fun getEventsByCategory(categoryId: Long): Result<List<Meeting>>
     suspend fun getEventsByCommunity(communityId: Long): Result<List<Meeting>>
+
+    suspend fun getAdBlocks(): Result<List<AdBlock>>
 }

@@ -28,8 +28,10 @@ class CommunityMapper {
     fun communityInfoToDomain(dto: CommunityInfoDto): CommunityInfo {
         return CommunityInfo(
             id = dto.id,
-            title = dto.name,
-            imageUrl = dto.imageUrl
+            name = dto.name,
+            description = dto.description ?: "",
+            imageUrl = dto.imageUrl,
+            subscribersCount = dto.subscribersCount ?: 0
         )
     }
 }

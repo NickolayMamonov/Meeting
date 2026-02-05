@@ -49,7 +49,7 @@ fun UIKitPersonCard(
             )
             .padding(SpacingTokens.M)
             .width(68.dp),
-        horizontalAlignment = Alignment.Start,
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
     ) {
         // Avatar
@@ -61,7 +61,7 @@ fun UIKitPersonCard(
         // Name
         Text(
             text = name,
-            style = TypographyTokens.BodyText1,
+            style = TypographyTokens.BodyText2,
             color = colorScheme.neutralBody,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

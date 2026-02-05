@@ -152,7 +152,7 @@ private fun ParticipantsContent(
                         UIKitPersonCard(
                             name = participant.name,
                             role = participant.bio,
-                            imageUrl = participant.avatar,
+                            imageUrl = participant.avatarUrl,
                             onCardClick = { onParticipantClick(participant.id) }
                         )
                     }
@@ -221,23 +221,25 @@ private fun ErrorContent(
 private fun MeetingParticipantsScreenPreview() {
     UIKitTheme {
         val mockParticipants = listOf(
-            Person(1, "Анна", "Иванова", "https://picsum.photos/100/100?random=1", "UX Designer"),
-            Person(2, "Петр", "Петров", "https://picsum.photos/100/100?random=2", "Android Dev"),
+            Person(1, "Анна", "Иванова", "https://picsum.photos/100/100?random=1", "UX Designer","Дизайн"),
+            Person(2, "Петр", "Петров", "https://picsum.photos/100/100?random=2", "Android Dev","Разработка"),
             Person(
                 3,
                 "Мария",
                 "Сидорова",
                 "https://picsum.photos/100/100?random=3",
-                "Product Manager"
+                "Product Manager",
+                "Разработка"
             ),
-            Person(4, "Алексей", "Козлов", "https://picsum.photos/100/100?random=4", "Аналитик"),
-            Person(5, "Ольга", "Новикова", "https://picsum.photos/100/100?random=5", "QA Engineer"),
+            Person(4, "Алексей", "Козлов", "https://picsum.photos/100/100?random=4", "Аналитик","Аналитика"),
+            Person(5, "Ольга", "Новикова", "https://picsum.photos/100/100?random=5", "QA Engineer","Тестирование"),
             Person(
                 6,
                 "Дмитрий",
                 "Кузнецов",
                 "https://picsum.photos/100/100?random=6",
-                "Backend Dev"
+                "Backend Dev",
+                "Разработка"
             )
         )
         

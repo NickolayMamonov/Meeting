@@ -3,32 +3,31 @@ package com.whysoezzy.domain.models
 sealed class AdBlock {
     abstract val id: Long
     abstract val isActive: Boolean
+    abstract val title: String
+    abstract val description: String
 
-    data class CommunityAd(
+    data class CommunitiesAd(
         override val id: Long,
-        val communityId: Long,
-        val communityName: String,
-        val communityDescription: String,
-        val communityImageUrl: String,
-        val subscribersCount: Int = 0,
+        override val title: String,
+        override val description: String,
+        val communities: List<CommunityInfo>,
         override val isActive: Boolean = true
     ) : AdBlock()
 
     data class TextAd(
         override val id: Long,
-        val title: String,
-        val description: String,
+        override val title: String,
+        override val description: String,
         val actionText: String? = null,
         val actionUrl: String? = null,
         override val isActive: Boolean = true
     ) : AdBlock()
 
-    data class BannerAd(
+    data class PeopleAd(
         override val id: Long,
-        val title: String,
-        val imageUrl: String,
-        val actionUrl: String,
-        val backgroundColor: String? = null,
+        override val title: String,
+        override val description: String,
+        val users: List<Person>,
         override val isActive: Boolean = true
     ) : AdBlock()
 }
