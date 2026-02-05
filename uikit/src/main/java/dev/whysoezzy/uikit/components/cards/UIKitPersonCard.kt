@@ -49,7 +49,7 @@ fun UIKitPersonCard(
             )
             .padding(SpacingTokens.M)
             .width(68.dp),
-        horizontalAlignment = Alignment.Start,
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
     ) {
         // Avatar

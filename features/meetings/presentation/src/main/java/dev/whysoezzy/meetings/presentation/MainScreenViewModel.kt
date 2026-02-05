@@ -46,7 +46,6 @@ class MainScreenViewModel(
 
             getMainScreenDataUseCase()
                 .onSuccess { data ->
-                    // ✅ Мапим List<Meeting> → List<UIKitMeetingInfo>
                     _uiState.value = MainScreenUiState.Success(
                         heroMeetings = data.heroMeetings.toUIKitMeetingInfos(),
                         popularMeetings = data.popularMeetings.toUIKitMeetingInfos(),
@@ -60,7 +59,8 @@ class MainScreenViewModel(
                             onCardClick = { communityId ->
                                 // TODO: Навигация к сообществу
                             }
-                        )
+                        ),
+                        adBlocks = data.adBlocks
                     )
                 }
                 .onFailure { exception ->
@@ -84,7 +84,6 @@ class MainScreenViewModel(
 
             searchUseCase(query)
                 .onSuccess { searchData ->
-                    // ✅ Мапим List<Meeting> → List<UIKitMeetingInfo>
                     _uiState.value = MainScreenUiState.SearchResults(
                         meetings = searchData.meetings.toUIKitMeetingInfos(),
                         communities = searchData.communities.toUIKitCommunityInfoList(
