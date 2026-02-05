@@ -2,8 +2,8 @@ package com.whysoezzy.domain.models
 
 data class CommunityInfo(
     val id: Long,
-    val title: String,
-    val description: String? = null,
+    val name: String,
+    val description: String,
     val imageUrl: String,
-    val membersCount : Int? = null
+    val subscribersCount: Int
 )
