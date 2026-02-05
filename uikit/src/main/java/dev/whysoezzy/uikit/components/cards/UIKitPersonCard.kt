@@ -61,7 +61,7 @@ fun UIKitPersonCard(
         // Name
         Text(
             text = name,
-            style = TypographyTokens.BodyText1,
+            style = TypographyTokens.BodyText2,
             color = colorScheme.neutralBody,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

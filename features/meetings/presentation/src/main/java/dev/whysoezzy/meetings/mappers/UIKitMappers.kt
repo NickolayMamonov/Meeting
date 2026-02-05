@@ -34,7 +34,7 @@ fun Person.toUIKit() = UIKitPerson(
     id = id,
     name = name,
     surname = surname,
-    avatar = avatar,
+    avatar = avatarUrl,
     description = bio
 )
 
@@ -80,7 +80,7 @@ fun List<Tag>.toUIKit(
 
 fun List<Person>.toUIKitPersons() = map { it.toUIKit() }
 
-fun List<Person>.toAvatarUrls() = map { it.avatar }
+fun List<Person>.toAvatarUrls() = map { it.avatarUrl }
 
 fun TagState.toUIKitTagState(): UIKitTagState = when (this) {
     TagState.ACTIVE -> UIKitTagState.ACTIVE
@@ -168,7 +168,7 @@ fun CommunityInfo.toUIKitCommunityInfo(
 ): UIKitCommunityInfo {
     return UIKitCommunityInfo(
         id = id,
-        title = title,
+        title = name,
         imageUrl = imageUrl,
         isSubscribed = isSubscribed,
         onSubscribeClick = onSubscribeClick,

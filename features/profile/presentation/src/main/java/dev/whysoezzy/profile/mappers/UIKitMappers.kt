@@ -81,7 +81,7 @@ fun Person.toUIKitPerson(): UIKitPerson {
         id = id,
         name = name,
         surname = surname,
-        avatar = avatar,
+        avatar = avatarUrl,
         description = bio
     )
 }
@@ -89,7 +89,7 @@ fun Person.toUIKitPerson(): UIKitPerson {
 fun CommunityInfo.toUIKitCommunity(): UIKitCommunity {
     return UIKitCommunity(
         id = id,
-        name = title,
+        name = name,
         description = description ?: "",
         imageUrl = imageUrl
     )
@@ -127,7 +127,7 @@ fun CommunityInfo.toUIKitCommunityInfo(
 ): UIKitCommunityInfo {
     return UIKitCommunityInfo(
         id = id,
-        title = title,
+        title = name,
         imageUrl = imageUrl,
         isSubscribed = isSubscribed,
         onSubscribeClick = onSubscribeClick,
