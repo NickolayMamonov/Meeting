@@ -275,15 +275,17 @@ private fun MeetingContent(
         }
 
         // 6. Host Block
-        item {
-            UIKitHostCard(
-                title = "Ведущий",
-                name = uiState.host.name,
-                surname = uiState.host.surname,
-                description = uiState.host.description,
-                imageUrl = uiState.host.imageUrl,
-                onCardClick = { onHostClick(uiState.host.id) }
-            )
+        uiState.host?.let { host ->
+            item {
+                UIKitHostCard(
+                    title = "Ведущий",
+                    name = host.name,
+                    surname = host.surname,
+                    description = host.description,
+                    imageUrl = host.imageUrl,
+                    onCardClick = { onHostClick(host.id) }
+                )
+            }
         }
 
         // 7. Address with Map - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
@@ -307,13 +309,15 @@ private fun MeetingContent(
         }
 
         // 9. Community Block - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
-        item {
-            UIKitCommunityBlock(
-                communityName = uiState.community.title,
-                communityDescription = uiState.community.description,
-                communityImageUrl = uiState.community.imageUrl,
-                onCommunityClick = { onCommunityClick(uiState.community.id) }
-            )
+        uiState.community?.let { community ->
+            item {
+                UIKitCommunityBlock(
+                    communityName = community.title,
+                    communityDescription = community.description,
+                    communityImageUrl = community.imageUrl,
+                    onCommunityClick = { onCommunityClick(community.id) }
+                )
+            }
         }
 
         // 10. Other Meetings

@@ -19,6 +19,6 @@ val mainFeatureModule = module {
 
     // ViewModels
     viewModel { MainScreenViewModel(get(), get(), get()) }
-    viewModel { MeetingDetailsViewModel() }
+    viewModel { MeetingDetailsViewModel(get(),get(),get()) }
     viewModel { MeetingParticipantsViewModel() }
 }

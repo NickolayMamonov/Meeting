@@ -18,12 +18,12 @@ sealed class MeetingDetailsUiState {
         val address: UIKitAddress,
         val tags: List<UIKitMeetingTag>,
         val description: String,
-        val host: UIKitPersonHost,
+        val host: UIKitPersonHost?,
         val nearestMetro: String,
         val participants: List<UIKitPerson>,
         val isUserJoined: Boolean,
         val totalPlaces: Int,
-        val community: UIKitCommunityHost,
+        val community: UIKitCommunityHost?,
         val otherMeetings: List<UIKitMeetingInfo>
     ) : MeetingDetailsUiState()
 
