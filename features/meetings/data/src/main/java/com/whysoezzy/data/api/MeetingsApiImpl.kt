@@ -1,10 +1,7 @@
 package com.whysoezzy.data.api
 
-import com.whysoezzy.data.dto.AdBlockDto
 import com.whysoezzy.data.dto.AdBlockResponseDto
-import com.whysoezzy.data.dto.ApiResponse
 import com.whysoezzy.data.dto.MeetingDto
-import com.whysoezzy.data.dto.TagDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete

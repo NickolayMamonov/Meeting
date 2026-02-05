@@ -70,7 +70,7 @@ fun MeetingTag.toUIKitEventCardTag(
 
 fun MeetingInfo.toUIKitAddress(): UIKitAddress {
     return UIKitAddress(
-        address = address ?: "",
+        address = address,
         latitude = 0.0,
         longitude = 0.0
     )
@@ -90,7 +90,7 @@ fun CommunityInfo.toUIKitCommunity(): UIKitCommunity {
     return UIKitCommunity(
         id = id,
         name = name,
-        description = description ?: "",
+        description = description,
         imageUrl = imageUrl
     )
 }
@@ -115,7 +115,7 @@ fun Map<SocialMediaType, String>.toUIKitSocialMediaInfoList(): List<UIKitSocialM
         UIKitSocialMediaInfo(
             type = type.toUIKitSocialMedia(),
             url = url,
-            username = extractUsername(url) // вспомогательная функция
+            username = extractUsername(url)
         )
     }
 }
