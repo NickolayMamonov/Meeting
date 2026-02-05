@@ -66,8 +66,9 @@ class MeetingMapper {
                     id = personDto.id,
                     name = personDto.name,
                     surname = personDto.surname,
-                    avatar = personDto.imageUrl ?: "",  // Используем imageUrl вместо avatar
-                    bio = personDto.bio ?: ""
+                    avatarUrl = personDto.imageUrl ?: "",
+                    bio = personDto.bio ?: "",
+                    role = personDto.bio ?: "Не указано"
                 )
             },
             meetingStatus = mapMeetingStatus(dto.meetingStatus),
