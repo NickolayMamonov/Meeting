@@ -20,7 +20,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 /**
  * Блок с участниками
  *
- * @param title Заголовок блока (по умолчанию "Участники")
+ * @param title Заголовок блока (по умолчанию "Пойдут на встречу")
  * @param participantAvatars Список URL аватаров участников
  * @param participantCount Общее количество участников
  * @param avatarSize Размер аватаров в dp
