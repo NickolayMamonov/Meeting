@@ -2,7 +2,6 @@ package dev.whysoezzy.meetings.participants.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
