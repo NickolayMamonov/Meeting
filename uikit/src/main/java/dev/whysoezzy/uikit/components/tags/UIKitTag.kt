@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
@@ -117,10 +116,10 @@ fun UIKitTag(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun UIKitTagGroup(
+    modifier: Modifier = Modifier,
     tags: List<String>,
     selectedTags: Set<String> = emptySet(),
     size: UIKitTagSize = UIKitTagSize.MEDIUM,
-    modifier: Modifier = Modifier,
     onTagClick: ((String) -> Unit)? = null
 ) {
     FlowRow(

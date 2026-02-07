@@ -30,8 +30,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.whysoezzy.domain.models.Person
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.cards.UIKitPersonCard
-import dev.whysoezzy.uikit.components.text.TextHeading1
-import dev.whysoezzy.uikit.components.text.TextMetadata2
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel

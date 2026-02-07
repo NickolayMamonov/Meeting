@@ -28,13 +28,13 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  */
 @Composable
 fun UIKitAddressMapBlock(
+    modifier: Modifier = Modifier,
     title: String = "Адрес",
     address: String,
     latitude: Double,
     longitude: Double,
     nearestMetro: String,
     onMapClick: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),

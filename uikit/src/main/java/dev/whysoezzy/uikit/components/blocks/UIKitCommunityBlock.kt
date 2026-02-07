@@ -39,6 +39,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  */
 @Composable
 fun UIKitCommunityBlock(
+    modifier: Modifier = Modifier,
     title: String = "Организатор",
     communityName: String,
     communityDescription: String,
@@ -47,7 +48,6 @@ fun UIKitCommunityBlock(
     cornerRadius: Int = 8,
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     onCommunityClick: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),

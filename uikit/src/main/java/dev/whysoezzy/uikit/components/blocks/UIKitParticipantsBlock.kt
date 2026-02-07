@@ -30,13 +30,13 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  */
 @Composable
 fun UIKitParticipantsBlock(
+    modifier: Modifier = Modifier,
     title: String = "Пойдут на встречу",
     participantAvatars: List<String>,
     participantCount: Int,
     avatarSize: Int = 40,
     maxVisibleAvatars: Int = 8,
     onParticipantsClick: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
