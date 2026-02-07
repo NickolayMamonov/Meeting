@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -62,7 +63,8 @@ fun MeetingParticipantsScreen(
                     IconButton(onClick = onBackPressed) {
                         Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Назад")
                     }
-                }
+                },
+                windowInsets = WindowInsets(0,0,0,0)
             )
         }
     ) { paddingValues ->
@@ -132,7 +134,7 @@ private fun ParticipantsContent(
                     participants.forEach { participant ->
                         UIKitPersonCard(
                             name = participant.name,
-                            role = participant.bio,
+                            role = participant.role,
                             imageUrl = participant.avatarUrl,
                             onCardClick = { onParticipantClick(participant.id) }
                         )

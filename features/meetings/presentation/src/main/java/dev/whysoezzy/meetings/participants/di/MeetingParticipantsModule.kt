@@ -5,8 +5,9 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 val meetingParticipantsModule = module {
-    viewModel { (meetingId: Long) ->
+    viewModel {
         MeetingParticipantsViewModel(
+            getMeetingByIdUseCase = get()
         )
     }
 }
