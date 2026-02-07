@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,6 +35,7 @@ fun UIKitAvatar(
     imageUrl: String,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
+    clipType: Shape = CircleShape,
     placeholder: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
@@ -41,7 +44,7 @@ fun UIKitAvatar(
     Box(
         modifier = modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(clipType)
             .then(
                 if (onClick != null) {
                     Modifier.clickable(onClick = onClick)
@@ -126,12 +129,14 @@ fun UIKitAvatarPreview() {
             // Small avatar with image
             UIKitAvatar(
                 imageUrl = "https://picsum.photos/200",
+                clipType = RoundedCornerShape(8.dp),
                 size = 40.dp
             )
 
             // Medium avatar without image
             UIKitAvatar(
                 imageUrl = "",
+                clipType = RoundedCornerShape(2.dp),
                 size = 64.dp
             )
 

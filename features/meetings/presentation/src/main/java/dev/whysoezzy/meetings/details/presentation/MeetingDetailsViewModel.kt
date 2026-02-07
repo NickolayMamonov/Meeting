@@ -2,14 +2,9 @@ package dev.whysoezzy.meetings.details.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.whysoezzy.domain.models.CommunityHost
-import com.whysoezzy.domain.models.MeetingAddress
-import com.whysoezzy.domain.models.MeetingInfo
-import com.whysoezzy.domain.models.MeetingStatus
-import com.whysoezzy.domain.models.MeetingTag
-import com.whysoezzy.domain.models.Person
-import com.whysoezzy.domain.models.PersonHost
-import com.whysoezzy.domain.models.TagState
+import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
+import com.whysoezzy.domain.usecase.JoinMeetingUseCase
+import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
 import dev.whysoezzy.meetings.mappers.toUIKit
 import dev.whysoezzy.meetings.mappers.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,11 +12,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class MeetingDetailsViewModel : ViewModel() {
+class MeetingDetailsViewModel(
+    private val getMeetingByIdUseCase: GetMeetingByIdUseCase,
+    private val joinMeetingUseCase: JoinMeetingUseCase,
+    private val leaveMeetingUseCase: LeaveMeetingUseCase
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MeetingDetailsUiState>(MeetingDetailsUiState.Loading)
     val uiState: StateFlow<MeetingDetailsUiState> = _uiState.asStateFlow()
 
+    private var currentMeetingId: Long? = null
     fun onEvent(event: MeetingDetailsEvent) {
         when (event) {
             is MeetingDetailsEvent.LoadMeeting -> loadMeeting(event.meetingId)
@@ -49,123 +49,78 @@ class MeetingDetailsViewModel : ViewModel() {
         }
     }
 
-    fun loadMeeting(meetingId: Long) {
+    private fun loadMeeting(meetingId: Long) {
         viewModelScope.launch {
             _uiState.value = MeetingDetailsUiState.Loading
+            currentMeetingId = meetingId
 
-            try {
-                // Mock data for now
-                val mockTags = listOf(
-                    MeetingTag(1, "Android", TagState.ACTIVE),
-                    MeetingTag(2, "Kotlin", TagState.ACTIVE),
-                    MeetingTag(3, "Design", TagState.ACTIVE)
-                )
-
-                val mockParticipants = listOf(
-                    Person(
-                        1,
-                        "Анна",
-                        "Иванова",
-                        "https://picsum.photos/100/100?random=1",
-                        "Дизайнер",
-                        "Дизайн"
-                    ),
-                    Person(
-                        2,
-                        "Петр",
-                        "Петров",
-                        "https://picsum.photos/100/100?random=2",
-                        "Разработчик",
-                        "Разработка"
-                    ),
-                    Person(3, "Мария", "Сидорова", "https://picsum.photos/100/100?random=3", "PM","Разработка"),
-                    Person(
-                        4,
-                        "Алексей",
-                        "Козлов",
-                        "https://picsum.photos/100/100?random=4",
-                        "Аналитик",
-                        "Аналитика"
-                    ),
-                    Person(5, "Ольга", "Новикова", "https://picsum.photos/100/100?random=5", "QA","Тестирование")
-                )
-
-                val mockOtherMeetings = listOf(
-                    MeetingInfo(
-                        id = 100,
-                        imageUrl = "https://picsum.photos/320/180?random=100",
-                        title = "Мастер-класс по Jetpack Compose",
-                        address = "ул. Пушкина, 10",
-                        tags = mockTags.take(2),
-                        time = System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000, // +7 дней
-                        meetingStatus = MeetingStatus.ACTIVE
-                    ),
-                    MeetingInfo(
-                        id = 101,
-                        imageUrl = "https://picsum.photos/320/180?random=101",
-                        title = "Конференция Android Dev",
-                        address = "ул. Ленина, 5",
-                        tags = mockTags,
-                        time = System.currentTimeMillis() + 14 * 24 * 60 * 60 * 1000, // +14 дней
-                        meetingStatus = MeetingStatus.ACTIVE
+            getMeetingByIdUseCase(meetingId)
+                .onSuccess { meeting ->
+                    _uiState.value = MeetingDetailsUiState.Success(
+                        meetingId = meeting.id,
+                        imageUrl = meeting.imageUrl,
+                        title = meeting.title,
+                        dateTime = meeting.date,
+                        address = meeting.address.toUIKit(),
+                        tags = meeting.tags.toUIKitMeetingTags(),
+                        description = meeting.description,
+                        host = meeting.personHost?.toUIKitPersonHost(),
+                        nearestMetro = extractMetroFromAddress(meeting.address.address),
+                        participants = meeting.participants.map { it.toUIKit() },
+                        isUserJoined = meeting.isUserInParticipants,
+                        totalPlaces = meeting.capacity,
+                        community = meeting.communityHost?.toUIKitCommunityHost(),
+                        otherMeetings = meeting.communityHost?.meetingsInfo?.toUIKitMeetingInfoList() ?: emptyList()
                     )
-                )
-
-                _uiState.value = MeetingDetailsUiState.Success(
-                    meetingId = meetingId,
-                    imageUrl = "https://picsum.photos/800/600?random=$meetingId",
-                    title = "Встреча разработчиков Android #$meetingId",
-                    dateTime = "15 декабря 2024, 19:00",
-                    address = MeetingAddress(
-                        address = "ул. Тверская, 15, офис 301",
-                        latitude = 55.7558,
-                        longitude = 37.6176
-                    ).toUIKit(),
-                    tags = mockTags.toUIKitMeetingTags(),
-                    description = "Обсуждение новых технологий...",
-                    host = PersonHost(
-                        id = 1,
-                        name = "Александр",
-                        surname = "Петров",
-                        description = "Senior Android Developer",
-                        imageUrl = "https://picsum.photos/200/200?random=host$meetingId"
-                    ).toUIKitPersonHost(),
-                    nearestMetro = "М. Охотный ряд",
-                    participants = mockParticipants.map { it.toUIKit() },
-                    isUserJoined = false,
-                    totalPlaces = 30,
-                    community = CommunityHost(
-                        id = 1,
-                        title = "Android Developers Moscow",
-                        description = "Сообщество разработчиков...",
-                        imageUrl = "https://picsum.photos/300/300?random=community$meetingId",
-                        meetingsInfo = mockOtherMeetings
-                    ).toUIKitCommunityHost(),
-                    otherMeetings = mockOtherMeetings.toUIKitMeetingInfoList()
-                )
-            } catch (e: Exception) {
-                _uiState.value = MeetingDetailsUiState.Error(
-                    message = e.message ?: "Не удалось загрузить информацию о встрече"
-                )
-            }
+                }
+                .onFailure { exception ->
+                    _uiState.value = MeetingDetailsUiState.Error(
+                        message = exception.message ?: "Не удалось загрузить информацию о встрече"
+                    )
+                }
         }
     }
 
     private fun joinMeeting() {
-        val currentState = _uiState.value
-        if (currentState is MeetingDetailsUiState.Success && !currentState.isUserJoined) {
-            _uiState.value = currentState.copy(
-                isUserJoined = true
-            )
+        val meetingId = currentMeetingId ?: return
+        val currentState = _uiState.value as? MeetingDetailsUiState.Success ?: return
+        if (currentState.isUserJoined) return
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(isUserJoined = true)
+
+            joinMeetingUseCase(meetingId)
+                .onSuccess {
+
+                }
+                .onFailure { exception ->
+                    _uiState.value = currentState.copy(isUserJoined = false)
+                    println("Failed to join meeting: ${exception.message}")
+
+                }
         }
     }
 
     private fun leaveMeeting() {
-        val currentState = _uiState.value
-        if (currentState is MeetingDetailsUiState.Success && currentState.isUserJoined) {
-            _uiState.value = currentState.copy(
-                isUserJoined = false
-            )
+        val meetingId = currentMeetingId ?: return
+        val currentState = _uiState.value as? MeetingDetailsUiState.Success ?: return
+        if (!currentState.isUserJoined) return
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(isUserJoined = false)
+            leaveMeetingUseCase(meetingId)
+                .onSuccess {
+
+                }
+                .onFailure { exception ->
+                    _uiState.value = currentState.copy(isUserJoined = true)
+                    println("Failed to leave meeting: ${exception.message}")
+                }
+        }
+    }
+    private fun extractMetroFromAddress(address: String): String {
+        return if (address.contains("М.")) {
+            address.substringAfter("М.").substringBefore(",").trim()
+        } else {
+            "Не указано"
         }
     }
 }

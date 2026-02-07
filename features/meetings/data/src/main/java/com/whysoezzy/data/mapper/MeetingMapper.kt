@@ -30,7 +30,7 @@ class MeetingMapper {
                 MeetingTag(
                     id = tagDto.id,
                     text = tagDto.text,
-                    state = TagState.ACTIVE  // По умолчанию ACTIVE, т.к. state больше не приходит
+                    state = TagState.ACTIVE
                 )
             },
             personHost = dto.personHost?.let { personHostDto ->
@@ -41,7 +41,7 @@ class MeetingMapper {
                     description = personHostDto.description,
                     imageUrl = personHostDto.imageUrl
                 )
-            } as PersonHost,
+            },
             communityHost = dto.communityHost?.let { communityHostDto ->
                 CommunityHost(
                     id = communityHostDto.id,
@@ -53,14 +53,14 @@ class MeetingMapper {
                             id = infoDto.id,
                             title = infoDto.title,
                             imageUrl = infoDto.imageUrl,
-                            time = 0L,  // Упрощенный MeetingInfoDto не содержит time
-                            tags = emptyList(),  // Упрощенный MeetingInfoDto не содержит tags
-                            address = "",  // Упрощенный MeetingInfoDto не содержит address
-                            meetingStatus = MeetingStatus.ACTIVE,  // Упрощенный MeetingInfoDto не содержит status
+                            time = 0L,
+                            tags = emptyList(),
+                            address = "",
+                            meetingStatus = MeetingStatus.ACTIVE,
                         )
                     }
                 )
-            } as CommunityHost,
+            },
             participants = dto.participants.map { personDto ->
                 Person(
                     id = personDto.id,

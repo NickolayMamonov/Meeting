@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -62,7 +63,6 @@ fun MeetingDetailsScreen(
     meetingId: Long,
     onBackPressed: () -> Unit,
     onParticipantsClick: () -> Unit,
-    modifier: Modifier = Modifier,
     viewModel: MeetingDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -105,7 +105,12 @@ fun MeetingDetailsScreen(
     ) { paddingValues ->
         when (uiState) {
             is MeetingDetailsUiState.Loading -> {
-                LoadingContent(modifier = Modifier.padding(paddingValues))
+                LoadingContent(modifier = Modifier.padding(
+                    start = 0.dp,
+                    top = 0.dp,
+                    end = 0.dp,
+                    bottom = paddingValues.calculateBottomPadding()
+                ))
             }
 
             is MeetingDetailsUiState.Success -> {
@@ -137,7 +142,11 @@ fun MeetingDetailsScreen(
                     },
                     onMapClick = { viewModel.onEvent(MeetingDetailsEvent.OpenMap) },
                     onParticipantsClick = onParticipantsClick,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(start = 0.dp,
+                        top = paddingValues.calculateTopPadding(),
+                        end = 0.dp,
+                        bottom = paddingValues.calculateBottomPadding()
+                    )
                 )
             }
 
@@ -146,7 +155,11 @@ fun MeetingDetailsScreen(
                     message = (uiState as MeetingDetailsUiState.Error).message,
                     onRetry = { viewModel.onEvent(MeetingDetailsEvent.LoadMeeting(meetingId)) },
                     onBackPressed = onBackPressed,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(start = 0.dp,
+                        top = 0.dp,
+                        end = 0.dp,
+                        bottom = paddingValues.calculateBottomPadding()
+                    )
                 )
             }
         }
@@ -184,14 +197,14 @@ private fun BottomActionSection(
             // Кнопка действия
             if (isUserJoined) {
                 UIKitButton(
-                    text = "Покинуть встречу",
+                    text = "Записаться на встречу",
                     onClick = onLeaveClick,
                     state = UIKitButtonState.PRIMARY,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 UIKitButton(
-                    text = "Записаться на встречу",
+                    text = "Покинуть встречу",
                     onClick = onJoinClick,
                     state = UIKitButtonState.SECONDARY,
                     modifier = Modifier.fillMaxWidth()
@@ -230,7 +243,8 @@ private fun MeetingContent(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = SpacingTokens.L),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
+
     ) {
         // 1. Meeting Image
         item {
@@ -239,7 +253,8 @@ private fun MeetingContent(
                 contentDescription = "Изображение встречи",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Crop
             )
         }
@@ -275,18 +290,20 @@ private fun MeetingContent(
         }
 
         // 6. Host Block
-        item {
-            UIKitHostCard(
-                title = "Ведущий",
-                name = uiState.host.name,
-                surname = uiState.host.surname,
-                description = uiState.host.description,
-                imageUrl = uiState.host.imageUrl,
-                onCardClick = { onHostClick(uiState.host.id) }
-            )
+        uiState.host?.let { host ->
+            item {
+                UIKitHostCard(
+                    title = "Ведущий",
+                    name = host.name,
+                    surname = host.surname,
+                    description = host.description,
+                    imageUrl = host.imageUrl,
+                    onCardClick = { onHostClick(host.id) }
+                )
+            }
         }
 
-        // 7. Address with Map - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
+        // 7. Address with Map
         item {
             UIKitAddressMapBlock(
                 address = uiState.address.address,
@@ -297,7 +314,7 @@ private fun MeetingContent(
             )
         }
 
-        // 8. Participants - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
+        // 8. Participants
         item {
             UIKitParticipantsBlock(
                 participantAvatars = uiState.participants.map { it.avatar },
@@ -306,14 +323,16 @@ private fun MeetingContent(
             )
         }
 
-        // 9. Community Block - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
-        item {
-            UIKitCommunityBlock(
-                communityName = uiState.community.title,
-                communityDescription = uiState.community.description,
-                communityImageUrl = uiState.community.imageUrl,
-                onCommunityClick = { onCommunityClick(uiState.community.id) }
-            )
+        // 9. Community Block
+        uiState.community?.let { community ->
+            item {
+                UIKitCommunityBlock(
+                    communityName = community.title,
+                    communityDescription = community.description,
+                    communityImageUrl = community.imageUrl,
+                    onCommunityClick = { onCommunityClick(community.id) }
+                )
+            }
         }
 
         // 10. Other Meetings

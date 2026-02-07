@@ -39,6 +39,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  */
 @Composable
 fun UIKitCommunityBlock(
+    modifier: Modifier = Modifier,
     title: String = "Организатор",
     communityName: String,
     communityDescription: String,
@@ -47,7 +48,6 @@ fun UIKitCommunityBlock(
     cornerRadius: Int = 8,
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     onCommunityClick: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -56,7 +56,6 @@ fun UIKitCommunityBlock(
         // Заголовок
         TextHeading2(text = title)
 
-        // Карточка сообщества
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -64,14 +63,10 @@ fun UIKitCommunityBlock(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
-            // Изображение сообщества
-
-
-            // Информация о сообществе
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                TextSubheading1(text = communityName)
+                TextSubheading1(text = communityName, color = Color.Black)
                 TextBody2(
                     text = communityDescription,
                     overflow = TextOverflow.Ellipsis,

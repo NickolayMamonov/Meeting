@@ -20,7 +20,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 /**
  * Блок с участниками
  *
- * @param title Заголовок блока (по умолчанию "Участники")
+ * @param title Заголовок блока (по умолчанию "Пойдут на встречу")
  * @param participantAvatars Список URL аватаров участников
  * @param participantCount Общее количество участников
  * @param avatarSize Размер аватаров в dp
@@ -30,13 +30,13 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  */
 @Composable
 fun UIKitParticipantsBlock(
-    title: String = "Участники",
+    modifier: Modifier = Modifier,
+    title: String = "Пойдут на встречу",
     participantAvatars: List<String>,
     participantCount: Int,
     avatarSize: Int = 40,
     maxVisibleAvatars: Int = 8,
     onParticipantsClick: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
