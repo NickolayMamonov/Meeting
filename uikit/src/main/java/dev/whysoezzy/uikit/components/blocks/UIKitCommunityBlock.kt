@@ -56,7 +56,6 @@ fun UIKitCommunityBlock(
         // Заголовок
         TextHeading2(text = title)
 
-        // Карточка сообщества
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -64,14 +63,10 @@ fun UIKitCommunityBlock(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
-            // Изображение сообщества
-
-
-            // Информация о сообществе
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                TextSubheading1(text = communityName)
+                TextSubheading1(text = communityName, color = Color.Black)
                 TextBody2(
                     text = communityDescription,
                     overflow = TextOverflow.Ellipsis,

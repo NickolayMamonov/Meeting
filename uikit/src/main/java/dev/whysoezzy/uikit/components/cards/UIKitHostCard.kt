@@ -71,7 +71,7 @@ fun UIKitHostCard(
             UIKitAvatar(
                 imageUrl = imageUrl,
                 size = 96.dp,
-                modifier = Modifier.clip(RoundedCornerShape(2.dp))
+                clipType = RoundedCornerShape(8.dp)
             )
         }
     }

@@ -122,23 +122,6 @@ private fun ParticipantsContent(
             .padding(horizontal = SpacingTokens.L),
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
     ) {
-        // Header
-        item {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
-            ) {
-                TextHeading1(
-                    text = "Участники",
-                    textAlign = TextAlign.Start
-                )
-
-                TextMetadata2(
-                    text = "Всего участников: ${participants.size}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         // Participants Grid
         item {
             if (participants.isNotEmpty()) {

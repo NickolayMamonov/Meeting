@@ -30,7 +30,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  */
 @Composable
 fun UIKitParticipantsBlock(
-    title: String = "Участники",
+    title: String = "Пойдут на встречу",
     participantAvatars: List<String>,
     participantCount: Int,
     avatarSize: Int = 40,

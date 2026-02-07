@@ -11,8 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import dev.whysoezzy.uikit.components.maps.UIKitMapView
-import dev.whysoezzy.uikit.components.text.TextBody1
-import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -34,7 +32,7 @@ fun UIKitAddressMapBlock(
     address: String,
     latitude: Double,
     longitude: Double,
-    nearestMetro: String? = null,
+    nearestMetro: String,
     onMapClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -42,25 +40,18 @@ fun UIKitAddressMapBlock(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
     ) {
-        // Заголовок
-        TextHeading2(text = title)
-
         // Адрес
-        TextBody1(text = address)
+        TextHeading2(text = address)
 
         // Информация о ближайшем метро
-        nearestMetro?.let { metro ->
+        if(nearestMetro != "Не указано"){
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
             ) {
                 Text(
-                    text = "🚇 : $metro",
+                    text = "🚇 : $nearestMetro",
                     style = MaterialTheme.typography.bodyMedium
-                )
-                TextBody2(
-                    text = "Ближайшее метро: $metro",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -98,7 +89,7 @@ private fun UIKitAddressMapBlockWithoutMetroPreview() {
             address = "ул. Пушкина, д. Колотушкина",
             latitude = 55.7558,
             longitude = 37.6176,
-            nearestMetro = null,
+            nearestMetro = "Не указано",
             onMapClick = { }
         )
     }

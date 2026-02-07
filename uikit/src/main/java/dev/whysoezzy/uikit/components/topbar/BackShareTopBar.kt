@@ -1,6 +1,7 @@
 package dev.whysoezzy.uikit.components.topbar
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -50,6 +51,7 @@ fun BackShareTopBar(
                 Icon(Icons.Default.Share, contentDescription = "Share")
             }
         },
+        windowInsets = WindowInsets(0,0,0,0),
         modifier = modifier
     )
 

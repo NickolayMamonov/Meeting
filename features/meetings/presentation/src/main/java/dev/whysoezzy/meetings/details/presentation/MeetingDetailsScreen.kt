@@ -3,6 +3,7 @@ package dev.whysoezzy.meetings.details.presentation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -105,7 +107,12 @@ fun MeetingDetailsScreen(
     ) { paddingValues ->
         when (uiState) {
             is MeetingDetailsUiState.Loading -> {
-                LoadingContent(modifier = Modifier.padding(paddingValues))
+                LoadingContent(modifier = Modifier.padding(
+                    start = 0.dp,
+                    top = 0.dp,
+                    end = 0.dp,
+                    bottom = paddingValues.calculateBottomPadding()
+                ))
             }
 
             is MeetingDetailsUiState.Success -> {
@@ -137,7 +144,11 @@ fun MeetingDetailsScreen(
                     },
                     onMapClick = { viewModel.onEvent(MeetingDetailsEvent.OpenMap) },
                     onParticipantsClick = onParticipantsClick,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(start = 0.dp,
+                        top = paddingValues.calculateTopPadding(),
+                        end = 0.dp,
+                        bottom = paddingValues.calculateBottomPadding()
+                    )
                 )
             }
 
@@ -146,7 +157,11 @@ fun MeetingDetailsScreen(
                     message = (uiState as MeetingDetailsUiState.Error).message,
                     onRetry = { viewModel.onEvent(MeetingDetailsEvent.LoadMeeting(meetingId)) },
                     onBackPressed = onBackPressed,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(start = 0.dp,
+                        top = 0.dp,
+                        end = 0.dp,
+                        bottom = paddingValues.calculateBottomPadding()
+                    )
                 )
             }
         }
@@ -184,14 +199,14 @@ private fun BottomActionSection(
             // Кнопка действия
             if (isUserJoined) {
                 UIKitButton(
-                    text = "Покинуть встречу",
+                    text = "Записаться на встречу",
                     onClick = onLeaveClick,
                     state = UIKitButtonState.PRIMARY,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 UIKitButton(
-                    text = "Записаться на встречу",
+                    text = "Покинуть встречу",
                     onClick = onJoinClick,
                     state = UIKitButtonState.SECONDARY,
                     modifier = Modifier.fillMaxWidth()
@@ -230,7 +245,8 @@ private fun MeetingContent(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = SpacingTokens.L),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
+
     ) {
         // 1. Meeting Image
         item {
@@ -239,7 +255,8 @@ private fun MeetingContent(
                 contentDescription = "Изображение встречи",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Crop
             )
         }
@@ -288,7 +305,7 @@ private fun MeetingContent(
             }
         }
 
-        // 7. Address with Map - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
+        // 7. Address with Map
         item {
             UIKitAddressMapBlock(
                 address = uiState.address.address,
@@ -299,7 +316,7 @@ private fun MeetingContent(
             )
         }
 
-        // 8. Participants - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
+        // 8. Participants
         item {
             UIKitParticipantsBlock(
                 participantAvatars = uiState.participants.map { it.avatar },
@@ -308,7 +325,7 @@ private fun MeetingContent(
             )
         }
 
-        // 9. Community Block - ИСПОЛЬЗОВАНИЕ НОВОГО БЛОКА ИЗ UIKIT
+        // 9. Community Block
         uiState.community?.let { community ->
             item {
                 UIKitCommunityBlock(

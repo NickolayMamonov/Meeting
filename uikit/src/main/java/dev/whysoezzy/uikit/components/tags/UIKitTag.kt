@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,7 +79,7 @@ fun UIKitTag(
     ) {
         when (size) {
             UIKitTagSize.LARGE -> {
-                androidx.compose.material3.Text(
+                Text(
                     text = text,
                     style = TypographyTokens.Heading2.copy(fontWeight = FontWeight.Medium),
                     color = textColor,
@@ -90,7 +91,7 @@ fun UIKitTag(
             }
 
             UIKitTagSize.MEDIUM -> {
-                androidx.compose.material3.Text(
+                Text(
                     text = text,
                     style = TypographyTokens.Subheading2.copy(fontWeight = FontWeight.Medium),
                     color = textColor,
@@ -99,12 +100,12 @@ fun UIKitTag(
             }
 
             UIKitTagSize.SMALL -> {
-                androidx.compose.material3.Text(
+                Text(
                     text = text,
-                    style = TypographyTokens.BodyText2.copy(fontWeight = FontWeight.Medium),
+                    style = TypographyTokens.Metadata1.copy(fontWeight = FontWeight.Medium),
                     color = textColor,
                     modifier = Modifier.padding(
-                        horizontal = 6.dp,
+                        horizontal = 4.dp,
                         vertical = 3.dp
                     )
                 )
