@@ -1,6 +1,5 @@
 package com.whysoezzy.data.mapper
 
-import com.whysoezzy.data.dto.AdBlockDto
 import com.whysoezzy.data.dto.AdBlockResponseDto
 import com.whysoezzy.data.dto.CommunityInfoDto
 import com.whysoezzy.data.dto.UserInfoDto
