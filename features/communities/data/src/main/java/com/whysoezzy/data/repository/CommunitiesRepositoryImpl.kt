@@ -3,6 +3,8 @@ package com.whysoezzy.data.repository
 import com.whysoezzy.data.api.CommunitiesApiImpl
 import com.whysoezzy.data.mapper.CommunityMapper
 import com.whysoezzy.domain.models.Community
+import com.whysoezzy.domain.models.Meeting
+import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.repository.CommunitiesRepository
 import com.whysoezzy.network.safeApiCall
 
@@ -40,6 +42,20 @@ class CommunitiesRepositoryImpl(
         return safeApiCall {
             val response = communitiesApi.searchCommunities(query)
             response.map { communityMapper.toDomain(it) }
+        }
+    }
+
+    override suspend fun getCommunityMeetings(id: Long): Result<List<Meeting>> {
+        return safeApiCall {
+            val response = communitiesApi.getCommunityMeetings(id)
+            response.map { communityMapper.meetingToDomain(it) }
+        }
+    }
+
+    override suspend fun getCommunitySubscribers(id: Long): Result<List<Person>> {
+        return safeApiCall {
+            val response = communitiesApi.getCommunitySubscribers(id)
+            response.map { communityMapper.userInfoToDomain(it) }
         }
     }
 }
