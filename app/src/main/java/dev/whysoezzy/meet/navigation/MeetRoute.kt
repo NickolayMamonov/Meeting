@@ -34,4 +34,7 @@ sealed class MeetRoute(val route: String) {
     // Profile routes
     object Profile : MeetRoute("profile")
     object ProfileEdit : MeetRoute("profile/edit")
+    object UserProfile : MeetRoute("profile/{userId}") {
+        fun createRoute(userId: Long) = "profile/$userId"
+    }
 }
