@@ -1,5 +1,6 @@
 package dev.whysoezzy.communities.details.presentation
 
+import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
@@ -14,9 +15,10 @@ sealed class CommunityDetailsUiState {
         val tags: List<MeetingTag>,
         val description: String,
         val isSubscribed: Boolean,
+        val subscribersCount: Int,
         val subscribers: List<Person>,
-        val activeMeetings: List<MeetingInfo>,
-        val pastMeetings: List<MeetingInfo>
+        val activeMeetings: List<Meeting>,
+        val pastMeetings: List<Meeting>
     ) : CommunityDetailsUiState()
 
     data class Error(val message: String) : CommunityDetailsUiState()

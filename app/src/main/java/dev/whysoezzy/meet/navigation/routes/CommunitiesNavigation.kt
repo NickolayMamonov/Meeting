@@ -4,7 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import dev.whysoezzy.communities.details.presentation.CommunityDetailsScreen
-import dev.whysoezzy.communities.subscribers.presentation.CommunitySubscribersScreen
+import dev.whysoezzy.communities.subscribers.CommunitySubscribersScreen
 import dev.whysoezzy.meet.navigation.MeetRoute
 
 fun NavGraphBuilder.communitiesNavigation(navController: NavController) {
@@ -17,6 +17,9 @@ fun NavGraphBuilder.communitiesNavigation(navController: NavController) {
             },
             onSubscribersClick = {
                 navController.navigate(MeetRoute.CommunitySubscribers.createRoute(communityId))
+            },
+            onMeetingClick = { meetingId ->
+                navController.navigate(MeetRoute.MeetingDetails.createRoute(meetingId))
             }
         )
     }

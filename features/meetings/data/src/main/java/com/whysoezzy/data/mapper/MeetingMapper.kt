@@ -82,7 +82,7 @@ class MeetingMapper {
             "ACTIVE" -> MeetingStatus.ACTIVE
             "COMPLETED" -> MeetingStatus.COMPLETED
             "CANCELLED" -> MeetingStatus.CANCELLED
-            "FINISHED" -> MeetingStatus.COMPLETED  // Сервер отправляет FINISHED
+            "FINISHED" -> MeetingStatus.COMPLETED
             "FULL" -> MeetingStatus.FULL
             "DRAFT" -> MeetingStatus.DRAFT
             else -> MeetingStatus.ACTIVE

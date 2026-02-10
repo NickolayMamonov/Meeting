@@ -1,6 +1,8 @@
 package com.whysoezzy.data.api
 
 import com.whysoezzy.data.dto.CommunityDto
+import com.whysoezzy.data.dto.MeetingDto
+import com.whysoezzy.data.dto.UserInfoDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -33,5 +35,13 @@ class CommunitiesApiImpl(private val client: HttpClient) {
         return client.get("communities/search") {
             parameter("query", query)
         }.body()
+    }
+
+    suspend fun getCommunityMeetings(id: Long): List<MeetingDto> {
+        return client.get("communities/$id/meetings").body()
+    }
+
+    suspend fun getCommunitySubscribers(id: Long): List<UserInfoDto> {
+        return client.get("communities/$id/subscribers").body()
     }
 }

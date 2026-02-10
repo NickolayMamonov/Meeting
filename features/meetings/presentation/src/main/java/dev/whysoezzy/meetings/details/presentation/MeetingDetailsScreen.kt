@@ -63,6 +63,7 @@ fun MeetingDetailsScreen(
     meetingId: Long,
     onBackPressed: () -> Unit,
     onParticipantsClick: () -> Unit,
+    onCommunityClick: (Long) -> Unit = {},
     viewModel: MeetingDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -126,13 +127,7 @@ fun MeetingDetailsScreen(
                             )
                         )
                     },
-                    onCommunityClick = {
-                        viewModel.onEvent(
-                            MeetingDetailsEvent.NavigateToCommunity(
-                                it
-                            )
-                        )
-                    },
+                    onCommunityClick = onCommunityClick,
                     onOtherMeetingClick = {
                         viewModel.onEvent(
                             MeetingDetailsEvent.NavigateToMeeting(

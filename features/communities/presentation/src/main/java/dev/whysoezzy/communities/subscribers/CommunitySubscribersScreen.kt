@@ -1,4 +1,4 @@
-package dev.whysoezzy.meetings.participants.presentation
+package dev.whysoezzy.communities.subscribers
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
@@ -19,20 +19,19 @@ import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading
-
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MeetingParticipantsScreen(
-    meetingId: Long,
+fun CommunitySubscribersScreen(
+    communityId: Long,
     onBackPressed: () -> Unit,
-    viewModel: MeetingParticipantsViewModel = koinViewModel()
+    viewModel: CommunitySubscribersViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(meetingId) {
-        viewModel.onEvent(MeetingParticipantsEvent.LoadParticipants(meetingId))
+    LaunchedEffect(communityId) {
+        viewModel.onEvent(CommunitySubscribersEvent.LoadSubscribers(communityId))
     }
 
     Scaffold(
@@ -41,9 +40,9 @@ fun MeetingParticipantsScreen(
                 title = {
                     Text(
                         text = when (uiState) {
-                            is MeetingParticipantsUiState.Success ->
-                                (uiState as MeetingParticipantsUiState.Success).meetingTitle
-                            else -> "Участники"
+                            is CommunitySubscribersUiState.Success ->
+                                (uiState as CommunitySubscribersUiState.Success).communityName
+                            else -> "Подписчики"
                         }
                     )
                 },
@@ -57,33 +56,33 @@ fun MeetingParticipantsScreen(
         }
     ) { paddingValues ->
         when (val state = uiState) {
-            is MeetingParticipantsUiState.Loading -> {
+            is CommunitySubscribersUiState.Loading -> {
                 PersonsGridLoading(modifier = Modifier.padding(paddingValues))
             }
 
-            is MeetingParticipantsUiState.Success -> {
+            is CommunitySubscribersUiState.Success -> {
                 PersonsGridContent(
-                    persons = state.participants.map { participant ->
+                    persons = state.subscribers.map { subscriber ->
                         PersonItem(
-                            id = participant.id,
-                            name = "${participant.name} ${participant.surname}",
-                            role = participant.role,
-                            imageUrl = participant.avatarUrl
+                            id = subscriber.id,
+                            name = "${subscriber.name} ${subscriber.surname}",
+                            role = subscriber.role,
+                            imageUrl = subscriber.avatarUrl
                         )
                     },
-                    onPersonClick = { participantId ->
-                        viewModel.onEvent(MeetingParticipantsEvent.NavigateToProfile(participantId))
+                    onPersonClick = { subscriberId ->
+                        viewModel.onEvent(CommunitySubscribersEvent.NavigateToProfile(subscriberId))
                     },
-                    emptyStateText = "Пока нет участников",
+                    emptyStateText = "Пока нет подписчиков",
                     modifier = Modifier.padding(paddingValues)
                 )
             }
 
-            is MeetingParticipantsUiState.Error -> {
+            is CommunitySubscribersUiState.Error -> {
                 PersonsGridError(
                     message = state.message,
                     onRetry = {
-                        viewModel.onEvent(MeetingParticipantsEvent.LoadParticipants(meetingId))
+                        viewModel.onEvent(CommunitySubscribersEvent.LoadSubscribers(communityId))
                     },
                     onBackPressed = onBackPressed,
                     modifier = Modifier.padding(paddingValues)

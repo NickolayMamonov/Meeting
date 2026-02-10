@@ -32,6 +32,9 @@ fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
             },
             onParticipantsClick = {
                 navController.navigate(MeetRoute.MeetingParticipants.createRoute(meetingId))
+            },
+            onCommunityClick = { communityId ->
+                navController.navigate(MeetRoute.CommunityDetails.createRoute(communityId))
             }
         )
     }
