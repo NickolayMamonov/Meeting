@@ -12,8 +12,10 @@ sealed class  ProfileDetailsUiState {
         val name: String,
         val surname: String,
         val email: String,
+        val city: String = "",
         val description: String,
         val avatarUrl: String?,
+        val interests: List<String> = emptyList(),
         val isOwnProfile: Boolean,
         val socialMedias: List<UIKitSocialMediaInfo>,
         val userMeetings: List<UIKitMeetingInfo>,
@@ -34,3 +36,4 @@ sealed class ProfileDetailsEvent {
     data class ToggleCommunitySubscription(val communityId: Long, val isSubscribed: Boolean) :
         ProfileDetailsEvent()
 }
+

@@ -63,7 +63,8 @@ fun MeetingDetailsScreen(
     meetingId: Long,
     onBackPressed: () -> Unit,
     onParticipantsClick: () -> Unit,
-    onCommunityClick: (Long) -> Unit = {},
+    onCommunityClick: (Long) -> Unit,
+    onHostClick: (Long) -> Unit,
     viewModel: MeetingDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -119,7 +120,7 @@ fun MeetingDetailsScreen(
                     uiState = uiState as MeetingDetailsUiState.Success,
                     onJoinClick = { viewModel.onEvent(MeetingDetailsEvent.JoinMeeting) },
                     onLeaveClick = { viewModel.onEvent(MeetingDetailsEvent.LeaveMeeting) },
-                    onHostClick = { viewModel.onEvent(MeetingDetailsEvent.NavigateToProfile(it)) },
+                    onHostClick = onHostClick,
                     onParticipantClick = {
                         viewModel.onEvent(
                             MeetingDetailsEvent.NavigateToProfile(

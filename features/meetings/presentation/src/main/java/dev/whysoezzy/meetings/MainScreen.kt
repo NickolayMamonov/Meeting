@@ -56,7 +56,8 @@ fun MainScreen(
     viewModel: MainScreenViewModel = koinViewModel(),
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onUserProfileClick: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -91,7 +92,8 @@ fun MainScreen(
                         communities = state.communities,
                         adBlocks = state.adBlocks,
                         onMeetingClick = onMeetingClick,
-                        onCommunityClick = onCommunityClick
+                        onCommunityClick = onCommunityClick,
+                        onUserProfileClick = onUserProfileClick
                     )
                 }
 
@@ -137,7 +139,7 @@ private fun MainScreenTopBar(
                 query = searchQuery,
                 onQueryChange = onSearchQueryChange,
                 placeholder = "Поиск встреч и сообществ",
-                onProfileClick = {},
+                onProfileClick = onProfileClick,
                 onCancelClick = {}
             )
             IconButton(onClick = onProfileClick) {
@@ -169,7 +171,8 @@ private fun MainScreenContent(
     communities: List<UIKitCommunityInfo>,
     adBlocks: List<AdBlock>,
     onMeetingClick: (Long) -> Unit,
-    onCommunityClick: (Long) -> Unit
+    onCommunityClick: (Long) -> Unit,
+    onUserProfileClick: (Long) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -354,7 +357,8 @@ private fun MainScreenContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
-                        onAdClick = {}
+                        onUserClick = onUserProfileClick,
+//                        onAdClick = {}
                     )
                 }
             }

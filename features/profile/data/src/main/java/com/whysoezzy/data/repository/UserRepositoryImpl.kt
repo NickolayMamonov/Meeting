@@ -2,6 +2,8 @@ package com.whysoezzy.data.repository
 
 import com.whysoezzy.data.api.UserApiImpl
 import com.whysoezzy.data.mapper.UserMapper
+import com.whysoezzy.domain.models.CommunityInfo
+import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.repository.UserRepository
 import com.whysoezzy.network.safeApiCall
@@ -12,23 +14,37 @@ class UserRepositoryImpl(
 ) : UserRepository {
     override suspend fun getCurrentUser(): Result<User> {
         return safeApiCall {
-            val response = userApi.getCurrentUser()
-            userMapper.toDomain(response)
-        }
-    }
-
-    override suspend fun updateUserProfile(user: User): Result<User> {
-        return safeApiCall {
-            val userDto = userMapper.toDto(user)
-            val response = userApi.updateUserProfile(userDto)
+            val response = userApi.getCurrentUserProfile()
             userMapper.toDomain(response)
         }
     }
 
     override suspend fun getUserById(id: Long): Result<User> {
         return safeApiCall {
-            val response = userApi.getUserById(id)
+            val response = userApi.getUserProfile(id)
             userMapper.toDomain(response)
+        }
+    }
+
+    override suspend fun updateUserProfile(user: User): Result<User> {
+        return safeApiCall {
+            val updateDto = userMapper.toUpdateDto(user)
+            val response = userApi.updateUserProfile(updateDto)
+            userMapper.toDomain(response)
+        }
+    }
+
+    override suspend fun getUserMeetings(userId: Long): Result<List<MeetingInfo>> {
+        return safeApiCall {
+            val response = userApi.getUserMeetings(userId)
+            response.map { userMapper.meetingInfoToDomain(it) }
+        }
+    }
+
+    override suspend fun getUserCommunities(userId: Long): Result<List<CommunityInfo>> {
+        return safeApiCall {
+            val response = userApi.getUserCommunities(userId)
+            response.map { userMapper.communityInfoToDomain(it) }
         }
     }
 }

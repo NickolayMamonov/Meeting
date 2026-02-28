@@ -1,9 +1,14 @@
 package dev.whysoezzy.uikit.components.topbar
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
@@ -37,7 +42,6 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
  * @param contentColor Цвет контента топбара
  * @param modifier Модификатор для кастомизации
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileTopBar(
     title: String,
@@ -45,25 +49,36 @@ fun ProfileTopBar(
     onBackClick: () -> Unit,
     onEditClick: () -> Unit = {},
     onShareClick: () -> Unit = {},
-    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    applyStatusBarPadding: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    TopAppBar(
-        modifier = modifier.fillMaxWidth(),
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = contentColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(containerColor)
+            .then(
+                if (applyStatusBarPadding) {
+                    Modifier.statusBarsPadding()  // ✅ Только если нужно
+                } else {
+                    Modifier
+                }
             )
-        },
-        navigationIcon = {
+            .padding(horizontal = 4.dp, vertical = 4.dp),  // ✅ Минимальный padding
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Левая часть: кнопка назад + заголовок
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier.weight(1f)
+        ) {
+            // Кнопка "Назад"
             IconButton(
-                onClick = onBackClick
+                onClick = onBackClick,
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -72,49 +87,60 @@ fun ProfileTopBar(
                     modifier = Modifier.size(24.dp)
                 )
             }
-        },
-        actions = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (isOwnProfile) {
-                    // Кнопка редактирования для собственного профиля
-                    IconButton(
-                        onClick = onEditClick
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Редактировать",
-                            tint = contentColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
 
-                // Кнопка поделиться
+            // Заголовок (если есть)
+            if (title.isNotBlank()) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp)
+                )
+            }
+        }
+
+        // Правая часть: кнопки действий
+        Row(
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isOwnProfile) {
+                // Кнопка "Редактировать"
                 IconButton(
-                    onClick = onShareClick
+                    onClick = onEditClick,
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Поделиться",
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Редактировать",
                         tint = contentColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = backgroundColor,
-            titleContentColor = contentColor,
-            navigationIconContentColor = contentColor,
-            actionIconContentColor = contentColor
-        )
-    )
+
+            // Кнопка "Поделиться"
+            IconButton(
+                onClick = onShareClick,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Поделиться",
+                    tint = contentColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
 }
 
-@Preview
+@Preview(name = "Own Profile - Default", showBackground = true)
 @Composable
 private fun ProfileTopBarOwnProfilePreview() {
     UIKitTheme {
@@ -123,12 +149,46 @@ private fun ProfileTopBarOwnProfilePreview() {
             isOwnProfile = true,
             onBackClick = { },
             onEditClick = { },
-            onShareClick = { }
+            onShareClick = { },
         )
     }
 }
 
-@Preview
+@Preview(name = "Own Profile - Transparent", showBackground = true)
+@Composable
+private fun ProfileTopBarTransparentPreview() {
+    UIKitTheme {
+        ProfileTopBar(
+            title = "",
+            isOwnProfile = true,
+            onBackClick = { },
+            onEditClick = { },
+            onShareClick = { },
+            containerColor = Color.Transparent,
+            contentColor = Color.White,
+            applyStatusBarPadding = true
+        )
+    }
+}
+
+@Preview(name = "Own Profile - Transparent NO Status Bar Padding", showBackground = true)
+@Composable
+private fun ProfileTopBarTransparentNoPaddingPreview() {
+    UIKitTheme {
+        ProfileTopBar(
+            title = "",
+            isOwnProfile = true,
+            onBackClick = { },
+            onEditClick = { },
+            onShareClick = { },
+            containerColor = Color.Transparent,
+            contentColor = Color.White,
+            applyStatusBarPadding = false
+        )
+    }
+}
+
+@Preview(name = "Other Profile", showBackground = true)
 @Composable
 private fun ProfileTopBarOtherProfilePreview() {
     UIKitTheme {
@@ -141,7 +201,7 @@ private fun ProfileTopBarOtherProfilePreview() {
     }
 }
 
-@Preview
+@Preview(name = "Long Name", showBackground = true)
 @Composable
 private fun ProfileTopBarLongNamePreview() {
     UIKitTheme {

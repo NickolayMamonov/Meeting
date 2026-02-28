@@ -10,6 +10,9 @@ import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
+import com.whysoezzy.domain.usecase.GetUserByIdUseCase
+import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
+import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
@@ -19,7 +22,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ProfileDetailsViewModel(
-    private val getUserProfileUseCase: GetCurrentUserUseCase
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val getUserByIdUseCase: GetUserByIdUseCase,
+    private val getUserMeetingsUseCase: GetUserMeetingsUseCase,
+    private val getUserCommunitiesUseCase: GetUserCommunitiesUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ProfileDetailsUiState>(ProfileDetailsUiState.Loading)
@@ -45,79 +51,38 @@ class ProfileDetailsViewModel(
             _uiState.value = ProfileDetailsUiState.Loading
 
             try {
-                getUserProfileUseCase()
+                val isOwnProfile = userId == null
+
+                // Загружаем профиль пользователя
+                val userResult = if (isOwnProfile) {
+                    getCurrentUserUseCase()
+                } else {
+                    getUserByIdUseCase(userId)
+                }
+
+                userResult
                     .onSuccess { user ->
-                        // Временные mock данные для демонстрации
-                        val mockSocialMedias = listOf(
-                            SocialMediaInfo(
-                                type = SocialMediaType.TELEGRAM,
-                                url = "https://t.me/username",
-                                username = "@username"
-                            ),
-                            SocialMediaInfo(
-                                type = SocialMediaType.HABR,
-                                url = "https://habr.com/users/username",
-                                username = "username"
-                            )
-                        )
+                        // Загружаем встречи и сообщества пользователя
+                        val meetingsResult = getUserMeetingsUseCase(user.id)
+                        val communitiesResult = getUserCommunitiesUseCase(user.id)
 
-                        val mockTags = listOf(
-                            MeetingTag(1, "Android", TagState.ACTIVE),
-                            MeetingTag(2, "Kotlin", TagState.ACTIVE)
-                        )
-
-                        val mockMeetings = listOf(
-                            MeetingInfo(
-                                id = 1,
-                                imageUrl = "https://picsum.photos/212/148?random=1",
-                                title = "Android Dev Meetup",
-                                address = "ул. Тверская, 15",
-                                tags = mockTags,
-                                time = System.currentTimeMillis(),
-                                meetingStatus = MeetingStatus.ACTIVE
-                            ),
-                            MeetingInfo(
-                                id = 2,
-                                imageUrl = "https://picsum.photos/212/148?random=2",
-                                title = "Kotlin Conf",
-                                address = "ул. Пушкина, 10",
-                                tags = mockTags.take(1),
-                                time = System.currentTimeMillis() + 86400000,
-                                meetingStatus = MeetingStatus.ACTIVE
-                            )
-                        )
-
-                        val mockCommunities = listOf(
-                            CommunityInfo(
-                                id = 1,
-                                name = "Android Developers Moscow",
-                                description = "Сообщество разработчиков Android в Москве",
-                                imageUrl = "https://picsum.photos/300/300?random=1",
-                                subscribersCount = 1250
-                            ),
-                            CommunityInfo(
-                                id = 2,
-                                name = "Kotlin User Group",
-                                description = "Kotlin enthusiasts",
-                                imageUrl = "https://picsum.photos/300/300?random=2",
-                                subscribersCount = 890
-                            )
-                        )
+                        val meetings = meetingsResult.getOrNull() ?: emptyList()
+                        val communities = communitiesResult.getOrNull() ?: emptyList()
 
                         _uiState.value = ProfileDetailsUiState.Success(
                             userId = user.id,
                             name = user.name,
                             surname = user.surname,
                             email = user.email,
-                            description = user.bio.ifBlank {
-                                "Senior Android Developer в крутой компании. Люблю изучать новые технологии и делиться знаниями с сообществом."
-                            },
-                            avatarUrl = user.avatar,
-                            isOwnProfile = userId == null, // null означает собственный профиль
-                            socialMedias = mockSocialMedias.map { it.toUIKitSocialMediaInfo() },
-                            userMeetings = mockMeetings.map { it.toUIKitMeetingInfo() },
-                            userCommunities = mockCommunities.toUIKitCommunityInfoList(
-                                subscribedIds = setOf(1, 2),
+                            city = user.city,
+                            description = user.bio,
+                            avatarUrl = user.avatar.takeIf { it.isNotBlank() },
+                            interests = emptyList(), // TODO: добавить интересы из бэкенда
+                            isOwnProfile = isOwnProfile,
+                            socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
+                            userMeetings = meetings.map { it.toUIKitMeetingInfo() },
+                            userCommunities = communities.toUIKitCommunityInfoList(
+                                subscribedIds = emptySet(), // TODO: получать подписки с бэкенда
                                 onSubscribeClick = { communityId, isSubscribed ->
                                     handleToggleCommunitySubscription(communityId, isSubscribed)
                                 },
@@ -125,7 +90,7 @@ class ProfileDetailsViewModel(
                                     handleNavigateToCommunity(communityId)
                                 }
                             ),
-                            subscribedCommunityIds = setOf(1, 2) // Mock данные подписок
+                            subscribedCommunityIds = emptySet() // TODO: получать подписки с бэкенда
                         )
                     }
                     .onFailure { exception ->
@@ -177,7 +142,7 @@ class ProfileDetailsViewModel(
                 subscribedCommunityIds = updatedSubscriptions
             )
 
-            // Здесь можно добавить вызов API для синхронизации с сервером
+            // TODO: Добавить вызов API для синхронизации с сервером
         }
     }
 }

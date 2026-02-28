@@ -151,31 +151,31 @@ fun List<CommunityInfo>.toUIKitCommunityInfoList(
     }
 }
 
-fun User.toProfileUiState(
-    isOwnProfile: Boolean,
-    subscribedCommunityIds: Set<Long>,
-    onCommunitySubscribe: (Long, Boolean) -> Unit,
-    onCommunityClick: (Long) -> Unit,
-    onMeetingClick: (Long) -> Unit
-): ProfileDetailsUiState.Success {
-    return ProfileDetailsUiState.Success(
-        userId = id,
-        name = name,
-        surname = surname,
-        email = email,
-        description = bio,
-        avatarUrl = avatar,
-        isOwnProfile = isOwnProfile,
-        socialMedias = socialMedia.toUIKitSocialMediaInfoList(),
-        userMeetings = participatingMeetings.map { it.toUIKitMeetingInfo() },
-        userCommunities = subscribedCommunities.toUIKitCommunityInfoList(
-            subscribedIds = subscribedCommunityIds,
-            onSubscribeClick = onCommunitySubscribe,
-            onCardClick = onCommunityClick
-        ),
-        subscribedCommunityIds = subscribedCommunityIds
-    )
-}
+//fun User.toProfileUiState(
+//    isOwnProfile: Boolean,
+//    subscribedCommunityIds: Set<Long>,
+//    onCommunitySubscribe: (Long, Boolean) -> Unit,
+//    onCommunityClick: (Long) -> Unit,
+//    onMeetingClick: (Long) -> Unit
+//): ProfileDetailsUiState.Success {
+//    return ProfileDetailsUiState.Success(
+//        userId = id,
+//        name = name,
+//        surname = surname,
+//        email = email,
+//        description = bio,
+//        avatarUrl = avatar,
+//        isOwnProfile = isOwnProfile,
+//        socialMedias = socialMedia.toUIKitSocialMediaInfoList(),
+//        userMeetings = participatingMeetings.map { it.toUIKitMeetingInfo() },
+//        userCommunities = subscribedCommunities.toUIKitCommunityInfoList(
+//            subscribedIds = subscribedCommunityIds,
+//            onSubscribeClick = onCommunitySubscribe,
+//            onCardClick = onCommunityClick
+//        ),
+//        subscribedCommunityIds = subscribedCommunityIds
+//    )
+//}
 
 private fun extractUsername(url: String): String {
     return url.substringAfterLast('/').substringBefore('?')

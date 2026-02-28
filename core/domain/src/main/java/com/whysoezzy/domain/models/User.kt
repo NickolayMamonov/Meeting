@@ -9,8 +9,6 @@ data class User(
     val avatar: String,
     val phone: String,
     val bio: String,
-    val interests: List<MeetingTag>,
-    val socialMedia: Map<SocialMediaType, String>,
-    val subscribedCommunities: List<CommunityInfo>,
-    val participatingMeetings: List<MeetingInfo>
+    val socialMedias: List<SocialMediaInfo> = emptyList()
 )
+
