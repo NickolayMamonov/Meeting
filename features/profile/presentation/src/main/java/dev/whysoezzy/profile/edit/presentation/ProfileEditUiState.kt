@@ -1,9 +1,5 @@
 package dev.whysoezzy.profile.edit.presentation
 
-import com.whysoezzy.domain.models.MeetingTag
-import com.whysoezzy.domain.models.SocialMediaType
-
-
 data class ProfileEditUiState(
     // Основная информация
     val name: String = "",

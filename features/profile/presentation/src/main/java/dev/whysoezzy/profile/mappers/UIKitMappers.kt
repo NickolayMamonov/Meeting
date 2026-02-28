@@ -10,8 +10,6 @@ import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.TagState
-import com.whysoezzy.domain.models.User
-import dev.whysoezzy.profile.details.presentation.ProfileDetailsUiState
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitMeetingStatus
@@ -244,9 +242,9 @@ fun MeetingInfo.toUIKitMeetingInfo(): UIKitMeetingInfo {
         title = title,
         imageUrl = imageUrl,
         date = formatDateTime(time),
-        address = address ?: "",
+        address = address,
         tags = tags.toUIKitMeetingTags(),
-        meetingStatus = meetingStatus?.toUIKitMeetingStatus()
+        meetingStatus = meetingStatus.toUIKitMeetingStatus()
     )
 }
 

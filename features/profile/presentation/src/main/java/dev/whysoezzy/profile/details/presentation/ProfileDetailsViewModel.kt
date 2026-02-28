@@ -2,13 +2,6 @@ package dev.whysoezzy.profile.details.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.whysoezzy.domain.models.CommunityInfo
-import com.whysoezzy.domain.models.MeetingInfo
-import com.whysoezzy.domain.models.MeetingStatus
-import com.whysoezzy.domain.models.MeetingTag
-import com.whysoezzy.domain.models.SocialMediaInfo
-import com.whysoezzy.domain.models.SocialMediaType
-import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase

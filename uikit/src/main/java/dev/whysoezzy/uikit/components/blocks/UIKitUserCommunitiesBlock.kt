@@ -8,13 +8,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-
-
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
-import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 /**
@@ -29,12 +25,12 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  */
 @Composable
 fun UIKitUserCommunitiesBlock(
+    modifier: Modifier = Modifier,
     title: String = "Мои сообщества",
     communities: List<UIKitCommunityInfo>,
     subscribedCommunityIds: Set<Long> = emptySet(),
     onCommunityClick: (Long) -> Unit,
-    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> }
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
