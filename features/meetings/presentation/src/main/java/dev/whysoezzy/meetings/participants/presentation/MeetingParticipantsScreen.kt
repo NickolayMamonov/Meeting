@@ -19,7 +19,6 @@ import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading
-
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,12 +26,21 @@ import org.koin.androidx.compose.koinViewModel
 fun MeetingParticipantsScreen(
     meetingId: Long,
     onBackPressed: () -> Unit,
+    onPersonClick: (Long) -> Unit = {},
     viewModel: MeetingParticipantsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(meetingId) {
         viewModel.onEvent(MeetingParticipantsEvent.LoadParticipants(meetingId))
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is MeetingParticipantsNavEvent.NavigateToProfile -> onPersonClick(event.userId)
+            }
+        }
     }
 
     Scaffold(

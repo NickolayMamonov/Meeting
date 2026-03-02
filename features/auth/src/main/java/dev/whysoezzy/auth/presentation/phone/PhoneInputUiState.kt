@@ -7,7 +7,8 @@ data class PhoneInputUiState(
     val error: String? = null
 ) {
     val isValid: Boolean
-        get() = phoneNumber.length >= 18 && error == null // +7 (999) 999-99-99
+        // +7 (999) 999-99-99 = 18 символов, или 11 цифр (без форматирования)
+        get() = phoneNumber.filter { it.isDigit() }.length == 11 && error == null
 }
 
 sealed class PhoneInputEvent {

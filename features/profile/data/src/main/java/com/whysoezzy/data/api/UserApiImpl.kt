@@ -1,6 +1,9 @@
 package com.whysoezzy.data.api
 
-import com.whysoezzy.data.dto.UserDto
+import com.whysoezzy.data.dto.CommunityInfoDto
+import com.whysoezzy.data.dto.MeetingInfoDto
+import com.whysoezzy.data.dto.UpdateUserDto
+import com.whysoezzy.data.dto.UserProfileDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -10,18 +13,26 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
 class UserApiImpl(private val client: HttpClient) {
-    suspend fun getCurrentUser(): UserDto {
-        return client.get("users/profile").body()
+    suspend fun getCurrentUserProfile(): UserProfileDto {
+        return client.get("profile").body()
     }
 
-    suspend fun updateUserProfile(user: UserDto): UserDto {
-        return client.put("users/profile") {
+    suspend fun getUserProfile(id: Long): UserProfileDto {
+        return client.get("users/$id").body()
+    }
+
+    suspend fun updateUserProfile(updateDto: UpdateUserDto): UserProfileDto {
+        return client.put("profile") {
             contentType(ContentType.Application.Json)
-            setBody(user)
+            setBody(updateDto)
         }.body()
     }
 
-    suspend fun getUserById(id: Long): UserDto {
-        return client.get("users/$id").body()
+    suspend fun getUserMeetings(userId: Long): List<MeetingInfoDto> {
+        return client.get("users/$userId/meetings").body()
+    }
+
+    suspend fun getUserCommunities(userId: Long): List<CommunityInfoDto> {
+        return client.get("users/$userId/communities").body()
     }
 }

@@ -2,18 +2,39 @@ package dev.whysoezzy.auth.presentation.code
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
+import com.whysoezzy.auth.domain.usecase.VerifyOtpUseCase
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+sealed class CodeVerificationNavEvent {
+    /** Пользователь существующий — сразу в Main */
+    data object NavigateToMain : CodeVerificationNavEvent()
+    /** Новый пользователь — нужно ввести имя */
+    data class NavigateToNameInput(val phone: String, val code: String) : CodeVerificationNavEvent()
+}
+
 class CodeVerificationViewModel(
-    private val phoneNumber: String
+    private val phoneNumber: String,
+    private val verifyOtpUseCase: VerifyOtpUseCase,
+    private val sendOtpUseCase: SendOtpUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CodeVerificationUiState())
     val uiState: StateFlow<CodeVerificationUiState> = _uiState.asStateFlow()
+
+    private val _navEvent = MutableSharedFlow<CodeVerificationNavEvent>(extraBufferCapacity = 1)
+    val navEvent: SharedFlow<CodeVerificationNavEvent> = _navEvent.asSharedFlow()
+
+    private var timerJob: Job? = null
 
     init {
         startTimer()
@@ -21,21 +42,10 @@ class CodeVerificationViewModel(
 
     fun onEvent(event: CodeVerificationEvent) {
         when (event) {
-            is CodeVerificationEvent.UpdateCode -> {
-                updateCode(event.code)
-            }
-
-            CodeVerificationEvent.VerifyCode -> {
-                verifyCode()
-            }
-
-            CodeVerificationEvent.ResendCode -> {
-                resendCode()
-            }
-
-            CodeVerificationEvent.TickTimer -> {
-                tickTimer()
-            }
+            is CodeVerificationEvent.UpdateCode -> updateCode(event.code)
+            CodeVerificationEvent.VerifyCode -> verifyCode()
+            CodeVerificationEvent.ResendCode -> resendCode()
+            CodeVerificationEvent.TickTimer -> tickTimer()
         }
     }
 
@@ -45,11 +55,8 @@ class CodeVerificationViewModel(
             error = null,
             isVerified = false
         )
-
-        // Auto-verify when 4 digits are entered
-        if (code.length == 4) {
-            verifyCode()
-        }
+        // Авто-верификация при вводе 4 цифр
+        if (code.length == 4) verifyCode()
     }
 
     private fun verifyCode() {
@@ -58,32 +65,26 @@ class CodeVerificationViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            try {
-                // Simulate API call
-                delay(2000)
+            verifyOtpUseCase(phoneNumber, _uiState.value.code)
+                .onSuccess { result: AuthResult ->
+                    _uiState.value = _uiState.value.copy(isLoading = false, isVerified = true)
 
-                // TODO: Implement actual code verification
-                // authRepository.verifyCode(phoneNumber, code)
-
-                // For demo, accept "1234" as valid code
-                if (_uiState.value.code == "1234") {
+                    if (result.isNewUser) {
+                        // Новый пользователь — нужно ввести имя на следующем экране
+                        _navEvent.emit(
+                            CodeVerificationNavEvent.NavigateToNameInput(phoneNumber, _uiState.value.code)
+                        )
+                    } else {
+                        // Существующий — токены уже сохранены в TokenManager, идём в Main
+                        _navEvent.emit(CodeVerificationNavEvent.NavigateToMain)
+                    }
+                }
+                .onFailure { exception ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        isVerified = true
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Неверный код подтверждения"
+                        error = exception.message ?: "Неверный код подтверждения"
                     )
                 }
-
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Не удалось проверить код"
-                )
-            }
         }
     }
 
@@ -91,27 +92,28 @@ class CodeVerificationViewModel(
         if (!_uiState.value.canResend) return
 
         viewModelScope.launch {
-            try {
-                // TODO: Implement actual code resending
-                // authRepository.sendSmsCode(phoneNumber)
+            _uiState.value = _uiState.value.copy(error = null)
 
-                _uiState.value = _uiState.value.copy(
-                    remainingTime = 60,
-                    canResend = false,
-                    error = null
-                )
-                startTimer()
-
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = e.message ?: "Не удалось отправить код повторно"
-                )
-            }
+            sendOtpUseCase(phoneNumber)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        remainingTime = 60,
+                        canResend = false,
+                        code = ""
+                    )
+                    startTimer()
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        error = exception.message ?: "Не удалось отправить код повторно"
+                    )
+                }
         }
     }
 
     private fun startTimer() {
-        viewModelScope.launch {
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
             repeat(60) {
                 delay(1000)
                 tickTimer()
@@ -120,10 +122,8 @@ class CodeVerificationViewModel(
     }
 
     private fun tickTimer() {
-        val currentState = _uiState.value
-        val newTime = currentState.remainingTime - 1
-
-        _uiState.value = currentState.copy(
+        val newTime = _uiState.value.remainingTime - 1
+        _uiState.value = _uiState.value.copy(
             remainingTime = maxOf(0, newTime),
             canResend = newTime <= 0
         )

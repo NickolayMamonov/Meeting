@@ -33,16 +33,22 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun CodeVerificationScreen(
     phoneNumber: String,
-    onCodeVerified: () -> Unit,
+    onCodeVerifiedExisting: () -> Unit,
+    onCodeVerifiedNew: (phone: String, code: String) -> Unit,
     onBackPressed: () -> Unit,
-    modifier: Modifier = Modifier,
     viewModel: CodeVerificationViewModel = koinViewModel { parametersOf(phoneNumber) }
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(uiState.isVerified) {
-        if (uiState.isVerified) {
-            onCodeVerified()
+    // Подписываемся на навигационные события из ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is CodeVerificationNavEvent.NavigateToMain ->
+                    onCodeVerifiedExisting()
+                is CodeVerificationNavEvent.NavigateToNameInput ->
+                    onCodeVerifiedNew(event.phone, event.code)
+            }
         }
     }
 
@@ -76,7 +82,6 @@ private fun CodeVerificationContent(
     ) {
         Spacer(modifier = Modifier.height(60.dp))
 
-        // Header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
@@ -86,7 +91,6 @@ private fun CodeVerificationContent(
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
-
             TextBody2(
                 text = "Мы отправили код подтверждения на номер\n$phoneNumber",
                 color = ColorTokens.NeutralWeak,
@@ -96,14 +100,12 @@ private fun CodeVerificationContent(
 
         Spacer(modifier = Modifier.height(SpacingTokens.L))
 
-        // Code input
         UIKitCodeInput(
             value = uiState.code,
             onValueChange = onCodeChange,
             isError = uiState.error != null
         )
 
-        // Error message
         if (uiState.error != null) {
             TextMetadata1(
                 text = uiState.error,
@@ -114,7 +116,6 @@ private fun CodeVerificationContent(
 
         Spacer(modifier = Modifier.height(SpacingTokens.M))
 
-        // Resend code
         if (uiState.canResend) {
             TextButton(onClick = onResendClick) {
                 TextMetadata1(
@@ -132,7 +133,6 @@ private fun CodeVerificationContent(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Verify button
         UIKitButton(
             text = "Подтвердить",
             onClick = onVerifyClick,
@@ -152,10 +152,7 @@ private fun CodeVerificationScreenPreview() {
     UIKitTheme {
         CodeVerificationContent(
             phoneNumber = "+7 (999) 123-45-67",
-            uiState = CodeVerificationUiState(
-                code = "12",
-                remainingTime = 45
-            )
+            uiState = CodeVerificationUiState(code = "12", remainingTime = 45)
         )
     }
 }

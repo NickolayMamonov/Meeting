@@ -8,14 +8,23 @@ import org.koin.dsl.module
 
 val authFeatureModule = module {
 
-    // ViewModels
-    viewModel { NameInputViewModel() }
-
-    viewModel { PhoneInputViewModel() }
+    viewModel {
+        PhoneInputViewModel(
+            sendOtpUseCase = get()
+        )
+    }
 
     viewModel { (phoneNumber: String) ->
         CodeVerificationViewModel(
-            phoneNumber = phoneNumber
+            phoneNumber = phoneNumber,
+            verifyOtpUseCase = get(),
+            sendOtpUseCase = get()
+        )
+    }
+
+    viewModel {
+        NameInputViewModel(
+            userApi = get()
         )
     }
 }

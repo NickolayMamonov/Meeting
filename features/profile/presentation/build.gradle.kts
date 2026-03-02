@@ -42,6 +42,7 @@ dependencies {
     implementation(project(":features:profile:domain"))
     implementation(project(":features:profile:data"))
     implementation(project(":core:domain"))
+    implementation(project(":core:auth"))
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 

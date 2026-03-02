@@ -15,41 +15,57 @@ fun NavGraphBuilder.authNavigation(navController: NavController) {
         startDestination = MeetRoute.PhoneInput.route,
         route = MeetRoute.Auth.route
     ) {
+
+        // 1. Ввод телефона
         composable(MeetRoute.PhoneInput.route) {
             PhoneInputScreen(
                 onPhoneSubmitted = { phoneNumber ->
-                    navController.navigate(MeetRoute.CodeVerification.createRoute(phoneNumber))
+                    navController.navigate(
+                        MeetRoute.CodeVerification.createRoute(phoneNumber)
+                    )
                 },
-                onBackPressed = {
-                    navController.popBackStack()
-                }
+                onBackPressed = { navController.popBackStack() }
             )
         }
 
+        // 2. Ввод кода подтверждения
         composable(MeetRoute.CodeVerification.route) { backStackEntry ->
-            val phoneNumber = backStackEntry.arguments?.getString("phoneNumber") ?: ""
+            val phoneEncoded = backStackEntry.arguments?.getString("phoneNumber") ?: ""
+            val phone = MeetRoute.decode(phoneEncoded)
+
             CodeVerificationScreen(
-                phoneNumber = phoneNumber,
-                onCodeVerified = {
-                    navController.navigate(MeetRoute.NameInput.route)
+                phoneNumber = phone,
+                onCodeVerifiedExisting = {
+                    // Существующий пользователь — сразу в Main, очищаем Auth stack
+                    navController.navigate(MeetRoute.Main.route) {
+                        popUpTo(MeetRoute.Auth.route) { inclusive = true }
+                    }
                 },
-                onBackPressed = {
-                    navController.popBackStack()
-                }
+                onCodeVerifiedNew = { p, code ->
+                    // Новый пользователь — нужно ввести имя
+                    navController.navigate(MeetRoute.NameInput.createRoute(p, code))
+                },
+                onBackPressed = { navController.popBackStack() }
             )
         }
 
-        composable(MeetRoute.NameInput.route) {
+        // 3. Ввод имени (только для новых пользователей)
+        composable(MeetRoute.NameInput.route) { backStackEntry ->
+            val phoneEncoded = backStackEntry.arguments?.getString("phone") ?: ""
+            val phone = MeetRoute.decode(phoneEncoded)
+            val code = backStackEntry.arguments?.getString("code") ?: ""
+
             NameInputScreen(
+                phone = phone,
+                code = code,
                 onNameSubmitted = {
                     navController.navigate(MeetRoute.AuthSuccess.route)
                 },
-                onBackPressed = {
-                    navController.popBackStack()
-                }
+                onBackPressed = { navController.popBackStack() }
             )
         }
 
+        // 4. Экран успешной регистрации
         composable(MeetRoute.AuthSuccess.route) {
             AuthSuccessScreen(
                 onContinueClicked = {

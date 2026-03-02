@@ -1,21 +1,42 @@
 package com.whysoezzy.data.dto
 
-
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class UserDto(
+data class UserProfileDto(
     @SerialName("id") val id: Long,
     @SerialName("name") val name: String,
     @SerialName("surname") val surname: String,
-    @SerialName("email") val email: String?,
-    @SerialName("city") val city: String,
-    @SerialName("avatar") val avatar: String?,
-    @SerialName("phone") val phone: String,
-    @SerialName("bio") val bio: String,
-    @SerialName("interests") val interests: List<MeetingTagDto>,
-    @SerialName("socialMedia") val socialMedia: Map<String, String>,
-    @SerialName("subscribedCommunities") val subscribedCommunities: List<CommunityInfoDto>,
-    @SerialName("participatingMeetings") val participatingMeetings: List<MeetingInfoDto>
+    @SerialName("email") val email: String? = null,
+    @SerialName("phone") val phone: String? = null,
+    @SerialName("city") val city: String? = null,
+    @SerialName("description") val description: String? = null,
+    @SerialName("avatarUrl") val avatarUrl: String? = null,
+    @SerialName("interests") val interests: List<TagDto> = emptyList(),
+    @SerialName("socialMedias") val socialMedias: List<SocialMediaDto> = emptyList(),
+    @SerialName("showCommunities") val showCommunities: Boolean = true,
+    @SerialName("showMeetings") val showMeetings: Boolean = true,
+    @SerialName("notificationsEnabled") val notificationsEnabled: Boolean = true
+)
+
+@Serializable
+data class SocialMediaDto(
+    @SerialName("type") val type: String,
+    @SerialName("url") val url: String
+)
+
+@Serializable
+data class UpdateUserDto(
+    @SerialName("name") val name: String? = null,
+    @SerialName("surname") val surname: String? = null,
+    @SerialName("email") val email: String? = null,
+    @SerialName("city") val city: String? = null,
+    @SerialName("description") val description: String? = null,
+    @SerialName("avatarUrl") val avatarUrl: String? = null,
+    @SerialName("interestIds") val interestIds: List<Long>? = null,
+    @SerialName("socialMedias") val socialMedias: List<SocialMediaDto>? = null,
+    @SerialName("showCommunities") val showCommunities: Boolean? = null,
+    @SerialName("showMeetings") val showMeetings: Boolean? = null,
+    @SerialName("notificationsEnabled") val notificationsEnabled: Boolean? = null
 )

@@ -3,14 +3,13 @@ package com.whysoezzy.auth.domain.usecase
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.common.utils.ValidationUtils
 
-class SendSmsUseCase(
+class SendOtpUseCase(
     private val authRepository: AuthRepository
 ) {
-    suspend operator fun invoke(phoneNumber: String): Result<String> {
-        if (!ValidationUtils.isValidPhoneNumber(phoneNumber)) {
+    suspend operator fun invoke(phone: String): Result<Unit> {
+        if (!ValidationUtils.isValidPhoneNumber(phone)) {
             return Result.failure(Exception("Некорректный номер телефона"))
         }
-
-        return authRepository.sendSmsCode(phoneNumber)
+        return authRepository.sendOtp(phone)
     }
 }

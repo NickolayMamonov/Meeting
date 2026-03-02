@@ -5,19 +5,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import dev.whysoezzy.uikit.components.blocks.UIKitUserCommunitiesBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitUserMeetingsBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitUserProfileBlock
@@ -27,7 +32,6 @@ import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.topbar.ProfileTopBar
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-import kotlin.collections.isNotEmpty
 
 @Composable
 fun ProfileDetailsScreen(
@@ -35,80 +39,83 @@ fun ProfileDetailsScreen(
     userId: Long? = null,
     onBackPressed: () -> Unit,
     onEditClick: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onMeetingClick: (Long) -> Unit = {},
     onCommunityClick: (Long) -> Unit = {},
-    onSocialMediaClick: (String) -> Unit = {},
-    onCommunitySubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
     viewModel: ProfileDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(userId) {
         viewModel.onEvent(ProfileDetailsEvent.LoadProfile(userId))
     }
 
-    Scaffold(
-        topBar = {
-            when (uiState) {
-                is ProfileDetailsUiState.Success -> {
-                    ProfileTopBar(
-                        title = "${(uiState as ProfileDetailsUiState.Success).name} ${(uiState as ProfileDetailsUiState.Success).surname}",
-                        isOwnProfile = (uiState as ProfileDetailsUiState.Success).isOwnProfile,
-                        onBackClick = onBackPressed,
-                        onEditClick = { viewModel.onEvent(ProfileDetailsEvent.EditProfile) },
-                        onShareClick = { viewModel.onEvent(ProfileDetailsEvent.ShareProfile) }
-                    )
-                }
-
-                else -> {
-                    ProfileTopBar(
-                        title = "",
-                        isOwnProfile = false,
-                        onBackClick = onBackPressed
-                    )
-                }
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is ProfileDetailsNavEvent.NavigateToAuth -> onLogout()
+                is ProfileDetailsNavEvent.NavigateToEdit -> onEditClick()
+                is ProfileDetailsNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
+                is ProfileDetailsNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
+                is ProfileDetailsNavEvent.OpenSocialMedia -> openUrlIntent(context, event.url)
+                is ProfileDetailsNavEvent.ShareProfile -> shareProfileIntent(context, event.name, event.shareText)
             }
         }
-    ) { paddingValues ->
-        when (uiState) {
-            is ProfileDetailsUiState.Loading -> {
-                LoadingContent(modifier = Modifier.padding(paddingValues))
-            }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        when (val state = uiState) {
+            is ProfileDetailsUiState.Loading -> LoadingContent()
 
             is ProfileDetailsUiState.Success -> {
                 ProfileContent(
-                    uiState = uiState as ProfileDetailsUiState.Success,
-                    onMeetingClick = onMeetingClick,
-                    onCommunityClick = onCommunityClick,
-                    onSocialMediaClick = onSocialMediaClick,
+                    uiState = state,
+                    onMeetingClick = { meetingId ->
+                        viewModel.onEvent(ProfileDetailsEvent.NavigateToMeeting(meetingId))
+                    },
+                    onCommunityClick = { communityId ->
+                        viewModel.onEvent(ProfileDetailsEvent.NavigateToCommunity(communityId))
+                    },
+                    onSocialMediaClick = { url ->
+                        viewModel.onEvent(ProfileDetailsEvent.OpenSocialMedia(url))
+                    },
                     onCommunitySubscribeClick = { communityId, isSubscribed ->
                         viewModel.onEvent(
-                            ProfileDetailsEvent.ToggleCommunitySubscription(
-                                communityId,
-                                isSubscribed
-                            )
+                            ProfileDetailsEvent.ToggleCommunitySubscription(communityId, isSubscribed)
                         )
                     },
-                    modifier = Modifier.padding(paddingValues)
+                    onLogoutClick = {
+                        viewModel.onEvent(ProfileDetailsEvent.Logout)
+                    }
                 )
             }
 
             is ProfileDetailsUiState.Error -> {
                 ErrorContent(
-                    message = (uiState as ProfileDetailsUiState.Error).message,
+                    message = state.message,
                     onRetry = { viewModel.onEvent(ProfileDetailsEvent.LoadProfile(userId)) },
-                    onBackPressed = onBackPressed,
-                    modifier = Modifier.padding(paddingValues)
+                    onBackPressed = onBackPressed
                 )
             }
         }
+
+        val successState = uiState as? ProfileDetailsUiState.Success
+        ProfileTopBar(
+            title = "",
+            isOwnProfile = successState?.isOwnProfile ?: false,
+            onBackClick = onBackPressed,
+            onEditClick = { viewModel.onEvent(ProfileDetailsEvent.EditProfile) },
+            onShareClick = { viewModel.onEvent(ProfileDetailsEvent.ShareProfile) },
+            containerColor = Color.Transparent,
+            contentColor = Color.White,
+            applyStatusBarPadding = false
+        )
     }
 }
 
 @Composable
-private fun LoadingContent(
-    modifier: Modifier = Modifier
-) {
+private fun LoadingContent(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -124,44 +131,45 @@ private fun ProfileContent(
     onCommunityClick: (Long) -> Unit,
     onSocialMediaClick: (String) -> Unit,
     onCommunitySubscribeClick: (Long, Boolean) -> Unit,
+    onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = SpacingTokens.L),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
-    ) {
-        // Отступ от топбара
-        item {
-            Spacer(modifier = Modifier.height(SpacingTokens.S))
-        }
+    LazyColumn(modifier = modifier.fillMaxSize()) {
 
         item {
             UIKitUserProfileBlock(
-                name = uiState.name,
+                name = uiState.name.ifBlank { "Укажите имя" },
                 surname = uiState.surname,
-                description = uiState.description,
-                avatarUrl = uiState.avatarUrl
+                city = uiState.city,
+                description = uiState.description.ifBlank {
+                    if (uiState.isOwnProfile) "Добавьте описание профиля…" else ""
+                },
+                avatarUrl = uiState.avatarUrl,
+                interests = uiState.interests
             )
         }
 
-        if (uiState.socialMedias.isNotEmpty()) {
-            item {
-                UIKitSocialMediaList(
-                    socialMedias = uiState.socialMedias,
-                    onSocialMediaClick = onSocialMediaClick
-                )
+        item {
+            Column(
+                modifier = Modifier.padding(horizontal = SpacingTokens.L),
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+            ) {
+                if (uiState.socialMedias.isNotEmpty()) {
+                    UIKitSocialMediaList(
+                        socialMedias = uiState.socialMedias,
+                        onSocialMediaClick = onSocialMediaClick
+                    )
+                }
             }
         }
 
-
         if (uiState.userMeetings.isNotEmpty()) {
-            items( items = uiState.userMeetings ) {
+            item {
                 UIKitUserMeetingsBlock(
                     title = if (uiState.isOwnProfile) "Мои встречи" else "Встречи",
                     meetings = uiState.userMeetings,
-                    onMeetingClick = onMeetingClick
+                    onMeetingClick = onMeetingClick,
+                    modifier = Modifier.padding(horizontal = SpacingTokens.L)
                 )
             }
         }
@@ -173,11 +181,35 @@ private fun ProfileContent(
                     communities = uiState.userCommunities,
                     subscribedCommunityIds = uiState.subscribedCommunityIds,
                     onCommunityClick = onCommunityClick,
-                    onSubscribeClick = { communityId, isSubscribed ->
-                        // Передаем событие в ViewModel
-                        // Здесь нужно бы добавить параметр в ProfileContent
-                        // онСоммунитисабскрибеКлик(communityId, isSubscribed)
-                    }
+                    onSubscribeClick = onCommunitySubscribeClick,
+                    modifier = Modifier.padding(horizontal = SpacingTokens.L)
+                )
+            }
+        }
+
+        if (uiState.isOwnProfile) {
+            item {
+                Spacer(modifier = Modifier.height(SpacingTokens.L))
+            }
+            if (uiState.name.isBlank()) {
+                item {
+                    UIKitButton(
+                        text = "Заполнить профиль",
+                        onClick = { /* навигация через существующий икон EditProfile в TopBar */ },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = SpacingTokens.L)
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(SpacingTokens.M)) }
+            }
+            item {
+                UIKitButton(
+                    text = "Выйти",
+                    onClick = onLogoutClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = SpacingTokens.L)
                 )
             }
         }
@@ -188,161 +220,6 @@ private fun ProfileContent(
     }
 }
 
-//@Composable
-//private fun ProfileContent(
-//    user: Person,
-//    meetings: List<MeetingInfo>,
-//    communities: List<CommunityInfo>,
-//    onMeetingClick: (Long) -> Unit,
-//    onCommunityClick: (Long) -> Unit,
-//    modifier: Modifier = Modifier
-//) {
-//    LazyColumn(
-//        modifier = modifier
-//            .fillMaxSize()
-//            .padding(horizontal = SpacingTokens.L),
-//        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
-//    ) {
-//        // 1. Профиль пользователя
-//        item {
-//            UserProfileSection(user = user)
-//        }
-//
-//        // 2. Встречи пользователя
-//        if (meetings.isNotEmpty()) {
-//            item {
-//                Text(
-//                    text = "Встречи (${meetings.size})",
-//                    style = MaterialTheme.typography.headlineSmall,
-//                    modifier = Modifier.padding(vertical = SpacingTokens.S)
-//                )
-//            }
-//
-//            item {
-//                LazyRow(
-//                    horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
-//                ) {
-//                    items(
-//                        items = meetings,
-//                    ) { meeting ->
-//                        MeetingCard(
-//                            meeting = meeting,
-//                            onClick = { onMeetingClick(meeting.id) }
-//                        )
-//                    }
-//                }
-//            }
-//        }
-//
-//        // 3. Сообщества пользователя
-//        if (communities.isNotEmpty()) {
-//            item {
-//                Text(
-//                    text = "Сообщества (${communities.size})",
-//                    style = MaterialTheme.typography.headlineSmall,
-//                    modifier = Modifier.padding(vertical = SpacingTokens.S)
-//                )
-//            }
-//
-//            item {
-//                LazyRow(
-//                    horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
-//                ) {
-//                    items(
-//                        items = communities,
-//                        key = { it.id }
-//                    ) { community ->
-//                        CommunityCard(
-//                            community = community,
-//                            onClick = { onCommunityClick(community.id) }
-//                        )
-//                    }
-//                }
-//            }
-//        }
-//
-//        // Отступ снизу
-//        item {
-//            Spacer(modifier = Modifier.height(SpacingTokens.XL))
-//        }
-//    }
-//}
-//
-//@Composable
-//private fun MeetingCard(
-//    meeting: MeetingInfo,
-//    onClick: () -> Unit
-//) {
-//    // ✅ Применяем мапперы
-//    UIKitEventCard(
-//        imageUrl = meeting.imageUrl,
-//        title = meeting.title,
-//        date = formatDate(meeting.time),
-//        address = meeting.toUIKitAddress(),
-//        tags = meeting.tags.toUIKitEventCardTags(),
-//        cardType = UIKitEventCardType.COMPACT,
-//        onCardClick = onClick
-//    )
-//}
-//
-//@Composable
-//private fun CommunityCard(
-//    community: CommunityInfo,
-//    onClick: () -> Unit
-//) {
-//    val uiKitCommunity = community.toUIKitCommunity()
-//
-//    UIKitCommunityCard(
-//        name = uiKitCommunity.name,
-//        description = uiKitCommunity.description,
-//        imageUrl = uiKitCommunity.imageUrl,
-//        onCardClick = onClick
-//    )
-//}
-//
-//@Composable
-//private fun UserProfileSection(user: Person) {
-//    val uiKitPerson = user.toUIKitPerson()
-//
-//    Column(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(vertical = SpacingTokens.M),
-//        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
-//    ) {
-//        Row(
-//            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//            // Аватар
-//            AsyncImage(
-//                model = uiKitPerson.avatar,
-//                contentDescription = "User avatar",
-//                modifier = Modifier
-//                    .size(80.dp)
-//                    .clip(CircleShape),
-//                contentScale = ContentScale.Crop
-//            )
-//
-//            // Имя и фамилия
-//            Column {
-//                Text(
-//                    text = "${uiKitPerson.name} ${uiKitPerson.surname}",
-//                    style = MaterialTheme.typography.headlineMedium
-//                )
-//            }
-//        }
-//
-//        // Описание
-//        if (uiKitPerson.description.isNotEmpty()) {
-//            Text(
-//                text = uiKitPerson.description,
-//                style = MaterialTheme.typography.bodyMedium,
-//                color = MaterialTheme.colorScheme.onSurfaceVariant
-//            )
-//        }
-//    }
-//}
 @Composable
 private fun ErrorContent(
     message: String,
@@ -362,97 +239,85 @@ private fun ErrorContent(
                 text = message,
                 textAlign = TextAlign.Center
             )
+            UIKitButton(text = "Повторить", onClick = onRetry)
+            UIKitButton(text = "Назад", onClick = onBackPressed)
+        }
+    }
+}
 
-            UIKitButton(
-                text = "Повторить",
-                onClick = onRetry
-            )
+private fun openUrlIntent(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        context.startActivity(intent)
+    } catch (_: Exception) { }
+}
 
-            UIKitButton(
-                text = "Назад",
-                onClick = onBackPressed
+private fun shareProfileIntent(context: Context, name: String, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, name)
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "Поделиться профилем"))
+}
+
+// region Previews
+
+@Preview
+@Composable
+private fun LoadingPreview() {
+    dev.whysoezzy.uikit.theme.UIKitTheme {
+        androidx.compose.material3.Surface { LoadingContent() }
+    }
+}
+
+@Preview
+@Composable
+private fun SuccessPreview() {
+    dev.whysoezzy.uikit.theme.UIKitTheme {
+        androidx.compose.material3.Surface {
+            ProfileContent(
+                uiState = ProfileDetailsUiState.Success(
+                    userId = 1,
+                    name = "Сергей",
+                    surname = "",
+                    email = "sergey@example.com",
+                    city = "Москва",
+                    description = "Занимаюсь разработкой интерфейсов",
+                    avatarUrl = "https://picsum.photos/200/200?random=1",
+                    interests = listOf("Разработка", "Дизайн", "Backend"),
+                    isOwnProfile = true,
+                    socialMedias = listOf(
+                        dev.whysoezzy.uikit.models.UIKitSocialMediaInfo(
+                            type = dev.whysoezzy.uikit.models.UIKitSocialMedia.TELEGRAM,
+                            url = "https://t.me/username",
+                            username = "@username"
+                        )
+                    ),
+                    userMeetings = emptyList(),
+                    userCommunities = emptyList(),
+                    subscribedCommunityIds = emptySet()
+                ),
+                onMeetingClick = {},
+                onCommunityClick = {},
+                onSocialMediaClick = {},
+                onCommunitySubscribeClick = { _, _ -> },
+                onLogoutClick = {}
             )
         }
     }
 }
-//
-//@Preview
-//@Composable
-//private fun ProfileDetailsScreenPreview() {
-//    UIKitTheme {
-//        val mockTags = listOf(
-//            MeetingTag(1, "Android", TagState.ACTIVE),
-//            MeetingTag(2, "Kotlin", TagState.ACTIVE)
-//        )
-//
-//        val mockMeetings = listOf(
-//            MeetingInfo(
-//                id = 1,
-//                imageUrl = "https://picsum.photos/212/148?random=1",
-//                title = "Android Dev Meetup",
-//                address = "ул. Тверская, 15",
-//                tags = mockTags,
-//                time = System.currentTimeMillis(),
-//                meetingStatus = MeetingStatus.ACTIVE
-//            ),
-//            MeetingInfo(
-//                id = 2,
-//                imageUrl = "https://picsum.photos/212/148?random=2",
-//                title = "Kotlin Conf",
-//                address = "ул. Пушкина, 10",
-//                tags = mockTags.take(1),
-//                time = System.currentTimeMillis() + 86400000,
-//                meetingStatus = MeetingStatus.ACTIVE
-//            )
-//        )
-//
-//        val mockCommunities = listOf(
-//            CommunityInfo(
-//                id = 1,
-//                title = "Android Developers Moscow",
-//                description = "Сообщество разработчиков Android в Москве",
-//                imageUrl = "https://picsum.photos/300/300?random=1",
-//                membersCount = 1250
-//            ),
-//            CommunityInfo(
-//                id = 2,
-//                title = "Kotlin User Group",
-//                description = "Kotlin enthusiasts",
-//                imageUrl = "https://picsum.photos/300/300?random=2",
-//                membersCount = 890
-//            )
-//        )
-//
-//        val mockSocialMedias = listOf(
-//            SocialMediaInfo(
-//                type = SocialMediaType.TELEGRAM,
-//                url = "https://t.me/username",
-//                username = "@username"
-//            ),
-//            SocialMediaInfo(
-//                type = SocialMediaType.HABR,
-//                url = "https://habr.com/users/username",
-//                username = "username"
-//            )
-//        )
-//
-//        ProfileContent(
-//            uiState = ProfileDetailsUiState.Success(
-//                userId = 1,
-//                name = "Иван",
-//                surname = "Петров",
-//                email = "ivan.petrov@example.com",
-//                description = "Senior Android Developer в крутой компании. Люблю изучать новые технологии и делиться знаниями с сообществом.",
-//                avatarUrl = "https://picsum.photos/200/200?random=1",
-//                isOwnProfile = true,
-//                socialMedias = mockSocialMedias,
-//                userMeetings = mockMeetings,
-//                userCommunities = mockCommunities
-//            ),
-//            onMeetingClick = { },
-//            onCommunityClick = { },
-//            onSocialMediaClick = { },
-//            onCommunitySubscribeClick = { _, _ -> },
-//        )
-//    }
-//}
+
+@Preview
+@Composable
+private fun ErrorPreview() {
+    dev.whysoezzy.uikit.theme.UIKitTheme {
+        androidx.compose.material3.Surface {
+            ErrorContent(
+                message = "Не удалось загрузить профиль",
+                onRetry = {},
+                onBackPressed = {}
+            )
+        }
+    }
+}

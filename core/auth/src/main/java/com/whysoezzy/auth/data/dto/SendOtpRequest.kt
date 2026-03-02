@@ -4,7 +4,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class RegisterRequest(
-    @SerialName("phone_number") val phoneNumber: String,
-    @SerialName("name") val name: String
+data class SendOtpRequest(
+    @SerialName("phone") val phone: String
 )

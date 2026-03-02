@@ -5,6 +5,6 @@ data class MainScreenData(
     val popularMeetings: List<Meeting>,
     val allMeetings: List<Meeting>,
     val categories: List<MeetingTag>,
-    val communities: List<CommunityInfo>,
+    val communities: List<Community>,
     val adBlocks: List<AdBlock> = emptyList()
 )

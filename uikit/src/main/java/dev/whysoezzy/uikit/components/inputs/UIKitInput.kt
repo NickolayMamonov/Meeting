@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,14 +45,18 @@ fun UIKitInput(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     hint: String = "",
+    placeholder: String = hint,
     isError: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     maxLines: Int = 1,
+    minLines: Int = 1,
     errorMessage: String = ""
 ) {
     val colorScheme = UIKitTheme.colors
     var isFocused by remember { mutableStateOf(false) }
+
+    val displayHint = if (hint.isNotEmpty()) hint else placeholder
 
     val inputState = when {
         isError -> UIKitInputState.ERROR
@@ -62,11 +65,11 @@ fun UIKitInput(
         else -> UIKitInputState.EMPTY
     }
 
-    Column {
+    Column(modifier = modifier) {
         Box(
-            modifier = modifier
-                .width(343.dp)
-                .height(56.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (minLines > 1) (48 * minLines).dp else 48.dp)
                 .clip(RoundedCornerShape(BorderRadiusTokens.L))
                 .background(
                     when (inputState) {
@@ -115,12 +118,12 @@ fun UIKitInput(
                     cursorBrush = SolidColor(colorScheme.brandDefault),
                     keyboardOptions = keyboardOptions,
                     visualTransformation = visualTransformation,
-                    maxLines = maxLines,
+                    maxLines = if (minLines > 1) minLines else maxLines,
                     decorationBox = { innerTextField ->
                         Box {
                             if (value.isEmpty() && !isFocused) {
                                 Text(
-                                    text = hint,
+                                    text = displayHint,
                                     color = colorScheme.neutralWeak,
                                     fontSize = 16.sp
                                 )
@@ -143,9 +146,9 @@ fun UIKitInput(
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "Empty")
 @Composable
-fun UIKitInputPreview() {
+fun UIKitInputEmptyPreview() {
     UIKitTheme {
         Column(
             modifier = Modifier
@@ -153,30 +156,78 @@ fun UIKitInputPreview() {
                 .padding(SpacingTokens.M),
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
-            // Empty state
-            var emptyText by remember { mutableStateOf("") }
+            var text by remember { mutableStateOf("") }
             UIKitInput(
-                value = emptyText,
-                onValueChange = { emptyText = it },
-                hint = "Enter text"
+                value = text,
+                onValueChange = { text = it },
+                hint = "Enter text",
+                modifier = Modifier.fillMaxWidth()
             )
+        }
+    }
+}
 
-            // Filled state
-            var filledText by remember { mutableStateOf("Some text") }
+@Preview(showBackground = true, name = "Filled")
+@Composable
+fun UIKitInputFilledPreview() {
+    UIKitTheme {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        ) {
+            var text by remember { mutableStateOf("Some text") }
             UIKitInput(
-                value = filledText,
-                onValueChange = { filledText = it },
-                hint = "Enter text"
+                value = text,
+                onValueChange = { text = it },
+                hint = "Enter text",
+                modifier = Modifier.fillMaxWidth()
             )
+        }
+    }
+}
 
-            // Error state
-            var errorText by remember { mutableStateOf("Invalid input") }
+@Preview(showBackground = true, name = "Error")
+@Composable
+fun UIKitInputErrorPreview() {
+    UIKitTheme {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        ) {
+            var text by remember { mutableStateOf("Invalid") }
             UIKitInput(
-                value = errorText,
-                onValueChange = { errorText = it },
+                value = text,
+                onValueChange = { text = it },
                 hint = "Enter text",
                 isError = true,
-                errorMessage = "Error message"
+                errorMessage = "Error message",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Multiline")
+@Composable
+fun UIKitInputMultilinePreview() {
+    UIKitTheme {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        ) {
+            var text by remember { mutableStateOf("") }
+            UIKitInput(
+                value = text,
+                onValueChange = { text = it },
+                hint = "Enter multiline text",
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

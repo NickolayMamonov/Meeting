@@ -2,10 +2,6 @@ package com.whysoezzy.auth.data.repository
 
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.data.api.AuthApiImpl
-import com.whysoezzy.auth.data.dto.RefreshTokenRequest
-import com.whysoezzy.auth.data.dto.RegisterRequest
-import com.whysoezzy.auth.data.dto.SendSmsRequest
-import com.whysoezzy.auth.data.dto.VerifySmsRequest
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.network.safeApiCall
@@ -14,67 +10,60 @@ class AuthRepositoryImpl(
     private val authApi: AuthApiImpl,
     private val tokenManager: TokenManager
 ) : AuthRepository {
-    override suspend fun sendSmsCode(phoneNumber: String): Result<String> {
+
+    override suspend fun sendOtp(phone: String): Result<Unit> {
         return safeApiCall {
-            val response = authApi.sendSms(SendSmsRequest(phoneNumber))
-            response.message
+            authApi.sendOtp(phone)
         }
     }
 
-    override suspend fun verifySmsCode(
-        phoneNumber: String,
-        code: String
-    ): Result<String> {
-        return safeApiCall {
-            val response = authApi.verifySms(VerifySmsRequest(phoneNumber, code))
-            response.message
-        }
-    }
-
-    override suspend fun register(
-        phoneNumber: String,
-        name: String
+    override suspend fun verifyOtp(
+        phone: String,
+        code: String,
+        name: String?,
+        surname: String?
     ): Result<AuthResult> {
         return safeApiCall {
-            val response = authApi.register(RegisterRequest(phoneNumber, name))
+            val response = authApi.verifyOtp(phone, code, name, surname)
 
             tokenManager.saveTokens(
                 accessToken = response.accessToken,
                 refreshToken = response.refreshToken,
-                userId = response.userId
+                userId = response.user.id
             )
 
             AuthResult(
                 accessToken = response.accessToken,
                 refreshToken = response.refreshToken,
-                userId = response.userId
+                userId = response.user.id,
+                isNewUser = response.isNewUser
             )
         }
     }
 
-    override suspend fun refreshToken(): Result<AuthResult> {
+    override suspend fun refreshToken(): Result<String> {
         return safeApiCall {
             val currentRefreshToken =
                 tokenManager.getRefreshToken() ?: throw Exception("No refresh token available")
-
-            val response = authApi.refreshToken(RefreshTokenRequest(currentRefreshToken))
-
+            val response = authApi.refreshToken(currentRefreshToken)
             tokenManager.saveTokens(
                 accessToken = response.accessToken,
-                refreshToken = response.refreshToken,
-                userId = response.userId
+                refreshToken = currentRefreshToken,
+                userId = tokenManager.getUserId()
             )
 
-            AuthResult(
-                accessToken = response.accessToken,
-                refreshToken = response.refreshToken,
-                userId = response.userId
-            )
+            response.accessToken
         }
     }
 
     override suspend fun logout() {
-        tokenManager.clearTokens()
+        try {
+            authApi.logout()
+        } catch (_: Exception) {
+            // Даже если сервер недоступен — очищаем локальные токены
+        } finally {
+            tokenManager.clearTokens()
+        }
     }
 
     override fun isLoggedIn(): Boolean {

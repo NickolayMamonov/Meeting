@@ -1,7 +1,6 @@
 package dev.whysoezzy.communities.details.presentation
 
 import com.whysoezzy.domain.models.Meeting
-import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
 
@@ -30,4 +29,5 @@ sealed class CommunityDetailsEvent {
     data class NavigateToMeeting(val meetingId: Long) : CommunityDetailsEvent()
     data class NavigateToProfile(val userId: Long) : CommunityDetailsEvent()
     object NavigateToSubscribers : CommunityDetailsEvent()
+    object ShareCommunity : CommunityDetailsEvent()
 }

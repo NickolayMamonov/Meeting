@@ -4,38 +4,34 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.meetings.presentation.MainScreenEvent
+import dev.whysoezzy.meetings.presentation.MainScreenNavEvent
 import dev.whysoezzy.meetings.presentation.MainScreenUiState
 import dev.whysoezzy.meetings.presentation.MainScreenViewModel
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
@@ -56,10 +52,20 @@ fun MainScreen(
     viewModel: MainScreenViewModel = koinViewModel(),
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onUserProfileClick: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is MainScreenNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
+                is MainScreenNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -68,7 +74,7 @@ fun MainScreen(
                 onSearchQueryChange = { query ->
                     viewModel.onEvent(MainScreenEvent.Search(query))
                 },
-                onProfileClick = onProfileClick
+                onProfileClick = onProfileClick,
             )
         }
     ) { paddingValues ->
@@ -87,20 +93,11 @@ fun MainScreen(
                         heroMeetings = state.heroMeetings,
                         popularMeetings = state.popularMeetings,
                         allMeetings = state.allMeetings,
-                        categories = state.categories,
                         communities = state.communities,
                         adBlocks = state.adBlocks,
                         onMeetingClick = onMeetingClick,
-                        onCommunityClick = onCommunityClick
-                    )
-                }
-
-                is MainScreenUiState.SearchResults -> {
-                    SearchResultsContent(
-                        meetings = state.meetings,
-                        communities = state.communities,
-                        onMeetingClick = onMeetingClick,
-                        onCommunityClick = onCommunityClick
+                        onCommunityClick = onCommunityClick,
+                        onUserProfileClick = onUserProfileClick,
                     )
                 }
 
@@ -117,37 +114,19 @@ fun MainScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScreenTopBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onProfileClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            UIKitSearchBar(
-                query = searchQuery,
-                onQueryChange = onSearchQueryChange,
-                placeholder = "Поиск встреч и сообществ",
-                onProfileClick = {},
-                onCancelClick = {}
-            )
-            IconButton(onClick = onProfileClick) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Профиль"
-                )
-            }
-        }
-    }
+    UIKitSearchBar(
+        query = searchQuery,
+        onQueryChange = onSearchQueryChange,
+        placeholder = "Поиск встреч и сообществ",
+        onProfileClick = onProfileClick,
+        onCancelClick = {}
+    )
 }
 
 @Composable
@@ -165,16 +144,23 @@ private fun MainScreenContent(
     heroMeetings: List<UIKitMeetingInfo>,
     popularMeetings: List<UIKitMeetingInfo>,
     allMeetings: List<UIKitMeetingInfo>,
-    categories: List<UIKitMeetingTag>,
     communities: List<UIKitCommunityInfo>,
     adBlocks: List<AdBlock>,
     onMeetingClick: (Long) -> Unit,
-    onCommunityClick: (Long) -> Unit
+    onCommunityClick: (Long) -> Unit,
+    onUserProfileClick: (Long) -> Unit,
 ) {
+    // Генерируем бесконечный циклический список рекламных блоков, чтобы типы чередовались
+    val cyclingAdBlocks = rememberCyclingAdBlocks(adBlocks)
+    val meetingsWithAds = remember(allMeetings, cyclingAdBlocks) {
+        buildMeetingsWithAdsList(allMeetings, cyclingAdBlocks)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
+        // Блок Hero-встреч: широкие карточки вверху
         if (heroMeetings.isNotEmpty()) {
             item {
                 LazyRow(
@@ -204,41 +190,17 @@ private fun MainScreenContent(
                     }
                 }
             }
-
             item { Spacer(modifier = Modifier.height(24.dp)) }
         }
 
-        // Секция категорий (фильтры)
-        if (categories.isNotEmpty()) {
-            item {
-                TextHeading2(text = "Категории",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(categories) { category ->
-                        FilterChip(
-                            selected = category.state == UIKitTagState.SELECTED,
-                            onClick = { /* TODO: фильтрация по категории */ },
-                            label = { Text(category.text) }
-                        )
-                    }
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-        }
-
-        // Секция популярных встреч
+        // Блок Популярных встреч: компактные карточки
         if (popularMeetings.isNotEmpty()) {
             item {
-                TextHeading2(text = "Ближайшие встречи",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                TextHeading2(
+                    text = "Ближайшие встречи",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
-
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -267,29 +229,17 @@ private fun MainScreenContent(
                     }
                 }
             }
-
             item { Spacer(modifier = Modifier.height(24.dp)) }
         }
 
-        // Секция сообществ
+        // Блок Рекомендуемых сообществ
         if (communities.isNotEmpty()) {
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Рекомендуемые сообщества",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    TextButton(onClick = { /* TODO: показать все сообщества */ }) {
-                        Text("Все")
-                    }
-                }
+                TextHeading2(
+                    text = "Рекомендуемые сообщества",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
-
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -302,27 +252,23 @@ private fun MainScreenContent(
                             isSubscribed = community.isSubscribed,
                             onSubscribeClick = community.onSubscribeClick,
                             onCardClick = community.onCardClick,
-                            modifier = Modifier.width(200.dp)
                         )
                     }
                 }
             }
-
             item { Spacer(modifier = Modifier.height(24.dp)) }
         }
 
-        // Секция всех встреч
+        // Секция "Все встречи" с рекламой через каждые 3 встречи
         item {
-            TextHeading2(text = "Все встречи",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            TextHeading2(
+                text = "Все встречи",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
 
-        val meetingsWithAds = buildMeetingsWithAdsList(allMeetings, adBlocks)
-
         items(meetingsWithAds.size) { index ->
-            val item = meetingsWithAds[index]
-
-            when (item) {
+            when (val item = meetingsWithAds[index]) {
                 is MeetingOrAd.Meeting -> {
                     UIKitEventCard(
                         imageUrl = item.meeting.imageUrl,
@@ -347,107 +293,13 @@ private fun MainScreenContent(
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                     )
                 }
-
                 is MeetingOrAd.Ad -> {
                     AdBlockComponent(
                         adBlock = item.adBlock,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        onAdClick = {}
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchResultsContent(
-    meetings: List<UIKitMeetingInfo>,
-    communities: List<UIKitCommunityInfo>,
-    onMeetingClick: (Long) -> Unit,
-    onCommunityClick: (Long) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp)
-    ) {
-        // Результаты поиска по сообществам
-        if (communities.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Сообщества",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            items(communities) { community ->
-                UIKitCommunityCard(
-                    imageUrl = community.imageUrl,
-                    title = community.title,
-                    isSubscribed = community.isSubscribed,
-                    onSubscribeClick = community.onSubscribeClick,
-                    onCardClick = community.onCardClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                )
-            }
-
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-        }
-
-        // Результаты поиска по встречам
-        if (meetings.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Встречи",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            items(meetings) { meeting ->
-                UIKitEventCard(
-                    imageUrl = meeting.imageUrl,
-                    title = meeting.title,
-                    date = meeting.date,
-                    address = UIKitAddress(
-                        address = meeting.address,
-                        latitude = 0.0,
-                        longitude = 0.0
-                    ),
-                    tags = meeting.tags.map { tag ->
-                        UIKitEventCardTag(
-                            text = tag.text,
-                            isSelected = tag.state == UIKitTagState.SELECTED,
-                            isEnabled = tag.state != UIKitTagState.DISABLED
-                        )
-                    },
-                    cardType = UIKitEventCardType.COMPACT,
-                    onCardClick = { onMeetingClick(meeting.id) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                )
-            }
-        }
-
-        // Если ничего не найдено
-        if (meetings.isEmpty() && communities.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Ничего не найдено",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                            .padding(vertical = 8.dp),
+                        onUserClick = onUserProfileClick
                     )
                 }
             }
@@ -493,16 +345,37 @@ private sealed class MeetingOrAd {
     data class Ad(val adBlock: AdBlock) : MeetingOrAd()
 }
 
+/**
+ * Генерирует циклический список рекламных блоков достаточной длины, чтобы
+ * типы AdBlock чередовались (например, Communities → Text → People → Communities → ...).
+ * Если isNotEmpty(), генерируется список из ~3×meetings.size/3 элементов.
+ */
+@Composable
+private fun rememberCyclingAdBlocks(adBlocks: List<AdBlock>): List<AdBlock> {
+    return remember(adBlocks) {
+        if (adBlocks.isEmpty()) return@remember emptyList()
+        // Нам нужно больше блоков, чем есть уникальных — циклически повторяем
+        // Достаточно 30 рекламных слотов (хватит даже для 90+ встреч)
+        List(30) { i -> adBlocks[i % adBlocks.size] }
+    }
+}
+
+/**
+ * Вставляет рекламный блок после каждой 3-й встречи.
+ * Циклический adBlocks гарантирует чередование типов.
+ */
 private fun buildMeetingsWithAdsList(
     meetings: List<UIKitMeetingInfo>,
     adBlocks: List<AdBlock>
 ): List<MeetingOrAd> {
+    if (adBlocks.isEmpty()) return meetings.map { MeetingOrAd.Meeting(it) }
+
     val result = mutableListOf<MeetingOrAd>()
     var adIndex = 0
 
     meetings.forEachIndexed { index, meeting ->
         result.add(MeetingOrAd.Meeting(meeting))
-
+        // После каждой 3-й встречи вставляем рекламу
         if ((index + 1) % 3 == 0 && adIndex < adBlocks.size) {
             result.add(MeetingOrAd.Ad(adBlocks[adIndex]))
             adIndex++

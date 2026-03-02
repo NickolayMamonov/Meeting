@@ -35,27 +35,34 @@ fun UIKitPhoneInput(
 }
 
 private fun formatPhoneNumber(input: String): String {
-    // Remove all non-digit characters
+    // Извлекаем только цифры
     val digits = input.filter { it.isDigit() }
 
-    return when {
-        digits.isEmpty() -> ""
-        digits.length <= 1 -> "+7"
-        digits.length <= 4 -> "+7 (${digits.substring(1)})"
-        digits.length <= 7 -> "+7 (${digits.substring(1, 4)}) ${digits.substring(4)}"
-        digits.length <= 9 -> "+7 (${digits.substring(1, 4)}) ${
-            digits.substring(
-                4,
-                7
-            )
-        }-${digits.substring(7)}"
+    // Нормализуем: убираем ведущую 7/8 если она есть,
+    // чтобы работать с 10-значным номером (без кода страны)
+    val local = when {
+        digits.startsWith("7") || digits.startsWith("8") -> digits.drop(1)
+        else -> digits
+    }.take(10)
 
-        else -> "+7 (${digits.substring(1, 4)}) ${digits.substring(4, 7)}-${
-            digits.substring(
-                7,
-                9
-            )
-        }-${digits.substring(9, minOf(11, digits.length))}"
+    // Строим форматированную строку по мере ввода
+    return buildString {
+        if (local.isEmpty()) return ""
+        append("+7")
+        append(" (")
+        append(local.take(3))
+        if (local.length >= 3) {
+            append(") ")
+            append(local.substring(3).take(3))
+        }
+        if (local.length >= 6) {
+            append("-")
+            append(local.substring(6).take(2))
+        }
+        if (local.length >= 8) {
+            append("-")
+            append(local.substring(8).take(2))
+        }
     }
 }
 

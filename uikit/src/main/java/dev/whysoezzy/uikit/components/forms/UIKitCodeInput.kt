@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -12,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,31 +35,36 @@ fun UIKitCodeInput(
     codeLength: Int = 4,
     isError: Boolean = false
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
-    ) {
-        repeat(codeLength) { index ->
-            CodeDigitBox(
-                digit = value.getOrNull(index)?.toString() ?: "",
-                isActive = index == value.length,
-                isError = isError
-            )
-        }
-    }
-
-    // Hidden text field for input handling - без автофокуса
-    BasicTextField(
-        value = value,
-        onValueChange = { newValue ->
-            if (newValue.length <= codeLength && newValue.all { it.isDigit() }) {
-                onValueChange(newValue)
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S, Alignment.CenterHorizontally)
+        ) {
+            repeat(codeLength) { index ->
+                CodeDigitBox(
+                    digit = value.getOrNull(index)?.toString() ?: "",
+                    isActive = index == value.length,
+                    isError = isError
+                )
             }
-        },
-        modifier = Modifier.size(0.dp),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-        cursorBrush = SolidColor(ColorTokens.BrandDark)
-    )
+        }
+
+        BasicTextField(
+            value = value,
+            onValueChange = { newValue ->
+                val filtered = newValue.filter { it.isDigit() }
+                if (filtered.length <= codeLength) {
+                    onValueChange(filtered)
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .alpha(0f),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            cursorBrush = SolidColor(ColorTokens.BrandDark)
+        )
+    }
 }
 
 @Composable

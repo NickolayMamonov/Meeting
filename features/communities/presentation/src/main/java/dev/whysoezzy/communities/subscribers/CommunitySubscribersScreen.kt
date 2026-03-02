@@ -26,12 +26,21 @@ import org.koin.androidx.compose.koinViewModel
 fun CommunitySubscribersScreen(
     communityId: Long,
     onBackPressed: () -> Unit,
+    onPersonClick: (Long) -> Unit = {},
     viewModel: CommunitySubscribersViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(communityId) {
         viewModel.onEvent(CommunitySubscribersEvent.LoadSubscribers(communityId))
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is CommunitySubscribersNavEvent.NavigateToProfile -> onPersonClick(event.userId)
+            }
+        }
     }
 
     Scaffold(

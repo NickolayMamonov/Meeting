@@ -42,6 +42,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":features:meetings:domain"))
+    implementation(project(":features:communities:domain"))
 
     // Koin for DI
     implementation(platform(libs.koin.bom))
