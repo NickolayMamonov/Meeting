@@ -18,10 +18,5 @@ sealed class MainScreenUiState {
         val adBlocks: List<AdBlock> = emptyList()
     ) : MainScreenUiState()
 
-    data class SearchResults(
-        val meetings: List<UIKitMeetingInfo>,
-        val communities: List<UIKitCommunityInfo>
-    ) : MainScreenUiState()
-
     data class Error(val message: String) : MainScreenUiState()
 }

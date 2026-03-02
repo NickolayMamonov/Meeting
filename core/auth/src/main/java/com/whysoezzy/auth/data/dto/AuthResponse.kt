@@ -5,7 +5,17 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AuthResponse(
-    @SerialName("access_token") val accessToken: String,
-    @SerialName("refresh_token") val refreshToken: String,
-    @SerialName("user_id") val userId: Long
+    @SerialName("accessToken") val accessToken: String,
+    @SerialName("refreshToken") val refreshToken: String,
+    @SerialName("isNewUser") val isNewUser: Boolean,
+    @SerialName("user") val user: AuthUserDto
+)
+
+@Serializable
+data class AuthUserDto(
+    @SerialName("id") val id: Long,
+    @SerialName("name") val name: String,
+    @SerialName("surname") val surname: String,
+    @SerialName("phone") val phone: String? = null,
+    @SerialName("avatarUrl") val avatarUrl: String? = null
 )

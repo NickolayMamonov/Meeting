@@ -1,5 +1,7 @@
 package dev.whysoezzy.communities.details.presentation
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -53,13 +56,31 @@ fun CommunityDetailsScreen(
     onBackPressed: () -> Unit,
     onSubscribersClick: () -> Unit,
     onMeetingClick: (Long) -> Unit,
+    onUserProfileClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: CommunityDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(communityId) {
         viewModel.onEvent(CommunityDetailsEvent.LoadCommunity(communityId))
+    }
+
+    // Подписываемся на навигационные события
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is CommunityDetailsNavEvent.NavigateToMeeting ->
+                    onMeetingClick(event.meetingId)
+                is CommunityDetailsNavEvent.NavigateToProfile ->
+                    onUserProfileClick(event.userId)
+                is CommunityDetailsNavEvent.NavigateToSubscribers ->
+                    onSubscribersClick()
+                is CommunityDetailsNavEvent.ShareCommunity ->
+                    shareCommunityIntent(context, event.title, event.shareText)
+            }
+        }
     }
 
     Scaffold(
@@ -69,14 +90,14 @@ fun CommunityDetailsScreen(
                     BackShareTopBar(
                         title = state.title,
                         onBackClick = onBackPressed,
-                        onShareClick = { /* TODO: Share */ },
+                        onShareClick = { viewModel.onEvent(CommunityDetailsEvent.ShareCommunity) }
                     )
                 }
                 else -> {
                     BackShareTopBar(
                         title = "Сообщество",
                         onBackClick = onBackPressed,
-                        onShareClick = { },
+                        onShareClick = {}
                     )
                 }
             }
@@ -93,8 +114,12 @@ fun CommunityDetailsScreen(
                     onSubscribeClick = {
                         viewModel.onEvent(CommunityDetailsEvent.ToggleSubscription)
                     },
-                    onSubscribersClick = onSubscribersClick,
-                    onMeetingClick = onMeetingClick,
+                    onSubscribersClick = {
+                        viewModel.onEvent(CommunityDetailsEvent.NavigateToSubscribers)
+                    },
+                    onMeetingClick = { meetingId ->
+                        viewModel.onEvent(CommunityDetailsEvent.NavigateToMeeting(meetingId))
+                    },
                     paddingValues = paddingValues,
                     modifier = modifier
                 )
@@ -114,13 +139,8 @@ fun CommunityDetailsScreen(
 }
 
 @Composable
-private fun LoadingContent(
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+private fun LoadingContent(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
     }
 }
@@ -153,10 +173,7 @@ private fun CommunityDetailsContent(
                     .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Crop
             )
-            TextHeading1(
-                text = state.title,
-                modifier = Modifier.fillMaxWidth()
-            )
+            TextHeading1(text = state.title, modifier = Modifier.fillMaxWidth())
         }
 
         item {
@@ -165,10 +182,7 @@ private fun CommunityDetailsContent(
                 contentPadding = PaddingValues(vertical = SpacingTokens.XS)
             ) {
                 items(state.tags) { tag ->
-                    UIKitTag(
-                        text = tag.text,
-                        size = UIKitTagSize.MEDIUM
-                    )
+                    UIKitTag(text = tag.text, size = UIKitTagSize.MEDIUM)
                 }
             }
         }
@@ -176,14 +190,14 @@ private fun CommunityDetailsContent(
         item {
             if (state.isSubscribed) {
                 UIKitButton(
-                    text = "Покинуть встречу",
+                    text = "Покинуть сообщество",
                     onClick = onSubscribeClick,
                     state = UIKitButtonState.SECONDARY,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 UIKitButton(
-                    text = "Записаться на встречу",
+                    text = "Вступить в сообщество",
                     onClick = onSubscribeClick,
                     state = UIKitButtonState.PRIMARY,
                     modifier = Modifier.fillMaxWidth()
@@ -192,17 +206,11 @@ private fun CommunityDetailsContent(
         }
 
         item {
-            TextBody2(
-                text = state.description,
-                modifier = Modifier.fillMaxWidth()
-            )
+            TextBody2(text = state.description, modifier = Modifier.fillMaxWidth())
         }
 
         item {
-            SubscribersSection(
-                state = state,
-                onSubscribersClick = onSubscribersClick
-            )
+            SubscribersSection(state = state, onSubscribersClick = onSubscribersClick)
         }
 
         if (state.activeMeetings.isNotEmpty()) {
@@ -223,11 +231,7 @@ private fun CommunityDetailsContent(
                         longitude = meeting.address.longitude
                     ),
                     tags = meeting.tags.map { tag ->
-                        UIKitEventCardTag(
-                            text = tag.text,
-                            isSelected = true,
-                            isEnabled = false
-                        )
+                        UIKitEventCardTag(text = tag.text, isSelected = true, isEnabled = false)
                     },
                     cardType = UIKitEventCardType.WIDE,
                     onCardClick = { onMeetingClick(meeting.id) },
@@ -245,9 +249,7 @@ private fun CommunityDetailsContent(
             }
 
             item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
-                ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
                     items(state.pastMeetings) { meeting ->
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
@@ -317,10 +319,7 @@ private fun ErrorContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
@@ -330,11 +329,16 @@ private fun ErrorContent(
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
-
-            UIKitButton(
-                text = "Повторить",
-                onClick = onRetry
-            )
+            UIKitButton(text = "Повторить", onClick = onRetry)
         }
     }
+}
+
+private fun shareCommunityIntent(context: Context, title: String, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, title)
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "Поделиться сообществом"))
 }

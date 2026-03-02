@@ -9,11 +9,11 @@ class UpdateUserProfileUseCase(
 ) {
     suspend operator fun invoke(user: User): Result<User> {
         if (!ValidationUtils.isValidName(user.name)) {
-            return Result.failure(Exception("Некорректное имя"))
+            return Result.failure(Exception("Некорректное имя: минимум 2 символа"))
         }
 
-        if (!ValidationUtils.isValidName(user.surname)) {
-            return Result.failure(Exception("Некорректная фамилия"))
+        if (user.surname.isNotBlank() && !ValidationUtils.isValidName(user.surname)) {
+            return Result.failure(Exception("Некорректная фамилия: минимум 2 символа"))
         }
 
         return repository.updateUserProfile(user)

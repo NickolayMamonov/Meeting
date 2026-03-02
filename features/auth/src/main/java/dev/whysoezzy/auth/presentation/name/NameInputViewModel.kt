@@ -2,89 +2,98 @@ package dev.whysoezzy.auth.presentation.name
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import com.whysoezzy.data.api.UserApiImpl
+import com.whysoezzy.data.dto.UpdateUserDto
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class NameInputViewModel : ViewModel() {
+sealed class NameInputNavEvent {
+    data object NavigateToSuccess : NameInputNavEvent()
+}
+
+/**
+ * NameInputViewModel — экран для новых пользователей.
+ * Сессия уже аутентифицирована (verify-otp прошёл на CodeVerificationScreen,
+ * токены уже сохранены в TokenManager).
+ * Здесь просто обновляем имя/фамилию через PUT /profile.
+ */
+class NameInputViewModel(
+    private val userApi: UserApiImpl
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NameInputUiState())
     val uiState: StateFlow<NameInputUiState> = _uiState.asStateFlow()
 
+    private val _navEvent = MutableSharedFlow<NameInputNavEvent>(extraBufferCapacity = 1)
+    val navEvent: SharedFlow<NameInputNavEvent> = _navEvent.asSharedFlow()
+
     fun onEvent(event: NameInputEvent) {
         when (event) {
-            is NameInputEvent.UpdateName -> {
-                updateName(event.name)
-            }
-
-            is NameInputEvent.UpdateSurname -> {
-                updateSurname(event.surname)
-            }
-
-            NameInputEvent.Continue -> {
-                validateAndContinue()
-            }
+            is NameInputEvent.UpdateName -> updateName(event.name)
+            is NameInputEvent.UpdateSurname -> updateSurname(event.surname)
+            NameInputEvent.Continue -> validateAndSubmit()
         }
     }
 
     private fun updateName(name: String) {
-        val nameError = validateName(name)
         _uiState.value = _uiState.value.copy(
             name = name,
-            nameError = nameError,
+            nameError = null,
             isSubmitted = false
         )
     }
 
     private fun updateSurname(surname: String) {
-        val surnameError = validateSurname(surname)
         _uiState.value = _uiState.value.copy(
             surname = surname,
-            surnameError = surnameError,
+            surnameError = null,
             isSubmitted = false
         )
     }
 
-    private fun validateName(name: String): String? {
-        return when {
-            name.isBlank() -> "Имя не может быть пустым"
-            name.length < 2 -> "Имя должно содержать минимум 2 символа"
-            !name.all { it.isLetter() || it.isWhitespace() } -> "Имя может содержать только буквы"
-            else -> null
-        }
+    private fun validateName(name: String): String? = when {
+        name.isBlank() -> "Имя не может быть пустым"
+        name.length < 2 -> "Минимум 2 символа"
+        !name.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
+        else -> null
     }
 
-    private fun validateSurname(surname: String): String? {
-        return when {
-            surname.isBlank() -> "Фамилия не может быть пустой"
-            surname.length < 2 -> "Фамилия должна содержать минимум 2 символа"
-            !surname.all { it.isLetter() || it.isWhitespace() } -> "Фамилия может содержать только буквы"
-            else -> null
-        }
+    private fun validateSurname(surname: String): String? = when {
+        surname.isBlank() -> "Фамилия не может быть пустой"
+        surname.length < 2 -> "Минимум 2 символа"
+        !surname.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
+        else -> null
     }
 
-    private fun validateAndContinue() {
-        val currentState = _uiState.value
-        val nameError = validateName(currentState.name)
-        val surnameError = validateSurname(currentState.surname)
+    private fun validateAndSubmit() {
+        val state = _uiState.value
+        val nameError = validateName(state.name)
+        val surnameError = validateSurname(state.surname)
 
-        _uiState.value = currentState.copy(
-            nameError = nameError,
-            surnameError = surnameError
-        )
+        _uiState.value = state.copy(nameError = nameError, surnameError = surnameError)
+        if (nameError != null || surnameError != null) return
 
-        if (nameError == null && surnameError == null) {
-            viewModelScope.launch {
-                _uiState.value = _uiState.value.copy(isLoading = true)
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, nameError = null)
 
-                // Simulate API call to save user data
-                delay(1500)
-
+            try {
+                userApi.updateUserProfile(
+                    UpdateUserDto(
+                        name = _uiState.value.name,
+                        surname = _uiState.value.surname
+                    )
+                )
+                _uiState.value = _uiState.value.copy(isLoading = false, isSubmitted = true)
+                _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
+            } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    isSubmitted = true
+                    nameError = e.message ?: "Не удалось сохранить имя. Попробуйте ещё раз."
                 )
             }
         }

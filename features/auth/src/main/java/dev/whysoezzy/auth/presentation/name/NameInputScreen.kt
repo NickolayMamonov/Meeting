@@ -36,9 +36,11 @@ fun NameInputScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(uiState.isSubmitted) {
-        if (uiState.isSubmitted) {
-            onNameSubmitted()
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is NameInputNavEvent.NavigateToSuccess -> onNameSubmitted()
+            }
         }
     }
 
@@ -70,7 +72,6 @@ private fun NameInputContent(
     ) {
         Spacer(modifier = Modifier.height(60.dp))
 
-        // Header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
@@ -80,7 +81,6 @@ private fun NameInputContent(
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
-
             TextBody2(
                 text = "Расскажите нам как к вам обращаться",
                 color = ColorTokens.NeutralWeak,
@@ -90,41 +90,35 @@ private fun NameInputContent(
 
         Spacer(modifier = Modifier.height(SpacingTokens.L))
 
-        // Input fields
-        Column(
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
-        ) {
-            uiState.nameError?.let {
-                UIKitInput(
-                    value = uiState.name,
-                    onValueChange = onNameChange,
-                    isError = true,
-                    errorMessage = it,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            uiState.surnameError?.let {
-                UIKitInput(
-                    value = uiState.surname,
-                    onValueChange = onNameChange,
-                    isError = true,
-                    errorMessage = it,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
+        Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
+            UIKitInput(
+                value = uiState.name,
+                onValueChange = onNameChange,
+                hint = "Имя",
+                isError = uiState.nameError != null,
+                errorMessage = uiState.nameError ?: "",
+                modifier = Modifier.fillMaxWidth()
+            )
+            UIKitInput(
+                value = uiState.surname,
+                onValueChange = onSurnameChange,
+                hint = "Фамилия",
+                isError = uiState.surnameError != null,
+                errorMessage = uiState.surnameError ?: "",
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Continue button
         UIKitButton(
             text = "Продолжить",
             onClick = onContinueClick,
-            state = if (uiState.isLoading) UIKitButtonState.LOADING
-            else if (uiState.isValid) UIKitButtonState.PRIMARY
-            else UIKitButtonState.DISABLED,
+            state = when {
+                uiState.isLoading -> UIKitButtonState.LOADING
+                uiState.isValid -> UIKitButtonState.PRIMARY
+                else -> UIKitButtonState.DISABLED
+            },
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -134,12 +128,7 @@ private fun NameInputContent(
 @Composable
 private fun NameInputScreenPreview() {
     UIKitTheme {
-        NameInputContent(
-            uiState = NameInputUiState(
-                name = "Иван",
-                surname = "Петров"
-            )
-        )
+        NameInputContent(uiState = NameInputUiState(name = "Иван", surname = "Петров"))
     }
 }
 

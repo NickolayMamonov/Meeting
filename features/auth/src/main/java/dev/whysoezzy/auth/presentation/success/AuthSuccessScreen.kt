@@ -8,13 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,8 +28,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 @Composable
 fun AuthSuccessScreen(
-    onContinueClicked: () -> Unit,
-    modifier: Modifier = Modifier
+    onContinueClicked: () -> Unit
 ) {
     Scaffold { paddingValues ->
         AuthSuccessContent(
@@ -53,7 +52,7 @@ private fun AuthSuccessContent(
     ) {
         // Success icon
         Icon(
-            imageVector = ImageVector.vectorResource(android.R.drawable.ic_dialog_info), // Replace with checkmark icon
+            imageVector = Icons.Filled.CheckCircle,
             contentDescription = "Успех",
             tint = ColorTokens.AccentSuccess,
             modifier = Modifier.size(80.dp)

@@ -6,11 +6,25 @@ import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
 import dev.whysoezzy.meetings.mappers.toUIKit
-import dev.whysoezzy.meetings.mappers.*
+import dev.whysoezzy.meetings.mappers.toUIKitCommunityHost
+import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfoList
+import dev.whysoezzy.meetings.mappers.toUIKitMeetingTags
+import dev.whysoezzy.meetings.mappers.toUIKitPersonHost
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+sealed class MeetingDetailsNavEvent {
+    data class NavigateToProfile(val userId: Long) : MeetingDetailsNavEvent()
+    data class NavigateToMeeting(val meetingId: Long) : MeetingDetailsNavEvent()
+    data class NavigateToCommunity(val communityId: Long) : MeetingDetailsNavEvent()
+    data class OpenMap(val latitude: Double, val longitude: Double, val address: String) : MeetingDetailsNavEvent()
+    data class ShareMeeting(val title: String, val shareText: String) : MeetingDetailsNavEvent()
+}
 
 class MeetingDetailsViewModel(
     private val getMeetingByIdUseCase: GetMeetingByIdUseCase,
@@ -21,31 +35,27 @@ class MeetingDetailsViewModel(
     private val _uiState = MutableStateFlow<MeetingDetailsUiState>(MeetingDetailsUiState.Loading)
     val uiState: StateFlow<MeetingDetailsUiState> = _uiState.asStateFlow()
 
+    private val _navEvent = MutableSharedFlow<MeetingDetailsNavEvent>(extraBufferCapacity = 1)
+    val navEvent: SharedFlow<MeetingDetailsNavEvent> = _navEvent.asSharedFlow()
+
     private var currentMeetingId: Long? = null
+
     fun onEvent(event: MeetingDetailsEvent) {
         when (event) {
             is MeetingDetailsEvent.LoadMeeting -> loadMeeting(event.meetingId)
             MeetingDetailsEvent.JoinMeeting -> joinMeeting()
             MeetingDetailsEvent.LeaveMeeting -> leaveMeeting()
-            is MeetingDetailsEvent.NavigateToProfile -> {
-                // Навигация к профилю пользователя
+            is MeetingDetailsEvent.NavigateToProfile -> viewModelScope.launch {
+                _navEvent.emit(MeetingDetailsNavEvent.NavigateToProfile(event.userId))
             }
-
-            is MeetingDetailsEvent.NavigateToCommunity -> {
-                // Навигация к сообществу
+            is MeetingDetailsEvent.NavigateToCommunity -> viewModelScope.launch {
+                _navEvent.emit(MeetingDetailsNavEvent.NavigateToCommunity(event.communityId))
             }
-
-            is MeetingDetailsEvent.NavigateToMeeting -> {
-                // Навигация к другой встрече
+            is MeetingDetailsEvent.NavigateToMeeting -> viewModelScope.launch {
+                _navEvent.emit(MeetingDetailsNavEvent.NavigateToMeeting(event.meetingId))
             }
-
-            MeetingDetailsEvent.OpenMap -> {
-                // Открытие карты
-            }
-
-            MeetingDetailsEvent.ShareMeeting -> {
-                // Поделиться встречей
-            }
+            MeetingDetailsEvent.OpenMap -> openMap()
+            MeetingDetailsEvent.ShareMeeting -> shareMeeting()
         }
     }
 
@@ -70,7 +80,8 @@ class MeetingDetailsViewModel(
                         isUserJoined = meeting.isUserInParticipants,
                         totalPlaces = meeting.capacity,
                         community = meeting.communityHost?.toUIKitCommunityHost(),
-                        otherMeetings = meeting.communityHost?.meetingsInfo?.toUIKitMeetingInfoList() ?: emptyList()
+                        otherMeetings = meeting.communityHost?.meetingsInfo?.toUIKitMeetingInfoList()
+                            ?: emptyList()
                     )
                 }
                 .onFailure { exception ->
@@ -87,15 +98,9 @@ class MeetingDetailsViewModel(
         if (currentState.isUserJoined) return
         viewModelScope.launch {
             _uiState.value = currentState.copy(isUserJoined = true)
-
             joinMeetingUseCase(meetingId)
-                .onSuccess {
-
-                }
-                .onFailure { exception ->
+                .onFailure {
                     _uiState.value = currentState.copy(isUserJoined = false)
-                    println("Failed to join meeting: ${exception.message}")
-
                 }
         }
     }
@@ -107,15 +112,37 @@ class MeetingDetailsViewModel(
         viewModelScope.launch {
             _uiState.value = currentState.copy(isUserJoined = false)
             leaveMeetingUseCase(meetingId)
-                .onSuccess {
-
-                }
-                .onFailure { exception ->
+                .onFailure {
                     _uiState.value = currentState.copy(isUserJoined = true)
-                    println("Failed to leave meeting: ${exception.message}")
                 }
         }
     }
+
+    private fun openMap() {
+        val state = _uiState.value as? MeetingDetailsUiState.Success ?: return
+        viewModelScope.launch {
+            _navEvent.emit(
+                MeetingDetailsNavEvent.OpenMap(
+                    latitude = state.address.latitude,
+                    longitude = state.address.longitude,
+                    address = state.address.address
+                )
+            )
+        }
+    }
+
+    private fun shareMeeting() {
+        val state = _uiState.value as? MeetingDetailsUiState.Success ?: return
+        viewModelScope.launch {
+            _navEvent.emit(
+                MeetingDetailsNavEvent.ShareMeeting(
+                    title = state.title,
+                    shareText = "Приходи на встречу «${state.title}»! ${state.dateTime}, ${state.address.address}"
+                )
+            )
+        }
+    }
+
     private fun extractMetroFromAddress(address: String): String {
         return if (address.contains("М.")) {
             address.substringAfter("М.").substringBefore(",").trim()

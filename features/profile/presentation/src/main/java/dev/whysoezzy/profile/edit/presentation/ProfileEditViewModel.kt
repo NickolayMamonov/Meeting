@@ -5,25 +5,38 @@ import androidx.lifecycle.viewModelScope
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.User
+import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+sealed class ProfileEditNavEvent {
+    object NavigateBack : ProfileEditNavEvent()
+}
+
 class ProfileEditViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
-    private val updateUserProfileUseCase: UpdateUserProfileUseCase
+    private val updateUserProfileUseCase: UpdateUserProfileUseCase,
+    private val getAllTagsUseCase: GetAllTagsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileEditUiState())
     val uiState: StateFlow<ProfileEditUiState> = _uiState.asStateFlow()
 
+    private val _navEvent = MutableSharedFlow<ProfileEditNavEvent>(extraBufferCapacity = 1)
+    val navEvent: SharedFlow<ProfileEditNavEvent> = _navEvent.asSharedFlow()
+
     private var currentUser: User? = null
 
     init {
         loadProfile()
+        loadAvailableTags()
     }
 
     fun onEvent(event: ProfileEditEvent) {
@@ -43,6 +56,7 @@ class ProfileEditViewModel(
             is ProfileEditEvent.AddInterest -> addInterest()
             is ProfileEditEvent.AddInterestWithText -> addInterestWithText(event.interest)
             is ProfileEditEvent.RemoveInterest -> removeInterest(event.interest)
+            is ProfileEditEvent.ToggleTag -> toggleTag(event.tagId, event.tagName)
 
             // Социальные сети
             is ProfileEditEvent.UpdateSocialMedia -> updateSocialMedia(event.type, event.username)
@@ -73,12 +87,12 @@ class ProfileEditViewModel(
                             email = user.email,
                             city = user.city,
                             description = user.bio,
-                            avatarUrl = user.avatar,
-                            interests = emptyList(),
+                            avatarUrl = user.avatar.takeIf { it.isNotBlank() },
+                            interests = user.interests.map { it.name },
                             socialMedias = extractSocialMedias(user.socialMedias),
-                            showCommunities = true,
-                            showMeetings = true,
-                            notificationsEnabled = true,
+                            showCommunities = user.showCommunities,
+                            showMeetings = user.showMeetings,
+                            notificationsEnabled = user.notificationsEnabled,
                             isLoading = false
                         )
                     }
@@ -182,6 +196,32 @@ class ProfileEditViewModel(
         )
     }
 
+    /**
+     * Переключает выбор тега по его имени (используется для выбора из списка)
+     */
+    private fun toggleTag(tagId: Long, tagName: String) {
+        val currentInterests = _uiState.value.interests.toMutableList()
+        if (currentInterests.contains(tagName)) {
+            currentInterests.remove(tagName)
+        } else {
+            currentInterests.add(tagName)
+        }
+        _uiState.value = _uiState.value.copy(
+            interests = currentInterests,
+            isSaved = false
+        )
+    }
+
+    private fun loadAvailableTags() {
+        viewModelScope.launch {
+            getAllTagsUseCase()
+                .onSuccess { tags ->
+                    _uiState.value = _uiState.value.copy(
+                        availableTags = tags.associate { it.id to it.name }
+                    )
+                }
+        }
+    }
 
     private fun updateSocialMedia(type: String, username: String) {
         val currentSocialMedias = _uiState.value.socialMedias.toMutableMap()
@@ -322,6 +362,18 @@ class ProfileEditViewModel(
                     }
                 }
 
+                // Сопоставляем имена интересов с ID тегов через availableTags
+                val availableTags = currentState.availableTags  // Map<Long, String>
+                val updatedInterests = currentState.interests.mapNotNull { interestName ->
+                    val tagId = availableTags.entries.firstOrNull { it.value == interestName }?.key
+                    if (tagId != null) {
+                        com.whysoezzy.domain.models.Tag(id = tagId, name = interestName)
+                    } else {
+                        // Интерес есть в исходном профиле пользователя
+                        user.interests.firstOrNull { it.name == interestName }
+                    }
+                }
+
                 val updatedUser = user.copy(
                     name = currentState.name,
                     surname = currentState.surname,
@@ -329,10 +381,12 @@ class ProfileEditViewModel(
                     email = currentState.email,
                     city = currentState.city,
                     bio = currentState.description,
-                    avatar = currentState.avatarUrl ?: "Unexpected avatar",
-                    socialMedias = socialMediasList
-                    // TODO: Сохранить interests (если добавить в User)
-                    // TODO: Сохранить настройки приватности
+                    avatar = currentState.avatarUrl ?: "",
+                    socialMedias = socialMediasList,
+                    interests = updatedInterests,
+                    showCommunities = currentState.showCommunities,
+                    showMeetings = currentState.showMeetings,
+                    notificationsEnabled = currentState.notificationsEnabled
                 )
 
                 updateUserProfileUseCase(updatedUser)

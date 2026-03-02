@@ -6,31 +6,38 @@ import com.whysoezzy.auth.data.repository.AuthRepositoryImpl
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
-import com.whysoezzy.auth.domain.usecase.RegisterUserUseCase
-import com.whysoezzy.auth.domain.usecase.SendSmsUseCase
-import com.whysoezzy.auth.domain.usecase.VerifySmsUseCase
+import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
+import com.whysoezzy.auth.domain.usecase.VerifyOtpUseCase
 import com.whysoezzy.network.KtorNetworkModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 val authModule = module {
+
     single { TokenManager(androidContext()) }
 
     single(qualifier = named("publicClient")) {
         KtorNetworkModule.provideHttpClient()
     }
 
+    single { AuthApiImpl(get(named("publicClient"))) }
+
+    single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
+
     single(qualifier = named("authorizedClient")) {
         val tokenManager: TokenManager = get()
-        val authRepository: AuthRepository = get()
+        val authRepo = lazy { get<AuthRepository>() }
 
         KtorNetworkModule.provideHttpClient(
             tokenProvider = tokenManager,
             onRefreshToken = {
                 try {
-                    val result = authRepository.refreshToken().getOrNull()
-                    result?.let { Pair(it.accessToken, it.refreshToken) }
+                    val newAccessToken = authRepo.value.refreshToken().getOrNull()
+                    newAccessToken?.let { access ->
+                        val refresh = tokenManager.getRefreshToken() ?: ""
+                        Pair(access, refresh)
+                    }
                 } catch (e: Exception) {
                     null
                 }
@@ -38,13 +45,8 @@ val authModule = module {
         )
     }
 
-    single { AuthApiImpl(get(named("publicClient"))) }
-
-    single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
-
-    factory { SendSmsUseCase(get()) }
-    factory { VerifySmsUseCase(get()) }
-    factory { RegisterUserUseCase(get()) }
+    factory { SendOtpUseCase(get()) }
+    factory { VerifyOtpUseCase(get()) }
     factory { LogoutUseCase(get()) }
     factory { IsLoggedInUseCase(get()) }
 }

@@ -10,8 +10,10 @@ data class ProfileEditUiState(
     val description: String = "",
     val avatarUrl: String? = null,
 
-    // Интересы (редактируемый список)
+    // Интересы — ID выбранных тегов
     val interests: List<String> = emptyList(),
+    // Все доступные теги (id -> name)
+    val availableTags: Map<Long, String> = emptyMap(),
 
     // Социальные сети (Map: тип -> username)
     val socialMedias: Map<String, String> = emptyMap(),

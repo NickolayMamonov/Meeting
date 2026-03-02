@@ -3,10 +3,24 @@ package com.whysoezzy.auth.domain.repository
 import com.whysoezzy.auth.domain.models.AuthResult
 
 interface AuthRepository {
-    suspend fun sendSmsCode(phoneNumber: String): Result<String>
-    suspend fun verifySmsCode(phoneNumber: String, code: String): Result<String>
-    suspend fun register(phoneNumber: String, name: String): Result<AuthResult>
-    suspend fun refreshToken(): Result<AuthResult>
+    /** Отправить OTP-код на номер телефона */
+    suspend fun sendOtp(phone: String): Result<Unit>
+
+    /** Верифицировать код. Для новых пользователей передаётся name/surname.
+     *  Возвращает AuthResult с флагом isNewUser. */
+    suspend fun verifyOtp(
+        phone: String,
+        code: String,
+        name: String? = null,
+        surname: String? = null
+    ): Result<AuthResult>
+
+    /** Обновить access-токен по refresh-токену.
+     *  Возвращает новый accessToken (refreshToken остаётся прежним). */
+    suspend fun refreshToken(): Result<String>
+
+    /** Выход — инвалидация refresh-токенов на сервере + очистка локального хранилища */
     suspend fun logout()
+
     fun isLoggedIn(): Boolean
 }

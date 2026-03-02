@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -99,40 +101,71 @@ fun ProfileEditScreen(
     }
 
     if (showAddInterestDialog) {
+        val availableTags = uiState.availableTags
         AlertDialog(
-            onDismissRequest = {
-                showAddInterestDialog = false
-                newInterestText = ""
-            },
-            title = { Text("Добавить интерес") },
+            onDismissRequest = { showAddInterestDialog = false },
+            title = { Text("Выберите интересы") },
             text = {
-                UIKitInput(
-                    value = newInterestText,
-                    onValueChange = { newInterestText = it },
-                    hint = "Например: Android разработка",
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (availableTags.isEmpty()) {
+                    // Теги не загрузились — фолбэк на текстовое поле
+                    UIKitInput(
+                        value = newInterestText,
+                        onValueChange = { newInterestText = it },
+                        hint = "Например: Android разработка",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    // Список тегов с чекбоксами
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(availableTags.entries.toList()) { (tagId, tagName) ->
+                            val isSelected = uiState.interests.contains(tagName)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.onEvent(
+                                            ProfileEditEvent.ToggleTag(tagId, tagName)
+                                        )
+                                    }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = {
+                                        viewModel.onEvent(
+                                            ProfileEditEvent.ToggleTag(tagId, tagName)
+                                        )
+                                    }
+                                )
+                                Text(
+                                    text = tagName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (newInterestText.isNotBlank()) {
+                TextButton(onClick = { showAddInterestDialog = false }) {
+                    Text("Готово")
+                }
+            },
+            dismissButton = {
+                if (availableTags.isEmpty() && newInterestText.isNotBlank()) {
+                    TextButton(
+                        onClick = {
                             viewModel.onEvent(ProfileEditEvent.AddInterestWithText(newInterestText))
                             newInterestText = ""
                             showAddInterestDialog = false
                         }
-                    },
-                    enabled = newInterestText.isNotBlank()
-                ) {
-                    Text("Добавить")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showAddInterestDialog = false
-                    newInterestText = ""
-                }) {
-                    Text("Отмена")
+                    ) {
+                        Text("Добавить")
+                    }
                 }
             }
         )
@@ -156,7 +189,7 @@ private fun EditContent(
     uiState: ProfileEditUiState,
     onAvatarClick: () -> Unit,
     onNameChange: (String) -> Unit,
-    onSurnameChange: (String) -> Unit,
+    onSurnameChange: (String) -> Unit = {},
     onPhoneChange: (String) -> Unit,
     onCityChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
@@ -230,13 +263,23 @@ private fun EditContent(
             ) {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
 
-                // Имя и Фамилия
+                // Имя
                 UIKitInput(
-                    value = "${uiState.name} ${uiState.surname}",
+                    value = uiState.name,
                     onValueChange = onNameChange,
-                    hint = "Имя Фамилия",
+                    hint = "Имя",
                     isError = uiState.nameError != null,
-                    errorMessage = uiState.nameError ?: "Unknown error",
+                    errorMessage = uiState.nameError ?: "",
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Фамилия
+                UIKitInput(
+                    value = uiState.surname,
+                    onValueChange = onSurnameChange,
+                    hint = "Фамилия",
+                    isError = uiState.surnameError != null,
+                    errorMessage = uiState.surnameError ?: "",
                     modifier = Modifier.fillMaxWidth()
                 )
 

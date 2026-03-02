@@ -2,26 +2,23 @@ package dev.whysoezzy.auth.presentation.phone
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class PhoneInputViewModel : ViewModel() {
+class PhoneInputViewModel(
+    private val sendOtpUseCase: SendOtpUseCase
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PhoneInputUiState())
     val uiState: StateFlow<PhoneInputUiState> = _uiState.asStateFlow()
 
     fun onEvent(event: PhoneInputEvent) {
         when (event) {
-            is PhoneInputEvent.UpdatePhoneNumber -> {
-                updatePhoneNumber(event.phoneNumber)
-            }
-
-            PhoneInputEvent.SendCode -> {
-                sendCode()
-            }
+            is PhoneInputEvent.UpdatePhoneNumber -> updatePhoneNumber(event.phoneNumber)
+            PhoneInputEvent.SendCode -> sendCode()
         }
     }
 
@@ -36,8 +33,9 @@ class PhoneInputViewModel : ViewModel() {
 
     private fun validatePhoneNumber(phoneNumber: String): String? {
         val digits = phoneNumber.filter { it.isDigit() }
+        // local = 10 цифр после кода страны, итого 11 с кодом 7
         return when {
-            digits.length < 11 -> "Введите корректный номер телефона"
+            digits.length < 11 -> null // ещё вводит — не показываем ошибку
             !digits.startsWith("7") -> "Номер должен начинаться с +7"
             else -> null
         }
@@ -49,24 +47,19 @@ class PhoneInputViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            try {
-                // Simulate API call
-                delay(2000)
-
-                // TODO: Implement actual SMS sending logic
-                // authRepository.sendSmsCode(phoneNumber)
-
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isCodeSent = true
-                )
-
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Не удалось отправить код"
-                )
-            }
+            sendOtpUseCase(_uiState.value.phoneNumber)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isCodeSent = true
+                    )
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Не удалось отправить код"
+                    )
+                }
         }
     }
 }

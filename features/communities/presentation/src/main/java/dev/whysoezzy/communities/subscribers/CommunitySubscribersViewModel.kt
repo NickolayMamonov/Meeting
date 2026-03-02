@@ -4,10 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+sealed class CommunitySubscribersNavEvent {
+    data class NavigateToProfile(val userId: Long) : CommunitySubscribersNavEvent()
+}
 
 class CommunitySubscribersViewModel(
     private val getCommunityByIdUseCase: GetCommunityByIdUseCase,
@@ -18,11 +25,14 @@ class CommunitySubscribersViewModel(
         MutableStateFlow<CommunitySubscribersUiState>(CommunitySubscribersUiState.Loading)
     val uiState: StateFlow<CommunitySubscribersUiState> = _uiState.asStateFlow()
 
+    private val _navEvent = MutableSharedFlow<CommunitySubscribersNavEvent>(extraBufferCapacity = 1)
+    val navEvent: SharedFlow<CommunitySubscribersNavEvent> = _navEvent.asSharedFlow()
+
     fun onEvent(event: CommunitySubscribersEvent) {
         when (event) {
             is CommunitySubscribersEvent.LoadSubscribers -> loadSubscribers(event.communityId)
-            is CommunitySubscribersEvent.NavigateToProfile -> {
-                // Навигация к профилю - обрабатывается в Screen
+            is CommunitySubscribersEvent.NavigateToProfile -> viewModelScope.launch {
+                _navEvent.emit(CommunitySubscribersNavEvent.NavigateToProfile(event.userId))
             }
         }
     }
@@ -32,7 +42,6 @@ class CommunitySubscribersViewModel(
             _uiState.value = CommunitySubscribersUiState.Loading
 
             try {
-                // Загружаем базовую информацию о сообществе для получения названия
                 val communityResult = getCommunityByIdUseCase(communityId)
                 if (communityResult.isFailure) {
                     _uiState.value = CommunitySubscribersUiState.Error(
@@ -42,8 +51,6 @@ class CommunitySubscribersViewModel(
                 }
 
                 val community = communityResult.getOrThrow()
-
-                // Загружаем подписчиков
                 val subscribersResult = getCommunitySubscribersUseCase(communityId)
                 if (subscribersResult.isFailure) {
                     _uiState.value = CommunitySubscribersUiState.Error(
@@ -52,11 +59,9 @@ class CommunitySubscribersViewModel(
                     return@launch
                 }
 
-                val subscribers = subscribersResult.getOrThrow()
-
                 _uiState.value = CommunitySubscribersUiState.Success(
                     communityName = community.name,
-                    subscribers = subscribers
+                    subscribers = subscribersResult.getOrThrow()
                 )
             } catch (e: Exception) {
                 _uiState.value = CommunitySubscribersUiState.Error(
@@ -66,5 +71,3 @@ class CommunitySubscribersViewModel(
         }
     }
 }
-
-

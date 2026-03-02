@@ -11,14 +11,16 @@ val profileFeatureModule = module {
             getCurrentUserUseCase = get(),
             getUserByIdUseCase = get(),
             getUserMeetingsUseCase = get(),
-            getUserCommunitiesUseCase = get()
+            getUserCommunitiesUseCase = get(),
+            logoutUseCase = get()
         )
     }
 
     viewModel {
         ProfileEditViewModel(
             getCurrentUserUseCase = get(),
-            updateUserProfileUseCase = get()
+            updateUserProfileUseCase = get(),
+            getAllTagsUseCase = get()
         )
     }
 }

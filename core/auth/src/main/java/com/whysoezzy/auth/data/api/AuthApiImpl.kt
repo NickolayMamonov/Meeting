@@ -2,11 +2,9 @@ package com.whysoezzy.auth.data.api
 
 import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.RefreshTokenRequest
-import com.whysoezzy.auth.data.dto.RegisterRequest
-import com.whysoezzy.auth.data.dto.SendSmsRequest
-import com.whysoezzy.auth.data.dto.SendSmsResponse
-import com.whysoezzy.auth.data.dto.VerifySmsRequest
-import com.whysoezzy.auth.data.dto.VerifySmsResponse
+import com.whysoezzy.auth.data.dto.RefreshTokenResponse
+import com.whysoezzy.auth.data.dto.SendOtpRequest
+import com.whysoezzy.auth.data.dto.VerifyOtpRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -15,31 +13,34 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
 class AuthApiImpl(private val client: HttpClient) {
-    suspend fun sendSms(request: SendSmsRequest): SendSmsResponse {
-        return client.post("auth/send-sms") {
+
+    suspend fun sendOtp(phone: String): Map<String, String> {
+        return client.post("auth/send-otp") {
             contentType(ContentType.Application.Json)
-            setBody(request)
+            setBody(SendOtpRequest(phone))
         }.body()
     }
 
-    suspend fun verifySms(request: VerifySmsRequest): VerifySmsResponse {
-        return client.post("auth/verify-sms") {
+    suspend fun verifyOtp(
+        phone: String,
+        code: String,
+        name: String? = null,
+        surname: String? = null
+    ): AuthResponse {
+        return client.post("auth/verify-otp") {
             contentType(ContentType.Application.Json)
-            setBody(request)
+            setBody(VerifyOtpRequest(phone, code, name, surname))
         }.body()
     }
 
-    suspend fun register(request: RegisterRequest): AuthResponse {
-        return client.post("auth/register") {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
-    suspend fun refreshToken(request: RefreshTokenRequest): AuthResponse {
+    suspend fun refreshToken(refreshToken: String): RefreshTokenResponse {
         return client.post("auth/refresh") {
             contentType(ContentType.Application.Json)
-            setBody(request)
+            setBody(RefreshTokenRequest(refreshToken))
         }.body()
+    }
+
+    suspend fun logout(): Map<String, String> {
+        return client.post("auth/logout").body()
     }
 }

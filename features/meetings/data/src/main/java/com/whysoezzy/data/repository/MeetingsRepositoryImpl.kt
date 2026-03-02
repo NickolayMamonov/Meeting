@@ -1,11 +1,11 @@
 package com.whysoezzy.data.repository
 
-import android.util.Log
 import com.whysoezzy.data.api.MeetingsApiImpl
 import com.whysoezzy.data.mapper.MeetingMapper
 import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.Meeting
+import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.repository.MeetingsRepository
 import com.whysoezzy.network.safeApiCall
 
@@ -13,81 +13,66 @@ class MeetingsRepositoryImpl(
     private val meetingsApi: MeetingsApiImpl,
     private val meetingMapper: MeetingMapper,
 ) : MeetingsRepository {
-    override suspend fun getHeroEvents(): Result<List<Meeting>> {
-        return safeApiCall {
-            val response = meetingsApi.getHeroEvents()
-            response.map { meetingMapper.toDomain(it) }
+
+    override suspend fun getHeroEvents(): Result<List<Meeting>> = safeApiCall {
+        meetingsApi.getHeroEvents().map { meetingMapper.toDomain(it) }
+    }
+
+    override suspend fun getPopularEvents(): Result<List<Meeting>> = safeApiCall {
+        meetingsApi.getPopularEvents().map { meetingMapper.toDomain(it) }
+    }
+
+    override suspend fun getAllEvents(page: Int, limit: Int, tagId: Long?): Result<List<Meeting>> = safeApiCall {
+        meetingsApi.getAllEvents(page = page, limit = limit, tagId = tagId)
+            .map { meetingMapper.toDomain(it) }
+    }
+
+    override suspend fun searchEvents(query: String): Result<List<Meeting>> = safeApiCall {
+        meetingsApi.searchEvents(query).map { meetingMapper.toDomain(it) }
+    }
+
+    override suspend fun getMeetingById(id: Long): Result<Meeting> = safeApiCall {
+        meetingMapper.toDomain(meetingsApi.getMeetingsById(id))
+    }
+
+    override suspend fun getMeetingParticipants(meetingId: Long): Result<List<Person>> = safeApiCall {
+        meetingsApi.getMeetingParticipants(meetingId).map { dto ->
+            Person(
+                id = dto.id,
+                name = dto.name,
+                surname = dto.surname,
+                avatarUrl = dto.avatarUrl,
+                bio = dto.bio,
+                role = dto.role
+            )
         }
     }
 
-    override suspend fun getPopularEvents(): Result<List<Meeting>> {
-        return safeApiCall {
-            val response = meetingsApi.getPopularEvents()
-            response.map { meetingMapper.toDomain(it) }
-        }
+    override suspend fun joinMeeting(meetingId: Long): Result<Unit> = safeApiCall {
+        meetingsApi.joinMeeting(id = meetingId)
     }
 
-    override suspend fun getAllEvents(
-        page: Int,
-        limit: Int
-    ): Result<List<Meeting>> {
-        return safeApiCall {
-            val response = meetingsApi.getAllEvents(page = page, limit = limit)
-            response.map { meetingMapper.toDomain(it) }
-        }
+    override suspend fun leaveMeeting(meetingId: Long): Result<Unit> = safeApiCall {
+        meetingsApi.leaveMeeting(id = meetingId)
     }
 
-    override suspend fun searchEvents(query: String): Result<List<Meeting>> {
-        return safeApiCall {
-            val response = meetingsApi.searchEvents(query)
-            response.map { meetingMapper.toDomain(it) }
-        }
+    override suspend fun getUserMeetings(): Result<List<Meeting>> = safeApiCall {
+        meetingsApi.getUserMeetings().map { meetingMapper.toDomain(it) }
     }
 
-    override suspend fun getMeetingById(id: Long): Result<Meeting> {
-        return safeApiCall {
-            val response = meetingsApi.getMeetingsById(id)
-            meetingMapper.toDomain(response)
-        }
+    override suspend fun getEventsByCommunity(communityId: Long): Result<List<Meeting>> = safeApiCall {
+        meetingsApi.getEventsByCommunity(communityId = communityId)
+            .map { meetingMapper.toDomain(it) }
     }
 
-    override suspend fun joinMeeting(meetingId: Long): Result<Unit> {
-        return safeApiCall {
-            meetingsApi.joinMeeting(id = meetingId)
+    override suspend fun getAdBlocks(): Result<List<AdBlock>> = safeApiCall {
+        val raw = meetingsApi.getAdBlocks()
+        android.util.Log.d("MeetingsRepo", "Raw adBlocks from API: ${raw.size} items")
+        raw.forEach { dto ->
+            android.util.Log.d("MeetingsRepo", "  AdBlock dto: id=${dto.id}, type=${dto.type}, title=${dto.title}")
         }
-    }
-
-    override suspend fun leaveMeeting(meetingId: Long): Result<Unit> {
-        return safeApiCall {
-            meetingsApi.leaveMeeting(id = meetingId)
-        }
-    }
-
-    override suspend fun getUserMeetings(): Result<List<Meeting>> {
-        return safeApiCall {
-            val response = meetingsApi.getUserMeetings()
-            response.map { meetingMapper.toDomain(it) }
-        }
-    }
-
-    override suspend fun getEventsByCategory(categoryId: Long): Result<List<Meeting>> {
-        return safeApiCall {
-            val response = meetingsApi.getEventsByCategory(categoryId)
-            response.map { meetingMapper.toDomain(it) }
-        }
-    }
-
-    override suspend fun getEventsByCommunity(communityId: Long): Result<List<Meeting>> {
-        return safeApiCall {
-            val response = meetingsApi.getEventsByCommunity(communityId = communityId)
-            response.map { meetingMapper.toDomain(it) }
-        }
-    }
-
-    override suspend fun getAdBlocks(): Result<List<AdBlock>> {
-        return safeApiCall {
-            val response = meetingsApi.getAdBlocks()
-            response.map { it.toDomain() }
-        }
+        val mapped = raw.map { it.toDomain() }
+        android.util.Log.d("MeetingsRepo", "Mapped adBlocks: ${mapped.size} items")
+        mapped
     }
 }

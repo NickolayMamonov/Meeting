@@ -12,6 +12,7 @@ class UserRepositoryImpl(
     private val userApi: UserApiImpl,
     private val userMapper: UserMapper
 ) : UserRepository {
+
     override suspend fun getCurrentUser(): Result<User> {
         return safeApiCall {
             val response = userApi.getCurrentUserProfile()
@@ -28,7 +29,8 @@ class UserRepositoryImpl(
 
     override suspend fun updateUserProfile(user: User): Result<User> {
         return safeApiCall {
-            val updateDto = userMapper.toUpdateDto(user)
+            val interestIds = user.interests.map { it.id }.takeIf { it.isNotEmpty() }
+            val updateDto = userMapper.toUpdateDto(user, interestIds)
             val response = userApi.updateUserProfile(updateDto)
             userMapper.toDomain(response)
         }
