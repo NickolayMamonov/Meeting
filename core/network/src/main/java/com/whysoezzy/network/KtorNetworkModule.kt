@@ -95,7 +95,7 @@ object KtorNetworkModule {
                                     )
                                 }
                             } catch (e: Exception) {
-                                android.util.Log.e("KtorAuth", "Token refresh failed", e)
+                                Log.e("KtorAuth", "Token refresh failed", e)
                                 null
                             }
                         }
