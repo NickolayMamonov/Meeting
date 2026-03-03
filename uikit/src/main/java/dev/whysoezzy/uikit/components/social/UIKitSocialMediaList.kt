@@ -3,8 +3,8 @@ package dev.whysoezzy.uikit.components.social
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -19,117 +19,100 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-
 import dev.whysoezzy.uikit.R
-import dev.whysoezzy.uikit.components.text.TextMetadata2
 import dev.whysoezzy.uikit.models.UIKitSocialMedia
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
+/**
+ * Горизонтальный список иконок социальных сетей.
+ * По дизайну: квадратные кнопки 52×52dp с фиолетовым фоном #9A10F0, белая иконка.
+ */
 @Composable
 fun UIKitSocialMediaList(
     socialMedias: List<UIKitSocialMediaInfo>,
     modifier: Modifier = Modifier,
-    onSocialMediaClick: (String) -> Unit = { }
+    onSocialMediaClick: (String) -> Unit = {}
 ) {
-    if (socialMedias.isNotEmpty()) {
-        LazyRow(
-            modifier = modifier,
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
-        ) {
-            items(socialMedias) { socialMedia ->
-                UIKitSocialMediaItem(
-                    socialMediaInfo = socialMedia,
-                    onClick = { onSocialMediaClick(socialMedia.url) }
-                )
-            }
+    if (socialMedias.isEmpty()) return
+
+    LazyRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+    ) {
+        items(socialMedias) { socialMedia ->
+            UIKitSocialMediaButton(
+                socialMediaInfo = socialMedia,
+                onClick = { onSocialMediaClick(socialMedia.url) }
+            )
         }
     }
 }
 
 @Composable
-private fun UIKitSocialMediaItem(
+private fun UIKitSocialMediaButton(
     socialMediaInfo: UIKitSocialMediaInfo,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
-    Row(
+    Box(
         modifier = modifier
-            .clip(RoundedCornerShape(BorderRadiusTokens.S))
-            .background(getSocialMediaColor(socialMediaInfo.type).copy(alpha = 0.1f))
-            .clickable { onClick() }
-            .padding(
-                horizontal = SpacingTokens.S,
-                vertical = SpacingTokens.XS
-            ),
-        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.XS),
-        verticalAlignment = Alignment.CenterVertically
+            .size(52.dp)
+            .clip(RoundedCornerShape(BorderRadiusTokens.M))
+            .background(Color(0xFF9A10F0))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
     ) {
         Icon(
             painter = getSocialMediaIcon(socialMediaInfo.type),
             contentDescription = getSocialMediaName(socialMediaInfo.type),
-            tint = getSocialMediaColor(socialMediaInfo.type),
-            modifier = Modifier.size(16.dp)
-        )
-
-        TextMetadata2(
-            text = socialMediaInfo.username,
-            color = getSocialMediaColor(socialMediaInfo.type)
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
         )
     }
 }
 
 @Composable
-private fun getSocialMediaIcon(socialMediaType: UIKitSocialMedia): Painter {
-    return when (socialMediaType) {
+private fun getSocialMediaIcon(type: UIKitSocialMedia): Painter {
+    return when (type) {
         UIKitSocialMedia.TELEGRAM -> painterResource(R.drawable.telegram_logo)
         UIKitSocialMedia.HABR -> painterResource(R.drawable.habr_icon)
-        else -> painterResource(R.drawable.telegram_logo) // fallback
+        UIKitSocialMedia.GITHUB -> painterResource(R.drawable.habr_icon) // fallback
+        UIKitSocialMedia.LINKEDIN -> painterResource(R.drawable.telegram_logo) // fallback
     }
 }
 
-private fun getSocialMediaColor(socialMediaType: UIKitSocialMedia): Color {
-    return when (socialMediaType) {
-        UIKitSocialMedia.TELEGRAM -> Color(0xFF0088CC)
-        UIKitSocialMedia.HABR -> Color(0xFF77A2B6)
-        UIKitSocialMedia.GITHUB -> Color(0xFF333333)
-        UIKitSocialMedia.LINKEDIN -> Color(0xFF0077B5)
-    }
+private fun getSocialMediaName(type: UIKitSocialMedia): String = when (type) {
+    UIKitSocialMedia.TELEGRAM -> "Telegram"
+    UIKitSocialMedia.HABR -> "Habr"
+    UIKitSocialMedia.GITHUB -> "GitHub"
+    UIKitSocialMedia.LINKEDIN -> "LinkedIn"
 }
 
-private fun getSocialMediaName(socialMediaType: UIKitSocialMedia): String {
-    return when (socialMediaType) {
-        UIKitSocialMedia.TELEGRAM -> "Telegram"
-        UIKitSocialMedia.HABR -> "Habr"
-        UIKitSocialMedia.GITHUB -> "GitHub"
-        UIKitSocialMedia.LINKEDIN -> "LinkedIn"
-    }
-}
-
-@Preview
+@Preview(showBackground = true)
 @Composable
 private fun UIKitSocialMediaListPreview() {
     UIKitTheme {
-        UIKitSocialMediaList(
-            socialMedias = listOf(
-                UIKitSocialMediaInfo(
-                    type = UIKitSocialMedia.TELEGRAM,
-                    url = "https://t.me/username",
-                    username = "@username"
-                ),
-                UIKitSocialMediaInfo(
-                    type = UIKitSocialMedia.HABR,
-                    url = "https://habr.com/users/username",
-                    username = "username"
-                ),
-                UIKitSocialMediaInfo(
-                    type = UIKitSocialMedia.GITHUB,
-                    url = "https://github.com/username",
-                    username = "username"
+        Row(
+            modifier = Modifier,
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        ) {
+            UIKitSocialMediaList(
+                socialMedias = listOf(
+                    UIKitSocialMediaInfo(
+                        type = UIKitSocialMedia.HABR,
+                        url = "https://habr.com/users/username",
+                        username = "username"
+                    ),
+                    UIKitSocialMediaInfo(
+                        type = UIKitSocialMedia.TELEGRAM,
+                        url = "https://t.me/username",
+                        username = "@username"
+                    )
                 )
             )
-        )
+        }
     }
 }

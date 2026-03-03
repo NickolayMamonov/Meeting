@@ -55,12 +55,12 @@ fun ProfileTopBar(
             .background(containerColor)
             .then(
                 if (applyStatusBarPadding) {
-                    Modifier.statusBarsPadding()  // ✅ Только если нужно
+                    Modifier.statusBarsPadding()
                 } else {
                     Modifier
                 }
             )
-            .padding(horizontal = 4.dp, vertical = 4.dp),  // ✅ Минимальный padding
+            .padding(horizontal = 4.dp, vertical = 0.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

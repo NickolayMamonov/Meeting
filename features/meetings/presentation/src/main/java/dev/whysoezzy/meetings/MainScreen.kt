@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -75,6 +76,7 @@ fun MainScreen(
                     viewModel.onEvent(MainScreenEvent.Search(query))
                 },
                 onProfileClick = onProfileClick,
+                modifier = Modifier.statusBarsPadding()
             )
         }
     ) { paddingValues ->
@@ -116,6 +118,7 @@ fun MainScreen(
 
 @Composable
 private fun MainScreenTopBar(
+    modifier: Modifier = Modifier,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onProfileClick: () -> Unit
@@ -125,7 +128,8 @@ private fun MainScreenTopBar(
         onQueryChange = onSearchQueryChange,
         placeholder = "Поиск встреч и сообществ",
         onProfileClick = onProfileClick,
-        onCancelClick = {}
+        onCancelClick = {},
+        modifier = modifier
     )
 }
 

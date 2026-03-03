@@ -60,7 +60,6 @@ fun MeetingParticipantsScreen(
                         Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Назад")
                     }
                 },
-                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { paddingValues ->

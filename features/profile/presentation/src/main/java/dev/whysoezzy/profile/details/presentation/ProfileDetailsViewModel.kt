@@ -3,6 +3,7 @@ package dev.whysoezzy.profile.details.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
+import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
@@ -61,6 +62,12 @@ class ProfileDetailsViewModel(
 
                 userResult
                     .onSuccess { user ->
+                        // Если это свой профиль и имя ещё не заполнено — отправляем на NameInputScreen
+                        if (isOwnProfile && user.name.isBlank()) {
+                            _navEvent.emit(ProfileDetailsNavEvent.NavigateToNameInput)
+                            return@onSuccess
+                        }
+
                         val meetings = getUserMeetingsUseCase(user.id).getOrNull() ?: emptyList()
                         val communities = getUserCommunitiesUseCase(user.id).getOrNull() ?: emptyList()
 
@@ -94,9 +101,14 @@ class ProfileDetailsViewModel(
                         )
                     }
                     .onFailure { exception ->
-                        _uiState.value = ProfileDetailsUiState.Error(
-                            message = exception.message ?: "Не удалось загрузить профиль"
-                        )
+                        if (exception is ApiException.UnauthorizedError) {
+                            // Access token протух и refresh тоже не помог — разлогиниваем
+                            handleLogout()
+                        } else {
+                            _uiState.value = ProfileDetailsUiState.Error(
+                                message = exception.message ?: "Не удалось загрузить профиль"
+                            )
+                        }
                     }
             } catch (e: Exception) {
                 _uiState.value = ProfileDetailsUiState.Error(message = e.message ?: "Произошла ошибка")

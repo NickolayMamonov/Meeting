@@ -10,12 +10,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,18 +32,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
-import dev.whysoezzy.uikit.components.text.TextBody2
-import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.toggles.UIKitToggleRow
 import dev.whysoezzy.uikit.components.topbar.EditTopBar
+import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
+import dev.whysoezzy.uikit.tokens.ColorTokens
+import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 
@@ -48,36 +59,32 @@ fun ProfileEditScreen(
     modifier: Modifier = Modifier,
     onBackPressed: () -> Unit,
     onSaveSuccess: () -> Unit,
+    onEditInterests: (List<String>) -> Unit = {},
     viewModel: ProfileEditViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
-    var showAddInterestDialog by remember { mutableStateOf(false) }
-    var newInterestText by remember { mutableStateOf("") }
+    var showInterestDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isSaved) {
-        if (uiState.isSaved) {
-            onSaveSuccess()
-        }
+        if (uiState.isSaved) onSaveSuccess()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading && uiState.name.isEmpty() -> {
-                LoadingContent()
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
-
             else -> {
                 EditContent(
                     uiState = uiState,
                     onAvatarClick = { viewModel.onEvent(ProfileEditEvent.ChangeAvatar) },
-                    onNameChange = { viewModel.onEvent(ProfileEditEvent.UpdateName(it)) },
-                    onSurnameChange = { viewModel.onEvent(ProfileEditEvent.UpdateSurname(it)) },
-                    onPhoneChange = { viewModel.onEvent(ProfileEditEvent.UpdatePhone(it)) },
+                    onNameSurnameChange = { viewModel.onEvent(ProfileEditEvent.UpdateNameSurname(it)) },
                     onCityChange = { viewModel.onEvent(ProfileEditEvent.UpdateCity(it)) },
                     onDescriptionChange = { viewModel.onEvent(ProfileEditEvent.UpdateDescription(it)) },
-                    onAddInterest = { showAddInterestDialog = true },
-                    onRemoveInterest = { interest -> viewModel.onEvent(ProfileEditEvent.RemoveInterest(interest)) },
+                    onAddInterest = { showInterestDialog = true },
+                    onRemoveInterest = { viewModel.onEvent(ProfileEditEvent.RemoveInterest(it)) },
                     onSocialMediaChange = { type, username ->
                         viewModel.onEvent(ProfileEditEvent.UpdateSocialMedia(type, username))
                     },
@@ -96,38 +103,27 @@ fun ProfileEditScreen(
             isSaveEnabled = uiState.isValid && !uiState.isSaving,
             containerColor = Color.Transparent,
             contentColor = Color.White,
-            applyStatusBarPadding = false
+            applyStatusBarPadding = true
         )
     }
 
-    if (showAddInterestDialog) {
-        val availableTags = uiState.availableTags
+    // Диалог выбора интересов
+    if (showInterestDialog) {
         AlertDialog(
-            onDismissRequest = { showAddInterestDialog = false },
+            onDismissRequest = { showInterestDialog = false },
             title = { Text("Выберите интересы") },
             text = {
-                if (availableTags.isEmpty()) {
-                    // Теги не загрузились — фолбэк на текстовое поле
-                    UIKitInput(
-                        value = newInterestText,
-                        onValueChange = { newInterestText = it },
-                        hint = "Например: Android разработка",
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                if (uiState.availableTags.isEmpty()) {
+                    Text("Загрузка тегов…")
                 } else {
-                    // Список тегов с чекбоксами
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(availableTags.entries.toList()) { (tagId, tagName) ->
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(uiState.availableTags.entries.toList()) { (tagId, tagName) ->
                             val isSelected = uiState.interests.contains(tagName)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        viewModel.onEvent(
-                                            ProfileEditEvent.ToggleTag(tagId, tagName)
-                                        )
+                                        viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
                                     }
                                     .padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -135,9 +131,7 @@ fun ProfileEditScreen(
                                 Checkbox(
                                     checked = isSelected,
                                     onCheckedChange = {
-                                        viewModel.onEvent(
-                                            ProfileEditEvent.ToggleTag(tagId, tagName)
-                                        )
+                                        viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
                                     }
                                 )
                                 Text(
@@ -151,21 +145,25 @@ fun ProfileEditScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAddInterestDialog = false }) {
-                    Text("Готово")
+                TextButton(onClick = { showInterestDialog = false }) { Text("Готово") }
+            }
+        )
+    }
+
+    // Диалог подтверждения удаления профиля
+    if (uiState.showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) },
+            title = { Text("Удалить профиль?") },
+            text = { Text("Аккаунт будет удалён. У вас будет 30 дней, чтобы восстановить его.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile) }) {
+                    Text("Удалить", color = ColorTokens.AccentDanger)
                 }
             },
             dismissButton = {
-                if (availableTags.isEmpty() && newInterestText.isNotBlank()) {
-                    TextButton(
-                        onClick = {
-                            viewModel.onEvent(ProfileEditEvent.AddInterestWithText(newInterestText))
-                            newInterestText = ""
-                            showAddInterestDialog = false
-                        }
-                    ) {
-                        Text("Добавить")
-                    }
+                TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) }) {
+                    Text("Отмена")
                 }
             }
         )
@@ -173,24 +171,10 @@ fun ProfileEditScreen(
 }
 
 @Composable
-private fun LoadingContent(
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
-}
-
-@Composable
 private fun EditContent(
     uiState: ProfileEditUiState,
     onAvatarClick: () -> Unit,
-    onNameChange: (String) -> Unit,
-    onSurnameChange: (String) -> Unit = {},
-    onPhoneChange: (String) -> Unit,
+    onNameSurnameChange: (String) -> Unit,
     onCityChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onAddInterest: () -> Unit,
@@ -202,94 +186,70 @@ private fun EditContent(
     onDeleteProfile: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize()
-    ) {
-        // 1. Обложка с кнопкой "Изменить фото"
+    LazyColumn(modifier = modifier.fillMaxSize()) {
+
+        // 1. Фото + кнопка "Изменить фото"
         item {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(280.dp)
-                    .clickable { onAvatarClick() },
-                contentAlignment = Alignment.Center
+                modifier = Modifier.fillMaxWidth().height(280.dp),
+                contentAlignment = Alignment.BottomCenter
             ) {
-                // Аватар
                 if (uiState.avatarUrl != null) {
                     AsyncImage(
                         model = uiState.avatarUrl,
                         contentDescription = "Фото профиля",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp),
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 } else {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp)
+                        modifier = Modifier.fillMaxSize()
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                     )
                 }
-
-                // Кнопка "Изменить фото"
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
                         .padding(bottom = SpacingTokens.M)
-                        .background(
-                            color = Color.Black.copy(alpha = 0.6f),
-                            shape = MaterialTheme.shapes.medium
-                        )
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(BorderRadiusTokens.S))
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { onAvatarClick() }
+                        .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S)
                 ) {
                     Text(
                         text = "Изменить фото",
                         color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium
+                        fontFamily = SFProDisplayFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
                     )
                 }
             }
         }
 
-        // 2. Основная информация
+        // 2. Основные поля
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = SpacingTokens.L),
+                    .padding(horizontal = SpacingTokens.L)
+                    .padding(top = SpacingTokens.M),
                 verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
             ) {
-                Spacer(modifier = Modifier.height(SpacingTokens.M))
-
-                // Имя
+                // Единое поле "Имя Фамилия"
                 UIKitInput(
-                    value = uiState.name,
-                    onValueChange = onNameChange,
-                    hint = "Имя",
+                    value = uiState.nameSurname,
+                    onValueChange = onNameSurnameChange,
+                    hint = "Имя Фамилия",
                     isError = uiState.nameError != null,
                     errorMessage = uiState.nameError ?: "",
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Фамилия
-                UIKitInput(
-                    value = uiState.surname,
-                    onValueChange = onSurnameChange,
-                    hint = "Фамилия",
-                    isError = uiState.surnameError != null,
-                    errorMessage = uiState.surnameError ?: "",
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Телефон
+                // Телефон — readOnly
                 UIKitInput(
                     value = uiState.phone,
-                    onValueChange = onPhoneChange,
+                    onValueChange = {},
                     hint = "+7 000 000-00-00",
-                    isError = uiState.phoneError != null,
-                    errorMessage = uiState.phoneError ?: "Unknown error",
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -307,9 +267,9 @@ private fun EditContent(
                     onValueChange = onDescriptionChange,
                     hint = "Расскажите о себе",
                     isError = uiState.descriptionError != null,
-                    errorMessage = uiState.descriptionError ?: "Unknown error",
+                    errorMessage = uiState.descriptionError ?: "",
                     modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3
+                    minLines = 3
                 )
             }
         }
@@ -319,80 +279,74 @@ private fun EditContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = SpacingTokens.L),
+                    .padding(horizontal = SpacingTokens.L)
+                    .padding(top = SpacingTokens.L),
                 verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
             ) {
-                TextHeading2(text = "Интересы")
-
-                // Теги (кликабельные для удаления)
+                Text(
+                    text = "Интересы",
+                    fontFamily = SFProDisplayFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 22.sp,
+                    color = ColorTokens.NeutralActive
+                )
                 if (uiState.interests.isNotEmpty()) {
                     UIKitTagGroup(
                         tags = uiState.interests,
                         size = UIKitTagSize.MEDIUM,
-                        onTagClick = onRemoveInterest,  // Клик удаляет тег
+                        onTagClick = onRemoveInterest,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-
-                // Кнопка "+ Добавить"
                 Text(
                     text = "+ Добавить",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = SFProDisplayFontFamily,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 14.sp,
+                    color = ColorTokens.BrandDefault,
                     modifier = Modifier.clickable { onAddInterest() }
                 )
             }
         }
 
-        // 4. Социальные сети (4 отдельных поля)
+        // 4. Социальные сети — Хабр и Телеграм
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = SpacingTokens.L),
+                    .padding(horizontal = SpacingTokens.L)
+                    .padding(top = SpacingTokens.L),
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
             ) {
-                TextHeading2(text = "Социальные сети")
-
-                SocialMediaField(
-                    icon = "📱",  // Можно заменить на иконку
-                    label = "Хабр",
+                Text(
+                    text = "Социальные сети",
+                    fontFamily = SFProDisplayFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 22.sp,
+                    color = ColorTokens.NeutralActive
+                )
+                SocialField(
+                    icon = painterResource(R.drawable.habr_icon),
                     value = uiState.socialMedias["habr"] ?: "",
                     onValueChange = { onSocialMediaChange("habr", it) },
-                    placeholder = "Habr",
+                    hint = "Хабр"
                 )
-
-                SocialMediaField(
-                    icon = "✈️",
-                    label = "Telegram",
+                SocialField(
+                    icon = painterResource(R.drawable.telegram_logo),
                     value = uiState.socialMedias["telegram"] ?: "",
                     onValueChange = { onSocialMediaChange("telegram", it) },
-                    placeholder = "Telegram"
-                )
-
-                SocialMediaField(
-                    icon = "💼",
-                    label = "LinkedIn",
-                    value = uiState.socialMedias["linkedin"] ?: "",
-                    onValueChange = { onSocialMediaChange("linkedin", it) },
-                    placeholder = "LinkedIn"
-                )
-
-                SocialMediaField(
-                    icon = "🐙",
-                    label = "GitHub",
-                    value = uiState.socialMedias["github"] ?: "",
-                    onValueChange = { onSocialMediaChange("github", it) },
-                    placeholder = "GitHub"
+                    hint = "Телеграм"
                 )
             }
         }
 
-        // 5. Настройки приватности
+        // 5. Настройки
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = SpacingTokens.L),
+                    .padding(horizontal = SpacingTokens.L)
+                    .padding(top = SpacingTokens.L),
                 verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
             ) {
                 UIKitToggleRow(
@@ -400,13 +354,11 @@ private fun EditContent(
                     checked = uiState.showCommunities,
                     onCheckedChange = { onToggleShowCommunities() }
                 )
-
                 UIKitToggleRow(
                     label = "Показывать мои встречи",
                     checked = uiState.showMeetings,
                     onCheckedChange = { onToggleShowMeetings() }
                 )
-
                 UIKitToggleRow(
                     label = "Включить уведомления",
                     checked = uiState.notificationsEnabled,
@@ -417,33 +369,33 @@ private fun EditContent(
 
         // 6. Удалить профиль
         item {
-            Spacer(modifier = Modifier.height(SpacingTokens.L))
+            Spacer(modifier = Modifier.height(SpacingTokens.XL))
             Text(
                 text = "Удалить профиль",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = SFProDisplayFontFamily,
                 fontWeight = FontWeight.Medium,
+                fontSize = 16.sp,
+                color = ColorTokens.AccentDanger,
+                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onDeleteProfile() }
-                    .padding(horizontal = SpacingTokens.L, vertical = SpacingTokens.S)
+                    .padding(vertical = SpacingTokens.M)
             )
         }
 
-        // Нижний отступ
         item {
-            Spacer(modifier = Modifier.height(SpacingTokens.XL))
+            Spacer(modifier = Modifier.height(SpacingTokens.XL).navigationBarsPadding())
         }
     }
 }
 
 @Composable
-private fun SocialMediaField(
-    icon: String,
-    label: String,
+private fun SocialField(
+    icon: Painter,
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String,
+    hint: String,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -451,30 +403,17 @@ private fun SocialMediaField(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
     ) {
-        // Иконка + Label
-        Row(
-            modifier = Modifier.weight(0.35f),
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = icon,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            TextBody2(
-                text = label,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        // Поле ввода
+        Icon(
+            painter = icon,
+            contentDescription = hint,
+            tint = ColorTokens.NeutralWeak,
+            modifier = Modifier.size(20.dp)
+        )
         UIKitInput(
             value = value,
             onValueChange = onValueChange,
-            hint = placeholder,
+            hint = hint,
             modifier = Modifier.fillMaxWidth()
         )
     }
 }
-
-

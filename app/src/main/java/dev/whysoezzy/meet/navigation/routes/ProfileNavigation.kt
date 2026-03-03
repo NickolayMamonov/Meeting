@@ -8,6 +8,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
+import dev.whysoezzy.auth.presentation.name.NameInputScreen
 import dev.whysoezzy.meet.navigation.MeetRoute
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsScreen
 import dev.whysoezzy.profile.edit.presentation.ProfileEditScreen
@@ -23,7 +24,6 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
         val isLoggedIn = remember { isLoggedInUseCase() }
 
         if (!isLoggedIn) {
-            // Незалогинен — отправляем на авторизацию
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 navController.navigate(MeetRoute.Auth.route) {
                     popUpTo(MeetRoute.Profile.route) { inclusive = true }
@@ -38,6 +38,10 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
                     navController.navigate(MeetRoute.Main.route) {
                         popUpTo(MeetRoute.Main.route) { inclusive = false }
                     }
+                },
+                // Профиль без имени — отправляем заполнить прямо здесь
+                onNameInput = {
+                    navController.navigate(MeetRoute.NameInputFromProfile.route)
                 },
                 onMeetingClick = { meetingId ->
                     navController.navigate(MeetRoute.MeetingDetails.createRoute(meetingId))
@@ -73,6 +77,19 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
         ProfileEditScreen(
             onBackPressed = { navController.popBackStack() },
             onSaveSuccess = { navController.popBackStack() }
+        )
+    }
+
+    // Ввод имени для пользователей с пустым профилем (существующих без имени)
+    composable(MeetRoute.NameInputFromProfile.route) {
+        NameInputScreen(
+            onNameSubmitted = {
+                // После ввода имени — возвращаемся на профиль (он теперь перезагрузится с именем)
+                navController.navigate(MeetRoute.Profile.route) {
+                    popUpTo(MeetRoute.NameInputFromProfile.route) { inclusive = true }
+                }
+            },
+            onBackPressed = { navController.popBackStack() }
         )
     }
 }
