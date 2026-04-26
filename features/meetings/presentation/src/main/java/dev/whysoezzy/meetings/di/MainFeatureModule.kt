@@ -43,7 +43,8 @@ val mainFeatureModule = module {
         MeetingDetailsViewModel(
             getMeetingByIdUseCase = get(),
             joinMeetingUseCase = get(),
-            leaveMeetingUseCase = get()
+            leaveMeetingUseCase = get(),
+            isLoggedInUseCase = get()
         )
     }
     viewModel { MeetingParticipantsViewModel(get<GetMeetingParticipantsUseCase>()) }

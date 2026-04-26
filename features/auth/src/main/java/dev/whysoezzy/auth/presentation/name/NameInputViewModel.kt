@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.data.api.UserApiImpl
 import com.whysoezzy.data.dto.UpdateUserDto
+import com.whysoezzy.network.safeApiCall
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -81,20 +82,22 @@ class NameInputViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, nameError = null)
 
-            try {
+            safeApiCall {
                 userApi.updateUserProfile(
                     UpdateUserDto(
                         name = _uiState.value.name,
                         surname = _uiState.value.surname
                     )
                 )
+            }.onSuccess {
                 _uiState.value = _uiState.value.copy(isLoading = false, isSubmitted = true)
                 _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
-            } catch (e: Exception) {
+            }.onFailure { exception ->
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    nameError = e.message ?: "Не удалось сохранить имя. Попробуйте ещё раз."
+                    nameError = "Не удалось сохранить имя. Попробуйте ещё раз."
                 )
+                android.util.Log.e("NameInputVM", "updateUserProfile failed", exception)
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -52,12 +53,12 @@ import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun CommunityDetailsScreen(
+    modifier: Modifier = Modifier,
     communityId: Long,
     onBackPressed: () -> Unit,
     onSubscribersClick: () -> Unit,
     onMeetingClick: (Long) -> Unit,
     onUserProfileClick: (Long) -> Unit = {},
-    modifier: Modifier = Modifier,
     viewModel: CommunityDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -90,14 +91,16 @@ fun CommunityDetailsScreen(
                     BackShareTopBar(
                         title = state.title,
                         onBackClick = onBackPressed,
-                        onShareClick = { viewModel.onEvent(CommunityDetailsEvent.ShareCommunity) }
+                        onShareClick = { viewModel.onEvent(CommunityDetailsEvent.ShareCommunity) },
+                        modifier = Modifier.statusBarsPadding()
                     )
                 }
                 else -> {
                     BackShareTopBar(
                         title = "Сообщество",
                         onBackClick = onBackPressed,
-                        onShareClick = {}
+                        onShareClick = {},
+                        modifier = Modifier.statusBarsPadding()
                     )
                 }
             }

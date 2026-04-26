@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -60,6 +61,7 @@ import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+import androidx.core.net.toUri
 
 @Composable
 fun MeetingDetailsScreen(
@@ -70,6 +72,7 @@ fun MeetingDetailsScreen(
     onHostClick: (Long) -> Unit,
     onUserProfileClick: (Long) -> Unit = {},
     onOtherMeetingClick: (Long) -> Unit = {},
+    onAuthRequired: () -> Unit = {},
     viewModel: MeetingDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -89,6 +92,7 @@ fun MeetingDetailsScreen(
                     openMapIntent(context, event.latitude, event.longitude, event.address)
                 is MeetingDetailsNavEvent.ShareMeeting ->
                     shareIntent(context, event.title, event.shareText)
+                MeetingDetailsNavEvent.NavigateToAuth -> onAuthRequired()
             }
         }
     }
@@ -102,7 +106,8 @@ fun MeetingDetailsScreen(
                 onBackClick = onBackPressed,
                 onShareClick = {
                     if (successState != null) viewModel.onEvent(MeetingDetailsEvent.ShareMeeting)
-                }
+                },
+                modifier = Modifier.statusBarsPadding()
             )
         },
         bottomBar = {
@@ -346,14 +351,14 @@ private fun ErrorContent(
 }
 
 private fun openMapIntent(context: Context, lat: Double, lng: Double, address: String) {
-    val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(address)})")
+    val uri = "geo:$lat,$lng?q=$lat,$lng(${Uri.encode(address)})".toUri()
     val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
         setPackage("com.google.android.apps.maps")
     }
     if (mapIntent.resolveActivity(context.packageManager) != null) {
         context.startActivity(mapIntent)
     } else {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lng")))
+        context.startActivity(Intent(Intent.ACTION_VIEW, "geo:$lat,$lng".toUri()))
     }
 }
 

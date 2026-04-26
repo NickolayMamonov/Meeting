@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "dev.whysoezzy.features_meetings"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 30
@@ -39,6 +39,7 @@ android {
 dependencies {
     // UIKit
     implementation(project(":uikit"))
+    implementation(project(":core:auth"))
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":features:meetings:domain"))

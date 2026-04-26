@@ -2,6 +2,7 @@ package dev.whysoezzy.meetings.details.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
@@ -24,12 +25,14 @@ sealed class MeetingDetailsNavEvent {
     data class NavigateToCommunity(val communityId: Long) : MeetingDetailsNavEvent()
     data class OpenMap(val latitude: Double, val longitude: Double, val address: String) : MeetingDetailsNavEvent()
     data class ShareMeeting(val title: String, val shareText: String) : MeetingDetailsNavEvent()
+    object NavigateToAuth : MeetingDetailsNavEvent()
 }
 
 class MeetingDetailsViewModel(
     private val getMeetingByIdUseCase: GetMeetingByIdUseCase,
     private val joinMeetingUseCase: JoinMeetingUseCase,
-    private val leaveMeetingUseCase: LeaveMeetingUseCase
+    private val leaveMeetingUseCase: LeaveMeetingUseCase,
+    private val isLoggedInUseCase: IsLoggedInUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MeetingDetailsUiState>(MeetingDetailsUiState.Loading)
@@ -93,6 +96,10 @@ class MeetingDetailsViewModel(
     }
 
     private fun joinMeeting() {
+        if (!isLoggedInUseCase()) {
+            viewModelScope.launch { _navEvent.emit(MeetingDetailsNavEvent.NavigateToAuth) }
+            return
+        }
         val meetingId = currentMeetingId ?: return
         val currentState = _uiState.value as? MeetingDetailsUiState.Success ?: return
         if (currentState.isUserJoined) return

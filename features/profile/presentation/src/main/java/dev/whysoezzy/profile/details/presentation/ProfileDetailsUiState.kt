@@ -1,11 +1,10 @@
 package dev.whysoezzy.profile.details.presentation
 
-
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 
-sealed class  ProfileDetailsUiState {
+sealed class ProfileDetailsUiState {
     object Loading : ProfileDetailsUiState()
     data class Success(
         val userId: Long,
@@ -40,10 +39,11 @@ sealed class ProfileDetailsEvent {
 
 sealed class ProfileDetailsNavEvent {
     object NavigateToAuth : ProfileDetailsNavEvent()
+    /** Профиль загружен, но имя пустое — отправляем заполнить */
+    object NavigateToNameInput : ProfileDetailsNavEvent()
     data class NavigateToMeeting(val meetingId: Long) : ProfileDetailsNavEvent()
     data class NavigateToCommunity(val communityId: Long) : ProfileDetailsNavEvent()
     object NavigateToEdit : ProfileDetailsNavEvent()
     data class OpenSocialMedia(val url: String) : ProfileDetailsNavEvent()
     data class ShareProfile(val name: String, val shareText: String) : ProfileDetailsNavEvent()
 }
-

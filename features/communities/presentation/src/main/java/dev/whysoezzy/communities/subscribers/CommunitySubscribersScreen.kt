@@ -1,6 +1,5 @@
 package dev.whysoezzy.communities.subscribers
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -60,7 +59,6 @@ fun CommunitySubscribersScreen(
                         Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Назад")
                     }
                 },
-                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { paddingValues ->

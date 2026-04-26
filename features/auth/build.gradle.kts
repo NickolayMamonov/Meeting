@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "dev.whysoezzy.auth"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 30

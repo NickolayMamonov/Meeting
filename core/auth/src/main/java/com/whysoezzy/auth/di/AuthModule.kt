@@ -34,11 +34,17 @@ val authModule = module {
             onRefreshToken = {
                 try {
                     val newAccessToken = authRepo.value.refreshToken().getOrNull()
-                    newAccessToken?.let { access ->
+                    if (newAccessToken != null) {
                         val refresh = tokenManager.getRefreshToken() ?: ""
-                        Pair(access, refresh)
+                        Pair(newAccessToken, refresh)
+                    } else {
+                        // refresh token также протух — очищаем сессию
+                        tokenManager.clearTokens()
+                        null
                     }
                 } catch (e: Exception) {
+                    android.util.Log.e("AuthModule", "Refresh token failed, clearing session", e)
+                    tokenManager.clearTokens()
                     null
                 }
             }

@@ -55,6 +55,9 @@ fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
             },
             onOtherMeetingClick = { otherMeetingId ->
                 navController.navigate(MeetRoute.MeetingDetails.createRoute(otherMeetingId))
+            },
+            onAuthRequired = {
+                navController.navigate(MeetRoute.Auth.route)
             }
         )
     }

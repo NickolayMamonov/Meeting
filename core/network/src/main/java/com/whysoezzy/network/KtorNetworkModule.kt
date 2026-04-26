@@ -76,10 +76,18 @@ object KtorNetworkModule {
                             }
                         }
 
+                        sendWithoutRequest { request ->
+                            val baseHost = BuildConfig.BASE_URL
+                                .removePrefix("https://")
+                                .removePrefix("http://")
+                                .substringBefore("/")
+                                .substringBefore(":") // убираем порт если есть
+                            request.url.host == baseHost
+                        }
+
                         refreshTokens {
                             try {
                                 val tokens = onRefreshToken()
-
                                 tokens?.let {
                                     BearerTokens(
                                         accessToken = it.first,
@@ -87,6 +95,7 @@ object KtorNetworkModule {
                                     )
                                 }
                             } catch (e: Exception) {
+                                Log.e("KtorAuth", "Token refresh failed", e)
                                 null
                             }
                         }

@@ -10,6 +10,8 @@ sealed class MeetRoute(val route: String) {
     object NameInput : MeetRoute("auth/name/{phone}/{code}") {
         fun createRoute(phone: String, code: String) = "auth/name/${encode(phone)}/$code"
     }
+    /** Ввод имени без авторизационного контекста — для пользователей с пустым именем */
+    object NameInputFromProfile : MeetRoute("profile/setup-name")
     object AuthSuccess : MeetRoute("auth/success")
 
     // Main routes

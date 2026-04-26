@@ -1,7 +1,9 @@
 package dev.whysoezzy.profile.edit.presentation
 
 sealed class ProfileEditEvent {
-    // Основная информация
+    // Основная информация — единое поле "Имя Фамилия"
+    data class UpdateNameSurname(val nameSurname: String) : ProfileEditEvent()
+    // Раздельные — для совместимости
     data class UpdateName(val name: String) : ProfileEditEvent()
     data class UpdateSurname(val surname: String) : ProfileEditEvent()
     data class UpdatePhone(val phone: String) : ProfileEditEvent()
@@ -13,8 +15,8 @@ sealed class ProfileEditEvent {
     data object ChangeAvatar : ProfileEditEvent()
 
     // Интересы
-    data object AddInterest : ProfileEditEvent()  // Открыть диалог
-    data class AddInterestWithText(val interest: String) : ProfileEditEvent()  // для обратной совместимости
+    data object AddInterest : ProfileEditEvent()
+    data class AddInterestWithText(val interest: String) : ProfileEditEvent()
     data class RemoveInterest(val interest: String) : ProfileEditEvent()
     data class ToggleTag(val tagId: Long, val tagName: String) : ProfileEditEvent()
 
@@ -29,4 +31,6 @@ sealed class ProfileEditEvent {
     // Действия
     data object Save : ProfileEditEvent()
     data object DeleteProfile : ProfileEditEvent()
+    data object ConfirmDeleteProfile : ProfileEditEvent()
+    data object DismissDeleteProfile : ProfileEditEvent()
 }

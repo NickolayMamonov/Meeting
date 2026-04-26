@@ -15,6 +15,7 @@ class AuthRepositoryImpl(
         return safeApiCall {
             authApi.sendOtp(phone)
         }
+        //Unit
     }
 
     override suspend fun verifyOtp(

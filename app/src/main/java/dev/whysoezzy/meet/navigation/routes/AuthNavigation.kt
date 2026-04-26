@@ -50,14 +50,8 @@ fun NavGraphBuilder.authNavigation(navController: NavController) {
         }
 
         // 3. Ввод имени (только для новых пользователей)
-        composable(MeetRoute.NameInput.route) { backStackEntry ->
-            val phoneEncoded = backStackEntry.arguments?.getString("phone") ?: ""
-            val phone = MeetRoute.decode(phoneEncoded)
-            val code = backStackEntry.arguments?.getString("code") ?: ""
-
+        composable(MeetRoute.NameInput.route) {
             NameInputScreen(
-                phone = phone,
-                code = code,
                 onNameSubmitted = {
                     navController.navigate(MeetRoute.AuthSuccess.route)
                 },

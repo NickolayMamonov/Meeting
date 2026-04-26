@@ -10,7 +10,7 @@ data class ProfileEditUiState(
     val description: String = "",
     val avatarUrl: String? = null,
 
-    // Интересы — ID выбранных тегов
+    // Интересы — названия выбранных тегов
     val interests: List<String> = emptyList(),
     // Все доступные теги (id -> name)
     val availableTags: Map<Long, String> = emptyMap(),
@@ -34,8 +34,18 @@ data class ProfileEditUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+
+    // Диалог подтверждения удаления
+    val showDeleteConfirmDialog: Boolean = false
 ) {
+    // Единое поле "Имя Фамилия" для отображения в форме
+    val nameSurname: String
+        get() = buildString {
+            append(name)
+            if (surname.isNotBlank()) append(" $surname")
+        }.trim()
+
     // Валидация формы
     val isValid: Boolean
         get() = name.isNotBlank() &&
