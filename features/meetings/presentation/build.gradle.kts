@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "dev.whysoezzy.features_meetings"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 30

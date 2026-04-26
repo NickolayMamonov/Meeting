@@ -61,6 +61,7 @@ import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+import androidx.core.net.toUri
 
 @Composable
 fun MeetingDetailsScreen(
@@ -350,14 +351,14 @@ private fun ErrorContent(
 }
 
 private fun openMapIntent(context: Context, lat: Double, lng: Double, address: String) {
-    val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(address)})")
+    val uri = "geo:$lat,$lng?q=$lat,$lng(${Uri.encode(address)})".toUri()
     val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
         setPackage("com.google.android.apps.maps")
     }
     if (mapIntent.resolveActivity(context.packageManager) != null) {
         context.startActivity(mapIntent)
     } else {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lng")))
+        context.startActivity(Intent(Intent.ACTION_VIEW, "geo:$lat,$lng".toUri()))
     }
 }
 

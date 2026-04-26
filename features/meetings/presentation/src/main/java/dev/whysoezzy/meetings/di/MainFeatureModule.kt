@@ -1,6 +1,5 @@
 package dev.whysoezzy.meetings.di
 
-import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import com.whysoezzy.domain.usecase.GetHeroMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.GetMeetingParticipantsUseCase
