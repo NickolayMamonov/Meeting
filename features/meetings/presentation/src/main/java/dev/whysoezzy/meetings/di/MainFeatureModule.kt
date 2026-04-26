@@ -1,5 +1,6 @@
 package dev.whysoezzy.meetings.di
 
+import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import com.whysoezzy.domain.usecase.GetHeroMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.GetMeetingParticipantsUseCase
@@ -43,7 +44,8 @@ val mainFeatureModule = module {
         MeetingDetailsViewModel(
             getMeetingByIdUseCase = get(),
             joinMeetingUseCase = get(),
-            leaveMeetingUseCase = get()
+            leaveMeetingUseCase = get(),
+            isLoggedInUseCase = get()
         )
     }
     viewModel { MeetingParticipantsViewModel(get<GetMeetingParticipantsUseCase>()) }

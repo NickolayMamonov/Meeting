@@ -71,6 +71,7 @@ fun MeetingDetailsScreen(
     onHostClick: (Long) -> Unit,
     onUserProfileClick: (Long) -> Unit = {},
     onOtherMeetingClick: (Long) -> Unit = {},
+    onAuthRequired: () -> Unit = {},
     viewModel: MeetingDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -90,6 +91,7 @@ fun MeetingDetailsScreen(
                     openMapIntent(context, event.latitude, event.longitude, event.address)
                 is MeetingDetailsNavEvent.ShareMeeting ->
                     shareIntent(context, event.title, event.shareText)
+                MeetingDetailsNavEvent.NavigateToAuth -> onAuthRequired()
             }
         }
     }
