@@ -44,7 +44,6 @@ class ProfileEditViewModel(
             is ProfileEditEvent.UpdateNameSurname -> updateNameSurname(event.nameSurname)
             is ProfileEditEvent.UpdateName -> updateName(event.name)
             is ProfileEditEvent.UpdateSurname -> updateSurname(event.surname)
-            is ProfileEditEvent.UpdatePhone -> updatePhone(event.phone)
             is ProfileEditEvent.UpdateEmail -> updateEmail(event.email)
             is ProfileEditEvent.UpdateCity -> updateCity(event.city)
             is ProfileEditEvent.UpdateDescription -> updateDescription(event.description)
@@ -135,14 +134,6 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(
             surname = surname,
             surnameError = validateSurname(surname),
-            isSaved = false
-        )
-    }
-
-    private fun updatePhone(phone: String) {
-        _uiState.value = _uiState.value.copy(
-            phone = phone,
-            phoneError = validatePhone(phone),
             isSaved = false
         )
     }
@@ -319,12 +310,6 @@ class ProfileEditViewModel(
     private fun validateSurname(surname: String): String? = when {
         surname.isBlank() -> null
         surname.length < 2 -> "Минимум 2 символа"
-        else -> null
-    }
-
-    private fun validatePhone(phone: String): String? = when {
-        phone.isBlank() -> null
-        phone.length < 10 -> "Введите корректный номер"
         else -> null
     }
 
