@@ -6,7 +6,6 @@ sealed class ProfileEditEvent {
     // Раздельные — для совместимости
     data class UpdateName(val name: String) : ProfileEditEvent()
     data class UpdateSurname(val surname: String) : ProfileEditEvent()
-    data class UpdatePhone(val phone: String) : ProfileEditEvent()
     data class UpdateEmail(val email: String) : ProfileEditEvent()
     data class UpdateCity(val city: String) : ProfileEditEvent()
     data class UpdateDescription(val description: String) : ProfileEditEvent()

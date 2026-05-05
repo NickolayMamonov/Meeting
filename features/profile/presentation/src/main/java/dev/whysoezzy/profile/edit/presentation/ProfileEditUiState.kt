@@ -26,7 +26,6 @@ data class ProfileEditUiState(
     // Ошибки валидации
     val nameError: String? = null,
     val surnameError: String? = null,
-    val phoneError: String? = null,
     val emailError: String? = null,
     val descriptionError: String? = null,
 
