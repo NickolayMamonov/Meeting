@@ -2,6 +2,7 @@ package dev.whysoezzy.profile.details.presentation
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -158,8 +159,8 @@ private fun ProfileContent(
             }
         }
 
-        // 3. Встречи
-        if (uiState.userMeetings.isNotEmpty()) {
+        // 3. Встречи — для своего профиля показываем всегда (с заглушкой если пусто)
+        if (uiState.isOwnProfile || uiState.userMeetings.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
                 UIKitUserMeetingsBlock(
@@ -171,14 +172,14 @@ private fun ProfileContent(
             }
         }
 
-        // 4. Сообщества (без кнопки подписки — только просмотр)
-        if (uiState.userCommunities.isNotEmpty()) {
+        // 4. Сообщества — для своего профиля показываем всегда (с заглушкой если пусто)
+        if (uiState.isOwnProfile || uiState.userCommunities.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
                 UIKitUserCommunitiesBlock(
                     title = if (uiState.isOwnProfile) "Мои сообщества" else "Сообщества",
                     communities = uiState.userCommunities,
-                    subscribedCommunityIds = emptySet(), // не показываем кнопку подписки
+                    subscribedCommunityIds = emptySet(),
                     onCommunityClick = onCommunityClick,
                     onSubscribeClick = { _, _ -> },
                     modifier = Modifier.padding(horizontal = SpacingTokens.L)

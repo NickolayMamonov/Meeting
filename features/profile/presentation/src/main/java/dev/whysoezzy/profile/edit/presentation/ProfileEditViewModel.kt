@@ -44,7 +44,6 @@ class ProfileEditViewModel(
             is ProfileEditEvent.UpdateNameSurname -> updateNameSurname(event.nameSurname)
             is ProfileEditEvent.UpdateName -> updateName(event.name)
             is ProfileEditEvent.UpdateSurname -> updateSurname(event.surname)
-            is ProfileEditEvent.UpdatePhone -> updatePhone(event.phone)
             is ProfileEditEvent.UpdateEmail -> updateEmail(event.email)
             is ProfileEditEvent.UpdateCity -> updateCity(event.city)
             is ProfileEditEvent.UpdateDescription -> updateDescription(event.description)
@@ -64,7 +63,6 @@ class ProfileEditViewModel(
         }
     }
 
-    // ─── Загрузка ────────────────────────────────────────────────────────────
 
     private fun loadProfile() {
         viewModelScope.launch {
@@ -108,8 +106,6 @@ class ProfileEditViewModel(
         }
     }
 
-    // ─── Основная информация ─────────────────────────────────────────────────
-
     /**
      * Единое поле "Имя Фамилия" — первое слово = имя, остальное = фамилия.
      */
@@ -142,14 +138,6 @@ class ProfileEditViewModel(
         )
     }
 
-    private fun updatePhone(phone: String) {
-        _uiState.value = _uiState.value.copy(
-            phone = phone,
-            phoneError = validatePhone(phone),
-            isSaved = false
-        )
-    }
-
     private fun updateEmail(email: String) {
         _uiState.value = _uiState.value.copy(
             email = email,
@@ -174,8 +162,6 @@ class ProfileEditViewModel(
         // Обрабатывается в UI через ActivityResultLauncher
     }
 
-    // ─── Интересы ────────────────────────────────────────────────────────────
-
     private fun addInterestWithText(interest: String) {
         if (interest.isBlank()) return
         val list = _uiState.value.interests.toMutableList()
@@ -197,8 +183,6 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(interests = list, isSaved = false)
     }
 
-    // ─── Социальные сети ─────────────────────────────────────────────────────
-
     private fun updateSocialMedia(type: String, username: String) {
         val map = _uiState.value.socialMedias.toMutableMap()
         if (username.isBlank()) map.remove(type) else map[type] = username
@@ -207,8 +191,6 @@ class ProfileEditViewModel(
 
     private fun extractSocialMedias(list: List<SocialMediaInfo>): Map<String, String> =
         list.associate { it.type.name.lowercase() to it.username }
-
-    // ─── Настройки ───────────────────────────────────────────────────────────
 
     private fun toggleShowCommunities() {
         _uiState.value = _uiState.value.copy(
@@ -228,25 +210,26 @@ class ProfileEditViewModel(
         )
     }
 
-    // ─── Сохранение ──────────────────────────────────────────────────────────
-
     private fun saveProfile() {
         val state = _uiState.value
         val nameError = validateName(state.name)
         val surnameError = validateSurname(state.surname)
-        val phoneError = validatePhone(state.phone)
         val emailError = validateEmail(state.email)
         val descriptionError = validateDescription(state.description)
 
         _uiState.value = state.copy(
-            nameError = nameError, surnameError = surnameError,
-            phoneError = phoneError, emailError = emailError,
+            nameError = nameError,
+            surnameError = surnameError,
+            emailError = emailError,
             descriptionError = descriptionError
         )
-        if (nameError != null || surnameError != null || phoneError != null ||
+        if (nameError != null || surnameError != null ||
             emailError != null || descriptionError != null) return
 
-        val user = currentUser ?: return
+        val user = currentUser ?: run {
+            _uiState.value = _uiState.value.copy(error = "Профиль ещё не загружен, попробуйте позже")
+            return
+        }
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
@@ -286,6 +269,7 @@ class ProfileEditViewModel(
                     )
                 ).onSuccess {
                     _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
+                    _navEvent.tryEmit(ProfileEditNavEvent.NavigateBack)
                 }.onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
@@ -300,8 +284,6 @@ class ProfileEditViewModel(
             }
         }
     }
-
-    // ─── Удаление ────────────────────────────────────────────────────────────
 
     private fun showDeleteDialog() {
         _uiState.value = _uiState.value.copy(showDeleteConfirmDialog = true)
@@ -319,8 +301,6 @@ class ProfileEditViewModel(
         }
     }
 
-    // ─── Валидация ───────────────────────────────────────────────────────────
-
     private fun validateName(name: String): String? = when {
         name.isBlank() -> "Имя не может быть пустым"
         name.length < 2 -> "Минимум 2 символа"
@@ -330,12 +310,6 @@ class ProfileEditViewModel(
     private fun validateSurname(surname: String): String? = when {
         surname.isBlank() -> null
         surname.length < 2 -> "Минимум 2 символа"
-        else -> null
-    }
-
-    private fun validatePhone(phone: String): String? = when {
-        phone.isBlank() -> null
-        phone.length < 10 -> "Введите корректный номер"
         else -> null
     }
 

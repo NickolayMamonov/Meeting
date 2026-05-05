@@ -14,8 +14,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
+import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitAddress
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitTagState
@@ -48,7 +50,10 @@ fun UIKitUserMeetingsBlock(
         TextHeading2(text = title)
 
         if (meetings.isEmpty()) {
-            // Состояние пустого списка можно добавить позже
+            TextBody2(
+                text = "Вы пока не записаны ни на одну встречу",
+                color = ColorTokens.NeutralWeak
+            )
         } else {
             // Горизонтальный список встреч
             LazyRow(

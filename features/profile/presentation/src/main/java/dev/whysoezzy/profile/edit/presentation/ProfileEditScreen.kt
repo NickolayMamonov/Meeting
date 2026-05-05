@@ -21,6 +21,10 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,109 +68,139 @@ fun ProfileEditScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showInterestDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(uiState.isSaved) {
-        if (uiState.isSaved) onSaveSuccess()
+    // Навигация через navEvent — безопасно при рекомпозиции
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is ProfileEditNavEvent.NavigateBack -> onSaveSuccess()
+            }
+        }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        when {
-            uiState.isLoading && uiState.name.isEmpty() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            else -> {
-                EditContent(
-                    uiState = uiState,
-                    onAvatarClick = { viewModel.onEvent(ProfileEditEvent.ChangeAvatar) },
-                    onNameSurnameChange = { viewModel.onEvent(ProfileEditEvent.UpdateNameSurname(it)) },
-                    onCityChange = { viewModel.onEvent(ProfileEditEvent.UpdateCity(it)) },
-                    onDescriptionChange = { viewModel.onEvent(ProfileEditEvent.UpdateDescription(it)) },
-                    onAddInterest = { showInterestDialog = true },
-                    onRemoveInterest = { viewModel.onEvent(ProfileEditEvent.RemoveInterest(it)) },
-                    onSocialMediaChange = { type, username ->
-                        viewModel.onEvent(ProfileEditEvent.UpdateSocialMedia(type, username))
-                    },
-                    onToggleShowCommunities = { viewModel.onEvent(ProfileEditEvent.ToggleShowCommunities) },
-                    onToggleShowMeetings = { viewModel.onEvent(ProfileEditEvent.ToggleShowMeetings) },
-                    onToggleNotifications = { viewModel.onEvent(ProfileEditEvent.ToggleNotifications) },
-                    onDeleteProfile = { viewModel.onEvent(ProfileEditEvent.DeleteProfile) }
+    // Показываем ошибку в Snackbar
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { snackbarHostState.showSnackbar(it) }
+    }
+
+    Scaffold(
+        modifier = modifier,
+        containerColor = Color.Transparent,
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
         }
+    ) { _ ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Форма всегда показывается — пустые поля отображают hint-тексты,
+            // структура экрана (аватар-заглушка, секции, тогглы) видна с первого кадра
+            EditContent(
+                uiState = uiState,
+                onAvatarClick = { viewModel.onEvent(ProfileEditEvent.ChangeAvatar) },
+                onNameSurnameChange = { viewModel.onEvent(ProfileEditEvent.UpdateNameSurname(it)) },
+                onCityChange = { viewModel.onEvent(ProfileEditEvent.UpdateCity(it)) },
+                onDescriptionChange = { viewModel.onEvent(ProfileEditEvent.UpdateDescription(it)) },
+                onAddInterest = { showInterestDialog = true },
+                onRemoveInterest = { viewModel.onEvent(ProfileEditEvent.RemoveInterest(it)) },
+                onSocialMediaChange = { type, username ->
+                    viewModel.onEvent(ProfileEditEvent.UpdateSocialMedia(type, username))
+                },
+                onToggleShowCommunities = { viewModel.onEvent(ProfileEditEvent.ToggleShowCommunities) },
+                onToggleShowMeetings = { viewModel.onEvent(ProfileEditEvent.ToggleShowMeetings) },
+                onToggleNotifications = { viewModel.onEvent(ProfileEditEvent.ToggleNotifications) },
+                onDeleteProfile = { viewModel.onEvent(ProfileEditEvent.DeleteProfile) }
+            )
 
-        EditTopBar(
-            title = "",
-            onCancelClick = onBackPressed,
-            onSaveClick = { viewModel.onEvent(ProfileEditEvent.Save) },
-            isSaveEnabled = uiState.isValid && !uiState.isSaving,
-            containerColor = Color.Transparent,
-            contentColor = Color.White,
-            applyStatusBarPadding = true
-        )
-    }
+            // Лёгкий оверлей-спиннер во время первоначальной загрузки данных
+            if (uiState.isLoading && uiState.name.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
 
-    // Диалог выбора интересов
-    if (showInterestDialog) {
-        AlertDialog(
-            onDismissRequest = { showInterestDialog = false },
-            title = { Text("Выберите интересы") },
-            text = {
-                if (uiState.availableTags.isEmpty()) {
-                    Text("Загрузка тегов…")
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(uiState.availableTags.entries.toList()) { (tagId, tagName) ->
-                            val isSelected = uiState.interests.contains(tagName)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
-                                    }
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = {
-                                        viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
-                                    }
-                                )
-                                Text(
-                                    text = tagName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
+            EditTopBar(
+                title = "",
+                onCancelClick = onBackPressed,
+                onSaveClick = { viewModel.onEvent(ProfileEditEvent.Save) },
+                isSaveEnabled = uiState.isValid && !uiState.isSaving,
+                containerColor = Color.Transparent,
+                contentColor = Color.White,
+                applyStatusBarPadding = true
+            )
+        }
+
+        // Диалог выбора интересов
+        if (showInterestDialog) {
+            AlertDialog(
+                onDismissRequest = { showInterestDialog = false },
+                title = { Text("Выберите интересы") },
+                text = {
+                    if (uiState.availableTags.isEmpty()) {
+                        Text("Загрузка тегов…")
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                            items(uiState.availableTags.entries.toList()) { (tagId, tagName) ->
+                                val isSelected = uiState.interests.contains(tagName)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
+                                        }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = {
+                                            viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId,tagName))
+                                        }
+                                    )
+                                    Text(
+                                        text = tagName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
                             }
                         }
                     }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showInterestDialog = false }) { Text("Готово") }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showInterestDialog = false }) { Text("Готово") }
-            }
-        )
-    }
+            )
+        }
 
-    // Диалог подтверждения удаления профиля
-    if (uiState.showDeleteConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) },
-            title = { Text("Удалить профиль?") },
-            text = { Text("Аккаунт будет удалён. У вас будет 30 дней, чтобы восстановить его.") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile) }) {
-                    Text("Удалить", color = ColorTokens.AccentDanger)
+        // Диалог подтверждения удаления профиля
+        if (uiState.showDeleteConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) },
+                title = { Text("Удалить профиль?") },
+                text = { Text("Аккаунт будет удалён. У вас будет 30 дней, чтобы восстановить его.") },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile) }) {
+                        Text("Удалить", color = ColorTokens.AccentDanger)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) }) {
+                        Text("Отмена")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) }) {
-                    Text("Отмена")
-                }
-            }
-        )
+            )
+        }
     }
 }
 
@@ -293,6 +327,7 @@ private fun EditContent(
                 if (uiState.interests.isNotEmpty()) {
                     UIKitTagGroup(
                         tags = uiState.interests,
+                        selectedTags = uiState.interests.toSet(),
                         size = UIKitTagSize.MEDIUM,
                         onTagClick = onRemoveInterest,
                         modifier = Modifier.fillMaxWidth()

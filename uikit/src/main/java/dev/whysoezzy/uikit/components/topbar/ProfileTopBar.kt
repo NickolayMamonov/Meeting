@@ -99,27 +99,20 @@ fun ProfileTopBar(
             }
         }
 
-        // Правая часть: кнопки действий
-        Row(
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (isOwnProfile) {
-                // Кнопка "Редактировать"
-                IconButton(
-                    onClick = onEditClick,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Редактировать",
-                        tint = contentColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+        // Правая часть: кнопки действий — только одна кнопка в зависимости от типа профиля
+        if (isOwnProfile) {
+            IconButton(
+                onClick = onEditClick,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Редактировать",
+                    tint = contentColor,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-
-            // Кнопка "Поделиться"
+        } else {
             IconButton(
                 onClick = onShareClick,
                 modifier = Modifier.size(48.dp)
