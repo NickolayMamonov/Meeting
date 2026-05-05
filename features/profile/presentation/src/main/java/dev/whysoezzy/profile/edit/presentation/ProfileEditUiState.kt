@@ -51,7 +51,6 @@ data class ProfileEditUiState(
         get() = name.isNotBlank() &&
                 nameError == null &&
                 surnameError == null &&
-                phoneError == null &&
                 emailError == null &&
                 descriptionError == null
 }

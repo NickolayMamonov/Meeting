@@ -234,16 +234,15 @@ class ProfileEditViewModel(
         val state = _uiState.value
         val nameError = validateName(state.name)
         val surnameError = validateSurname(state.surname)
-        val phoneError = validatePhone(state.phone)
         val emailError = validateEmail(state.email)
         val descriptionError = validateDescription(state.description)
 
         _uiState.value = state.copy(
             nameError = nameError, surnameError = surnameError,
-            phoneError = phoneError, emailError = emailError,
+            emailError = emailError,
             descriptionError = descriptionError
         )
-        if (nameError != null || surnameError != null || phoneError != null ||
+        if (nameError != null || surnameError != null ||
             emailError != null || descriptionError != null) return
 
         val user = currentUser ?: return

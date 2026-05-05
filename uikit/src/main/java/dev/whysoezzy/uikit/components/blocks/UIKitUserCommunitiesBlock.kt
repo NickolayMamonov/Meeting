@@ -9,8 +9,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
+import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 /**
@@ -40,7 +42,10 @@ fun UIKitUserCommunitiesBlock(
         TextHeading2(text = title)
 
         if (communities.isEmpty()) {
-            // Состояние пустого списка можно добавить позже
+            TextBody2(
+                text = "Вы пока не состоите ни в одном сообществе",
+                color = ColorTokens.NeutralWeak
+            )
         } else {
             // Горизонтальный список сообществ
             LazyRow(

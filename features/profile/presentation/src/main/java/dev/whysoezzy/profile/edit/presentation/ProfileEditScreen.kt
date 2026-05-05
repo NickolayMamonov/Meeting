@@ -70,29 +70,34 @@ fun ProfileEditScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        when {
-            uiState.isLoading && uiState.name.isEmpty() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            else -> {
-                EditContent(
-                    uiState = uiState,
-                    onAvatarClick = { viewModel.onEvent(ProfileEditEvent.ChangeAvatar) },
-                    onNameSurnameChange = { viewModel.onEvent(ProfileEditEvent.UpdateNameSurname(it)) },
-                    onCityChange = { viewModel.onEvent(ProfileEditEvent.UpdateCity(it)) },
-                    onDescriptionChange = { viewModel.onEvent(ProfileEditEvent.UpdateDescription(it)) },
-                    onAddInterest = { showInterestDialog = true },
-                    onRemoveInterest = { viewModel.onEvent(ProfileEditEvent.RemoveInterest(it)) },
-                    onSocialMediaChange = { type, username ->
-                        viewModel.onEvent(ProfileEditEvent.UpdateSocialMedia(type, username))
-                    },
-                    onToggleShowCommunities = { viewModel.onEvent(ProfileEditEvent.ToggleShowCommunities) },
-                    onToggleShowMeetings = { viewModel.onEvent(ProfileEditEvent.ToggleShowMeetings) },
-                    onToggleNotifications = { viewModel.onEvent(ProfileEditEvent.ToggleNotifications) },
-                    onDeleteProfile = { viewModel.onEvent(ProfileEditEvent.DeleteProfile) }
-                )
+        // Форма всегда показывается — пустые поля отображают hint-тексты,
+        // структура экрана (аватар-заглушка, секции, тогглы) видна с первого кадра
+        EditContent(
+            uiState = uiState,
+            onAvatarClick = { viewModel.onEvent(ProfileEditEvent.ChangeAvatar) },
+            onNameSurnameChange = { viewModel.onEvent(ProfileEditEvent.UpdateNameSurname(it)) },
+            onCityChange = { viewModel.onEvent(ProfileEditEvent.UpdateCity(it)) },
+            onDescriptionChange = { viewModel.onEvent(ProfileEditEvent.UpdateDescription(it)) },
+            onAddInterest = { showInterestDialog = true },
+            onRemoveInterest = { viewModel.onEvent(ProfileEditEvent.RemoveInterest(it)) },
+            onSocialMediaChange = { type, username ->
+                viewModel.onEvent(ProfileEditEvent.UpdateSocialMedia(type, username))
+            },
+            onToggleShowCommunities = { viewModel.onEvent(ProfileEditEvent.ToggleShowCommunities) },
+            onToggleShowMeetings = { viewModel.onEvent(ProfileEditEvent.ToggleShowMeetings) },
+            onToggleNotifications = { viewModel.onEvent(ProfileEditEvent.ToggleNotifications) },
+            onDeleteProfile = { viewModel.onEvent(ProfileEditEvent.DeleteProfile) }
+        )
+
+        // Лёгкий оверлей-спиннер во время первоначальной загрузки данных
+        if (uiState.isLoading && uiState.name.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.25f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
             }
         }
 
@@ -130,9 +135,7 @@ fun ProfileEditScreen(
                             ) {
                                 Checkbox(
                                     checked = isSelected,
-                                    onCheckedChange = {
-                                        viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
-                                    }
+                                    onCheckedChange = null
                                 )
                                 Text(
                                     text = tagName,
@@ -293,6 +296,7 @@ private fun EditContent(
                 if (uiState.interests.isNotEmpty()) {
                     UIKitTagGroup(
                         tags = uiState.interests,
+                        selectedTags = uiState.interests.toSet(),
                         size = UIKitTagSize.MEDIUM,
                         onTagClick = onRemoveInterest,
                         modifier = Modifier.fillMaxWidth()
