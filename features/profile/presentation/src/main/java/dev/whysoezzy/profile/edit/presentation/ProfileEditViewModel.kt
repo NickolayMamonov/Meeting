@@ -245,7 +245,10 @@ class ProfileEditViewModel(
         if (nameError != null || surnameError != null ||
             emailError != null || descriptionError != null) return
 
-        val user = currentUser ?: return
+        val user = currentUser ?: run {
+            _uiState.value = _uiState.value.copy(error = "Профиль ещё не загружен, попробуйте позже")
+            return
+        }
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
@@ -285,6 +288,7 @@ class ProfileEditViewModel(
                     )
                 ).onSuccess {
                     _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
+                    _navEvent.tryEmit(ProfileEditNavEvent.NavigateBack)
                 }.onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
