@@ -163,7 +163,9 @@ fun ProfileEditScreen(
                                 ) {
                                     Checkbox(
                                         checked = isSelected,
-                                        onCheckedChange = null
+                                        onCheckedChange = {
+                                            viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId,tagName))
+                                        }
                                     )
                                     Text(
                                         text = tagName,
