@@ -7,14 +7,13 @@ junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.9.0"
 activityCompose = "1.10.1"
-composeBom = "2024.04.01"
+composeBom = "2025.05.00"
 navigationCompose = "2.8.5"
 appcompat = "1.7.0"
 material = "1.12.0"
 jetbrainsKotlinJvm = "2.0.0"
-kotlinxCoroutines = "1.6.4"
+kotlinxCoroutines = "1.9.0"
 coil = "2.7.0"
-retrofit = "2.11.0"
 timber = "5.0.1"
 lottie = "5.2.0"
 koin-bom = "3.5.6"
@@ -49,8 +48,6 @@ coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
-retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
-converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "retrofit" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 lottie-compose = {group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie"}
 lottie = {group = "com.airbnb.android", name = "lottie", version.ref = "lottie"}
