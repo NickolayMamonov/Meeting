@@ -49,14 +49,15 @@ object KtorNetworkModule {
                 )
             }
 
-            install(Logging) {
-                logger = object : Logger {
-                    override fun log(message: String) {
-                        Log.d("KtorClient", message)
+            if (BuildConfig.DEBUG) {
+                install(Logging) {
+                    logger = object : Logger {
+                        override fun log(message: String) {
+                            Log.d("KtorClient", message)
+                        }
                     }
-
+                    level = LogLevel.ALL
                 }
-                level = LogLevel.ALL
             }
 
             if (tokenProvider != null && onRefreshToken != null) {
@@ -81,7 +82,7 @@ object KtorNetworkModule {
                                 .removePrefix("https://")
                                 .removePrefix("http://")
                                 .substringBefore("/")
-                                .substringBefore(":") // убираем порт если есть
+                                .substringBefore(":")
                             request.url.host == baseHost
                         }
 

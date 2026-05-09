@@ -41,10 +41,9 @@ dependencies {
     implementation(project(":uikit"))
     implementation(project(":core:auth"))
     implementation(project(":core:common"))
-    // Нужен UserApiImpl для обновления имени/фамилии на NameInputScreen
     implementation(project(":features:profile:data"))
 
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation(libs.androidx.lifecycle.runtime.compose.android)
 
     // Koin for DI
     implementation(platform(libs.koin.bom))
@@ -59,7 +58,6 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-core")
-//    implementation(libs.androidx.lifecycle.runtime.compose.android)
 
     // Core Android
     implementation(libs.androidx.core.ktx)
