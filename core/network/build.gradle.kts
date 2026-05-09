@@ -10,7 +10,6 @@ android {
 
     defaultConfig {
         minSdk = 30
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -18,9 +17,11 @@ android {
     buildTypes {
         debug {
             buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080\"")
+            buildConfigField("Boolean", "IS_DEBUG", "true")
         }
         release {
             buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080\"")
+            buildConfigField("Boolean", "IS_DEBUG", "false")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -29,6 +30,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
@@ -42,13 +44,11 @@ android {
 
 dependencies {
     api(libs.ktor.client.core)
-    api(libs.ktor.client.android)
-    api(libs.ktor.client.content.negotiation)
-    api(libs.ktor.serialization.json)
-    api(libs.ktor.client.logging)
-    api(libs.ktor.client.auth)
-    implementation("io.ktor:ktor-client-okhttp:3.0.2")
-
+    implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.json)
+    implementation(libs.ktor.client.logging)
+    implementation(libs.ktor.client.auth)
     api(libs.kotlinx.serialization.json)
     implementation(project(":core:common"))
 
