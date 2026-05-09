@@ -49,7 +49,7 @@ object KtorNetworkModule {
                 )
             }
 
-            if (BuildConfig.IS_DEBUG) {
+            if (BuildConfig.DEBUG) {
                 install(Logging) {
                     logger = object : Logger {
                         override fun log(message: String) {
