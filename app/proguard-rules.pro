@@ -1,21 +1,39 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Читаемые stack trace в crash-репортах
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ===== kotlinx.serialization =====
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.whysoezzy.**$$serializer { *; }
+-keepclassmembers class com.whysoezzy.** { *** Companion; }
+-keepclasseswithmembers class com.whysoezzy.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class dev.whysoezzy.**$$serializer { *; }
+-keepclassmembers class dev.whysoezzy.** { *** Companion; }
+-keepclasseswithmembers class dev.whysoezzy.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ===== Ktor =====
+-keep class io.ktor.** { *; }
+-keepclassmembers class io.ktor.** { *; }
+-dontwarn io.ktor.**
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# ===== Koin =====
+-keep class org.koin.** { *; }
+-keepclassmembers class org.koin.** { *; }
+-dontwarn org.koin.**
+
+# ===== Kotlin =====
+-keep class kotlin.Metadata { *; }
+-dontwarn kotlin.**
+-keepclassmembers class **$WhenMappings { <fields>; }
+-keepclassmembers class kotlin.Lazy { *; }
