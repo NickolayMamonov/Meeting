@@ -9,6 +9,7 @@ import com.whysoezzy.domain.usecase.GetCommunityMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.domain.usecase.SubscribeToCommunityUseCase
 import com.whysoezzy.domain.usecase.UnsubscribeFromCommunityUseCase
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -60,46 +61,39 @@ class CommunityDetailsViewModel(
         viewModelScope.launch {
             _uiState.value = CommunityDetailsUiState.Loading
 
-            try {
-                val communityResult = getCommunityByIdUseCase(communityId)
-                if (communityResult.isFailure) {
+            getCommunityByIdUseCase(communityId)
+                .onFailure { e ->
                     _uiState.value = CommunityDetailsUiState.Error(
-                        message = communityResult.exceptionOrNull()?.message
-                            ?: "Не удалось загрузить информацию о сообществе"
+                        message = e.message ?: "Не удалось загрузить информацию о сообществе"
                     )
-                    return@launch
                 }
+                .onSuccess { community ->
+                    val meetingsDeferred = async { getCommunityMeetingsUseCase(communityId) }
+                    val subscribersDeferred = async { getCommunitySubscribersUseCase(communityId) }
 
-                val community = communityResult.getOrThrow()
-                val meetingsResult = getCommunityMeetingsUseCase(communityId)
-                val meetings = meetingsResult.getOrNull() ?: emptyList()
+                    val meetings = meetingsDeferred.await().getOrNull() ?: emptyList()
+                    val subscribers = subscribersDeferred.await().getOrNull() ?: emptyList()
 
-                val currentTime = System.currentTimeMillis()
-                val activeMeetings = meetings.filter { it.time >= currentTime }.sortedBy { it.time }
-                val pastMeetings = meetings.filter { it.time < currentTime }.sortedByDescending { it.time }
+                    val currentTime = System.currentTimeMillis()
+                    val activeMeetings = meetings.filter { it.time >= currentTime }.sortedBy { it.time }
+                    val pastMeetings = meetings.filter { it.time < currentTime }.sortedByDescending { it.time }
 
-                val subscribersResult = getCommunitySubscribersUseCase(communityId)
-                val subscribers = subscribersResult.getOrNull() ?: emptyList()
+                    _uiState.value = CommunityDetailsUiState.Success(
+                        communityId = community.id,
+                        imageUrl = community.imageUrl,
+                        title = community.name,
+                        tags = community.tags.map { tag ->
+                            MeetingTag(id = tag.id, text = tag.name, state = TagState.ACTIVE)
+                        },
+                        description = community.description,
+                        isSubscribed = community.isSubscribed,
+                        subscribersCount = community.subscribersCount,
+                        subscribers = subscribers,
+                        activeMeetings = activeMeetings,
+                        pastMeetings = pastMeetings
 
-                _uiState.value = CommunityDetailsUiState.Success(
-                    communityId = community.id,
-                    imageUrl = community.imageUrl,
-                    title = community.name,
-                    tags = community.tags.map { tag ->
-                        MeetingTag(id = tag.id, text = tag.name, state = TagState.ACTIVE)
-                    },
-                    description = community.description,
-                    isSubscribed = community.isSubscribed,
-                    subscribersCount = community.subscribersCount,
-                    subscribers = subscribers,
-                    activeMeetings = activeMeetings,
-                    pastMeetings = pastMeetings
-                )
-            } catch (e: Exception) {
-                _uiState.value = CommunityDetailsUiState.Error(
-                    message = e.message ?: "Не удалось загрузить информацию о сообществе"
-                )
-            }
+                    )
+                }
         }
     }
 

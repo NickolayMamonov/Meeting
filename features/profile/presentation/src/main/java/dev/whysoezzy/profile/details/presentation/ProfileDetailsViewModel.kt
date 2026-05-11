@@ -11,6 +11,7 @@ import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -56,63 +57,60 @@ class ProfileDetailsViewModel(
     private fun loadProfile(userId: Long?) {
         viewModelScope.launch {
             _uiState.value = ProfileDetailsUiState.Loading
-            try {
-                val isOwnProfile = userId == null
-                val userResult = if (isOwnProfile) getCurrentUserUseCase() else getUserByIdUseCase(userId)
 
-                userResult
-                    .onSuccess { user ->
-                        // Если это свой профиль и имя ещё не заполнено — отправляем на NameInputScreen
-                        if (isOwnProfile && user.name.isBlank()) {
-                            _navEvent.emit(ProfileDetailsNavEvent.NavigateToNameInput)
-                            return@onSuccess
-                        }
+            val isOwnProfile = userId == null
+            val userResult = if (isOwnProfile) getCurrentUserUseCase() else getUserByIdUseCase(userId)
 
-                        val meetings = getUserMeetingsUseCase(user.id).getOrNull() ?: emptyList()
-                        val communities = getUserCommunitiesUseCase(user.id).getOrNull() ?: emptyList()
-
-                        // Все сообщества из /users/{id}/communities — это те, на которые подписан пользователь
-                        val subscribedIds = communities.map { it.id }.toSet()
-
-                        _uiState.value = ProfileDetailsUiState.Success(
-                            userId = user.id,
-                            name = user.name,
-                            surname = user.surname,
-                            email = user.email,
-                            city = user.city,
-                            description = user.bio,
-                            avatarUrl = user.avatar.takeIf { it.isNotBlank() },
-                            interests = user.interests.map { it.name },
-                            isOwnProfile = isOwnProfile,
-                            socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
-                            userMeetings = meetings.map { it.toUIKitMeetingInfo() },
-                            userCommunities = communities.toUIKitCommunityInfoList(
-                                subscribedIds = subscribedIds,
-                                onSubscribeClick = { id, sub ->
-                                    handleToggleCommunitySubscription(id, sub)
-                                },
-                                onCardClick = { id ->
-                                    viewModelScope.launch {
-                                        _navEvent.emit(ProfileDetailsNavEvent.NavigateToCommunity(id))
-                                    }
-                                }
-                            ),
-                            subscribedCommunityIds = subscribedIds
+            userResult
+                .onFailure { exception ->
+                    if (exception is ApiException.UnauthorizedError) {
+                        handleLogout()
+                    } else {
+                        _uiState.value = ProfileDetailsUiState.Error(
+                            message = exception.message ?: "Не удалось загрузить профиль"
                         )
                     }
-                    .onFailure { exception ->
-                        if (exception is ApiException.UnauthorizedError) {
-                            // Access token протух и refresh тоже не помог — разлогиниваем
-                            handleLogout()
-                        } else {
-                            _uiState.value = ProfileDetailsUiState.Error(
-                                message = exception.message ?: "Не удалось загрузить профиль"
-                            )
-                        }
+                }
+                .onSuccess { user ->
+                    if (isOwnProfile && user.name.isBlank()) {
+                        _navEvent.emit(ProfileDetailsNavEvent.NavigateToNameInput)
+                        return@onSuccess
                     }
-            } catch (e: Exception) {
-                _uiState.value = ProfileDetailsUiState.Error(message = e.message ?: "Произошла ошибка")
-            }
+
+                    val meetingsDeferred    = async { getUserMeetingsUseCase(user.id) }
+                    val communitiesDeferred = async { getUserCommunitiesUseCase(user.id) }
+
+                    val meetings = meetingsDeferred.await().getOrNull() ?: emptyList()
+                    val communities = communitiesDeferred.await().getOrNull() ?: emptyList()
+
+                    val subscribedIds = communities.map { it.id }.toSet()
+
+                    _uiState.value = ProfileDetailsUiState.Success(
+                        userId = user.id,
+                        name = user.name,
+                        surname = user.surname,
+                        email = user.email,
+                        city = user.city,
+                        description = user.bio,
+                        avatarUrl = user.avatar.takeIf { it.isNotBlank() },
+                        interests = user.interests.map { it.name },
+                        isOwnProfile = isOwnProfile,
+                        socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
+                        userMeetings = meetings.map { it.toUIKitMeetingInfo() },
+                        userCommunities = communities.toUIKitCommunityInfoList(
+                            subscribedIds = subscribedIds,
+                            onSubscribeClick = { id, sub ->
+                                handleToggleCommunitySubscription(id, sub)
+                            },
+                            onCardClick = { id ->
+                                viewModelScope.launch {
+                                    _navEvent.emit(ProfileDetailsNavEvent.NavigateToCommunity(id))
+                                }
+                            }
+                        ),
+                        subscribedCommunityIds = subscribedIds
+                    )
+                }
         }
     }
 
