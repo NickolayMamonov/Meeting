@@ -2,9 +2,12 @@ package com.whysoezzy.domain.usecase
 
 import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.MainScreenData
+import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.repository.MeetingsRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Use case для загрузки данных главного экрана.
@@ -16,32 +19,40 @@ class GetMainScreenDataUseCase(
     private val getHeroMeetingsUseCase: GetHeroMeetingsUseCase,
     private val getPopularMeetingsUseCase: GetPopularMeetingsUseCase,
     private val getCommunities: suspend () -> Result<List<Community>> = { Result.success(emptyList()) },
-    private val getTags: suspend () -> Result<List<MeetingTag>> = { Result.success(emptyList()) }
+//    private val getTags: suspend () -> Result<List<MeetingTag>> = { Result.success(emptyList()) }
 ) {
     suspend operator fun invoke(): Result<MainScreenData> {
         return try {
-            val heroMeetings = getHeroMeetingsUseCase().getOrThrow()
-            val popularMeetings = getPopularMeetingsUseCase().getOrThrow()
-            val allMeetings = meetingsRepository.getAllEvents().getOrThrow()
-            val adBlocks = meetingsRepository.getAdBlocks().getOrNull() ?: emptyList()
-            val communities = getCommunities().getOrNull() ?: emptyList()
+            coroutineScope {
+                val heroDeferred = async { getHeroMeetingsUseCase() }
+                val popularDeferred = async { getPopularMeetingsUseCase() }
+                val allDeferred = async { meetingsRepository.getAllEvents() }
+                val adBlocksDeferred = async { meetingsRepository.getAdBlocks() }
+                val communitiesDeferred = async { getCommunities() }
 
-            val categories = allMeetings
-                .flatMap { it.tags }
-                .distinctBy { it.id }
-                .map { MeetingTag(id = it.id, text = it.text, state = TagState.ACTIVE) }
-                .take(10)
+                val heroMeetings = heroDeferred.await().getOrThrow()
+                val popularMeetings = popularDeferred.await().getOrThrow()
+                val allMeetings = allDeferred.await().getOrThrow()
+                val adBlocks = adBlocksDeferred.await().getOrNull() ?: emptyList()
+                val communities = communitiesDeferred.await().getOrNull() ?: emptyList()
 
-            Result.success(
-                MainScreenData(
-                    heroMeetings = heroMeetings,
-                    popularMeetings = popularMeetings,
-                    allMeetings = allMeetings,
-                    categories = categories,
-                    communities = communities,
-                    adBlocks = adBlocks
+                val categories = allMeetings
+                    .flatMap { it.tags }
+                    .distinctBy { it.id }
+                    .map { MeetingTag(id = it.id, text = it.text, state = TagState.ACTIVE) }
+                    .take(10)
+
+                Result.success(
+                    MainScreenData(
+                        heroMeetings = heroMeetings,
+                        popularMeetings = popularMeetings,
+                        allMeetings = allMeetings,
+                        categories = categories,
+                        communities = communities,
+                        adBlocks = adBlocks
+                    )
                 )
-            )
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

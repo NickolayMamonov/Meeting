@@ -4,6 +4,7 @@ import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.network.error.ErrorResponse
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.CancellationException
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
 
@@ -34,6 +35,8 @@ suspend inline fun <T> safeApiCall(crossinline apiCall: suspend () -> T): Result
         }
     } catch (e: IOException) {
         Result.failure(ApiException.NetworkError(e.message ?: "Network error"))
+    } catch (e: CancellationException){
+        throw e
     } catch (e: Exception) {
         Result.failure(ApiException.UnknownError(e.message ?: "Unknown error"))
     }

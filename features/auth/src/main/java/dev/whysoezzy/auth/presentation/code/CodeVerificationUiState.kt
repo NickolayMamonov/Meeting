@@ -16,5 +16,4 @@ sealed class CodeVerificationEvent {
     data class UpdateCode(val code: String) : CodeVerificationEvent()
     data object VerifyCode : CodeVerificationEvent()
     data object ResendCode : CodeVerificationEvent()
-    data object TickTimer : CodeVerificationEvent()
 }

@@ -45,7 +45,6 @@ class CodeVerificationViewModel(
             is CodeVerificationEvent.UpdateCode -> updateCode(event.code)
             CodeVerificationEvent.VerifyCode -> verifyCode()
             CodeVerificationEvent.ResendCode -> resendCode()
-            CodeVerificationEvent.TickTimer -> tickTimer()
         }
     }
 
@@ -114,18 +113,18 @@ class CodeVerificationViewModel(
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            repeat(60) {
-                delay(1000)
-                tickTimer()
+            val startTime = System.currentTimeMillis()
+            val durationMs = 60_000L
+            while (true){
+                val elapsed = System.currentTimeMillis() - startTime
+                val remaining = ((durationMs - elapsed) / 1000).toInt().coerceAtLeast(0)
+                _uiState.value = _uiState.value.copy(
+                    remainingTime = remaining,
+                    canResend = remaining <= 0
+                )
+                if (remaining <= 0) break
+                delay(200L)
             }
         }
-    }
-
-    private fun tickTimer() {
-        val newTime = _uiState.value.remainingTime - 1
-        _uiState.value = _uiState.value.copy(
-            remainingTime = maxOf(0, newTime),
-            canResend = newTime <= 0
-        )
     }
 }
