@@ -9,6 +9,7 @@ import com.whysoezzy.domain.usecase.GetCommunityMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.domain.usecase.SubscribeToCommunityUseCase
 import com.whysoezzy.domain.usecase.UnsubscribeFromCommunityUseCase
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,7 +65,7 @@ class CommunityDetailsViewModel(
             getCommunityByIdUseCase(communityId)
                 .onFailure { e ->
                     _uiState.value = CommunityDetailsUiState.Error(
-                        message = e.message ?: "Не удалось загрузить информацию о сообществе"
+                        message = e.toUserMessage()
                     )
                 }
                 .onSuccess { community ->

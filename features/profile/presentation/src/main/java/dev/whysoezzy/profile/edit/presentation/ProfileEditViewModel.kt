@@ -9,6 +9,7 @@ import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -90,7 +91,7 @@ class ProfileEditViewModel(
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.message ?: "Не удалось загрузить профиль"
+                        error = e.toUserMessage()
                     )
                 }
         }
@@ -259,7 +260,7 @@ class ProfileEditViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    error = "Ошибка при подготовке данных: ${e.message}"
+                    error = "Ошибка при подготовке данных профиля"
                 )
                 return@launch
             }
@@ -284,7 +285,7 @@ class ProfileEditViewModel(
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    error = e.message ?: "Не удалось сохранить профиль"
+                    error = e.toUserMessage()
                 )
             }
         }

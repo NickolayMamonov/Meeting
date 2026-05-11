@@ -8,6 +8,7 @@ import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
 import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
+import com.whysoezzy.network.toUserMessage
 import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
@@ -67,7 +68,7 @@ class ProfileDetailsViewModel(
                         handleLogout()
                     } else {
                         _uiState.value = ProfileDetailsUiState.Error(
-                            message = exception.message ?: "Не удалось загрузить профиль"
+                            message = exception.toUserMessage()
                         )
                     }
                 }

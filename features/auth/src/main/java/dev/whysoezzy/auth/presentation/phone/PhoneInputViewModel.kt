@@ -3,6 +3,7 @@ package dev.whysoezzy.auth.presentation.phone
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,7 +58,7 @@ class PhoneInputViewModel(
                 .onFailure { exception ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = exception.message ?: "Не удалось отправить код"
+                        error = exception.toUserMessage()
                     )
                 }
         }

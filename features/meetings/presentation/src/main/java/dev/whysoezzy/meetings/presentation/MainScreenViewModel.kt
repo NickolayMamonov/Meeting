@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
+import com.whysoezzy.network.toUserMessage
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfos
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingTags
@@ -101,7 +102,7 @@ class MainScreenViewModel(
                 }
                 .onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
-                        exception.message ?: "Произошла ошибка при загрузке данных"
+                        exception.toUserMessage()
                     )
                 }
         }
