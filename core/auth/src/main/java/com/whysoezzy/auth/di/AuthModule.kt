@@ -43,7 +43,6 @@ val authModule = module {
                         null
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("AuthModule", "Refresh token failed, clearing session", e)
                     tokenManager.clearTokens()
                     null
                 }

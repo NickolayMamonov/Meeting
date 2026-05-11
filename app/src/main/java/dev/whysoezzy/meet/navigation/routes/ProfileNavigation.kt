@@ -14,7 +14,6 @@ import dev.whysoezzy.profile.details.presentation.ProfileDetailsScreen
 import dev.whysoezzy.profile.edit.presentation.ProfileEditScreen
 import org.koin.compose.koinInject
 
-private const val TAG = "ProfileNavigation"
 
 fun NavGraphBuilder.profileNavigation(navController: NavController) {
 
@@ -59,7 +58,6 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
         arguments = listOf(navArgument("userId") { type = NavType.LongType })
     ) { backStackEntry ->
         val userId = backStackEntry.arguments?.getLong("userId") ?: 0L
-        Log.d(TAG, "UserProfile composable: userId=$userId")
         ProfileDetailsScreen(
             userId = userId,
             onBackPressed = { navController.popBackStack() },

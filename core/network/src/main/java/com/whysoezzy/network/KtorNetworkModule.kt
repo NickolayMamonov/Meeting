@@ -51,11 +51,6 @@ object KtorNetworkModule {
 
             if (BuildConfig.DEBUG) {
                 install(Logging) {
-                    logger = object : Logger {
-                        override fun log(message: String) {
-                            Log.d("KtorClient", message)
-                        }
-                    }
                     level = LogLevel.ALL
                 }
             }
@@ -96,7 +91,6 @@ object KtorNetworkModule {
                                     )
                                 }
                             } catch (e: Exception) {
-                                Log.e("KtorAuth", "Token refresh failed", e)
                                 null
                             }
                         }

@@ -11,12 +11,9 @@ import dev.whysoezzy.meetings.MainScreen
 import dev.whysoezzy.meetings.details.presentation.MeetingDetailsScreen
 import dev.whysoezzy.meetings.participants.presentation.MeetingParticipantsScreen
 
-private const val TAG = "MeetingsNavigation"
-
 fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
 
     composable(MeetRoute.Main.route) {
-        Log.d(TAG, "MainScreen composable created")
         MainScreen(
             onMeetingClick = { meetingId ->
                 navController.navigate(MeetRoute.MeetingDetails.createRoute(meetingId))
