@@ -3,6 +3,7 @@ package dev.whysoezzy.meetings.participants.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.domain.usecase.GetMeetingParticipantsUseCase
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -51,7 +52,7 @@ class MeetingParticipantsViewModel(
                 }
                 .onFailure { exception ->
                     _uiState.value = MeetingParticipantsUiState.Error(
-                        message = exception.message ?: "Не удалось загрузить участников встречи"
+                        message = exception.toUserMessage()
                     )
                 }
         }

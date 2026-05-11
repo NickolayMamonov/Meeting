@@ -92,12 +92,11 @@ class NameInputViewModel(
             }.onSuccess {
                 _uiState.value = _uiState.value.copy(isLoading = false, isSubmitted = true)
                 _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
-            }.onFailure { exception ->
+            }.onFailure {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     nameError = "Не удалось сохранить имя. Попробуйте ещё раз."
                 )
-                android.util.Log.e("NameInputVM", "updateUserProfile failed", exception)
             }
         }
     }

@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
+import com.whysoezzy.network.toUserMessage
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfos
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingTags
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitTagState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class MainScreenNavEvent {
     data class NavigateToCommunity(val communityId: Long) : MainScreenNavEvent()
@@ -66,31 +69,40 @@ class MainScreenViewModel(
 
             getMainScreenDataUseCase()
                 .onSuccess { data ->
-                    val allMeetingsMapped = data.allMeetings.toUIKitMeetingInfos()
+                    val mapped = withContext(Dispatchers.Default){
+                        val allMeetings = data.allMeetings.toUIKitMeetingInfos()
+                        val heroMeetings = data.heroMeetings.toUIKitMeetingInfos()
+                        val popularMeetings = data.popularMeetings.toUIKitMeetingInfos()
+                        val categories = data.categories.toUIKitMeetingTags()
+                        Triple(allMeetings,heroMeetings to popularMeetings,categories)
+                    }
+
+                    val (allMeetingsMapped, heroPair, categories) = mapped
+                    val (heroMeetings,popularMeetings) = heroPair
+
                     cachedAllMeetings = allMeetingsMapped
 
-                    android.util.Log.d("MainScreenVM", "adBlocks count: ${data.adBlocks.size}")
-                    android.util.Log.d("MainScreenVM", "adBlocks types: ${data.adBlocks.map { it::class.simpleName }}")
+                    val communities = data.communities.toUIKitCommunityInfoList(
+                        onSubscribeClick = { communityId, isSubscribed ->
+                            toggleCommunitySubscription(communityId,isSubscribed)
+                        },
+                        onCardClick = { communityId ->
+                            onEvent(MainScreenEvent.NavigateToCommunity(communityId))
+                        }
+                    )
 
                     _uiState.value = MainScreenUiState.Success(
-                        heroMeetings = data.heroMeetings.toUIKitMeetingInfos(),
-                        popularMeetings = data.popularMeetings.toUIKitMeetingInfos(),
+                        heroMeetings = heroMeetings,
+                        popularMeetings = popularMeetings,
                         allMeetings = allMeetingsMapped,
-                        categories = data.categories.toUIKitMeetingTags(),
-                        communities = data.communities.toUIKitCommunityInfoList(
-                            onSubscribeClick = { communityId, isSubscribed ->
-                                toggleCommunitySubscription(communityId, isSubscribed)
-                            },
-                            onCardClick = { communityId ->
-                                onEvent(MainScreenEvent.NavigateToCommunity(communityId))
-                            }
-                        ),
+                        categories = categories,
+                        communities = communities,
                         adBlocks = data.adBlocks
                     )
                 }
                 .onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
-                        exception.message ?: "Произошла ошибка при загрузке данных"
+                        exception.toUserMessage()
                     )
                 }
         }
@@ -98,24 +110,32 @@ class MainScreenViewModel(
 
     private fun performSearch(query: String) {
         _searchQuery.value = query
-        if (query.isBlank()) {
-            val currentState = _uiState.value as? MainScreenUiState.Success
-            if (currentState != null) {
-                _uiState.value = currentState.copy(allMeetings = cachedAllMeetings)
-            } else {
-                loadMainScreenData()
+        viewModelScope.launch {
+            if (query.isBlank()) {
+                val currentState = _uiState.value as? MainScreenUiState.Success
+                if (currentState != null) {
+                    _uiState.value = currentState.copy(allMeetings = cachedAllMeetings)
+                } else {
+                    loadMainScreenData()
+                }
+                return@launch
             }
-            return
-        }
+            val currentState = _uiState.value as? MainScreenUiState.Success ?: return@launch
 
-        val currentState = _uiState.value as? MainScreenUiState.Success ?: return
-        val lowerQuery = query.lowercase()
-        val filtered = cachedAllMeetings.filter { meeting ->
-            meeting.title.lowercase().contains(lowerQuery) ||
-            meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
-            meeting.address.lowercase().contains(lowerQuery)
+            viewModelScope.launch {
+                val lowerQuery = query.lowercase()
+                val filtered = withContext(Dispatchers.Default){
+                    cachedAllMeetings.filter { meeting ->
+                        meeting.title.lowercase().contains(lowerQuery) ||
+                                meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
+                                meeting.address.lowercase().contains(lowerQuery)
+                    }
+                }
+                if (_searchQuery.value == query){
+                    _uiState.value = currentState.copy(allMeetings = filtered)
+                }
+            }
         }
-        _uiState.value = currentState.copy(allMeetings = filtered)
     }
 
     /**
@@ -124,21 +144,24 @@ class MainScreenViewModel(
      */
     private fun filterByTag(tagId: Long?) {
         val currentState = _uiState.value as? MainScreenUiState.Success ?: return
+        viewModelScope.launch {
+            val (filtered, updatedCategories) = withContext(Dispatchers.Default) {
+                val filtered = if (tagId == null) {
+                    cachedAllMeetings
+                } else {
+                    cachedAllMeetings.filter { meeting -> meeting.tags.any { it.id == tagId } }
+                }
+                val updatedCategories = currentState.categories.map { tag ->
+                    tag.copy(state = if (tag.id == tagId) UIKitTagState.SELECTED else UIKitTagState.ACTIVE)
+                }
+                filtered to updatedCategories
+            }
 
-        val filtered = if (tagId == null) {
-            cachedAllMeetings
-        } else {
-            cachedAllMeetings.filter { meeting -> meeting.tags.any { it.id == tagId } }
+            _uiState.value = currentState.copy(
+                allMeetings = filtered,
+                categories = updatedCategories
+            )
         }
-
-        val updatedCategories = currentState.categories.map { tag ->
-            tag.copy(state = if (tag.id == tagId) UIKitTagState.SELECTED else UIKitTagState.ACTIVE)
-        }
-
-        _uiState.value = currentState.copy(
-            allMeetings = filtered,
-            categories = updatedCategories
-        )
     }
 
     /**

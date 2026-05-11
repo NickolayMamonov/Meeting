@@ -67,12 +67,7 @@ class MeetingsRepositoryImpl(
 
     override suspend fun getAdBlocks(): Result<List<AdBlock>> = safeApiCall {
         val raw = meetingsApi.getAdBlocks()
-        android.util.Log.d("MeetingsRepo", "Raw adBlocks from API: ${raw.size} items")
-        raw.forEach { dto ->
-            android.util.Log.d("MeetingsRepo", "  AdBlock dto: id=${dto.id}, type=${dto.type}, title=${dto.title}")
-        }
         val mapped = raw.map { it.toDomain() }
-        android.util.Log.d("MeetingsRepo", "Mapped adBlocks: ${mapped.size} items")
         mapped
     }
 }

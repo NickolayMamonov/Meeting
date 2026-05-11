@@ -6,6 +6,7 @@ import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
+import com.whysoezzy.network.toUserMessage
 import dev.whysoezzy.meetings.mappers.toUIKit
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityHost
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfoList
@@ -89,7 +90,7 @@ class MeetingDetailsViewModel(
                 }
                 .onFailure { exception ->
                     _uiState.value = MeetingDetailsUiState.Error(
-                        message = exception.message ?: "Не удалось загрузить информацию о встрече"
+                        message = exception.toUserMessage()
                     )
                 }
         }

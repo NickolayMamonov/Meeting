@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -65,7 +66,7 @@ class CommunitySubscribersViewModel(
                 )
             } catch (e: Exception) {
                 _uiState.value = CommunitySubscribersUiState.Error(
-                    message = e.message ?: "Не удалось загрузить подписчиков"
+                    message = e.toUserMessage()
                 )
             }
         }

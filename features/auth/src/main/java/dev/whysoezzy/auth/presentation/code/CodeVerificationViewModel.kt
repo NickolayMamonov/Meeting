@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
 import com.whysoezzy.auth.domain.usecase.VerifyOtpUseCase
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -45,7 +46,6 @@ class CodeVerificationViewModel(
             is CodeVerificationEvent.UpdateCode -> updateCode(event.code)
             CodeVerificationEvent.VerifyCode -> verifyCode()
             CodeVerificationEvent.ResendCode -> resendCode()
-            CodeVerificationEvent.TickTimer -> tickTimer()
         }
     }
 
@@ -82,7 +82,7 @@ class CodeVerificationViewModel(
                 .onFailure { exception ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = exception.message ?: "Неверный код подтверждения"
+                        error = exception.toUserMessage()
                     )
                 }
         }
@@ -105,7 +105,7 @@ class CodeVerificationViewModel(
                 }
                 .onFailure { exception ->
                     _uiState.value = _uiState.value.copy(
-                        error = exception.message ?: "Не удалось отправить код повторно"
+                        error = exception.toUserMessage()
                     )
                 }
         }
@@ -114,18 +114,18 @@ class CodeVerificationViewModel(
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            repeat(60) {
-                delay(1000)
-                tickTimer()
+            val startTime = System.currentTimeMillis()
+            val durationMs = 60_000L
+            while (true){
+                val elapsed = System.currentTimeMillis() - startTime
+                val remaining = ((durationMs - elapsed) / 1000).toInt().coerceAtLeast(0)
+                _uiState.value = _uiState.value.copy(
+                    remainingTime = remaining,
+                    canResend = remaining <= 0
+                )
+                if (remaining <= 0) break
+                delay(200L)
             }
         }
-    }
-
-    private fun tickTimer() {
-        val newTime = _uiState.value.remainingTime - 1
-        _uiState.value = _uiState.value.copy(
-            remainingTime = maxOf(0, newTime),
-            canResend = newTime <= 0
-        )
     }
 }

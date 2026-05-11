@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
+import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -89,7 +91,7 @@ class ProfileEditViewModel(
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.message ?: "Не удалось загрузить профиль"
+                        error = e.toUserMessage()
                     )
                 }
         }
@@ -233,8 +235,12 @@ class ProfileEditViewModel(
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
+
+            val socialMediasList: List<SocialMediaInfo>
+            val updatedInterests: List<Tag>
+
             try {
-                val socialMediasList = state.socialMedias.mapNotNull { (type, username) ->
+                socialMediasList = state.socialMedias.mapNotNull { (type,username) ->
                     if (username.isBlank()) return@mapNotNull null
                     try {
                         val smType = SocialMediaType.valueOf(type.uppercase())
@@ -246,40 +252,40 @@ class ProfileEditViewModel(
                     } catch (_: IllegalArgumentException) { null }
                 }
 
-                val updatedInterests = state.interests.mapNotNull { name ->
+                updatedInterests = state.interests.mapNotNull { name ->
                     val id = state.availableTags.entries.firstOrNull { it.value == name }?.key
-                    if (id != null) com.whysoezzy.domain.models.Tag(id = id, name = name)
+                    if (id != null) Tag(id = id, name = name)
                     else user.interests.firstOrNull { it.name == name }
-                }
-
-                updateUserProfileUseCase(
-                    user.copy(
-                        name = state.name,
-                        surname = state.surname,
-                        phone = state.phone,
-                        email = state.email,
-                        city = state.city,
-                        bio = state.description,
-                        avatar = state.avatarUrl ?: "",
-                        socialMedias = socialMediasList,
-                        interests = updatedInterests,
-                        showCommunities = state.showCommunities,
-                        showMeetings = state.showMeetings,
-                        notificationsEnabled = state.notificationsEnabled
-                    )
-                ).onSuccess {
-                    _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
-                    _navEvent.tryEmit(ProfileEditNavEvent.NavigateBack)
-                }.onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isSaving = false,
-                        error = e.message ?: "Не удалось сохранить профиль"
-                    )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    error = e.message ?: "Произошла ошибка при сохранении"
+                    error = "Ошибка при подготовке данных профиля"
+                )
+                return@launch
+            }
+            updateUserProfileUseCase(
+                user.copy(
+                    name = state.name,
+                    surname = state.surname,
+                    phone = state.phone,
+                    email = state.email,
+                    city = state.city,
+                    bio = state.description,
+                    avatar = state.avatarUrl ?: "",
+                    socialMedias = socialMediasList,
+                    interests = updatedInterests,
+                    showCommunities = state.showCommunities,
+                    showMeetings = state.showMeetings,
+                    notificationsEnabled = state.notificationsEnabled
+                )
+            ).onSuccess {
+                _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
+                _navEvent.tryEmit(ProfileEditNavEvent.NavigateBack)
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(
+                    isSaving = false,
+                    error = e.toUserMessage()
                 )
             }
         }
@@ -295,10 +301,7 @@ class ProfileEditViewModel(
 
     private fun confirmDeleteProfile() {
         _uiState.value = _uiState.value.copy(showDeleteConfirmDialog = false)
-        viewModelScope.launch {
-            // TODO: вызов deleteAccountUseCase когда будет добавлен
-            android.util.Log.d("ProfileEditVM", "Delete profile confirmed — TODO")
-        }
+        // TODO: вызов deleteAccountUseCase когда будет добавлен
     }
 
     private fun validateName(name: String): String? = when {
