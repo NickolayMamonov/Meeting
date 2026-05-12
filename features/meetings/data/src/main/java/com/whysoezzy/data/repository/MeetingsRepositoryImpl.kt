@@ -58,11 +58,6 @@ class MeetingsRepositoryImpl(
         meetingsApi.getUserMeetings().map { it.toDomain() }
     }
 
-    override suspend fun getEventsByCommunity(communityId: Long): Result<List<Meeting>> = safeApiCall {
-        meetingsApi.getEventsByCommunity(communityId = communityId)
-            .map { it.toDomain() }
-    }
-
     override suspend fun getAdBlocks(): Result<List<AdBlock>> = safeApiCall {
         val raw = meetingsApi.getAdBlocks()
         val mapped = raw.map { it.toDomain() }
