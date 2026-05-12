@@ -40,11 +40,11 @@ object KtorNetworkModule {
             install(ContentNegotiation) {
                 json(
                     Json {
-                        prettyPrint = true
+                        prettyPrint = BuildConfig.DEBUG
                         isLenient = true
                         ignoreUnknownKeys = true
                         coerceInputValues = true
-                        encodeDefaults = true
+                        encodeDefaults = false
                     }
                 )
             }
