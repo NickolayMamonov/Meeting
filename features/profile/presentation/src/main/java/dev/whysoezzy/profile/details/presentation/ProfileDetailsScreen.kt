@@ -17,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +37,7 @@ import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun ProfileDetailsScreen(
@@ -51,7 +51,7 @@ fun ProfileDetailsScreen(
     onCommunityClick: (Long) -> Unit = {},
     viewModel: ProfileDetailsViewModel = koinViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(userId) {
@@ -94,8 +94,6 @@ fun ProfileDetailsScreen(
             )
         }
 
-        // TopBar поверх фото — прозрачный, белые иконки, без statusBarsPadding
-        // (фото само уходит под статус бар через edge-to-edge)
         val successState = uiState as? ProfileDetailsUiState.Success
         ProfileTopBar(
             title = "",
