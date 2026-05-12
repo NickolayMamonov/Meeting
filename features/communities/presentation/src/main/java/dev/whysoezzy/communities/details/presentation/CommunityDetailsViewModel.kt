@@ -10,6 +10,11 @@ import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.domain.usecase.SubscribeToCommunityUseCase
 import com.whysoezzy.domain.usecase.UnsubscribeFromCommunityUseCase
 import com.whysoezzy.network.toUserMessage
+import dev.whysoezzy.communities.mappers.toUIKitMeetingInfo
+import dev.whysoezzy.communities.mappers.toUIKitPerson
+import dev.whysoezzy.uikit.models.UIKitMeetingTag
+import dev.whysoezzy.uikit.models.UIKitPerson
+import dev.whysoezzy.uikit.models.UIKitTagState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,14 +89,14 @@ class CommunityDetailsViewModel(
                         imageUrl = community.imageUrl,
                         title = community.name,
                         tags = community.tags.map { tag ->
-                            MeetingTag(id = tag.id, text = tag.name, state = TagState.ACTIVE)
+                            UIKitMeetingTag(id = tag.id, text = tag.name, state = UIKitTagState.ACTIVE)
                         },
                         description = community.description,
                         isSubscribed = community.isSubscribed,
                         subscribersCount = community.subscribersCount,
-                        subscribers = subscribers,
-                        activeMeetings = activeMeetings,
-                        pastMeetings = pastMeetings
+                        subscribers = subscribers.map { it.toUIKitPerson() },
+                        activeMeetings = activeMeetings.map { it.toUIKitMeetingInfo() },
+                        pastMeetings = pastMeetings.map { it.toUIKitMeetingInfo() }
 
                     )
                 }
