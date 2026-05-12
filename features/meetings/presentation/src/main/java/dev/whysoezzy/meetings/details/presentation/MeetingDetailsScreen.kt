@@ -23,7 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +61,7 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun MeetingDetailsScreen(
@@ -75,7 +75,7 @@ fun MeetingDetailsScreen(
     onAuthRequired: () -> Unit = {},
     viewModel: MeetingDetailsViewModel = koinViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(meetingId) {
@@ -299,7 +299,7 @@ private fun MeetingContent(
                 Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
                     TextHeading2(text = "Другие встречи сообщества")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-                        items(uiState.otherMeetings) { meeting ->
+                        items(uiState.otherMeetings, key = {it.id}) { meeting ->
                             UIKitEventCard(
                                 imageUrl = meeting.imageUrl,
                                 title = meeting.title,
@@ -350,26 +350,6 @@ private fun ErrorContent(
     }
 }
 
-private fun openMapIntent(context: Context, lat: Double, lng: Double, address: String) {
-    val uri = "geo:$lat,$lng?q=$lat,$lng(${Uri.encode(address)})".toUri()
-    val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
-        setPackage("com.google.android.apps.maps")
-    }
-    if (mapIntent.resolveActivity(context.packageManager) != null) {
-        context.startActivity(mapIntent)
-    } else {
-        context.startActivity(Intent(Intent.ACTION_VIEW, "geo:$lat,$lng".toUri()))
-    }
-}
-
-private fun shareIntent(context: Context, title: String, text: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, title)
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, "Поделиться встречей"))
-}
 
 @Preview
 @Composable

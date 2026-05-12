@@ -42,7 +42,7 @@ fun UIKitSocialMediaList(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
     ) {
-        items(socialMedias) { socialMedia ->
+        items(socialMedias, key = {it.type.name}) { socialMedia ->
             UIKitSocialMediaButton(
                 socialMediaInfo = socialMedia,
                 onClick = { onSocialMediaClick(socialMedia.url) }

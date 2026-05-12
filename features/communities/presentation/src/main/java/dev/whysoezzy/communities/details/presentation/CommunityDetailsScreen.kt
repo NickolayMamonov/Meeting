@@ -25,7 +25,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
@@ -61,7 +61,7 @@ fun CommunityDetailsScreen(
     onUserProfileClick: (Long) -> Unit = {},
     viewModel: CommunityDetailsViewModel = koinViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(communityId) {
@@ -184,7 +184,7 @@ private fun CommunityDetailsContent(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
                 contentPadding = PaddingValues(vertical = SpacingTokens.XS)
             ) {
-                items(state.tags) { tag ->
+                items(state.tags, key = {it.id}) { tag ->
                     UIKitTag(text = tag.text, size = UIKitTagSize.MEDIUM)
                 }
             }
@@ -223,7 +223,7 @@ private fun CommunityDetailsContent(
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
             }
 
-            items(state.activeMeetings) { meeting ->
+            items(state.activeMeetings, key = {it.id}) { meeting ->
                 UIKitEventCard(
                     imageUrl = meeting.imageUrl,
                     title = meeting.title,
@@ -253,7 +253,7 @@ private fun CommunityDetailsContent(
 
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-                    items(state.pastMeetings) { meeting ->
+                    items(state.pastMeetings, key = {it.id}) { meeting ->
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,
@@ -335,13 +335,4 @@ private fun ErrorContent(
             UIKitButton(text = "Повторить", onClick = onRetry)
         }
     }
-}
-
-private fun shareCommunityIntent(context: Context, title: String, text: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, title)
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, "Поделиться сообществом"))
 }

@@ -5,6 +5,4 @@ data class UIKitCommunityInfo(
     val title: String,
     val imageUrl: String,
     val isSubscribed: Boolean,
-    val onSubscribeClick: (Boolean) -> Unit,
-    val onCardClick: (() -> Unit)? = null
 )

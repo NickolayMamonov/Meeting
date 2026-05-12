@@ -25,11 +25,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.meetings.presentation.MainScreenEvent
 import dev.whysoezzy.meetings.presentation.MainScreenNavEvent
@@ -99,6 +101,11 @@ fun MainScreen(
                         onMeetingClick = onMeetingClick,
                         onCommunityClick = onCommunityClick,
                         onUserProfileClick = onUserProfileClick,
+                        onCommunitySubscribeClick = { communityId, isSubscribed ->
+                            viewModel.onEvent(
+                                MainScreenEvent.CommunitySubscriptionChanged(communityId, isSubscribed)
+                            )
+                        }
                     )
                 }
 
@@ -152,6 +159,7 @@ private fun MainScreenContent(
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit,
     onUserProfileClick: (Long) -> Unit,
+    onCommunitySubscribeClick: (Long, Boolean) -> Unit
 ) {
     // Генерируем бесконечный циклический список рекламных блоков, чтобы типы чередовались
     val cyclingAdBlocks = rememberCyclingAdBlocks(adBlocks)
@@ -170,7 +178,7 @@ private fun MainScreenContent(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(heroMeetings) { meeting ->
+                    items(heroMeetings, key = {it.id}) { meeting ->
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,
@@ -209,7 +217,7 @@ private fun MainScreenContent(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(popularMeetings) { meeting ->
+                    items(popularMeetings, key = {it.id}) { meeting ->
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,
@@ -248,13 +256,18 @@ private fun MainScreenContent(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(communities) { community ->
+                    items(communities, key = {it.id}) { community ->
                         UIKitCommunityCard(
                             imageUrl = community.imageUrl,
                             title = community.title,
                             isSubscribed = community.isSubscribed,
-                            onSubscribeClick = community.onSubscribeClick,
-                            onCardClick = community.onCardClick,
+                            onSubscribeClick = { isSubscribed ->
+                                onCommunitySubscribeClick(community.id,isSubscribed)
+                            },
+                            onCardClick = {
+                                onCommunityClick(community.id)
+                            }
+
                         )
                     }
                 }
@@ -270,8 +283,15 @@ private fun MainScreenContent(
             )
         }
 
-        items(meetingsWithAds.size) { index ->
-            when (val item = meetingsWithAds[index]) {
+        items(items = meetingsWithAds,
+            key = { item ->
+                when (item) {
+                    is MeetingOrAd.Meeting -> "meeting_${item.meeting.id}"
+                    is MeetingOrAd.Ad -> "ad_${item.adBlock.id}"
+                }
+            }
+        ) { item ->
+            when (item) {
                 is MeetingOrAd.Meeting -> {
                     UIKitEventCard(
                         imageUrl = item.meeting.imageUrl,

@@ -36,7 +36,7 @@ fun UIKitMeetingsList(
                 verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
                 contentPadding = PaddingValues(SpacingTokens.M)
             ) {
-                items(meetings) { meeting ->
+                items(meetings, key = {it.id}) { meeting ->
                     UIKitEventCard(
                         imageUrl = meeting.imageUrl,
                         title = meeting.title,
@@ -63,7 +63,7 @@ fun UIKitMeetingsList(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
                 contentPadding = PaddingValues(horizontal = SpacingTokens.M)
             ) {
-                items(meetings) { meeting ->
+                items(meetings, key = {it.id}) { meeting ->
                     UIKitEventCard(
                         imageUrl = meeting.imageUrl,
                         title = meeting.title,

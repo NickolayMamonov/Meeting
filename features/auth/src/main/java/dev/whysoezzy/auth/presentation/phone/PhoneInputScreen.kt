@@ -10,13 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.forms.UIKitPhoneInput
@@ -35,7 +35,7 @@ fun PhoneInputScreen(
     modifier: Modifier = Modifier,
     viewModel: PhoneInputViewModel = koinViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.isCodeSent) {
         if (uiState.isCodeSent && uiState.phoneNumber.isNotEmpty()) {

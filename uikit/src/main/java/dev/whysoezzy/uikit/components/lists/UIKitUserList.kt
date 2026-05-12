@@ -35,7 +35,7 @@ fun UIKitUserList(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
     ) {
-        items(users) { user ->
+        items(users, key = {it.id}) { user ->
             UIKitUserListItem(
                 user = user,
                 onClick = { onUserClick(user) }

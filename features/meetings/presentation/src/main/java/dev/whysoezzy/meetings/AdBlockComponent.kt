@@ -83,7 +83,7 @@ private fun CommunitiesAdBlock(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(adBlock.communities) { community ->
+            items(adBlock.communities, key = {it.id}) { community ->
                 UIKitCommunityCard(
                     imageUrl = community.imageUrl,
                     title = community.name,

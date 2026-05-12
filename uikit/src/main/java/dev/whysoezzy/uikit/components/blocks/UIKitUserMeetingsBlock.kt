@@ -60,7 +60,7 @@ fun UIKitUserMeetingsBlock(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
                 contentPadding = PaddingValues(horizontal = SpacingTokens.XS)
             ) {
-                items(meetings) { meeting ->
+                items(meetings, key = {it.id}) { meeting ->
                     UIKitEventCard(
                         imageUrl = meeting.imageUrl,
                         title = meeting.title,

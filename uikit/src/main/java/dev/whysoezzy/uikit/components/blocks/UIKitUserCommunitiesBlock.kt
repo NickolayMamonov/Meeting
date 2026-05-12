@@ -52,7 +52,7 @@ fun UIKitUserCommunitiesBlock(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
                 contentPadding = PaddingValues(horizontal = SpacingTokens.XS)
             ) {
-                items(communities) { community ->
+                items(communities, key = {it.id}) { community ->
                     UIKitCommunityCard(
                         imageUrl = community.imageUrl,
                         title = community.title,

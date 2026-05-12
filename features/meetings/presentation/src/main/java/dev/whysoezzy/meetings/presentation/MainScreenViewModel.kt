@@ -82,14 +82,7 @@ class MainScreenViewModel(
 
                     cachedAllMeetings = allMeetingsMapped
 
-                    val communities = data.communities.toUIKitCommunityInfoList(
-                        onSubscribeClick = { communityId, isSubscribed ->
-                            toggleCommunitySubscription(communityId,isSubscribed)
-                        },
-                        onCardClick = { communityId ->
-                            onEvent(MainScreenEvent.NavigateToCommunity(communityId))
-                        }
-                    )
+                    val communities = data.communities.toUIKitCommunityInfoList()
 
                     _uiState.value = MainScreenUiState.Success(
                         heroMeetings = heroMeetings,
