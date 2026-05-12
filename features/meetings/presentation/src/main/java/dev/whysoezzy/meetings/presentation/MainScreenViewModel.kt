@@ -33,9 +33,6 @@ class MainScreenViewModel(
     private val _uiState = MutableStateFlow<MainScreenUiState>(MainScreenUiState.Loading)
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
-    private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-
     private val _navEvent = MutableSharedFlow<MainScreenNavEvent>(extraBufferCapacity = 1)
     val navEvent: SharedFlow<MainScreenNavEvent> = _navEvent.asSharedFlow()
 
@@ -102,31 +99,34 @@ class MainScreenViewModel(
     }
 
     private fun performSearch(query: String) {
-        _searchQuery.value = query
-        viewModelScope.launch {
-            if (query.isBlank()) {
-                val currentState = _uiState.value as? MainScreenUiState.Success
-                if (currentState != null) {
-                    _uiState.value = currentState.copy(allMeetings = cachedAllMeetings)
-                } else {
-                    loadMainScreenData()
-                }
-                return@launch
-            }
-            val currentState = _uiState.value as? MainScreenUiState.Success ?: return@launch
+        val currentState = _uiState.value
 
-            viewModelScope.launch {
-                val lowerQuery = query.lowercase()
-                val filtered = withContext(Dispatchers.Default){
-                    cachedAllMeetings.filter { meeting ->
-                        meeting.title.lowercase().contains(lowerQuery) ||
-                                meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
-                                meeting.address.lowercase().contains(lowerQuery)
-                    }
+        if (currentState is MainScreenUiState.Success){
+            _uiState.value = currentState.copy(searchQuery = query)
+        }
+
+        if (query.isBlank()) {
+            val currentState = _uiState.value as? MainScreenUiState.Success
+            if (currentState != null) {
+                _uiState.value = currentState.copy(allMeetings = cachedAllMeetings)
+            } else {
+                loadMainScreenData()
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            val lowerQuery = query.lowercase()
+            val filtered = withContext(Dispatchers.Default){
+                cachedAllMeetings.filter { meeting ->
+                    meeting.title.lowercase().contains(lowerQuery) ||
+                            meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
+                            meeting.address.lowercase().contains(lowerQuery)
                 }
-                if (_searchQuery.value == query){
-                    _uiState.value = currentState.copy(allMeetings = filtered)
-                }
+            }
+            val latestState = _uiState.value as? MainScreenUiState.Success ?: return@launch
+            if (latestState.searchQuery == query){
+                _uiState.value = latestState.copy(allMeetings = filtered)
             }
         }
     }
