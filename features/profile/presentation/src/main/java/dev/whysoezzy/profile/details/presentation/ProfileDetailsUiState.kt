@@ -5,7 +5,7 @@ import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 
 sealed class ProfileDetailsUiState {
-    object Loading : ProfileDetailsUiState()
+    data object Loading : ProfileDetailsUiState()
     data class Success(
         val userId: Long,
         val name: String,
@@ -26,9 +26,9 @@ sealed class ProfileDetailsUiState {
 
 sealed class ProfileDetailsEvent {
     data class LoadProfile(val userId: Long?) : ProfileDetailsEvent()
-    object EditProfile : ProfileDetailsEvent()
-    object ShareProfile : ProfileDetailsEvent()
-    object Logout : ProfileDetailsEvent()
+    data object EditProfile : ProfileDetailsEvent()
+    data object ShareProfile : ProfileDetailsEvent()
+    data object Logout : ProfileDetailsEvent()
     data class NavigateToMeeting(val meetingId: Long) : ProfileDetailsEvent()
     data class NavigateToCommunity(val communityId: Long) : ProfileDetailsEvent()
     data class OpenSocialMedia(val url: String) : ProfileDetailsEvent()
@@ -37,12 +37,12 @@ sealed class ProfileDetailsEvent {
 }
 
 sealed class ProfileDetailsNavEvent {
-    object NavigateToAuth : ProfileDetailsNavEvent()
+    data object NavigateToAuth : ProfileDetailsNavEvent()
     /** Профиль загружен, но имя пустое — отправляем заполнить */
-    object NavigateToNameInput : ProfileDetailsNavEvent()
+    data object NavigateToNameInput : ProfileDetailsNavEvent()
     data class NavigateToMeeting(val meetingId: Long) : ProfileDetailsNavEvent()
     data class NavigateToCommunity(val communityId: Long) : ProfileDetailsNavEvent()
-    object NavigateToEdit : ProfileDetailsNavEvent()
+    data object NavigateToEdit : ProfileDetailsNavEvent()
     data class OpenSocialMedia(val url: String) : ProfileDetailsNavEvent()
     data class ShareProfile(val name: String, val shareText: String) : ProfileDetailsNavEvent()
 }
