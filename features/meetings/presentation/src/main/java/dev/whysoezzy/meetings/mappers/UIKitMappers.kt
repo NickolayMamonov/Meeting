@@ -6,24 +6,22 @@ import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
 import com.whysoezzy.domain.models.MeetingInfo
-import com.whysoezzy.domain.models.MeetingStatus
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.Tag
-import com.whysoezzy.domain.models.TagState
+import dev.whysoezzy.uikit.mappers.toUIKitMeetingStatus
+import dev.whysoezzy.uikit.mappers.toUIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunity
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitHost
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
-import dev.whysoezzy.uikit.models.UIKitMeetingStatus
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 import dev.whysoezzy.uikit.models.UIKitTag
-import dev.whysoezzy.uikit.models.UIKitTagState
 
 // ─── Address ─────────────────────────────────────────────────────────────────
 
@@ -63,31 +61,13 @@ fun List<Tag>.toUIKit(
     isEnabled: Boolean = true
 ) = map { it.toUIKit(isSelected, isEnabled) }
 
-fun TagState.toUIKitTagState(): UIKitTagState = when (this) {
-    TagState.ACTIVE -> UIKitTagState.ACTIVE
-    TagState.INACTIVE -> UIKitTagState.INACTIVE
-    TagState.SELECTED -> UIKitTagState.SELECTED
-    TagState.DISABLED -> UIKitTagState.DISABLED
-}
 
-fun MeetingTag.toUIKitMeetingTag() = UIKitMeetingTag(
-    id = id,
-    text = text,
-    state = state.toUIKitTagState()
-)
+
+
 
 fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> =
     filterNotNull().map { it.toUIKitMeetingTag() }
 
-// ─── Meeting status ───────────────────────────────────────────────────────────
-
-fun MeetingStatus.toUIKitMeetingStatus(): UIKitMeetingStatus = when (this) {
-    MeetingStatus.ACTIVE -> UIKitMeetingStatus.ACTIVE
-    MeetingStatus.COMPLETED -> UIKitMeetingStatus.COMPLETED
-    MeetingStatus.CANCELLED -> UIKitMeetingStatus.CANCELLED
-    MeetingStatus.FULL -> UIKitMeetingStatus.FULL
-    MeetingStatus.DRAFT -> UIKitMeetingStatus.DRAFT
-}
 
 // ─── Hosts ────────────────────────────────────────────────────────────────────
 
@@ -167,53 +147,43 @@ fun MeetingInfo.toUIKitAddress() = UIKitAddress(
 
 fun CommunityInfo.toUIKitCommunityInfo(
     isSubscribed: Boolean = false,
-    onSubscribeClick: (Boolean) -> Unit = {},
-    onCardClick: (() -> Unit)? = null
 ) = UIKitCommunityInfo(
     id = id,
     title = name,
     imageUrl = imageUrl,
     isSubscribed = isSubscribed,
-    onSubscribeClick = onSubscribeClick,
-    onCardClick = onCardClick
+
 )
 
 /**
  * Community (полная модель с isSubscribed от бэкенда) → UIKitCommunityInfo.
  * isSubscribed берётся из самой модели, не из внешнего Set.
  */
-fun Community.toUIKitCommunityInfo(
-    onSubscribeClick: (Boolean) -> Unit = {},
-    onCardClick: (() -> Unit)? = null
-) = UIKitCommunityInfo(
+fun Community.toUIKitCommunityInfo() = UIKitCommunityInfo(
     id = id,
     title = name,
     imageUrl = imageUrl,
-    isSubscribed = isSubscribed,
-    onSubscribeClick = onSubscribeClick,
-    onCardClick = onCardClick
+    isSubscribed = isSubscribed
 )
 
 /** Маппер для List<Community> — isSubscribed из модели, callbacks через DI */
-fun List<Community>.toUIKitCommunityInfoList(
-    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
-    onCardClick: ((Long) -> Unit)? = null
-): List<UIKitCommunityInfo> = map { community ->
-    community.toUIKitCommunityInfo(
-        onSubscribeClick = { isSubscribed -> onSubscribeClick(community.id, isSubscribed) },
-        onCardClick = onCardClick?.let { { it(community.id) } }
+fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map { community ->
+    UIKitCommunityInfo(
+        id = community.id,
+        title = community.name,
+        imageUrl = community.imageUrl,
+        isSubscribed = community.isSubscribed
     )
 }
 
+
 /** Маппер для List<CommunityInfo> — isSubscribed из внешнего Set */
 fun List<CommunityInfo>.toUIKitCommunityInfoList(
-    subscribedIds: Set<Long> = emptySet(),
-    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
-    onCardClick: ((Long) -> Unit)? = null
-): List<UIKitCommunityInfo> = map { community ->
-    community.toUIKitCommunityInfo(
-        isSubscribed = community.id in subscribedIds,
-        onSubscribeClick = { isSubscribed -> onSubscribeClick(community.id, isSubscribed) },
-        onCardClick = onCardClick?.let { { it(community.id) } }
-    )
+    subscribedIds: Set<Long> = emptySet()
+): List<UIKitCommunityInfo> {
+    return map { community ->
+        community.toUIKitCommunityInfo(
+            isSubscribed = subscribedIds.contains(community.id)
+        )
+    }
 }

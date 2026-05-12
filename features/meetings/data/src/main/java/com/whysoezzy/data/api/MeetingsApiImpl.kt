@@ -67,11 +67,6 @@ class MeetingsApiImpl(private val client: HttpClient) {
         return client.get("user/meetings").body()
     }
 
-    /** GET /communities/{id}/meetings */
-    suspend fun getEventsByCommunity(communityId: Long): List<MeetingDto> {
-        return client.get("communities/$communityId/meetings").body()
-    }
-
     /** GET /api/ads */
     suspend fun getAdBlocks(): List<AdBlockResponseDto> {
         return client.get("/api/ads").body()

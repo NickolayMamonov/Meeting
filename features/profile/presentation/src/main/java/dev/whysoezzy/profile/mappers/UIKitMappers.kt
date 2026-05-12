@@ -4,7 +4,6 @@ import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.CommunityHost
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
-import com.whysoezzy.domain.models.MeetingStatus
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.models.PersonHost
@@ -13,12 +12,12 @@ import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.TagState
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
-import dev.whysoezzy.uikit.models.UIKitMeetingStatus
-import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunity
 import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
+import dev.whysoezzy.uikit.mappers.toUIKitMeetingStatus
+import dev.whysoezzy.uikit.mappers.toUIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitPersonHost
@@ -26,29 +25,6 @@ import dev.whysoezzy.uikit.models.UIKitSocialMedia
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 import java.text.SimpleDateFormat
 import java.util.*
-
-fun TagState.toUIKitTagState(): UIKitTagState = when (this) {
-    TagState.ACTIVE -> UIKitTagState.ACTIVE
-    TagState.INACTIVE -> UIKitTagState.INACTIVE
-    TagState.SELECTED -> UIKitTagState.SELECTED
-    TagState.DISABLED -> UIKitTagState.DISABLED
-}
-
-fun MeetingStatus.toUIKitMeetingStatus(): UIKitMeetingStatus = when (this) {
-    MeetingStatus.ACTIVE -> UIKitMeetingStatus.ACTIVE
-    MeetingStatus.COMPLETED -> UIKitMeetingStatus.COMPLETED
-    MeetingStatus.CANCELLED -> UIKitMeetingStatus.CANCELLED
-    MeetingStatus.FULL -> UIKitMeetingStatus.FULL
-    MeetingStatus.DRAFT -> UIKitMeetingStatus.DRAFT
-}
-
-fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag {
-    return UIKitMeetingTag(
-        id = id,
-        text = text,
-        state = state.toUIKitTagState()
-    )
-}
 
 fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> {
     return filterNotNull().map { it.toUIKitMeetingTag() }

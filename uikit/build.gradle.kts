@@ -37,6 +37,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:domain"))
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)

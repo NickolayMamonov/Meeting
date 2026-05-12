@@ -14,6 +14,5 @@ interface MeetingsRepository {
     suspend fun joinMeeting(meetingId: Long): Result<Unit>
     suspend fun leaveMeeting(meetingId: Long): Result<Unit>
     suspend fun getUserMeetings(): Result<List<Meeting>>
-    suspend fun getEventsByCommunity(communityId: Long): Result<List<Meeting>>
     suspend fun getAdBlocks(): Result<List<AdBlock>>
 }

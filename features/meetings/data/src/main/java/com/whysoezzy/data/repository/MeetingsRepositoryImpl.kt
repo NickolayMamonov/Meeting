@@ -1,7 +1,6 @@
 package com.whysoezzy.data.repository
 
 import com.whysoezzy.data.api.MeetingsApiImpl
-import com.whysoezzy.data.mapper.MeetingMapper
 import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.Meeting
@@ -10,29 +9,28 @@ import com.whysoezzy.domain.repository.MeetingsRepository
 import com.whysoezzy.network.safeApiCall
 
 class MeetingsRepositoryImpl(
-    private val meetingsApi: MeetingsApiImpl,
-    private val meetingMapper: MeetingMapper,
+    private val meetingsApi: MeetingsApiImpl
 ) : MeetingsRepository {
 
     override suspend fun getHeroEvents(): Result<List<Meeting>> = safeApiCall {
-        meetingsApi.getHeroEvents().map { meetingMapper.toDomain(it) }
+        meetingsApi.getHeroEvents().map { it.toDomain() }
     }
 
     override suspend fun getPopularEvents(): Result<List<Meeting>> = safeApiCall {
-        meetingsApi.getPopularEvents().map { meetingMapper.toDomain(it) }
+        meetingsApi.getPopularEvents().map { it.toDomain() }
     }
 
     override suspend fun getAllEvents(page: Int, limit: Int, tagId: Long?): Result<List<Meeting>> = safeApiCall {
         meetingsApi.getAllEvents(page = page, limit = limit, tagId = tagId)
-            .map { meetingMapper.toDomain(it) }
+            .map { it.toDomain() }
     }
 
     override suspend fun searchEvents(query: String): Result<List<Meeting>> = safeApiCall {
-        meetingsApi.searchEvents(query).map { meetingMapper.toDomain(it) }
+        meetingsApi.searchEvents(query).map { it.toDomain() }
     }
 
     override suspend fun getMeetingById(id: Long): Result<Meeting> = safeApiCall {
-        meetingMapper.toDomain(meetingsApi.getMeetingsById(id))
+        meetingsApi.getMeetingsById(id).toDomain()
     }
 
     override suspend fun getMeetingParticipants(meetingId: Long): Result<List<Person>> = safeApiCall {
@@ -57,12 +55,7 @@ class MeetingsRepositoryImpl(
     }
 
     override suspend fun getUserMeetings(): Result<List<Meeting>> = safeApiCall {
-        meetingsApi.getUserMeetings().map { meetingMapper.toDomain(it) }
-    }
-
-    override suspend fun getEventsByCommunity(communityId: Long): Result<List<Meeting>> = safeApiCall {
-        meetingsApi.getEventsByCommunity(communityId = communityId)
-            .map { meetingMapper.toDomain(it) }
+        meetingsApi.getUserMeetings().map { it.toDomain() }
     }
 
     override suspend fun getAdBlocks(): Result<List<AdBlock>> = safeApiCall {
