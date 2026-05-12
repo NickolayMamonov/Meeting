@@ -350,26 +350,6 @@ private fun ErrorContent(
     }
 }
 
-private fun openMapIntent(context: Context, lat: Double, lng: Double, address: String) {
-    val uri = "geo:$lat,$lng?q=$lat,$lng(${Uri.encode(address)})".toUri()
-    val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
-        setPackage("com.google.android.apps.maps")
-    }
-    if (mapIntent.resolveActivity(context.packageManager) != null) {
-        context.startActivity(mapIntent)
-    } else {
-        context.startActivity(Intent(Intent.ACTION_VIEW, "geo:$lat,$lng".toUri()))
-    }
-}
-
-private fun shareIntent(context: Context, title: String, text: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, title)
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, "Поделиться встречей"))
-}
 
 @Preview
 @Composable
