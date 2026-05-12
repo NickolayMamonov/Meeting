@@ -58,7 +58,6 @@ fun MainScreen(
     onUserProfileClick: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.navEvent.collect { event ->
@@ -72,7 +71,7 @@ fun MainScreen(
     Scaffold(
         topBar = {
             MainScreenTopBar(
-                searchQuery = searchQuery,
+                searchQuery = (uiState as? MainScreenUiState.Success)?.searchQuery ?: "",
                 onSearchQueryChange = { query ->
                     viewModel.onEvent(MainScreenEvent.Search(query))
                 },

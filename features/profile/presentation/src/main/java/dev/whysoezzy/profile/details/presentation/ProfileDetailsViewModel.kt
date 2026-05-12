@@ -99,17 +99,8 @@ class ProfileDetailsViewModel(
                         socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
                         userMeetings = meetings.map { it.toUIKitMeetingInfo() },
                         userCommunities = communities.toUIKitCommunityInfoList(
-                            subscribedIds = subscribedIds,
-                            onSubscribeClick = { id, sub ->
-                                handleToggleCommunitySubscription(id, sub)
-                            },
-                            onCardClick = { id ->
-                                viewModelScope.launch {
-                                    _navEvent.emit(ProfileDetailsNavEvent.NavigateToCommunity(id))
-                                }
-                            }
+                            subscribedIds = subscribedIds
                         ),
-                        subscribedCommunityIds = subscribedIds
                     )
                 }
         }
@@ -142,12 +133,11 @@ class ProfileDetailsViewModel(
 
     private fun handleToggleCommunitySubscription(communityId: Long, isSubscribed: Boolean) {
         val currentState = _uiState.value as? ProfileDetailsUiState.Success ?: return
-        val updatedSubscriptions = if (isSubscribed) {
-            currentState.subscribedCommunityIds + communityId
-        } else {
-            currentState.subscribedCommunityIds - communityId
+        val updatedSubscriptions = currentState.userCommunities.map { community ->
+            if(community.id == communityId) community.copy(isSubscribed = isSubscribed)
+            else community
         }
-        _uiState.value = currentState.copy(subscribedCommunityIds = updatedSubscriptions)
+        _uiState.value = currentState.copy(userCommunities = updatedSubscriptions)
         // TODO: фаза 3.2 — синхронизировать с API
     }
 }

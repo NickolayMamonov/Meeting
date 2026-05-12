@@ -8,7 +8,7 @@ import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 
 sealed class MeetingDetailsUiState {
-    object Loading : MeetingDetailsUiState()
+    data object Loading : MeetingDetailsUiState()
 
     data class Success(
         val meetingId: Long,
@@ -32,11 +32,11 @@ sealed class MeetingDetailsUiState {
 
 sealed class MeetingDetailsEvent {
     data class LoadMeeting(val meetingId: Long) : MeetingDetailsEvent()
-    object JoinMeeting : MeetingDetailsEvent()
-    object LeaveMeeting : MeetingDetailsEvent()
+    data object JoinMeeting : MeetingDetailsEvent()
+    data object LeaveMeeting : MeetingDetailsEvent()
     data class NavigateToProfile(val userId: Long) : MeetingDetailsEvent()
     data class NavigateToCommunity(val communityId: Long) : MeetingDetailsEvent()
     data class NavigateToMeeting(val meetingId: Long) : MeetingDetailsEvent()
-    object OpenMap : MeetingDetailsEvent()
-    object ShareMeeting : MeetingDetailsEvent()
+    data object OpenMap : MeetingDetailsEvent()
+    data object ShareMeeting : MeetingDetailsEvent()
 }

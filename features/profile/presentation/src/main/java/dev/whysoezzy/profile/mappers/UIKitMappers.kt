@@ -120,14 +120,24 @@ fun Map<SocialMediaType, String>.toUIKitSocialMediaInfoList(): List<UIKitSocialM
 }
 
 fun CommunityInfo.toUIKitCommunityInfo(
-    isSubscribed: Boolean = false,
+    isSubscribed: Boolean = false
 ): UIKitCommunityInfo {
     return UIKitCommunityInfo(
         id = id,
         title = name,
         imageUrl = imageUrl,
-        isSubscribed = isSubscribed,
+        isSubscribed = isSubscribed
     )
+}
+
+fun List<CommunityInfo>.toUIKitCommunityInfoList(
+    subscribedIds: Set<Long> = emptySet()
+): List<UIKitCommunityInfo> {
+    return map { community ->
+        community.toUIKitCommunityInfo(
+            isSubscribed = subscribedIds.contains(community.id)
+        )
+    }
 }
 
 fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map { community ->

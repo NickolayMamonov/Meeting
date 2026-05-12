@@ -7,7 +7,7 @@ import dev.whysoezzy.uikit.models.UIKitMeetingTag
 
 
 sealed class MainScreenUiState {
-    object Loading : MainScreenUiState()
+    data object Loading : MainScreenUiState()
 
     data class Success(
         val heroMeetings: List<UIKitMeetingInfo>,
@@ -15,7 +15,8 @@ sealed class MainScreenUiState {
         val allMeetings: List<UIKitMeetingInfo>,
         val categories: List<UIKitMeetingTag>,
         val communities: List<UIKitCommunityInfo>,
-        val adBlocks: List<AdBlock> = emptyList()
+        val adBlocks: List<AdBlock> = emptyList(),
+        val searchQuery: String = ""
     ) : MainScreenUiState()
 
     data class Error(val message: String) : MainScreenUiState()

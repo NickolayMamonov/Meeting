@@ -3,7 +3,7 @@ package dev.whysoezzy.meetings.participants.presentation
 import com.whysoezzy.domain.models.Person
 
 sealed class MeetingParticipantsUiState {
-    object Loading : MeetingParticipantsUiState()
+    data object Loading : MeetingParticipantsUiState()
     data class Success(
         val meetingTitle: String,
         val participants: List<Person>
