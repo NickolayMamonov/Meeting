@@ -19,7 +19,6 @@ sealed class ProfileDetailsUiState {
         val socialMedias: List<UIKitSocialMediaInfo>,
         val userMeetings: List<UIKitMeetingInfo>,
         val userCommunities: List<UIKitCommunityInfo>,
-        val subscribedCommunityIds: Set<Long> = emptySet()
     ) : ProfileDetailsUiState()
 
     data class Error(val message: String) : ProfileDetailsUiState()
