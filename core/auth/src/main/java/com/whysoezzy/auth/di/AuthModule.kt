@@ -27,18 +27,17 @@ val authModule = module {
 
     single(qualifier = named("authorizedClient")) {
         val tokenManager: TokenManager = get()
-        val authRepo = lazy { get<AuthRepository>() }
 
         KtorNetworkModule.provideHttpClient(
             tokenProvider = tokenManager,
             onRefreshToken = {
                 try {
-                    val newAccessToken = authRepo.value.refreshToken().getOrNull()
+                    val authRepo = get<AuthRepository>()
+                    val newAccessToken = authRepo.refreshToken().getOrNull()
                     if (newAccessToken != null) {
                         val refresh = tokenManager.getRefreshToken() ?: ""
                         Pair(newAccessToken, refresh)
                     } else {
-                        // refresh token также протух — очищаем сессию
                         tokenManager.clearTokens()
                         null
                     }
