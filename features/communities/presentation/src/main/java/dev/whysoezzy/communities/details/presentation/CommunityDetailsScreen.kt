@@ -184,7 +184,7 @@ private fun CommunityDetailsContent(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
                 contentPadding = PaddingValues(vertical = SpacingTokens.XS)
             ) {
-                items(state.tags) { tag ->
+                items(state.tags, key = {it.id}) { tag ->
                     UIKitTag(text = tag.text, size = UIKitTagSize.MEDIUM)
                 }
             }
@@ -223,7 +223,7 @@ private fun CommunityDetailsContent(
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
             }
 
-            items(state.activeMeetings) { meeting ->
+            items(state.activeMeetings, key = {it.id}) { meeting ->
                 UIKitEventCard(
                     imageUrl = meeting.imageUrl,
                     title = meeting.title,
@@ -253,7 +253,7 @@ private fun CommunityDetailsContent(
 
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-                    items(state.pastMeetings) { meeting ->
+                    items(state.pastMeetings, key = {it.id}) { meeting ->
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,

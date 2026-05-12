@@ -299,7 +299,7 @@ private fun MeetingContent(
                 Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
                     TextHeading2(text = "Другие встречи сообщества")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-                        items(uiState.otherMeetings) { meeting ->
+                        items(uiState.otherMeetings, key = {it.id}) { meeting ->
                             UIKitEventCard(
                                 imageUrl = meeting.imageUrl,
                                 title = meeting.title,

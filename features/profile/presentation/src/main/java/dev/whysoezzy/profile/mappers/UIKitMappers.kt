@@ -1,5 +1,6 @@
 package dev.whysoezzy.profile.mappers
 
+import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.CommunityHost
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
@@ -120,60 +121,23 @@ fun Map<SocialMediaType, String>.toUIKitSocialMediaInfoList(): List<UIKitSocialM
 
 fun CommunityInfo.toUIKitCommunityInfo(
     isSubscribed: Boolean = false,
-    onSubscribeClick: (Boolean) -> Unit = {},
-    onCardClick: (() -> Unit)? = null
 ): UIKitCommunityInfo {
     return UIKitCommunityInfo(
         id = id,
         title = name,
         imageUrl = imageUrl,
         isSubscribed = isSubscribed,
-        onSubscribeClick = onSubscribeClick,
-        onCardClick = onCardClick
     )
 }
 
-fun List<CommunityInfo>.toUIKitCommunityInfoList(
-    subscribedIds: Set<Long> = emptySet(),
-    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
-    onCardClick: ((Long) -> Unit)? = null
-): List<UIKitCommunityInfo> {
-    return map { community ->
-        community.toUIKitCommunityInfo(
-            isSubscribed = subscribedIds.contains(community.id),
-            onSubscribeClick = { isSubscribed ->
-                onSubscribeClick(community.id, isSubscribed)
-            },
-            onCardClick = onCardClick?.let { { it(community.id) } }
-        )
-    }
+fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map { community ->
+    UIKitCommunityInfo(
+        id = community.id,
+        title = community.name,
+        imageUrl = community.imageUrl,
+        isSubscribed = community.isSubscribed
+    )
 }
-
-//fun User.toProfileUiState(
-//    isOwnProfile: Boolean,
-//    subscribedCommunityIds: Set<Long>,
-//    onCommunitySubscribe: (Long, Boolean) -> Unit,
-//    onCommunityClick: (Long) -> Unit,
-//    onMeetingClick: (Long) -> Unit
-//): ProfileDetailsUiState.Success {
-//    return ProfileDetailsUiState.Success(
-//        userId = id,
-//        name = name,
-//        surname = surname,
-//        email = email,
-//        description = bio,
-//        avatarUrl = avatar,
-//        isOwnProfile = isOwnProfile,
-//        socialMedias = socialMedia.toUIKitSocialMediaInfoList(),
-//        userMeetings = participatingMeetings.map { it.toUIKitMeetingInfo() },
-//        userCommunities = subscribedCommunities.toUIKitCommunityInfoList(
-//            subscribedIds = subscribedCommunityIds,
-//            onSubscribeClick = onCommunitySubscribe,
-//            onCardClick = onCommunityClick
-//        ),
-//        subscribedCommunityIds = subscribedCommunityIds
-//    )
-//}
 
 private fun extractUsername(url: String): String {
     return url.substringAfterLast('/').substringBefore('?')

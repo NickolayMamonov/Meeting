@@ -150,7 +150,7 @@ fun ProfileEditScreen(
                         Text("Загрузка тегов…")
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                            items(uiState.availableTags.entries.toList()) { (tagId, tagName) ->
+                            items(uiState.availableTags.entries.toList(), key = { (tagId, _) -> tagId }) { (tagId, tagName) ->
                                 val isSelected = uiState.interests.contains(tagName)
                                 Row(
                                     modifier = Modifier
