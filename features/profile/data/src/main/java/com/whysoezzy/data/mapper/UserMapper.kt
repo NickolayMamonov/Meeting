@@ -117,10 +117,10 @@ class UserMapper {
         if (dateStr.isBlank()) return 0L
 
         val isoFormats = listOf(
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()),
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()),
-            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()),
-            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT),
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT),
+            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT),
+            SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
         )
 
         for (fmt in isoFormats) {
