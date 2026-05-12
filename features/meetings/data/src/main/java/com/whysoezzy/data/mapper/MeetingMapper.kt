@@ -68,7 +68,7 @@ class MeetingMapper {
                     surname = personDto.surname,
                     avatarUrl = personDto.imageUrl ?: "",
                     bio = personDto.bio ?: "",
-                    role = personDto.bio ?: "Не указано"
+                    role = personDto.role?.takeIf { it.isNotBlank() } ?: "Не указано"
                 )
             },
             meetingStatus = mapMeetingStatus(dto.meetingStatus),
