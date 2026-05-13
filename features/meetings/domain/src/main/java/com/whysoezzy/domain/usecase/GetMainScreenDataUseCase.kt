@@ -2,7 +2,6 @@ package com.whysoezzy.domain.usecase
 
 import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.MainScreenData
-import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.repository.MeetingsRepository
@@ -14,12 +13,14 @@ import kotlinx.coroutines.coroutineScope
  * Принимает лямбду для загрузки сообществ (чтобы избежать зависимости meetings -> communities).
  * Принимает лямбду для загрузки тегов (чтобы избежать зависимости meetings -> profile).
  */
+
+typealias GetCommunitiesAction = suspend () -> Result<List<Community>>
+
 class GetMainScreenDataUseCase(
     private val meetingsRepository: MeetingsRepository,
     private val getHeroMeetingsUseCase: GetHeroMeetingsUseCase,
     private val getPopularMeetingsUseCase: GetPopularMeetingsUseCase,
-    private val getCommunities: suspend () -> Result<List<Community>> = { Result.success(emptyList()) },
-//    private val getTags: suspend () -> Result<List<MeetingTag>> = { Result.success(emptyList()) }
+    private val getCommunities: GetCommunitiesAction
 ) {
     suspend operator fun invoke(): Result<MainScreenData> {
         return try {
