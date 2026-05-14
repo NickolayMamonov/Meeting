@@ -20,9 +20,10 @@ class MeetingsRepositoryImpl(
         meetingsApi.getPopularEvents().map { it.toDomain() }
     }
 
+    // TODO: реализовать пагинацию через Paging 3 когда объём данных потребует этого
     override suspend fun getAllEvents(page: Int, limit: Int, tagId: Long?): Result<List<Meeting>> = safeApiCall {
-        meetingsApi.getAllEvents(page = page, limit = limit, tagId = tagId)
-            .map { it.toDomain() }
+        meetingsApi.getAllEvents(page = page, limit = limit, tagId = tagId).map { it.toDomain() }
+
     }
 
     override suspend fun searchEvents(query: String): Result<List<Meeting>> = safeApiCall {
