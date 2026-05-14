@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -54,7 +55,9 @@ fun UIKitUserProfileBlock(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(coverHeight.dp),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = ColorPainter(ColorTokens.NeutralLine),
+                error = ColorPainter(ColorTokens.NeutralLine)
             )
         } else {
             // Заглушка без фото — фон с инициалами по центру
