@@ -21,9 +21,7 @@ val mainFeatureModule = module {
             meetingsRepository = get(),
             getHeroMeetingsUseCase = get<GetHeroMeetingsUseCase>(),
             getPopularMeetingsUseCase = get<GetPopularMeetingsUseCase>(),
-            getCommunities = {
-                get<GetRecommendedCommunitiesUseCase>().invoke()
-            }
+            getCommunities = { get<GetRecommendedCommunitiesUseCase>().invoke()}
         )
     }
 
