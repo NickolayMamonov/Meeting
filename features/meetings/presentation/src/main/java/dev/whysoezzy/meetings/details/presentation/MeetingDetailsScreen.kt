@@ -370,6 +370,8 @@ private fun MeetingDetailsScreenPreview() {
                 title = "Мастер-класс по Compose",
                 date = "20 декабря 2024, 18:00",
                 address = "ул. Пушкина, 10",
+                latitude = 0.0,
+                longitude = 0.0,
                 tags = mockTags,
                 meetingStatus = UIKitMeetingStatus.ACTIVE
             )
