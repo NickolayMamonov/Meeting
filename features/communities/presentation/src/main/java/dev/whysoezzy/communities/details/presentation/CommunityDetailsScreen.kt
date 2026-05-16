@@ -233,9 +233,9 @@ private fun CommunityDetailsContent(
                     title = meeting.title,
                     date = meeting.date,
                     address = UIKitAddress(
-                        address = meeting.address.,
-                        latitude = meeting.address.latitude,
-                        longitude = meeting.address.longitude
+                        address = meeting.address,
+                        latitude = meeting.latitude,
+                        longitude = meeting.longitude
                     ),
                     tags = meeting.tags.map { tag ->
                         UIKitEventCardTag(text = tag.text, isSelected = true, isEnabled = false)
@@ -263,9 +263,9 @@ private fun CommunityDetailsContent(
                             title = meeting.title,
                             date = meeting.date,
                             address = UIKitAddress(
-                                address = meeting.address.address,
-                                latitude = meeting.address.latitude,
-                                longitude = meeting.address.longitude
+                                address = meeting.address,
+                                latitude = meeting.latitude,
+                                longitude = meeting.longitude
                             ),
                             tags = meeting.tags.map { tag ->
                                 UIKitEventCardTag(
@@ -303,7 +303,7 @@ private fun SubscribersSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             UIKitOverlappingAvatars(
-                avatarUrls = state.subscribers.map { it.avatarUrl },
+                avatarUrls = state.subscribers.map { it.avatar },
                 avatarSize = 40.dp,
                 maxVisibleAvatars = 5,
                 showCount = true

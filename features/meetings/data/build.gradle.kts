@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.whysoezzy.data"
+    namespace = "com.whysoezzy.meetings.data"
     compileSdk = 36
 
     defaultConfig {

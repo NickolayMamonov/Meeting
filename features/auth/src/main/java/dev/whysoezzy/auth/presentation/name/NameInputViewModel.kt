@@ -2,9 +2,7 @@ package dev.whysoezzy.auth.presentation.name
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.whysoezzy.data.api.UserApiImpl
-import com.whysoezzy.data.dto.UpdateUserDto
-import com.whysoezzy.network.safeApiCall
+import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,7 +22,7 @@ sealed class NameInputNavEvent {
  * Здесь просто обновляем имя/фамилию через PUT /profile.
  */
 class NameInputViewModel(
-    private val userApi: UserApiImpl
+    private val userProfilerUpdater: UserProfilerUpdater
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NameInputUiState())
@@ -82,22 +80,10 @@ class NameInputViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, nameError = null)
 
-            safeApiCall {
-                userApi.updateUserProfile(
-                    UpdateUserDto(
-                        name = _uiState.value.name,
-                        surname = _uiState.value.surname
-                    )
-                )
-            }.onSuccess {
-                _uiState.value = _uiState.value.copy(isLoading = false, isSubmitted = true)
-                _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
-            }.onFailure {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    nameError = "Не удалось сохранить имя. Попробуйте ещё раз."
-                )
-            }
+            userProfilerUpdater.updateName(
+                name = _uiState.value.name,
+                surname = _uiState.value.surname
+            )
         }
     }
 }

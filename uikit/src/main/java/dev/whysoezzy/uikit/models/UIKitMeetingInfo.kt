@@ -6,6 +6,8 @@ data class UIKitMeetingInfo(
     val imageUrl: String,
     val date: String,
     val address: String,
+    val latitude: Double,
+    val longitude: Double,
     val tags: List<UIKitMeetingTag>,
     val meetingStatus: UIKitMeetingStatus? = null
 )
