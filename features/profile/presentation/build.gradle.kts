@@ -40,11 +40,8 @@ dependencies {
     // UIKit
     implementation(project(":uikit"))
     implementation(project(":features:profile:domain"))
-    implementation(project(":features:profile:data"))
     implementation(project(":core:domain"))
     implementation(project(":core:auth"))
-
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // Koin for DI
     implementation(platform(libs.koin.bom))
@@ -58,7 +55,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-//    implementation(libs.androidx.lifecycle.runtime.compose.android)
+    implementation(libs.androidx.lifecycle.runtime.compose.android)
 
     // Core Android
     implementation(libs.androidx.core.ktx)

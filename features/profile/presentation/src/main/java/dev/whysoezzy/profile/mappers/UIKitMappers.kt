@@ -193,6 +193,8 @@ fun MeetingInfo.toUIKitMeetingInfo(): UIKitMeetingInfo {
         imageUrl = imageUrl,
         date = formatDateTime(time),
         address = address,
+        latitude = 0.0,
+        longitude = 0.0,
         tags = tags.toUIKitMeetingTags(),
         meetingStatus = meetingStatus.toUIKitMeetingStatus()
     )
