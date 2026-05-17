@@ -5,9 +5,7 @@ import com.whysoezzy.domain.models.Person
 import dev.whysoezzy.uikit.mappers.toUIKitMeetingStatus
 import dev.whysoezzy.uikit.mappers.toUIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
-import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitPerson
-import dev.whysoezzy.uikit.models.UIKitTagState
 
 fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
     id = id,

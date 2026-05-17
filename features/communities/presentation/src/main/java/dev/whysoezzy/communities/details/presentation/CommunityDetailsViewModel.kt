@@ -2,8 +2,6 @@ package dev.whysoezzy.communities.details.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.whysoezzy.domain.models.MeetingTag
-import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunityMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
@@ -13,7 +11,6 @@ import com.whysoezzy.network.toUserMessage
 import dev.whysoezzy.communities.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.communities.mappers.toUIKitPerson
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
-import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitTagState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
