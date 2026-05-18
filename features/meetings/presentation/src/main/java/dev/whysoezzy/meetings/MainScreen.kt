@@ -48,7 +48,7 @@ import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitTagState
 import org.koin.androidx.compose.koinViewModel
-
+private const val AD_BLOCK_INTERVAL = 3
 @Composable
 fun MainScreen(
     viewModel: MainScreenViewModel = koinViewModel(),
@@ -398,7 +398,7 @@ private fun buildMeetingsWithAdsList(
     meetings.forEachIndexed { index, meeting ->
         result.add(MeetingOrAd.Meeting(meeting))
         // После каждой 3-й встречи вставляем рекламу
-        if ((index + 1) % 3 == 0 && adIndex < adBlocks.size) {
+        if ((index + 1) % AD_BLOCK_INTERVAL == 0 && adIndex < adBlocks.size) {
             result.add(MeetingOrAd.Ad(adBlocks[adIndex]))
             adIndex++
         }

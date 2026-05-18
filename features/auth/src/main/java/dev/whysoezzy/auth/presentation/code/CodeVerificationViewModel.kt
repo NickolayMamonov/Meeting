@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
 import com.whysoezzy.auth.domain.usecase.VerifyOtpUseCase
-import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -15,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.times
+
 
 sealed class CodeVerificationNavEvent {
     /** Пользователь существующий — сразу в Main */
@@ -28,6 +29,11 @@ class CodeVerificationViewModel(
     private val verifyOtpUseCase: VerifyOtpUseCase,
     private val sendOtpUseCase: SendOtpUseCase
 ) : ViewModel() {
+    companion object {
+        private const val OTP_RESEND_TIMEOUT_SECONDS = 60
+        private const val TIMER_POLL_INTERVAL_MS = 200L
+        private const val TIMER_DURATION_MS = OTP_RESEND_TIMEOUT_SECONDS * 1000L
+    }
 
     private val _uiState = MutableStateFlow(CodeVerificationUiState())
     val uiState: StateFlow<CodeVerificationUiState> = _uiState.asStateFlow()
@@ -97,7 +103,7 @@ class CodeVerificationViewModel(
             sendOtpUseCase(phoneNumber)
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
-                        remainingTime = 60,
+                        remainingTime = OTP_RESEND_TIMEOUT_SECONDS,
                         canResend = false,
                         code = ""
                     )
@@ -115,7 +121,8 @@ class CodeVerificationViewModel(
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
             val startTime = System.currentTimeMillis()
-            val durationMs = 60_000L
+            val durationMs = TIMER_DURATION_MS
+
             while (true){
                 val elapsed = System.currentTimeMillis() - startTime
                 val remaining = ((durationMs - elapsed) / 1000).toInt().coerceAtLeast(0)
@@ -124,7 +131,7 @@ class CodeVerificationViewModel(
                     canResend = remaining <= 0
                 )
                 if (remaining <= 0) break
-                delay(200L)
+                delay(TIMER_POLL_INTERVAL_MS)
             }
         }
     }
