@@ -14,9 +14,18 @@ import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class UserMapper {
+
+    private val isoFormatters = listOf(
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    )
 
     fun toDomain(dto: UserProfileDto): User {
         return User(
@@ -113,22 +122,14 @@ class UserMapper {
      * Парсим строки вида "15 декабря 2024, 19:00" или ISO "2024-12-15T19:00:00".
      * Если не распарсить — возвращаем 0L.
      */
-    private fun parseDateToTimestamp(dateStr: String): Long {
-        if (dateStr.isBlank()) return 0L
-
-        val isoFormats = listOf(
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT),
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT),
-            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT),
-            SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
-        )
-
-        for (fmt in isoFormats) {
+    fun parseDateToTimestamp(dateString: String?): Long {
+        if (dateString.isNullOrBlank()) return 0L
+        for (formatter in isoFormatters) {
             try {
-                return fmt.parse(dateStr)?.time ?: continue
+                return LocalDateTime.parse(dateString, formatter)
+                    .toEpochSecond(java.time.ZoneOffset.UTC) * 1000
             } catch (_: Exception) { }
         }
-
         return 0L
     }
 }
