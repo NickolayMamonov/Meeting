@@ -39,7 +39,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
-    implementation(project(":core:auth"))
 
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
