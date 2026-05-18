@@ -3,6 +3,7 @@ package dev.whysoezzy.meetings.details.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
+import com.whysoezzy.common.utils.AddressUtils.extractMetroFromAddress
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
@@ -153,11 +154,5 @@ class MeetingDetailsViewModel(
         }
     }
 
-    private fun extractMetroFromAddress(address: String): String {
-        return if (address.contains("М.")) {
-            address.substringAfter("М.").substringBefore(",").trim()
-        } else {
-            "Не указано"
-        }
-    }
+
 }
