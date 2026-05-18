@@ -42,7 +42,6 @@ dependencies {
     implementation(project(":core:auth"))
     implementation(project(":core:common"))
 
-    implementation(libs.androidx.lifecycle.runtime.compose.android)
 
     // Koin for DI
     implementation(platform(libs.koin.bom))
