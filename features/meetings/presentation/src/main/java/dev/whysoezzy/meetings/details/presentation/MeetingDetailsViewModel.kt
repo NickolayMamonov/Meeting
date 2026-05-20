@@ -130,7 +130,7 @@ class MeetingDetailsViewModel(
     private fun openMap() {
         val state = _uiState.value as? MeetingDetailsUiState.Success ?: return
         viewModelScope.launch {
-            if (state.address.latitude != 0.0 && state.address.latitude != 0.0) {
+            if (state.address.latitude != 0.0 && state.address.longitude != 0.0) {
                 _navEvent.emit(
                     MeetingDetailsNavEvent.OpenMap(
                         latitude = state.address.latitude,
