@@ -11,6 +11,3 @@ kotlin {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
 }
-dependencies{
-    implementation(project(":core:network"))
-}
