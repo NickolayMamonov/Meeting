@@ -48,7 +48,6 @@ dependencies {
     implementation(libs.ktor.client.logging)
     implementation(libs.ktor.client.auth)
     api(libs.kotlinx.serialization.json)
-    implementation(project(":core:common"))
 
     // Desugaring for LocalDateTime
     coreLibraryDesugaring(libs.desugar.jdk.libs)
