@@ -29,6 +29,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
@@ -64,6 +65,7 @@ dependencies {
 
     implementation(project(":uikit"))
 
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
