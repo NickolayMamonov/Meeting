@@ -3,10 +3,9 @@ package dev.whysoezzy.communities.mappers
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.Person
 import dev.whysoezzy.uikit.mappers.toUIKitMeetingStatus
+import dev.whysoezzy.uikit.mappers.toUIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
-import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitPerson
-import dev.whysoezzy.uikit.models.UIKitTagState
 
 fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
     id = id,
@@ -14,13 +13,9 @@ fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
     imageUrl = imageUrl,
     date = date,
     address = address.address,
-    tags = tags.map { tag ->
-        UIKitMeetingTag(
-            id = tag.id,
-            text = tag.text,
-            state = UIKitTagState.ACTIVE
-        )
-    },
+    latitude = address.latitude,
+    longitude = address.longitude,
+    tags = tags.map { it.toUIKitMeetingTag() },
     meetingStatus = meetingStatus.toUIKitMeetingStatus()
 )
 

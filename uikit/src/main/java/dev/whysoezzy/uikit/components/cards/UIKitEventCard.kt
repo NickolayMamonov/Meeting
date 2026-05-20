@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -25,6 +26,7 @@ import dev.whysoezzy.uikit.components.tags.UIKitTagSize
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import dev.whysoezzy.uikit.tokens.TypographyTokens
 
@@ -92,7 +94,9 @@ fun UIKitEventCard(
                 .fillMaxWidth()
                 .height(imageHeight)
                 .clip(RoundedCornerShape(BorderRadiusTokens.L)),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(ColorTokens.NeutralLine),
+            error = ColorPainter(ColorTokens.NeutralLine)
         )
 
         // Title

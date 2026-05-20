@@ -44,12 +44,12 @@ class AuthRepositoryImpl(
 
     override suspend fun refreshToken(): Result<String> {
         return safeApiCall {
-            val currentRefreshToken =
-                tokenManager.getRefreshToken() ?: throw Exception("No refresh token available")
+            val currentRefreshToken = tokenManager.getRefreshToken()
+                ?: throw Exception("No refresh token available")
             val response = authApi.refreshToken(currentRefreshToken)
             tokenManager.saveTokens(
                 accessToken = response.accessToken,
-                refreshToken = currentRefreshToken,
+                refreshToken = response.refreshToken ?: currentRefreshToken,
                 userId = tokenManager.getUserId()
             )
 

@@ -10,5 +10,6 @@ data class RefreshTokenRequest(
 
 @Serializable
 data class RefreshTokenResponse(
-    @SerialName("accessToken") val accessToken: String
+    @SerialName("accessToken") val accessToken: String,
+    @SerialName("refreshToken") val refreshToken: String? = null
 )

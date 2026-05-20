@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +63,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.whysoezzy.uikit.tokens.ColorTokens
 
 @Composable
 fun MeetingDetailsScreen(
@@ -232,7 +234,9 @@ private fun MeetingContent(
                     .fillMaxWidth()
                     .height(200.dp)
                     .clip(RoundedCornerShape(16.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = ColorPainter(ColorTokens.NeutralLine),
+                error = ColorPainter(ColorTokens.NeutralLine)
             )
         }
 
@@ -366,6 +370,8 @@ private fun MeetingDetailsScreenPreview() {
                 title = "Мастер-класс по Compose",
                 date = "20 декабря 2024, 18:00",
                 address = "ул. Пушкина, 10",
+                latitude = 0.0,
+                longitude = 0.0,
                 tags = mockTags,
                 meetingStatus = UIKitMeetingStatus.ACTIVE
             )

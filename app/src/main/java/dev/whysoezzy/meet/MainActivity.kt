@@ -29,9 +29,6 @@ class MainActivity : ComponentActivity() {
 fun MeetApp() {
     val navController = rememberNavController()
 
-    // Без Scaffold на верхнем уровне — каждый экран управляет своими WindowInsets сам.
-    // ProfileDetailsScreen / ProfileEditScreen: фото edge-to-edge + TopBar с statusBarsPadding.
-    // MainScreen и остальные: используют внутренний Scaffold, который сам добавляет нужные отступы.
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background

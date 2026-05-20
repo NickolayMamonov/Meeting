@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.di
 
+import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
 import dev.whysoezzy.auth.presentation.code.CodeVerificationViewModel
 import dev.whysoezzy.auth.presentation.name.NameInputViewModel
 import dev.whysoezzy.auth.presentation.phone.PhoneInputViewModel
@@ -22,9 +23,5 @@ val authFeatureModule = module {
         )
     }
 
-    viewModel {
-        NameInputViewModel(
-            userApi = get()
-        )
-    }
+    viewModel { NameInputViewModel(get<UserProfilerUpdater>()) }
 }

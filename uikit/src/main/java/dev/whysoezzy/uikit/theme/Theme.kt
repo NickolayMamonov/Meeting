@@ -1,15 +1,18 @@
 package dev.whysoezzy.uikit.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
 fun UIKitTheme(
-    colorScheme: UIKitColorScheme = LightColorScheme,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     typography: UIKitTypography = DefaultTypography,
     content: @Composable () -> Unit
 ) {
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+
     CompositionLocalProvider(
         LocalUIKitColorScheme provides colorScheme,
         LocalUIKitTypography provides typography

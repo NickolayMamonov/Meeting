@@ -1,9 +1,11 @@
 package com.whysoezzy.data.di
 
+import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
 import com.whysoezzy.data.api.TagsApiImpl
 import com.whysoezzy.data.api.UserApiImpl
 import com.whysoezzy.data.mapper.UserMapper
 import com.whysoezzy.data.repository.TagRepositoryImpl
+import com.whysoezzy.data.repository.UserProfileUpdaterImpl
 import com.whysoezzy.data.repository.UserRepositoryImpl
 import com.whysoezzy.domain.repository.TagRepository
 import com.whysoezzy.domain.repository.UserRepository
@@ -23,7 +25,7 @@ val profileDataModule = module {
     // APIs
     single { UserApiImpl(get(named("authorizedClient"))) }
     single { TagsApiImpl(get(named("authorizedClient"))) }
-
+    single<UserProfilerUpdater> { UserProfileUpdaterImpl(get()) }
     // Repositories
     single<UserRepository> { UserRepositoryImpl(get(), get()) }
     single<TagRepository> { TagRepositoryImpl(get()) }

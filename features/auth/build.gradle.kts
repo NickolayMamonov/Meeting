@@ -41,9 +41,7 @@ dependencies {
     implementation(project(":uikit"))
     implementation(project(":core:auth"))
     implementation(project(":core:common"))
-    implementation(project(":features:profile:data"))
 
-    implementation(libs.androidx.lifecycle.runtime.compose.android)
 
     // Koin for DI
     implementation(platform(libs.koin.bom))

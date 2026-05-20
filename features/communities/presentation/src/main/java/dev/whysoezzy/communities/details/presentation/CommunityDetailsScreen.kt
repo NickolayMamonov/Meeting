@@ -1,7 +1,5 @@
 package dev.whysoezzy.communities.details.presentation
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +47,7 @@ import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.topbar.BackShareTopBar
 import dev.whysoezzy.uikit.models.UIKitAddress
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 
@@ -174,7 +174,9 @@ private fun CommunityDetailsContent(
                 modifier = Modifier
                     .size(240.dp)
                     .clip(RoundedCornerShape(16.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = ColorPainter(ColorTokens.NeutralLine),
+                error = ColorPainter(ColorTokens.NeutralLine)
             )
             TextHeading1(text = state.title, modifier = Modifier.fillMaxWidth())
         }
@@ -229,9 +231,9 @@ private fun CommunityDetailsContent(
                     title = meeting.title,
                     date = meeting.date,
                     address = UIKitAddress(
-                        address = meeting.address.address,
-                        latitude = meeting.address.latitude,
-                        longitude = meeting.address.longitude
+                        address = meeting.address,
+                        latitude = meeting.latitude,
+                        longitude = meeting.longitude
                     ),
                     tags = meeting.tags.map { tag ->
                         UIKitEventCardTag(text = tag.text, isSelected = true, isEnabled = false)
@@ -259,9 +261,9 @@ private fun CommunityDetailsContent(
                             title = meeting.title,
                             date = meeting.date,
                             address = UIKitAddress(
-                                address = meeting.address.address,
-                                latitude = meeting.address.latitude,
-                                longitude = meeting.address.longitude
+                                address = meeting.address,
+                                latitude = meeting.latitude,
+                                longitude = meeting.longitude
                             ),
                             tags = meeting.tags.map { tag ->
                                 UIKitEventCardTag(
@@ -299,7 +301,7 @@ private fun SubscribersSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             UIKitOverlappingAvatars(
-                avatarUrls = state.subscribers.map { it.avatarUrl },
+                avatarUrls = state.subscribers.map { it.avatar },
                 avatarSize = 40.dp,
                 maxVisibleAvatars = 5,
                 showCount = true

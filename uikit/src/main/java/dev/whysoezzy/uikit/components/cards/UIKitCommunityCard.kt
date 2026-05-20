@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -24,6 +25,7 @@ import coil.compose.AsyncImage
 import dev.whysoezzy.uikit.components.buttons.UIKitSubscribeButton
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import dev.whysoezzy.uikit.tokens.TypographyTokens
 
@@ -56,7 +58,9 @@ fun UIKitCommunityCard(
             modifier = Modifier
                 .size(104.dp)
                 .clip(RoundedCornerShape(BorderRadiusTokens.L)),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(ColorTokens.NeutralLine),
+            error = ColorPainter(ColorTokens.NeutralLine)
         )
         
         // Community Title

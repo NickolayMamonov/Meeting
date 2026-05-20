@@ -3,6 +3,7 @@ package dev.whysoezzy.meetings.details.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
+import com.whysoezzy.common.utils.AddressUtils.extractMetroFromAddress
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
@@ -129,13 +130,15 @@ class MeetingDetailsViewModel(
     private fun openMap() {
         val state = _uiState.value as? MeetingDetailsUiState.Success ?: return
         viewModelScope.launch {
-            _navEvent.emit(
-                MeetingDetailsNavEvent.OpenMap(
-                    latitude = state.address.latitude,
-                    longitude = state.address.longitude,
-                    address = state.address.address
+            if (state.address.latitude != 0.0 && state.address.latitude != 0.0) {
+                _navEvent.emit(
+                    MeetingDetailsNavEvent.OpenMap(
+                        latitude = state.address.latitude,
+                        longitude = state.address.longitude,
+                        address = state.address.address
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -151,11 +154,5 @@ class MeetingDetailsViewModel(
         }
     }
 
-    private fun extractMetroFromAddress(address: String): String {
-        return if (address.contains("М.")) {
-            address.substringAfter("М.").substringBefore(",").trim()
-        } else {
-            "Не указано"
-        }
-    }
+
 }
