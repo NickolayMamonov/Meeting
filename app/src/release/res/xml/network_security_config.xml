@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Release network security config.
+    Cleartext (HTTP) is denied for all domains. Only HTTPS traffic is allowed.
+    Certificate pinning is intentionally not configured here yet — see R-004
+    for the meeting_cert.crt cleanup / pin-set decision.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only network security config.
+    Allows cleartext HTTP to the Android emulator loopback (10.0.2.2)
+    and localhost so the debug app can reach a locally running backend.
+    Production traffic policy lives in app/src/release/res/xml/network_security_config.xml.
+-->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">10.0.2.2</domain>
