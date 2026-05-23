@@ -321,7 +321,9 @@ private fun MainScreenContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        onUserClick = onUserProfileClick
+                        onUserClick = onUserProfileClick,
+                        onCommunitySubscribe = onCommunitySubscribeClick,
+                        onCommunityClick = onCommunityClick
                     )
                 }
             }

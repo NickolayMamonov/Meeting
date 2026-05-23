@@ -33,7 +33,8 @@ class CommunityMapper {
             name = dto.name,
             description = dto.description ?: "",
             imageUrl = dto.imageUrl,
-            subscribersCount = dto.subscribersCount ?: 0
+            subscribersCount = dto.subscribersCount ?: 0,
+            isSubscribed = dto.isSubscribed
         )
     }
 

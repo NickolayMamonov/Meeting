@@ -41,7 +41,8 @@ fun CommunityInfoDto.toDomain(): CommunityInfo {
         name = name,
         description = description ?: "",
         imageUrl = imageUrl,
-        subscribersCount = subscribersCount ?: 0
+        subscribersCount = subscribersCount ?: 0,
+        isSubscribed = isSubscribed
     )
 }
 

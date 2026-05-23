@@ -31,6 +31,7 @@ fun AdBlockComponent(
     adBlock: AdBlock,
     modifier: Modifier = Modifier,
     onCommunitySubscribe: (Long, Boolean) -> Unit = { _, _ -> },
+    onCommunityClick: (Long) -> Unit = {},
     onUserClick: (Long) -> Unit = {},
     onAdClick: () -> Unit = {}
 ) {
@@ -38,7 +39,8 @@ fun AdBlockComponent(
         is AdBlock.CommunitiesAd -> CommunitiesAdBlock(
             adBlock = adBlock,
             modifier = modifier,
-            onCommunitySubscribe = onCommunitySubscribe
+            onCommunitySubscribe = onCommunitySubscribe,
+            onCommunityClick = onCommunityClick
         )
 
         is AdBlock.TextAd -> TextAdBlock(
@@ -58,7 +60,8 @@ fun AdBlockComponent(
 private fun CommunitiesAdBlock(
     adBlock: AdBlock.CommunitiesAd,
     modifier: Modifier = Modifier,
-    onCommunitySubscribe: (Long, Boolean) -> Unit
+    onCommunitySubscribe: (Long, Boolean) -> Unit,
+    onCommunityClick: (Long) -> Unit
 ) {
     Column(
         modifier = modifier
@@ -87,11 +90,11 @@ private fun CommunitiesAdBlock(
                 UIKitCommunityCard(
                     imageUrl = community.imageUrl,
                     title = community.name,
-                    isSubscribed = false,
+                    isSubscribed = community.isSubscribed,
                     onSubscribeClick = { isSubscribed ->
                         onCommunitySubscribe(community.id, isSubscribed)
                     },
-                    onCardClick = { /* TODO: навигация к сообществу */ },
+                    onCardClick = { onCommunityClick(community.id) },
                 )
             }
         }

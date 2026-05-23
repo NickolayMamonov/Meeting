@@ -5,5 +5,6 @@ data class CommunityInfo(
     val name: String,
     val description: String,
     val imageUrl: String,
-    val subscribersCount: Int
+    val subscribersCount: Int,
+    val isSubscribed: Boolean = false
 )
