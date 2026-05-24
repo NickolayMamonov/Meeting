@@ -1,13 +1,13 @@
 package com.whysoezzy.auth.data.repository
 
 import com.whysoezzy.auth.TokenManager
-import com.whysoezzy.auth.data.api.AuthApiImpl
+import com.whysoezzy.auth.data.api.AuthApi
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.network.safeApiCall
 
 class AuthRepositoryImpl(
-    private val authApi: AuthApiImpl,
+    private val authApi: AuthApi,
     private val tokenManager: TokenManager
 ) : AuthRepository {
 

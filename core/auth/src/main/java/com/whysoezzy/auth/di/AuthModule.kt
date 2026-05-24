@@ -1,7 +1,8 @@
 package com.whysoezzy.auth.di
 
 import com.whysoezzy.auth.TokenManager
-import com.whysoezzy.auth.data.api.AuthApiImpl
+import com.whysoezzy.auth.data.api.AuthApi
+import com.whysoezzy.auth.data.api.AuthApiKtor
 import com.whysoezzy.auth.data.repository.AuthRepositoryImpl
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
@@ -21,7 +22,7 @@ val authModule = module {
         KtorNetworkModule.provideHttpClient()
     }
 
-    single { AuthApiImpl(get(named("publicClient"))) }
+    single<AuthApi> { AuthApiKtor(get(named("publicClient"))) }
 
     single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
 

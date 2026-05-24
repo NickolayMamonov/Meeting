@@ -1,6 +1,7 @@
 package com.whysoezzy.data.di
 
-import com.whysoezzy.data.api.CommunitiesApiImpl
+import com.whysoezzy.data.api.CommunitiesApi
+import com.whysoezzy.data.api.CommunitiesApiKtor
 import com.whysoezzy.data.mapper.CommunityMapper
 import com.whysoezzy.data.repository.CommunitiesRepositoryImpl
 import com.whysoezzy.domain.repository.CommunitiesRepository
@@ -18,7 +19,7 @@ import org.koin.dsl.module
 val communitiesModule = module {
     single { CommunityMapper() }
 
-    single { CommunitiesApiImpl(get(named("authorizedClient"))) }
+    single<CommunitiesApi> { CommunitiesApiKtor(get(named("authorizedClient"))) }
 
     single<CommunitiesRepository> {
         CommunitiesRepositoryImpl(

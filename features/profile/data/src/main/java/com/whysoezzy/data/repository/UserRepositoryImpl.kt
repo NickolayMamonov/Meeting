@@ -1,6 +1,6 @@
 package com.whysoezzy.data.repository
 
-import com.whysoezzy.data.api.UserApiImpl
+import com.whysoezzy.data.api.UserApiKtor
 import com.whysoezzy.data.mapper.UserMapper
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
@@ -9,7 +9,7 @@ import com.whysoezzy.domain.repository.UserRepository
 import com.whysoezzy.network.safeApiCall
 
 class UserRepositoryImpl(
-    private val userApi: UserApiImpl,
+    private val userApi: UserApiKtor,
     private val userMapper: UserMapper
 ) : UserRepository {
 

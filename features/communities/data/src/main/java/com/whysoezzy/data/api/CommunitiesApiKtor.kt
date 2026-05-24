@@ -12,36 +12,36 @@ import io.ktor.client.request.post
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-class CommunitiesApiImpl(private val client: HttpClient) {
-    suspend fun getRecommendedCommunities(): List<CommunityDto> {
+class CommunitiesApiKtor(private val client: HttpClient): CommunitiesApi {
+    override suspend fun getRecommendedCommunities(): List<CommunityDto> {
         return client.get("communities/recommended").body()
     }
 
-    suspend fun getCommunityById(id: Long): CommunityDto {
+    override suspend fun getCommunityById(id: Long): CommunityDto {
         return client.get("communities/$id").body()
     }
 
-    suspend fun subscribeToCommunity(id: Long) {
+    override suspend fun subscribeToCommunity(id: Long) {
         client.post("communities/$id/subscribe") {
             contentType(ContentType.Application.Json)
         }
     }
 
-    suspend fun unsubscribeFromCommunity(id: Long) {
+    override suspend fun unsubscribeFromCommunity(id: Long) {
         client.delete("communities/$id/subscribe")
     }
 
-    suspend fun searchCommunities(query: String): List<CommunityDto> {
+    override suspend fun searchCommunities(query: String): List<CommunityDto> {
         return client.get("communities/search") {
             parameter("query", query)
         }.body()
     }
 
-    suspend fun getCommunityMeetings(id: Long): List<MeetingDto> {
+    override suspend fun getCommunityMeetings(id: Long): List<MeetingDto> {
         return client.get("communities/$id/meetings").body()
     }
 
-    suspend fun getCommunitySubscribers(id: Long): List<UserInfoDto> {
+    override suspend fun getCommunitySubscribers(id: Long): List<UserInfoDto> {
         return client.get("communities/$id/subscribers").body()
     }
 }

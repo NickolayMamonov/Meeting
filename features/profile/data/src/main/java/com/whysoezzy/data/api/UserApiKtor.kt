@@ -12,27 +12,27 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-class UserApiImpl(private val client: HttpClient) {
-    suspend fun getCurrentUserProfile(): UserProfileDto {
+class UserApiKtor(private val client: HttpClient): UserApi {
+    override suspend fun getCurrentUserProfile(): UserProfileDto {
         return client.get("profile").body()
     }
 
-    suspend fun getUserProfile(id: Long): UserProfileDto {
+    override suspend fun getUserProfile(id: Long): UserProfileDto {
         return client.get("users/$id").body()
     }
 
-    suspend fun updateUserProfile(updateDto: UpdateUserDto): UserProfileDto {
+    override suspend fun updateUserProfile(updateDto: UpdateUserDto): UserProfileDto {
         return client.put("profile") {
             contentType(ContentType.Application.Json)
             setBody(updateDto)
         }.body()
     }
 
-    suspend fun getUserMeetings(userId: Long): List<MeetingInfoDto> {
+    override suspend fun getUserMeetings(userId: Long): List<MeetingInfoDto> {
         return client.get("users/$userId/meetings").body()
     }
 
-    suspend fun getUserCommunities(userId: Long): List<CommunityInfoDto> {
+    override suspend fun getUserCommunities(userId: Long): List<CommunityInfoDto> {
         return client.get("users/$userId/communities").body()
     }
 }

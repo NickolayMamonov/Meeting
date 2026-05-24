@@ -12,20 +12,20 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-class AuthApiImpl(private val client: HttpClient) {
+internal class AuthApiKtor(private val client: HttpClient) : AuthApi {
 
-    suspend fun sendOtp(phone: String): Map<String, String> {
+    override suspend fun sendOtp(phone: String): Map<String, String> {
         return client.post("auth/send-otp") {
             contentType(ContentType.Application.Json)
             setBody(SendOtpRequest(phone))
         }.body()
     }
 
-    suspend fun verifyOtp(
+    override suspend fun verifyOtp(
         phone: String,
         code: String,
-        name: String? = null,
-        surname: String? = null
+        name: String?,
+        surname: String?
     ): AuthResponse {
         return client.post("auth/verify-otp") {
             contentType(ContentType.Application.Json)
@@ -33,14 +33,14 @@ class AuthApiImpl(private val client: HttpClient) {
         }.body()
     }
 
-    suspend fun refreshToken(refreshToken: String): RefreshTokenResponse {
+    override suspend fun refreshToken(refreshToken: String): RefreshTokenResponse {
         return client.post("auth/refresh") {
             contentType(ContentType.Application.Json)
             setBody(RefreshTokenRequest(refreshToken))
         }.body()
     }
 
-    suspend fun logout(): Map<String, String> {
+    override suspend fun logout(): Map<String, String> {
         return client.post("auth/logout").body()
     }
 }

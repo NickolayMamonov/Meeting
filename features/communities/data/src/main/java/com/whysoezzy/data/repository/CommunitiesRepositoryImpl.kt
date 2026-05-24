@@ -1,6 +1,6 @@
 package com.whysoezzy.data.repository
 
-import com.whysoezzy.data.api.CommunitiesApiImpl
+import com.whysoezzy.data.api.CommunitiesApiKtor
 import com.whysoezzy.data.mapper.CommunityMapper
 import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.domain.models.Community
@@ -10,7 +10,7 @@ import com.whysoezzy.domain.repository.CommunitiesRepository
 import com.whysoezzy.network.safeApiCall
 
 class CommunitiesRepositoryImpl(
-    private val communitiesApi: CommunitiesApiImpl,
+    private val communitiesApi: CommunitiesApiKtor,
     private val communityMapper: CommunityMapper
 ): CommunitiesRepository {
     override suspend fun getRecommendedCommunities(): Result<List<Community>> {
