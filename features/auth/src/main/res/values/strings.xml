@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- PhoneInputScreen -->
+    <string name="auth_phone_title">Добро пожаловать!</string>
+    <string name="auth_phone_subtitle">Для входа в приложение введите номер телефона</string>
+    <string name="auth_phone_placeholder">Номер телефона</string>
+    <string name="auth_phone_send_code">Отправить код</string>
+    <string name="auth_phone_error_invalid">Введите корректный номер телефона</string>
+
+    <!-- CodeVerificationScreen -->
+    <string name="auth_code_title">Введите код</string>
+    <string name="auth_code_subtitle">Мы отправили код подтверждения на номер\n%1$s</string>
+    <string name="auth_code_resend">Отправить код повторно</string>
+    <string name="auth_code_resend_timer">Отправить повторно через %1$d сек</string>
+    <string name="auth_code_confirm">Подтвердить</string>
+    <string name="auth_code_error_invalid">Неверный код подтверждения</string>
+
+    <!-- NameInputScreen -->
+    <string name="auth_name_title">Знакомство</string>
+    <string name="auth_name_subtitle">Расскажите нам как к вам обращаться</string>
+    <string name="auth_name_hint_first">Имя</string>
+    <string name="auth_name_hint_last">Фамилия</string>
+
+    <!-- AuthSuccessScreen -->
+    <string name="auth_success_content_description">Успех</string>
+    <string name="auth_success_title">Добро пожаловать!</string>
+    <string name="auth_success_subtitle">Регистрация успешно завершена.\nТеперь вы можете пользоваться всеми возможностями приложения.</string>
+</resources>

@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
@@ -38,6 +39,8 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.whysoezzy.profile.R
+import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun ProfileDetailsScreen(
@@ -135,7 +138,7 @@ private fun ProfileContent(
                 surname = uiState.surname,
                 city = uiState.city,
                 description = uiState.description.ifBlank {
-                    if (uiState.isOwnProfile) "Добавьте описание профиля…" else ""
+                    if (uiState.isOwnProfile) stringResource(R.string.profile_details_description_placeholder_self) else ""
                 },
                 avatarUrl = uiState.avatarUrl,
                 interests = uiState.interests,
@@ -162,7 +165,10 @@ private fun ProfileContent(
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
                 UIKitUserMeetingsBlock(
-                    title = if (uiState.isOwnProfile) "Мои встречи" else "Встречи",
+                    title = if (uiState.isOwnProfile)
+                        stringResource(R.string.profile_details_meetings_self)
+                    else
+                        stringResource(R.string.profile_details_meetings_other),
                     meetings = uiState.userMeetings,
                     onMeetingClick = onMeetingClick,
                     modifier = Modifier.padding(horizontal = SpacingTokens.L)
@@ -175,7 +181,7 @@ private fun ProfileContent(
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
                 UIKitUserCommunitiesBlock(
-                    title = if (uiState.isOwnProfile) "Мои сообщества" else "Сообщества",
+                    title = if (uiState.isOwnProfile) stringResource(R.string.profile_details_communities_self) else stringResource(R.string.profile_details_communities_other),
                     communities = uiState.userCommunities,
                     subscribedCommunityIds = emptySet(),
                     onCommunityClick = onCommunityClick,
@@ -190,7 +196,7 @@ private fun ProfileContent(
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.XL))
                 Text(
-                    text = "Выйти",
+                    text = stringResource(R.string.profile_details_logout),
                     fontFamily = SFProDisplayFontFamily,
                     fontWeight = FontWeight.Medium,
                     fontSize = 18.sp,

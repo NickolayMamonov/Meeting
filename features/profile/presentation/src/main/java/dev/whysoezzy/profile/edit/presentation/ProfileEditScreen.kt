@@ -41,13 +41,13 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
@@ -58,6 +58,9 @@ import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+import dev.whysoezzy.profile.R
+import dev.whysoezzy.uikit.R as UIKitR
+
 
 @Composable
 fun ProfileEditScreen(
@@ -145,10 +148,10 @@ fun ProfileEditScreen(
         if (showInterestDialog) {
             AlertDialog(
                 onDismissRequest = { showInterestDialog = false },
-                title = { Text("Выберите интересы") },
+                title = { Text(stringResource(R.string.profile_edit_interests_title)) },
                 text = {
                     if (uiState.availableTags.isEmpty()) {
-                        Text("Загрузка тегов…")
+                        Text(stringResource(R.string.profile_edit_interests_loading))
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxWidth()) {
                             items(uiState.availableTags.entries.toList(), key = { (tagId, _) -> tagId }) { (tagId, tagName) ->
@@ -179,7 +182,7 @@ fun ProfileEditScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showInterestDialog = false }) { Text("Готово") }
+                    TextButton(onClick = { showInterestDialog = false }) { Text(stringResource(dev.whysoezzy.uikit.R.string.action_done)) }
                 }
             )
         }
@@ -188,16 +191,16 @@ fun ProfileEditScreen(
         if (uiState.showDeleteConfirmDialog) {
             AlertDialog(
                 onDismissRequest = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) },
-                title = { Text("Удалить профиль?") },
-                text = { Text("Аккаунт будет удалён. У вас будет 30 дней, чтобы восстановить его.") },
+                title = { Text(stringResource(R.string.profile_edit_delete_title)) },
+                text = { Text(stringResource(R.string.profile_edit_delete_message)) },
                 confirmButton = {
                     TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile) }) {
-                        Text("Удалить", color = ColorTokens.AccentDanger)
+                        Text(stringResource(R.string.profile_edit_delete_confirm), color = ColorTokens.AccentDanger)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) }) {
-                        Text("Отмена")
+                        Text(stringResource(dev.whysoezzy.uikit.R.string.action_cancel))
                     }
                 }
             )
@@ -232,7 +235,7 @@ private fun EditContent(
                 if (uiState.avatarUrl != null) {
                     AsyncImage(
                         model = uiState.avatarUrl,
-                        contentDescription = "Фото профиля",
+                        contentDescription = stringResource(R.string.profile_edit_photo_content_description),
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
@@ -253,7 +256,7 @@ private fun EditContent(
                         .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S)
                 ) {
                     Text(
-                        text = "Изменить фото",
+                        text = stringResource(R.string.profile_edit_photo_change),
                         color = Color.White,
                         fontFamily = SFProDisplayFontFamily,
                         fontWeight = FontWeight.Medium,
@@ -276,7 +279,7 @@ private fun EditContent(
                 UIKitInput(
                     value = uiState.nameSurname,
                     onValueChange = onNameSurnameChange,
-                    hint = "Имя Фамилия",
+                    hint = stringResource(R.string.profile_edit_field_fullname),
                     isError = uiState.nameError != null,
                     errorMessage = uiState.nameError ?: "",
                     modifier = Modifier.fillMaxWidth()
@@ -294,7 +297,7 @@ private fun EditContent(
                 UIKitInput(
                     value = uiState.city,
                     onValueChange = onCityChange,
-                    hint = "Город",
+                    hint = stringResource(R.string.profile_edit_field_city),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -302,7 +305,7 @@ private fun EditContent(
                 UIKitInput(
                     value = uiState.description,
                     onValueChange = onDescriptionChange,
-                    hint = "Расскажите о себе",
+                    hint = stringResource(R.string.profile_edit_field_about),
                     isError = uiState.descriptionError != null,
                     errorMessage = uiState.descriptionError ?: "",
                     modifier = Modifier.fillMaxWidth(),
@@ -321,7 +324,7 @@ private fun EditContent(
                 verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
             ) {
                 Text(
-                    text = "Интересы",
+                    text = stringResource(R.string.profile_edit_section_interests),
                     fontFamily = SFProDisplayFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 22.sp,
@@ -357,7 +360,7 @@ private fun EditContent(
                 verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
             ) {
                 Text(
-                    text = "Социальные сети",
+                    text = stringResource(R.string.profile_edit_section_social),
                     fontFamily = SFProDisplayFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 22.sp,
@@ -367,13 +370,13 @@ private fun EditContent(
                     icon = painterResource(R.drawable.habr_icon),
                     value = uiState.socialMedias["habr"] ?: "",
                     onValueChange = { onSocialMediaChange("habr", it) },
-                    hint = "Хабр"
+                    hint = stringResource(R.string.profile_edit_social_habr)
                 )
                 SocialField(
                     icon = painterResource(R.drawable.telegram_logo),
                     value = uiState.socialMedias["telegram"] ?: "",
                     onValueChange = { onSocialMediaChange("telegram", it) },
-                    hint = "Телеграм"
+                    hint = stringResource(R.string.profile_edit_social_telegram)
                 )
             }
         }
@@ -388,17 +391,17 @@ private fun EditContent(
                 verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
             ) {
                 UIKitToggleRow(
-                    label = "Показывать мои сообщества",
+                    label = stringResource(R.string.profile_edit_toggle_show_communities),
                     checked = uiState.showCommunities,
                     onCheckedChange = { onToggleShowCommunities() }
                 )
                 UIKitToggleRow(
-                    label = "Показывать мои встречи",
+                    label = stringResource(R.string.profile_edit_toggle_show_meetings),
                     checked = uiState.showMeetings,
                     onCheckedChange = { onToggleShowMeetings() }
                 )
                 UIKitToggleRow(
-                    label = "Включить уведомления",
+                    label = stringResource(R.string.profile_edit_toggle_notifications),
                     checked = uiState.notificationsEnabled,
                     onCheckedChange = { onToggleNotifications() }
                 )
@@ -409,7 +412,7 @@ private fun EditContent(
         item {
             Spacer(modifier = Modifier.height(SpacingTokens.XL))
             Text(
-                text = "Удалить профиль",
+                text = stringResource(R.string.profile_edit_delete_profile),
                 fontFamily = SFProDisplayFontFamily,
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp,

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MainScreen -->
+    <string name="meetings_main_search_placeholder">Поиск встреч и сообществ</string>
+    <string name="meetings_main_section_upcoming">Ближайшие встречи</string>
+    <string name="meetings_main_section_communities">Рекомендуемые сообщества</string>
+    <string name="meetings_main_section_all">Все встречи</string>
+
+    <!-- MeetingDetailsScreen -->
+    <string name="meeting_details_capacity">Всего %1$d мест. Если передумаете — отпишитесь</string>
+    <string name="meeting_details_leave">Покинуть встречу</string>
+    <string name="meeting_details_join">Записаться на встречу</string>
+    <string name="meeting_details_image_content_description">Изображение встречи</string>
+    <string name="meeting_details_host_title">Ведущий</string>
+    <string name="meeting_details_community_other_meetings">Другие встречи сообщества</string>
+
+    <!-- MeetingParticipantsScreen -->
+    <string name="meeting_participants_default_title">Участники</string>
+    <string name="meeting_participants_empty">Пока нет участников</string>
+</resources>

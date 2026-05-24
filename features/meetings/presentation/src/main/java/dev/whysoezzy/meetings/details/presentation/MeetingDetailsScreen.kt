@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -61,9 +62,11 @@ import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-import androidx.core.net.toUri
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.whysoezzy.uikit.tokens.ColorTokens
+import dev.whysoezzy.features_meetings.R
+import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun MeetingDetailsScreen(
@@ -180,21 +183,21 @@ private fun BottomActionSection(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextBody2(
-                text = "Всего $totalPlaces мест. Если передумаете — отпишитесь",
+                text = stringResource(R.string.meeting_details_capacity,totalPlaces),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
             if (isUserJoined) {
                 UIKitButton(
-                    text = "Покинуть встречу",
+                    text = stringResource(R.string.meeting_details_leave),
                     onClick = onLeaveClick,
                     state = UIKitButtonState.SECONDARY,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 UIKitButton(
-                    text = "Записаться на встречу",
+                    text = stringResource(R.string.meeting_details_join),
                     onClick = onJoinClick,
                     state = UIKitButtonState.PRIMARY,
                     modifier = Modifier.fillMaxWidth()
@@ -229,7 +232,7 @@ private fun MeetingContent(
         item {
             AsyncImage(
                 model = uiState.imageUrl,
-                contentDescription = "Изображение встречи",
+                contentDescription = stringResource(R.string.meeting_details_image_content_description),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
@@ -259,7 +262,7 @@ private fun MeetingContent(
         uiState.host?.let { host ->
             item {
                 UIKitHostCard(
-                    title = "Ведущий",
+                    title = stringResource(R.string.meeting_details_host_title),
                     name = host.name,
                     surname = host.surname,
                     description = host.description,
@@ -301,7 +304,7 @@ private fun MeetingContent(
         if (uiState.otherMeetings.isNotEmpty()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-                    TextHeading2(text = "Другие встречи сообщества")
+                    TextHeading2(text = stringResource(R.string.meeting_details_community_other_meetings))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
                         items(uiState.otherMeetings, key = {it.id}) { meeting ->
                             UIKitEventCard(
@@ -348,8 +351,8 @@ private fun ErrorContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextBody1(text = message, textAlign = TextAlign.Center)
-            UIKitButton(text = "Повторить", onClick = onRetry)
-            UIKitButton(text = "Назад", onClick = onBackPressed)
+            UIKitButton(text = stringResource(dev.whysoezzy.uikit.R.string.action_retry), onClick = onRetry)
+            UIKitButton(text = stringResource(dev.whysoezzy.uikit.R.string.action_cancel), onClick = onBackPressed)
         }
     }
 }

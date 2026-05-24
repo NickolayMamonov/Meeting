@@ -30,10 +30,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import dev.whysoezzy.communities.R
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
@@ -97,7 +99,7 @@ fun CommunityDetailsScreen(
                 }
                 else -> {
                     BackShareTopBar(
-                        title = "Сообщество",
+                        title = stringResource(R.string.community_details_title),
                         onBackClick = onBackPressed,
                         onShareClick = {},
                         modifier = Modifier.statusBarsPadding()
@@ -195,14 +197,14 @@ private fun CommunityDetailsContent(
         item {
             if (state.isSubscribed) {
                 UIKitButton(
-                    text = "Покинуть сообщество",
+                    text = stringResource(R.string.community_details_leave),
                     onClick = onSubscribeClick,
                     state = UIKitButtonState.SECONDARY,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 UIKitButton(
-                    text = "Вступить в сообщество",
+                    text = stringResource(R.string.community_details_join),
                     onClick = onSubscribeClick,
                     state = UIKitButtonState.PRIMARY,
                     modifier = Modifier.fillMaxWidth()
@@ -221,7 +223,7 @@ private fun CommunityDetailsContent(
         if (state.activeMeetings.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
-                TextHeading2(text = "Встречи")
+                TextHeading2(text = stringResource(R.string.community_details_meetings))
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
             }
 
@@ -249,7 +251,7 @@ private fun CommunityDetailsContent(
         if (state.pastMeetings.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
-                TextHeading2(text = "Прошлые встречи")
+                TextHeading2(text = stringResource(R.string.community_details_meetings_past))
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
             }
 
@@ -292,7 +294,7 @@ private fun SubscribersSection(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
     ) {
-        TextHeading2(text = "Подписаны")
+        TextHeading2(text = stringResource(R.string.community_details_subscribers))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -334,7 +336,7 @@ private fun ErrorContent(
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
-            UIKitButton(text = "Повторить", onClick = onRetry)
+            UIKitButton(text = stringResource(dev.whysoezzy.uikit.R.string.action_retry), onClick = onRetry)
         }
     }
 }

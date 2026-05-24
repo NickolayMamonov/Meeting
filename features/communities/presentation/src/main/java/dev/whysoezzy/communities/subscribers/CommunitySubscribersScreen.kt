@@ -13,7 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.whysoezzy.communities.R
 import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
@@ -50,13 +52,14 @@ fun CommunitySubscribersScreen(
                         text = when (uiState) {
                             is CommunitySubscribersUiState.Success ->
                                 (uiState as CommunitySubscribersUiState.Success).communityName
-                            else -> "Подписчики"
+                            else -> stringResource(R.string.community_subscribers_default_title)
                         }
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Назад")
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(
+                            dev.whysoezzy.uikit.R.string.action_back))
                     }
                 },
             )
@@ -80,7 +83,7 @@ fun CommunitySubscribersScreen(
                     onPersonClick = { subscriberId ->
                         viewModel.onEvent(CommunitySubscribersEvent.NavigateToProfile(subscriberId))
                     },
-                    emptyStateText = "Пока нет подписчиков",
+                    emptyStateText = stringResource(R.string.community_subscribers_empty),
                     modifier = Modifier.padding(paddingValues)
                 )
             }

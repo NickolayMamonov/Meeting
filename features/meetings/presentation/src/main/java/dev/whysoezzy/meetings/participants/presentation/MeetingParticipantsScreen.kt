@@ -13,12 +13,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading
 import org.koin.androidx.compose.koinViewModel
+import dev.whysoezzy.features_meetings.R
+import dev.whysoezzy.uikit.R as UIKitR
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,7 +53,7 @@ fun MeetingParticipantsScreen(
                         text = when (uiState) {
                             is MeetingParticipantsUiState.Success ->
                                 (uiState as MeetingParticipantsUiState.Success).meetingTitle
-                            else -> "Участники"
+                            else -> stringResource(R.string.meeting_participants_default_title)
                         }
                     )
                 },
@@ -80,7 +83,7 @@ fun MeetingParticipantsScreen(
                     onPersonClick = { participantId ->
                         viewModel.onEvent(MeetingParticipantsEvent.NavigateToProfile(participantId))
                     },
-                    emptyStateText = "Пока нет участников",
+                    emptyStateText = stringResource(R.string.meeting_participants_empty),
                     modifier = Modifier.padding(paddingValues)
                 )
             }
