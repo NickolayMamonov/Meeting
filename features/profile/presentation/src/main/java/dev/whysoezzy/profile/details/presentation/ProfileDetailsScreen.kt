@@ -229,8 +229,8 @@ private fun ErrorContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextBody1(text = message, textAlign = TextAlign.Center)
-            UIKitButton(text = "Повторить", onClick = onRetry)
-            UIKitButton(text = "Назад", onClick = onBackPressed)
+            UIKitButton(text = stringResource(UIKitR.string.action_retry), onClick = onRetry)
+            UIKitButton(text = stringResource(UIKitR.string.action_back), onClick = onBackPressed)
         }
     }
 }
@@ -247,5 +247,5 @@ private fun shareProfileIntent(context: Context, name: String, text: String) {
         putExtra(Intent.EXTRA_SUBJECT, name)
         putExtra(Intent.EXTRA_TEXT, text)
     }
-    context.startActivity(Intent.createChooser(intent, "Поделиться профилем"))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.profile_details_share_chooser_title)))
 }

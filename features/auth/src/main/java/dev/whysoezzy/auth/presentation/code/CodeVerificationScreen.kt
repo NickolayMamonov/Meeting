@@ -168,7 +168,7 @@ private fun CodeVerificationScreenErrorPreview() {
             phoneNumber = "+7 (999) 123-45-67",
             uiState = CodeVerificationUiState(
                 code = "1234",
-                error = "Неверный код подтверждения",
+                error = stringResource(R.string.auth_code_error_invalid),
                 canResend = true
             )
         )

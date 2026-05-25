@@ -26,7 +26,9 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-
+import androidx.compose.ui.res.stringResource
+import dev.whysoezzy.auth.R
+import dev.whysoezzy.uikit.R as UIKitR
 @Composable
 fun NameInputScreen(
     onNameSubmitted: () -> Unit,
@@ -77,12 +79,12 @@ private fun NameInputContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextHeading1(
-                text = "Знакомство",
+                text = stringResource(R.string.auth_name_title),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
             TextBody2(
-                text = "Расскажите нам как к вам обращаться",
+                text = stringResource(R.string.auth_name_subtitle),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
@@ -94,7 +96,7 @@ private fun NameInputContent(
             UIKitInput(
                 value = uiState.name,
                 onValueChange = onNameChange,
-                hint = "Имя",
+                hint = stringResource(R.string.auth_name_hint_first),
                 isError = uiState.nameError != null,
                 errorMessage = uiState.nameError ?: "",
                 modifier = Modifier.fillMaxWidth()
@@ -102,7 +104,7 @@ private fun NameInputContent(
             UIKitInput(
                 value = uiState.surname,
                 onValueChange = onSurnameChange,
-                hint = "Фамилия",
+                hint = stringResource(R.string.auth_name_hint_last),
                 isError = uiState.surnameError != null,
                 errorMessage = uiState.surnameError ?: "",
                 modifier = Modifier.fillMaxWidth()
@@ -112,7 +114,7 @@ private fun NameInputContent(
         Spacer(modifier = Modifier.weight(1f))
 
         UIKitButton(
-            text = "Продолжить",
+            text = stringResource(UIKitR.string.action_continue),
             onClick = onContinueClick,
             state = when {
                 uiState.isLoading -> UIKitButtonState.LOADING

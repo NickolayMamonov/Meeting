@@ -59,7 +59,7 @@ fun MeetingParticipantsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Назад")
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(UIKitR.string.action_back))
                     }
                 },
             )
