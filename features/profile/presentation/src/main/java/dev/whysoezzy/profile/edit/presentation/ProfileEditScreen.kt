@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -100,8 +101,10 @@ fun ProfileEditScreen(
                 )
             }
         }
-    ) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
+    ) { innerPadding ->
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)) {
             // Форма всегда показывается — пустые поля отображают hint-тексты,
             // структура экрана (аватар-заглушка, секции, тогглы) видна с первого кадра
             EditContent(
@@ -367,13 +370,13 @@ private fun EditContent(
                     color = ColorTokens.NeutralActive
                 )
                 SocialField(
-                    icon = painterResource(R.drawable.habr_icon),
+                    icon = painterResource(UIKitR.drawable.habr_icon),
                     value = uiState.socialMedias["habr"] ?: "",
                     onValueChange = { onSocialMediaChange("habr", it) },
                     hint = stringResource(R.string.profile_edit_social_habr)
                 )
                 SocialField(
-                    icon = painterResource(R.drawable.telegram_logo),
+                    icon = painterResource(UIKitR.drawable.telegram_logo),
                     value = uiState.socialMedias["telegram"] ?: "",
                     onValueChange = { onSocialMediaChange("telegram", it) },
                     hint = stringResource(R.string.profile_edit_social_telegram)
