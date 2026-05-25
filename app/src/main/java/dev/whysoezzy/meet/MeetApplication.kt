@@ -7,6 +7,7 @@ import com.whysoezzy.data.di.profileDataModule
 import com.whysoezzy.auth.di.authModule
 import dev.whysoezzy.auth.di.authFeatureModule
 import dev.whysoezzy.communities.di.communityModule
+import dev.whysoezzy.meet.di.appGlueModule
 import dev.whysoezzy.meet.di.appModule
 import dev.whysoezzy.meetings.di.mainFeatureModule
 import dev.whysoezzy.profile.di.profileFeatureModule
@@ -25,6 +26,7 @@ class MeetApplication : Application() {
             androidContext(this@MeetApplication)
             modules(
                 appModule,
+                appGlueModule,
                 authModule,
                 authFeatureModule,
                 meetingsModule,
