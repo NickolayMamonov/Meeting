@@ -19,7 +19,7 @@ lottie = "5.2.0"
 koin-bom = "3.5.6"
 ksp = "2.0.0-1.0.22"
 ktor = "3.0.2"
-securityCrypto = "1.0.0"
+securityCrypto = "1.1.0-alpha07"
 desugarJdkLibs = "2.0.4"
 kotlinxSerialization = "1.6.3"
 

@@ -6,8 +6,6 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.whysoezzy.network.TokenProvider
 
-// TODO: androidx.security.crypto deprecated в 2024. Мигрировать на
-// EncryptedDataStore или прямой Android Keystore API
 class TokenManager(context: Context) : TokenProvider {
 
     private val masterKey = MasterKey.Builder(context)
