@@ -1,7 +1,11 @@
 package com.whysoezzy.data.repository
 
-import com.whysoezzy.data.api.UserApiKtor
-import com.whysoezzy.data.mapper.UserMapper
+import com.whysoezzy.data.api.UserApi
+
+import com.whysoezzy.data.mapper.toCommunityInfo
+import com.whysoezzy.data.mapper.toDomain
+import com.whysoezzy.data.mapper.toMeetingInfo
+import com.whysoezzy.data.mapper.toUpdateDto
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.User
@@ -9,44 +13,28 @@ import com.whysoezzy.domain.repository.UserRepository
 import com.whysoezzy.network.safeApiCall
 
 class UserRepositoryImpl(
-    private val userApi: UserApiKtor,
-    private val userMapper: UserMapper
+    private val userApi: UserApi
 ) : UserRepository {
 
-    override suspend fun getCurrentUser(): Result<User> {
-        return safeApiCall {
-            val response = userApi.getCurrentUserProfile()
-            userMapper.toDomain(response)
-        }
+    override suspend fun getCurrentUser(): Result<User> = safeApiCall {
+        userApi.getCurrentUserProfile().toDomain()
     }
 
-    override suspend fun getUserById(id: Long): Result<User> {
-        return safeApiCall {
-            val response = userApi.getUserProfile(id)
-            userMapper.toDomain(response)
-        }
+    override suspend fun getUserById(id: Long): Result<User> = safeApiCall {
+        userApi.getUserProfile(id).toDomain()
     }
 
-    override suspend fun updateUserProfile(user: User): Result<User> {
-        return safeApiCall {
-            val interestIds = user.interests.map { it.id }.takeIf { it.isNotEmpty() }
-            val updateDto = userMapper.toUpdateDto(user, interestIds)
-            val response = userApi.updateUserProfile(updateDto)
-            userMapper.toDomain(response)
-        }
+    override suspend fun updateUserProfile(user: User): Result<User> = safeApiCall {
+        val interestIds = user.interests.map { it.id }.takeIf { it.isNotEmpty() }
+        val updateDto = user.toUpdateDto(interestIds)
+        userApi.updateUserProfile(updateDto).toDomain()
     }
 
-    override suspend fun getUserMeetings(userId: Long): Result<List<MeetingInfo>> {
-        return safeApiCall {
-            val response = userApi.getUserMeetings(userId)
-            response.map { userMapper.meetingInfoToDomain(it) }
-        }
+    override suspend fun getUserMeetings(userId: Long): Result<List<MeetingInfo>> = safeApiCall {
+        userApi.getUserMeetings(userId).map { it.toMeetingInfo() }
     }
 
-    override suspend fun getUserCommunities(userId: Long): Result<List<CommunityInfo>> {
-        return safeApiCall {
-            val response = userApi.getUserCommunities(userId)
-            response.map { userMapper.communityInfoToDomain(it) }
-        }
+    override suspend fun getUserCommunities(userId: Long): Result<List<CommunityInfo>> = safeApiCall {
+        userApi.getUserCommunities(userId).map { it.toCommunityInfo() }
     }
 }

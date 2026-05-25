@@ -13,124 +13,116 @@ import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
-import java.text.SimpleDateFormat
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
-class UserMapper {
+private val isoFormatters = listOf(
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd")
+)
 
-    private val isoFormatters = listOf(
-        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
-        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-        DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    )
+fun UserProfileDto.toDomain(): User = User(
+    id = id,
+    name = name,
+    surname = surname,
+    email = email ?: "",
+    city = city ?: "",
+    avatar = avatarUrl ?: "",
+    phone = phone ?: "",
+    bio = description ?: "",
+    socialMedias = socialMedias.map { it.toDomain() },
+    interests = interests.map { it.toDomain() },
+    showCommunities = showCommunities,
+    showMeetings = showMeetings,
+    notificationsEnabled = notificationsEnabled
+)
 
-    fun toDomain(dto: UserProfileDto): User {
-        return User(
-            id = dto.id,
-            name = dto.name,
-            surname = dto.surname,
-            email = dto.email ?: "",
-            city = dto.city ?: "",
-            avatar = dto.avatarUrl ?: "",
-            phone = dto.phone ?: "",
-            bio = dto.description ?: "",
-            socialMedias = dto.socialMedias.map { it.toDomain() },
-            interests = dto.interests.map { it.toDomain() },
-            showCommunities = dto.showCommunities,
-            showMeetings = dto.showMeetings,
-            notificationsEnabled = dto.notificationsEnabled
-        )
+fun User.toUpdateDto(interestIds: List<Long>? = null): UpdateUserDto = UpdateUserDto(
+    name = name.takeIf { it.isNotEmpty() },
+    surname = surname.takeIf { it.isNotEmpty() },
+    email = email.takeIf { it.isNotEmpty() },
+    city = city.takeIf { it.isNotEmpty() },
+    description = bio.takeIf { it.isNotEmpty() },
+    avatarUrl = avatar.takeIf { it.isNotEmpty() },
+    interestIds = interestIds,
+    socialMedias = socialMedias.takeIf { it.isNotEmpty() }?.map { it.toDto() },
+    showCommunities = showCommunities,
+    showMeetings = showMeetings,
+    notificationsEnabled = notificationsEnabled
+)
+
+/**
+ * Локальное имя `toMeetingInfo`, чтобы не конфликтовать с
+ * MeetingDto.toDomain в :core:data (другой DTO, но Kotlin
+ * import resolver такие случаи плохо различает в split-package).
+ */
+fun MeetingInfoDto.toMeetingInfo(): MeetingInfo = MeetingInfo(
+    id = id,
+    title = title,
+    imageUrl = imageUrl,
+    time = parseDateToTimestamp(date),
+    address = "",
+    tags = emptyList(),
+    meetingStatus = MeetingStatus.ACTIVE
+)
+
+/**
+ * Локальное имя `toCommunityInfo`: в :features:meetings:data есть своя
+ * CommunityInfoDto.toDomain() (R-035 / R-037 — устранение дубликатов
+ * в будущем).
+ */
+fun CommunityInfoDto.toCommunityInfo(): CommunityInfo = CommunityInfo(
+    id = id,
+    name = name,
+    description = description ?: "",
+    imageUrl = imageUrl,
+    subscribersCount = subscribersCount ?: 0,
+    isSubscribed = isSubscribed
+)
+
+// ==================== Private ====================
+
+private fun TagDto.toDomain(): Tag = Tag(
+    id = id,
+    name = name
+)
+
+private fun SocialMediaDto.toDomain(): SocialMediaInfo = SocialMediaInfo(
+    type = mapSocialMediaType(type),
+    url = url,
+    username = extractUsername(url)
+)
+
+private fun SocialMediaInfo.toDto(): SocialMediaDto = SocialMediaDto(
+    type = type.name.lowercase(),
+    url = url
+)
+
+private fun mapSocialMediaType(platform: String): SocialMediaType =
+    when (platform.uppercase()) {
+        "TELEGRAM" -> SocialMediaType.TELEGRAM
+        "HABR" -> SocialMediaType.HABR
+        "GITHUB" -> SocialMediaType.GITHUB
+        "LINKEDIN" -> SocialMediaType.LINKEDIN
+        else -> SocialMediaType.TELEGRAM
     }
 
-    fun toUpdateDto(
-        user: User,
-        interestIds: List<Long>? = null
-    ): UpdateUserDto {
-        return UpdateUserDto(
-            name = user.name.takeIf { it.isNotEmpty() },
-            surname = user.surname.takeIf { it.isNotEmpty() },
-            email = user.email.takeIf { it.isNotEmpty() },
-            city = user.city.takeIf { it.isNotEmpty() },
-            description = user.bio.takeIf { it.isNotEmpty() },
-            avatarUrl = user.avatar.takeIf { it.isNotEmpty() },
-            interestIds = interestIds,
-            socialMedias = user.socialMedias.takeIf { it.isNotEmpty() }?.map { it.toDto() },
-            showCommunities = user.showCommunities,
-            showMeetings = user.showMeetings,
-            notificationsEnabled = user.notificationsEnabled
-        )
+private fun extractUsername(url: String): String =
+    url.substringAfterLast("/").takeIf { it.isNotBlank() } ?: url
+
+/**
+ * Парсит ISO-форматы дат. Если не распарсить — возвращает 0L.
+ */
+fun parseDateToTimestamp(dateString: String?): Long {
+    if (dateString.isNullOrBlank()) return 0L
+    for (formatter in isoFormatters) {
+        try {
+            return LocalDateTime.parse(dateString, formatter)
+                .toEpochSecond(ZoneOffset.UTC) * 1000
+        } catch (_: Exception) {}
     }
-
-    fun meetingInfoToDomain(dto: MeetingInfoDto): MeetingInfo {
-        return MeetingInfo(
-            id = dto.id,
-            title = dto.title,
-            imageUrl = dto.imageUrl,
-            time = parseDateToTimestamp(dto.date),
-            address = "",
-            tags = emptyList(),
-            meetingStatus = MeetingStatus.ACTIVE
-        )
-    }
-
-    fun communityInfoToDomain(dto: CommunityInfoDto): CommunityInfo {
-        return CommunityInfo(
-            id = dto.id,
-            name = dto.name,
-            description = dto.description ?: "",
-            imageUrl = dto.imageUrl,
-            subscribersCount = dto.subscribersCount ?: 0,
-            isSubscribed = dto.isSubscribed
-        )
-    }
-
-    // ==================== Private ====================
-
-    private fun TagDto.toDomain(): Tag = Tag(
-        id = id,
-        name = name
-    )
-
-    private fun SocialMediaDto.toDomain(): SocialMediaInfo = SocialMediaInfo(
-        type = mapSocialMediaType(type),
-        url = url,
-        username = extractUsername(url)
-    )
-
-    private fun SocialMediaInfo.toDto(): SocialMediaDto = SocialMediaDto(
-        type = type.name.lowercase(),
-        url = url
-    )
-
-    private fun mapSocialMediaType(platform: String): SocialMediaType {
-        return when (platform.uppercase()) {
-            "TELEGRAM" -> SocialMediaType.TELEGRAM
-            "HABR" -> SocialMediaType.HABR
-            "GITHUB" -> SocialMediaType.GITHUB
-            "LINKEDIN" -> SocialMediaType.LINKEDIN
-            else -> SocialMediaType.TELEGRAM
-        }
-    }
-
-    private fun extractUsername(url: String): String {
-        return url.substringAfterLast("/").takeIf { it.isNotBlank() } ?: url
-    }
-
-    /**
-     * Парсим строки вида "15 декабря 2024, 19:00" или ISO "2024-12-15T19:00:00".
-     * Если не распарсить — возвращаем 0L.
-     */
-    fun parseDateToTimestamp(dateString: String?): Long {
-        if (dateString.isNullOrBlank()) return 0L
-        for (formatter in isoFormatters) {
-            try {
-                return LocalDateTime.parse(dateString, formatter)
-                    .toEpochSecond(java.time.ZoneOffset.UTC) * 1000
-            } catch (_: Exception) { }
-        }
-        return 0L
-    }
+    return 0L
 }
