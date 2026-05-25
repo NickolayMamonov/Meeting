@@ -29,7 +29,7 @@ fun MeetNavHost(
     val startDestination = if (isLoggedIn == true) {
         MeetRoute.Main.route
     } else {
-        MeetRoute.PhoneInput.route
+        MeetRoute.Auth.route
     }
 
     NavHost(

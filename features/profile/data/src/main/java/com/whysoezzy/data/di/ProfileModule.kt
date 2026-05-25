@@ -27,7 +27,7 @@ val profileDataModule = module {
     single<UserRepository> { UserRepositoryImpl(get()) }
     single<TagRepository> { TagRepositoryImpl(get()) }
 
-    single<UserProfilerUpdater> { UserProfileUpdaterImpl(get()) }
+    single<UserProfilerUpdater> { UserProfileUpdaterImpl(get<UserApi>()) }
     // Use Cases
     factory { GetCurrentUserUseCase(get()) }
     factory { GetUserByIdUseCase(get()) }
