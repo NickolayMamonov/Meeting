@@ -1,5 +1,8 @@
 package dev.whysoezzy.auth.presentation.phone
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class PhoneInputUiState(
     val phoneNumber: String = "",
     val isLoading: Boolean = false,

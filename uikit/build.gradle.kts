@@ -36,6 +36,12 @@ android {
     }
 }
 
+composeCompiler {
+    stabilityConfigurationFile.set(
+        rootProject.layout.projectDirectory.file("compose-stability.conf")
+    )
+}
+
 dependencies {
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))

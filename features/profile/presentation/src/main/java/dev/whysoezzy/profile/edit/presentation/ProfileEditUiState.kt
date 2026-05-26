@@ -1,5 +1,8 @@
 package dev.whysoezzy.profile.edit.presentation
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class ProfileEditUiState(
     // Основная информация
     val name: String = "",

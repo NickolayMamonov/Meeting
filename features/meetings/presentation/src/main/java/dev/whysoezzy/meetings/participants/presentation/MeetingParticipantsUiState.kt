@@ -1,7 +1,9 @@
 package dev.whysoezzy.meetings.participants.presentation
 
+import androidx.compose.runtime.Immutable
 import com.whysoezzy.domain.models.Person
 
+@Immutable
 sealed class MeetingParticipantsUiState {
     data object Loading : MeetingParticipantsUiState()
     data class Success(

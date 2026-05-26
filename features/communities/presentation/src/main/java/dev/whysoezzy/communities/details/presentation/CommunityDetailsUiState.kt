@@ -1,11 +1,11 @@
 package dev.whysoezzy.communities.details.presentation
 
-
+import androidx.compose.runtime.Immutable
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitPerson
 
-
+@Immutable
 sealed class CommunityDetailsUiState {
     data object Loading : CommunityDetailsUiState()
     data class Success(

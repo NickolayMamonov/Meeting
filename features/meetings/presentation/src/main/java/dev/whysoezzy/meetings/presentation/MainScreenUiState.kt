@@ -1,11 +1,12 @@
 package dev.whysoezzy.meetings.presentation
 
+import androidx.compose.runtime.Immutable
 import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 
-
+@Immutable
 sealed class MainScreenUiState {
     data object Loading : MainScreenUiState()
 

@@ -1,5 +1,8 @@
 package dev.whysoezzy.auth.presentation.name
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class NameInputUiState(
     val name: String = "",
     val surname: String = "",
