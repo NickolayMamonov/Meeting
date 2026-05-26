@@ -1,6 +1,6 @@
 package com.whysoezzy.data.repository
 
-import com.whysoezzy.data.api.MeetingsApiKtor
+import com.whysoezzy.data.api.MeetingsApi
 import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.Meeting
@@ -9,7 +9,7 @@ import com.whysoezzy.domain.repository.MeetingsRepository
 import com.whysoezzy.network.safeApiCall
 
 class MeetingsRepositoryImpl(
-    private val meetingsApi: MeetingsApiKtor
+    private val meetingsApi: MeetingsApi
 ) : MeetingsRepository {
 
     override suspend fun getHeroEvents(): Result<List<Meeting>> = safeApiCall {

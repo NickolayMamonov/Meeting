@@ -1,12 +1,12 @@
 package com.whysoezzy.data.repository
 
-import com.whysoezzy.data.api.TagsApiKtor
+import com.whysoezzy.data.api.TagsApi
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.repository.TagRepository
 import com.whysoezzy.network.safeApiCall
 
 class TagRepositoryImpl(
-    private val tagsApi: TagsApiKtor
+    private val tagsApi: TagsApi
 ) : TagRepository {
 
     override suspend fun getAllTags(): Result<List<Tag>> {
