@@ -5,6 +5,7 @@ import com.whysoezzy.auth.data.api.AuthApi
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.network.safeApiCall
+import kotlinx.coroutines.flow.Flow
 
 class AuthRepositoryImpl(
     private val authApi: AuthApi,
@@ -67,7 +68,5 @@ class AuthRepositoryImpl(
         }
     }
 
-    override fun isLoggedIn(): Boolean {
-        return tokenManager.isLoggedIn()
-    }
+    override val isLoggedInFlow: Flow<Boolean> = tokenManager.isLoggedInFlow
 }

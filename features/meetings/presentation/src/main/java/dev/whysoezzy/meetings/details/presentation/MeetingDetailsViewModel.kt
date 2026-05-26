@@ -16,9 +16,11 @@ import dev.whysoezzy.meetings.mappers.toUIKitPersonHost
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed class MeetingDetailsNavEvent {
@@ -44,6 +46,13 @@ class MeetingDetailsViewModel(
     val navEvent: SharedFlow<MeetingDetailsNavEvent> = _navEvent.asSharedFlow()
 
     private var currentMeetingId: Long? = null
+
+    private val isLoggedIn: StateFlow<Boolean> = isLoggedInUseCase()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false
+        )
 
     fun onEvent(event: MeetingDetailsEvent) {
         when (event) {
@@ -98,7 +107,7 @@ class MeetingDetailsViewModel(
     }
 
     private fun joinMeeting() {
-        if (!isLoggedInUseCase()) {
+        if (!isLoggedIn.value) {
             viewModelScope.launch { _navEvent.emit(MeetingDetailsNavEvent.NavigateToAuth) }
             return
         }

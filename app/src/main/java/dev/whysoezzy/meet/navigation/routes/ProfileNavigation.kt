@@ -1,7 +1,10 @@
 package dev.whysoezzy.meet.navigation.routes
 
 import android.util.Log
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
@@ -20,35 +23,39 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
     // Собственный профиль — требует авторизации
     composable(MeetRoute.Profile.route) {
         val isLoggedInUseCase: IsLoggedInUseCase = koinInject()
-        val isLoggedIn = remember { isLoggedInUseCase() }
+        val isLoggedIn by isLoggedInUseCase()
+            .collectAsStateWithLifecycle(initialValue = null)
 
-        if (!isLoggedIn) {
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                navController.navigate(MeetRoute.Auth.route) {
-                    popUpTo(MeetRoute.Profile.route) { inclusive = true }
+        when (isLoggedIn) {
+            null -> { /* loading — пустой Box, splash, что угодно */ }
+            false -> {
+                LaunchedEffect(Unit) {
+                    navController.navigate(MeetRoute.Auth.route) {
+                        popUpTo(MeetRoute.Profile.route) { inclusive = true }
+                    }
                 }
             }
-        } else {
-            ProfileDetailsScreen(
-                userId = null,
-                onBackPressed = { navController.popBackStack() },
-                onEditClick = { navController.navigate(MeetRoute.ProfileEdit.route) },
-                onLogout = {
-                    navController.navigate(MeetRoute.Main.route) {
-                        popUpTo(MeetRoute.Main.route) { inclusive = false }
+            true -> {
+                ProfileDetailsScreen(
+                    userId = null,
+                    onBackPressed = { navController.popBackStack() },
+                    onEditClick = { navController.navigate(MeetRoute.ProfileEdit.route) },
+                    onLogout = {
+                        navController.navigate(MeetRoute.Main.route) {
+                            popUpTo(MeetRoute.Main.route) { inclusive = false }
+                        }
+                    },
+                    onNameInput = {
+                        navController.navigate(MeetRoute.NameInputFromProfile.route)
+                    },
+                    onMeetingClick = { meetingId ->
+                        navController.navigate(MeetRoute.MeetingDetails.createRoute(meetingId))
+                    },
+                    onCommunityClick = { communityId ->
+                        navController.navigate(MeetRoute.CommunityDetails.createRoute(communityId))
                     }
-                },
-                // Профиль без имени — отправляем заполнить прямо здесь
-                onNameInput = {
-                    navController.navigate(MeetRoute.NameInputFromProfile.route)
-                },
-                onMeetingClick = { meetingId ->
-                    navController.navigate(MeetRoute.MeetingDetails.createRoute(meetingId))
-                },
-                onCommunityClick = { communityId ->
-                    navController.navigate(MeetRoute.CommunityDetails.createRoute(communityId))
-                }
-            )
+                )
+            }
         }
     }
 
