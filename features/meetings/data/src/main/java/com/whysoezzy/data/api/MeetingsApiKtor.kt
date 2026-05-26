@@ -12,7 +12,7 @@ import io.ktor.client.request.post
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-class MeetingsApiKtor(private val client: HttpClient): MeetingsApi {
+internal class MeetingsApiKtor(private val client: HttpClient): MeetingsApi {
 
     /** GET /meetings/main — главный экран */
     override suspend fun getHeroEvents(): List<MeetingDto> {

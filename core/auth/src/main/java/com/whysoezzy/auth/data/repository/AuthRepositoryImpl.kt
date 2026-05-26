@@ -7,7 +7,7 @@ import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.network.safeApiCall
 import kotlinx.coroutines.flow.Flow
 
-class AuthRepositoryImpl(
+internal class AuthRepositoryImpl(
     private val authApi: AuthApi,
     private val tokenManager: TokenManager
 ) : AuthRepository {

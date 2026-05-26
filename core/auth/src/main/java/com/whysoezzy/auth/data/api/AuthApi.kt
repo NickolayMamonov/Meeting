@@ -3,7 +3,7 @@ package com.whysoezzy.auth.data.api
 import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.RefreshTokenResponse
 
-interface AuthApi {
+internal interface AuthApi {
     suspend fun sendOtp(phone: String): Map<String, String>
 
     suspend fun verifyOtp(

@@ -4,7 +4,7 @@ import com.whysoezzy.data.dto.AdBlockResponseDto
 import com.whysoezzy.data.dto.MeetingDto
 import com.whysoezzy.data.dto.UserInfoDto
 
-interface MeetingsApi {
+internal interface MeetingsApi {
     suspend fun getHeroEvents(): List<MeetingDto>
     suspend fun getPopularEvents(): List<MeetingDto>
     suspend fun getAllEvents(page: Int = 0, limit: Int = 20, tagId: Long? = null): List<MeetingDto>

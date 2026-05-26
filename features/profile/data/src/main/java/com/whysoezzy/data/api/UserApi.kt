@@ -5,7 +5,7 @@ import com.whysoezzy.data.dto.MeetingInfoDto
 import com.whysoezzy.data.dto.UpdateUserDto
 import com.whysoezzy.data.dto.UserProfileDto
 
-interface UserApi {
+internal interface UserApi {
     suspend fun getCurrentUserProfile(): UserProfileDto
     suspend fun getUserProfile(id: Long): UserProfileDto
     suspend fun updateUserProfile(updateDto: UpdateUserDto): UserProfileDto

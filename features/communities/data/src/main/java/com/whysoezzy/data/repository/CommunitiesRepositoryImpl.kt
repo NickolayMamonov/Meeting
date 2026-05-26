@@ -9,7 +9,7 @@ import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.repository.CommunitiesRepository
 import com.whysoezzy.network.safeApiCall
 
-class CommunitiesRepositoryImpl(
+internal class CommunitiesRepositoryImpl(
     private val communitiesApi: CommunitiesApi
 ) : CommunitiesRepository {
 

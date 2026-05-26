@@ -24,7 +24,7 @@ private val isoFormatters = listOf(
     DateTimeFormatter.ofPattern("yyyy-MM-dd")
 )
 
-fun UserProfileDto.toDomain(): User = User(
+internal fun UserProfileDto.toDomain(): User = User(
     id = id,
     name = name,
     surname = surname,
@@ -40,7 +40,7 @@ fun UserProfileDto.toDomain(): User = User(
     notificationsEnabled = notificationsEnabled
 )
 
-fun User.toUpdateDto(interestIds: List<Long>? = null): UpdateUserDto = UpdateUserDto(
+internal fun User.toUpdateDto(interestIds: List<Long>? = null): UpdateUserDto = UpdateUserDto(
     name = name.takeIf { it.isNotEmpty() },
     surname = surname.takeIf { it.isNotEmpty() },
     email = email.takeIf { it.isNotEmpty() },
@@ -59,7 +59,7 @@ fun User.toUpdateDto(interestIds: List<Long>? = null): UpdateUserDto = UpdateUse
  * MeetingDto.toDomain в :core:data (другой DTO, но Kotlin
  * import resolver такие случаи плохо различает в split-package).
  */
-fun MeetingInfoDto.toMeetingInfo(): MeetingInfo = MeetingInfo(
+internal fun MeetingInfoDto.toMeetingInfo(): MeetingInfo = MeetingInfo(
     id = id,
     title = title,
     imageUrl = imageUrl,
@@ -74,7 +74,7 @@ fun MeetingInfoDto.toMeetingInfo(): MeetingInfo = MeetingInfo(
  * CommunityInfoDto.toDomain() (R-035 / R-037 — устранение дубликатов
  * в будущем).
  */
-fun CommunityInfoDto.toCommunityInfo(): CommunityInfo = CommunityInfo(
+internal fun CommunityInfoDto.toCommunityInfo(): CommunityInfo = CommunityInfo(
     id = id,
     name = name,
     description = description ?: "",
@@ -116,7 +116,7 @@ private fun extractUsername(url: String): String =
 /**
  * Парсит ISO-форматы дат. Если не распарсить — возвращает 0L.
  */
-fun parseDateToTimestamp(dateString: String?): Long {
+private fun parseDateToTimestamp(dateString: String?): Long {
     if (dateString.isNullOrBlank()) return 0L
     for (formatter in isoFormatters) {
         try {

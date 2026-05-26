@@ -8,7 +8,7 @@ import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.repository.MeetingsRepository
 import com.whysoezzy.network.safeApiCall
 
-class MeetingsRepositoryImpl(
+internal class MeetingsRepositoryImpl(
     private val meetingsApi: MeetingsApi
 ) : MeetingsRepository {
 
@@ -20,7 +20,6 @@ class MeetingsRepositoryImpl(
         meetingsApi.getPopularEvents().map { it.toDomain() }
     }
 
-    // TODO: реализовать пагинацию через Paging 3 когда объём данных потребует этого
     override suspend fun getAllEvents(page: Int, limit: Int, tagId: Long?): Result<List<Meeting>> = safeApiCall {
         meetingsApi.getAllEvents(page = page, limit = limit, tagId = tagId).map { it.toDomain() }
 

@@ -12,7 +12,7 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-class UserApiKtor(private val client: HttpClient): UserApi {
+internal class UserApiKtor(private val client: HttpClient): UserApi {
     override suspend fun getCurrentUserProfile(): UserProfileDto {
         return client.get("profile").body()
     }

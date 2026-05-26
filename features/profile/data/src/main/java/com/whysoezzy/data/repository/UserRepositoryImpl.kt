@@ -12,7 +12,7 @@ import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.repository.UserRepository
 import com.whysoezzy.network.safeApiCall
 
-class UserRepositoryImpl(
+internal class UserRepositoryImpl(
     private val userApi: UserApi
 ) : UserRepository {
 

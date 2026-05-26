@@ -4,7 +4,7 @@ import com.whysoezzy.data.dto.CommunityDto
 import com.whysoezzy.data.dto.MeetingDto
 import com.whysoezzy.data.dto.UserInfoDto
 
-interface CommunitiesApi {
+internal interface CommunitiesApi {
     suspend fun getRecommendedCommunities(): List<CommunityDto>
     suspend fun getCommunityById(id: Long): CommunityDto
     suspend fun subscribeToCommunity(id: Long)

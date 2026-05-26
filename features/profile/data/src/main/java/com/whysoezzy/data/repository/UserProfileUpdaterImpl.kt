@@ -2,11 +2,10 @@ package com.whysoezzy.data.repository
 
 import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
 import com.whysoezzy.data.api.UserApi
-import com.whysoezzy.data.api.UserApiKtor
 import com.whysoezzy.data.dto.UpdateUserDto
 import com.whysoezzy.network.safeApiCall
 
-class UserProfileUpdaterImpl(
+internal class UserProfileUpdaterImpl(
     private val userApi: UserApi
 ) : UserProfilerUpdater {
     override suspend fun updateName(name: String, surname: String): Result<Unit> =

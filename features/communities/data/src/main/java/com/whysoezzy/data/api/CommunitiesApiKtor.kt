@@ -12,7 +12,7 @@ import io.ktor.client.request.post
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-class CommunitiesApiKtor(private val client: HttpClient): CommunitiesApi {
+internal class CommunitiesApiKtor(private val client: HttpClient): CommunitiesApi {
     override suspend fun getRecommendedCommunities(): List<CommunityDto> {
         return client.get("communities/recommended").body()
     }

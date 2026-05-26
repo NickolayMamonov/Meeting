@@ -5,7 +5,7 @@ import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.repository.TagRepository
 import com.whysoezzy.network.safeApiCall
 
-class TagRepositoryImpl(
+internal class TagRepositoryImpl(
     private val tagsApi: TagsApi
 ) : TagRepository {
 
