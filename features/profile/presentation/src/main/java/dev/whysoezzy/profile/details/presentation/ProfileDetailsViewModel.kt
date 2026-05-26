@@ -14,6 +14,7 @@ import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -80,11 +81,12 @@ class ProfileDetailsViewModel(
                         return@onSuccess
                     }
 
-                    val meetingsDeferred    = async { getUserMeetingsUseCase(user.id) }
-                    val communitiesDeferred = async { getUserCommunitiesUseCase(user.id) }
-
-                    val meetings = meetingsDeferred.await().getOrNull() ?: emptyList()
-                    val communities = communitiesDeferred.await().getOrNull() ?: emptyList()
+                    val (meetings, communities) = coroutineScope {
+                        val meetingsDeferred    = async { getUserMeetingsUseCase(user.id) }
+                        val communitiesDeferred = async { getUserCommunitiesUseCase(user.id) }
+                        (meetingsDeferred.await().getOrNull() ?: emptyList()) to
+                                (communitiesDeferred.await().getOrNull() ?: emptyList())
+                    }
 
                     val subscribedIds = communities.map { it.id }.toSet()
 
