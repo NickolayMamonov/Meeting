@@ -19,6 +19,8 @@ val meetingsModule = module {
 
     single<MeetingsApi> { MeetingsApiKtor(get(named("authorizedClient"))) }
 
+    single<MeetingsRepository> { MeetingsRepositoryImpl(get()) }
+
     factory { GetHeroMeetingsUseCase(get()) }
     factory { GetPopularMeetingsUseCase(get()) }
     factory { GetAllMeetingsUseCase(get()) }
