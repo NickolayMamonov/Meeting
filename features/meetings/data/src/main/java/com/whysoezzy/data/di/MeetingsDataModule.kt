@@ -1,6 +1,7 @@
 package com.whysoezzy.data.di
 
-import com.whysoezzy.data.api.MeetingsApiImpl
+import com.whysoezzy.data.api.MeetingsApi
+import com.whysoezzy.data.api.MeetingsApiKtor
 import com.whysoezzy.data.repository.MeetingsRepositoryImpl
 import com.whysoezzy.domain.repository.MeetingsRepository
 import com.whysoezzy.domain.usecase.GetAllMeetingsUseCase
@@ -16,7 +17,7 @@ import org.koin.dsl.module
 
 val meetingsModule = module {
 
-    single { MeetingsApiImpl(get(named("authorizedClient"))) }
+    single<MeetingsApi> { MeetingsApiKtor(get(named("authorizedClient"))) }
 
     single<MeetingsRepository> { MeetingsRepositoryImpl(get()) }
 

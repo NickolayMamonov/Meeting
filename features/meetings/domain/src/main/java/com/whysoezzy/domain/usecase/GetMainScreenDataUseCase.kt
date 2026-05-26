@@ -5,8 +5,11 @@ import com.whysoezzy.domain.models.MainScreenData
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.repository.MeetingsRepository
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Use case для загрузки данных главного экрана.
@@ -24,7 +27,7 @@ class GetMainScreenDataUseCase(
 ) {
     suspend operator fun invoke(): Result<MainScreenData> {
         return try {
-            coroutineScope {
+            supervisorScope {
                 val heroDeferred = async { getHeroMeetingsUseCase() }
                 val popularDeferred = async { getPopularMeetingsUseCase() }
                 val allDeferred = async { meetingsRepository.getAllEvents() }
@@ -34,8 +37,9 @@ class GetMainScreenDataUseCase(
                 val heroMeetings = heroDeferred.await().getOrThrow()
                 val popularMeetings = popularDeferred.await().getOrThrow()
                 val allMeetings = allDeferred.await().getOrThrow()
-                val adBlocks = adBlocksDeferred.await().getOrNull() ?: emptyList()
-                val communities = communitiesDeferred.await().getOrNull() ?: emptyList()
+
+                val adBlocks = adBlocksDeferred.awaitOrEmpty()
+                val communities = communitiesDeferred.awaitOrEmpty()
 
                 val categories = allMeetings
                     .flatMap { it.tags }
@@ -54,8 +58,19 @@ class GetMainScreenDataUseCase(
                     )
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 }
+
+private suspend fun <T> Deferred<Result<List<T>>>.awaitOrEmpty(): List<T> =
+    try {
+        await().getOrNull() ?: emptyList()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Throwable) {
+        emptyList()
+    }

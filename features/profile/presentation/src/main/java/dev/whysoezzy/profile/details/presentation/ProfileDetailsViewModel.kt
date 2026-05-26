@@ -8,11 +8,13 @@ import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
 import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
+import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.toUserMessage
 import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -26,6 +28,7 @@ class ProfileDetailsViewModel(
     private val getUserByIdUseCase: GetUserByIdUseCase,
     private val getUserMeetingsUseCase: GetUserMeetingsUseCase,
     private val getUserCommunitiesUseCase: GetUserCommunitiesUseCase,
+    private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
@@ -78,11 +81,12 @@ class ProfileDetailsViewModel(
                         return@onSuccess
                     }
 
-                    val meetingsDeferred    = async { getUserMeetingsUseCase(user.id) }
-                    val communitiesDeferred = async { getUserCommunitiesUseCase(user.id) }
-
-                    val meetings = meetingsDeferred.await().getOrNull() ?: emptyList()
-                    val communities = communitiesDeferred.await().getOrNull() ?: emptyList()
+                    val (meetings, communities) = coroutineScope {
+                        val meetingsDeferred    = async { getUserMeetingsUseCase(user.id) }
+                        val communitiesDeferred = async { getUserCommunitiesUseCase(user.id) }
+                        (meetingsDeferred.await().getOrNull() ?: emptyList()) to
+                                (communitiesDeferred.await().getOrNull() ?: emptyList())
+                    }
 
                     val subscribedIds = communities.map { it.id }.toSet()
 
@@ -132,12 +136,23 @@ class ProfileDetailsViewModel(
     }
 
     private fun handleToggleCommunitySubscription(communityId: Long, isSubscribed: Boolean) {
-        val currentState = _uiState.value as? ProfileDetailsUiState.Success ?: return
-        val updatedSubscriptions = currentState.userCommunities.map { community ->
-            if(community.id == communityId) community.copy(isSubscribed = isSubscribed)
-            else community
+        applySubscriptionToState(communityId, isSubscribed)
+
+        viewModelScope.launch {
+            manageCommunitySubscriptionUseCase(communityId, isSubscribed)
+                .onFailure {
+                    applySubscriptionToState(communityId, !isSubscribed)
+                }
         }
-        _uiState.value = currentState.copy(userCommunities = updatedSubscriptions)
-        // TODO: фаза 3.2 — синхронизировать с API
+    }
+
+    private fun applySubscriptionToState(communityId: Long, isSubscribed: Boolean) {
+        val state = _uiState.value as? ProfileDetailsUiState.Success ?: return
+        _uiState.value = state.copy(
+            userCommunities = state.userCommunities.map { community ->
+                if (community.id == communityId) community.copy(isSubscribed = isSubscribed)
+                else community
+            }
+        )
     }
 }

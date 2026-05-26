@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,9 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+import androidx.compose.ui.res.stringResource
+import dev.whysoezzy.auth.R
+import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun PhoneInputScreen(
@@ -75,13 +79,13 @@ private fun PhoneInputContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextHeading1(
-                text = "Добро пожаловать!",
+                text = stringResource(R.string.auth_phone_title),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
 
             TextBody2(
-                text = "Для входа в приложение введите номер телефона",
+                text = stringResource(R.string.auth_phone_subtitle),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
@@ -93,7 +97,7 @@ private fun PhoneInputContent(
         UIKitPhoneInput(
             value = uiState.phoneNumber,
             onValueChange = onPhoneNumberChange,
-            placeholder = "Номер телефона",
+            placeholder = stringResource(R.string.auth_phone_placeholder),
             state = if (uiState.error != null) UIKitInputState.ERROR else UIKitInputState.FILLED,
             errorMessage = uiState.error,
             modifier = Modifier.fillMaxWidth()
@@ -103,7 +107,7 @@ private fun PhoneInputContent(
 
         // Send code button
         UIKitButton(
-            text = "Отправить код",
+            text = stringResource(R.string.auth_phone_send_code),
             onClick = onSendCodeClick,
             state = when {
                 uiState.isLoading -> UIKitButtonState.LOADING
@@ -134,7 +138,7 @@ private fun PhoneInputScreenErrorPreview() {
         PhoneInputContent(
             uiState = PhoneInputUiState(
                 phoneNumber = "+7 (999) 123",
-                error = "Введите корректный номер телефона"
+                error = stringResource(R.string.auth_phone_error_invalid)
             )
         )
     }

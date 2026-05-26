@@ -3,6 +3,7 @@ package dev.whysoezzy.auth.presentation.name
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
+import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -78,12 +79,29 @@ class NameInputViewModel(
         if (nameError != null || surnameError != null) return
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, nameError = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                nameError = null,
+                surnameError = null
+            )
 
             userProfilerUpdater.updateName(
                 name = _uiState.value.name,
                 surname = _uiState.value.surname
             )
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSubmitted = true
+                    )
+                    _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        nameError = throwable.toUserMessage()
+                    )
+                }
         }
     }
 }

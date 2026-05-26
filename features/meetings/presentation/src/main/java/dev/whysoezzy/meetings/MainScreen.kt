@@ -25,13 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.meetings.presentation.MainScreenEvent
 import dev.whysoezzy.meetings.presentation.MainScreenNavEvent
@@ -48,6 +46,13 @@ import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitTagState
 import org.koin.androidx.compose.koinViewModel
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import dev.whysoezzy.features_meetings.R
+import dev.whysoezzy.uikit.R as UIKitR
+
 private const val AD_BLOCK_INTERVAL = 3
 @Composable
 fun MainScreen(
@@ -58,12 +63,15 @@ fun MainScreen(
     onUserProfileClick: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is MainScreenNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
-                is MainScreenNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is MainScreenNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
+                    is MainScreenNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
+                }
             }
         }
     }
@@ -131,7 +139,7 @@ private fun MainScreenTopBar(
     UIKitSearchBar(
         query = searchQuery,
         onQueryChange = onSearchQueryChange,
-        placeholder = "Поиск встреч и сообществ",
+        placeholder = stringResource(R.string.meetings_main_search_placeholder),
         onProfileClick = onProfileClick,
         onCancelClick = {},
         modifier = modifier
@@ -207,7 +215,7 @@ private fun MainScreenContent(
         if (popularMeetings.isNotEmpty()) {
             item {
                 TextHeading2(
-                    text = "Ближайшие встречи",
+                    text = stringResource(R.string.meetings_main_section_upcoming),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
@@ -246,7 +254,7 @@ private fun MainScreenContent(
         if (communities.isNotEmpty()) {
             item {
                 TextHeading2(
-                    text = "Рекомендуемые сообщества",
+                    text = stringResource(R.string.meetings_main_section_communities),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
@@ -277,7 +285,7 @@ private fun MainScreenContent(
         // Секция "Все встречи" с рекламой через каждые 3 встречи
         item {
             TextHeading2(
-                text = "Все встречи",
+                text = stringResource(R.string.meetings_main_section_all),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
@@ -321,7 +329,9 @@ private fun MainScreenContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        onUserClick = onUserProfileClick
+                        onUserClick = onUserProfileClick,
+                        onCommunitySubscribe = onCommunitySubscribeClick,
+                        onCommunityClick = onCommunityClick
                     )
                 }
             }
@@ -356,7 +366,7 @@ private fun ErrorContent(
             )
 
             Button(onClick = onRetry) {
-                Text("Повторить")
+                Text(stringResource(UIKitR.string.action_retry))
             }
         }
     }

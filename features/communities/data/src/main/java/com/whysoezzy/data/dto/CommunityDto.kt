@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class CommunityDto(
+internal data class CommunityDto(
     @SerialName("id") val id: Long,
     @SerialName("name") val name: String,
     @SerialName("description") val description: String,

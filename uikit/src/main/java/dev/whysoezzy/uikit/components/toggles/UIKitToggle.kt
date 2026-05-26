@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,7 +64,7 @@ fun UIKitToggle(
                 )
                 .clickable(
                     enabled = enabled,
-                    indication = rememberRipple(bounded = false),
+                    indication = ripple(bounded = false),
                     interactionSource = remember { MutableInteractionSource() },
                     onClick = { onCheckedChange(!checked) }
                 )

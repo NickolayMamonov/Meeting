@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Общие действия и подписи, используемые в нескольких фичах.
+        Сюда же позже могут переехать строки из app/strings.xml,
+        когда R-020 переведёт ErrorMessages на @StringRes.
+    -->
+    <string name="action_continue">Продолжить</string>
+    <string name="action_retry">Повторить</string>
+    <string name="action_back">Назад</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_done">Готово</string>
+</resources>

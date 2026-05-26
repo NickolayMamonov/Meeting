@@ -90,48 +90,48 @@ private fun formatMeetingDate(timestamp: Long): String {
     return dateFormat.format(Date(timestamp))
 }
 
-@Preview
-@Composable
-private fun UIKitUserMeetingsBlockPreview() {
-    UIKitTheme {
-        val mockTags = listOf(
-            UIKitMeetingTag(1,"Android", UIKitTagState.ACTIVE),
-            UIKitMeetingTag(2, "Kotlin", UIKitTagState.ACTIVE)
-        )
-
-        val mockMeetings = listOf(
-            UIKitMeetingInfo(
-                id = 1,
-                imageUrl = "https://picsum.photos/212/148?random=1",
-                title = "Android Dev Meetup",
-                address = "ул. Тверская, 15",
-                tags = mockTags,
-                date = "date",
-            ),
-            UIKitMeetingInfo(
-                id = 2,
-                imageUrl = "https://picsum.photos/212/148?random=2",
-                title = "Kotlin Conf",
-                address = "ул. Пушкина, 10",
-                tags = mockTags.take(1),
-                date = "date",
-                ),
-            UIKitMeetingInfo(
-                id = 3,
-                imageUrl = "https://picsum.photos/212/148?random=3",
-                title = "UI/UX Workshop",
-                address = "пр. Мира, 20",
-                tags = mockTags,
-                date = "date",
-            )
-        )
-
-        UIKitUserMeetingsBlock(
-            meetings = mockMeetings,
-            onMeetingClick = { }
-        )
-    }
-}
+//@Preview
+//@Composable
+//private fun UIKitUserMeetingsBlockPreview() {
+//    UIKitTheme {
+//        val mockTags = listOf(
+//            UIKitMeetingTag(1,"Android", UIKitTagState.ACTIVE),
+//            UIKitMeetingTag(2, "Kotlin", UIKitTagState.ACTIVE)
+//        )
+//
+//        val mockMeetings = listOf(
+//            UIKitMeetingInfo(
+//                id = 1,
+//                imageUrl = "https://picsum.photos/212/148?random=1",
+//                title = "Android Dev Meetup",
+//                address = "ул. Тверская, 15",
+//                tags = mockTags,
+//                date = "date",
+//            ),
+//            UIKitMeetingInfo(
+//                id = 2,
+//                imageUrl = "https://picsum.photos/212/148?random=2",
+//                title = "Kotlin Conf",
+//                address = "ул. Пушкина, 10",
+//                tags = mockTags.take(1),
+//                date = "date",
+//                ),
+//            UIKitMeetingInfo(
+//                id = 3,
+//                imageUrl = "https://picsum.photos/212/148?random=3",
+//                title = "UI/UX Workshop",
+//                address = "пр. Мира, 20",
+//                tags = mockTags,
+//                date = "date",
+//            )
+//        )
+//
+//        UIKitUserMeetingsBlock(
+//            meetings = mockMeetings,
+//            onMeetingClick = { }
+//        )
+//    }
+//}
 
 @Preview
 @Composable

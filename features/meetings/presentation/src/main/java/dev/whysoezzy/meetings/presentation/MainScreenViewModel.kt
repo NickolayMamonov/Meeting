@@ -2,6 +2,7 @@ package dev.whysoezzy.meetings.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.toUserMessage
@@ -10,7 +11,6 @@ import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfos
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingTags
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitTagState
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,7 +27,8 @@ sealed class MainScreenNavEvent {
 
 class MainScreenViewModel(
     private val getMainScreenDataUseCase: GetMainScreenDataUseCase,
-    private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase
+    private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
+    private val dispatchers: DispatcherProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MainScreenUiState>(MainScreenUiState.Loading)
@@ -66,7 +67,7 @@ class MainScreenViewModel(
 
             getMainScreenDataUseCase()
                 .onSuccess { data ->
-                    val mapped = withContext(Dispatchers.Default){
+                    val mapped = withContext(dispatchers.default){
                         val allMeetings = data.allMeetings.toUIKitMeetingInfos()
                         val heroMeetings = data.heroMeetings.toUIKitMeetingInfos()
                         val popularMeetings = data.popularMeetings.toUIKitMeetingInfos()
@@ -117,7 +118,7 @@ class MainScreenViewModel(
 
         viewModelScope.launch {
             val lowerQuery = query.lowercase()
-            val filtered = withContext(Dispatchers.Default){
+            val filtered = withContext(dispatchers.default){
                 cachedAllMeetings.filter { meeting ->
                     meeting.title.lowercase().contains(lowerQuery) ||
                             meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
@@ -138,7 +139,7 @@ class MainScreenViewModel(
     private fun filterByTag(tagId: Long?) {
         val currentState = _uiState.value as? MainScreenUiState.Success ?: return
         viewModelScope.launch {
-            val (filtered, updatedCategories) = withContext(Dispatchers.Default) {
+            val (filtered, updatedCategories) = withContext(dispatchers.default) {
                 val filtered = if (tagId == null) {
                     cachedAllMeetings
                 } else {

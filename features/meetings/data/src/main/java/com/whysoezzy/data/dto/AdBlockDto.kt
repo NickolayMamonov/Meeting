@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class AdBlockResponseDto(
+internal data class AdBlockResponseDto(
     val type: String,  // "COMMUNITIES", "TEXT", "PEOPLE"
     val id: Long,
     val isActive: Boolean,
@@ -23,13 +23,13 @@ data class AdBlockResponseDto(
 )
 
 @Serializable
-sealed class AdBlockDto {
+internal sealed class AdBlockDto {
     abstract val id: Long
     abstract val isActive: Boolean
 
     @Serializable
     @SerialName("COMMUNITY")
-    data class CommunityAdDto(
+    internal data class CommunityAdDto(
         override val id: Long,
         val communityId: Long,
         val communityName: String,
@@ -41,7 +41,7 @@ sealed class AdBlockDto {
 
     @Serializable
     @SerialName("TEXT")
-    data class TextAdDto(
+    internal data class TextAdDto(
         override val id: Long,
         val title: String,
         val description: String,
@@ -52,7 +52,7 @@ sealed class AdBlockDto {
 
     @Serializable
     @SerialName("BANNER")
-    data class BannerAdDto(
+    internal data class BannerAdDto(
         override val id: Long,
         val title: String,
         val imageUrl: String,

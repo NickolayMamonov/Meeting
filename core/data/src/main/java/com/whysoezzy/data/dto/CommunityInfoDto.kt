@@ -9,5 +9,6 @@ data class CommunityInfoDto(
     val name: String,
     val description: String? = null,
     val imageUrl: String,
-    val subscribersCount: Int? = null
+    val subscribersCount: Int? = null,
+    val isSubscribed: Boolean = false
 )

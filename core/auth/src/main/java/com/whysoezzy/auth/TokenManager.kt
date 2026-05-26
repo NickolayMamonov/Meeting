@@ -5,10 +5,11 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.whysoezzy.network.TokenProvider
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-// TODO: androidx.security.crypto deprecated в 2024. Мигрировать на
-// EncryptedDataStore или прямой Android Keystore API
-class TokenManager(context: Context) : TokenProvider {
+internal class TokenManager(context: Context) : TokenProvider {
 
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -22,6 +23,9 @@ class TokenManager(context: Context) : TokenProvider {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
+    private val _isLoggedInFlow = MutableStateFlow(prefs.getString(KEY_ACCESS_TOKEN, null) != null)
+    val isLoggedInFlow: StateFlow<Boolean> = _isLoggedInFlow.asStateFlow()
+
     fun saveTokens(accessToken: String, refreshToken: String, userId: Long? = null) {
         prefs.edit().apply {
             putString(KEY_ACCESS_TOKEN, accessToken)
@@ -29,16 +33,11 @@ class TokenManager(context: Context) : TokenProvider {
             userId?.let { putLong(KEY_USER_ID, it) }
             apply()
         }
+        _isLoggedInFlow.value = prefs.getString(KEY_ACCESS_TOKEN, null) != null
     }
 
-
-    override fun getAccessToken(): String? {
-        return prefs.getString(KEY_ACCESS_TOKEN, null)
-    }
-
-    override fun getRefreshToken(): String? {
-        return prefs.getString(KEY_REFRESH_TOKEN, null)
-    }
+    override fun getAccessToken(): String? = prefs.getString(KEY_ACCESS_TOKEN, null)
+    override fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
 
     fun getUserId(): Long? {
         val userId = prefs.getLong(KEY_USER_ID, -1L)
@@ -47,10 +46,7 @@ class TokenManager(context: Context) : TokenProvider {
 
     fun clearTokens() {
         prefs.edit().clear().apply()
-    }
-
-    fun isLoggedIn(): Boolean {
-        return getAccessToken() != null
+        _isLoggedInFlow.value = false
     }
 
     companion object {

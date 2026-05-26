@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ProfileEditScreen — interest dialog -->
+    <string name="profile_edit_interests_title">Выберите интересы</string>
+    <string name="profile_edit_interests_loading">Загрузка тегов…</string>
+
+    <!-- ProfileEditScreen — delete dialog -->
+    <string name="profile_edit_delete_title">Удалить профиль?</string>
+    <string name="profile_edit_delete_message">Аккаунт будет удалён. У вас будет 30 дней, чтобы восстановить его.</string>
+    <string name="profile_edit_delete_confirm">Удалить</string>
+
+    <!-- ProfileEditScreen — photo -->
+    <string name="profile_edit_photo_content_description">Фото профиля</string>
+    <string name="profile_edit_photo_change">Изменить фото</string>
+
+    <!-- ProfileEditScreen — fields -->
+    <string name="profile_edit_field_fullname">Имя Фамилия</string>
+    <string name="profile_edit_field_city">Город</string>
+    <string name="profile_edit_field_about">Расскажите о себе</string>
+
+    <!-- ProfileEditScreen — sections -->
+    <string name="profile_edit_section_interests">Интересы</string>
+    <string name="profile_edit_section_social">Социальные сети</string>
+    <string name="profile_edit_social_habr">Хабр</string>
+    <string name="profile_edit_social_telegram">Телеграм</string>
+
+    <!-- ProfileEditScreen — toggles -->
+    <string name="profile_edit_toggle_show_communities">Показывать мои сообщества</string>
+    <string name="profile_edit_toggle_show_meetings">Показывать мои встречи</string>
+    <string name="profile_edit_toggle_notifications">Включить уведомления</string>
+    <string name="profile_edit_delete_profile">Удалить профиль</string>
+
+    <!-- ProfileDetailsScreen -->
+    <string name="profile_details_description_placeholder_self">Добавьте описание профиля…</string>
+    <string name="profile_details_meetings_self">Мои встречи</string>
+    <string name="profile_details_meetings_other">Встречи</string>
+    <string name="profile_details_communities_self">Мои сообщества</string>
+    <string name="profile_details_communities_other">Сообщества</string>
+    <string name="profile_details_logout">Выйти</string>
+    <string name="profile_details_share_chooser_title">Поделиться профилем</string>
+</resources>

@@ -13,7 +13,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import dev.whysoezzy.communities.R
 import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
@@ -29,15 +34,18 @@ fun CommunitySubscribersScreen(
     viewModel: CommunitySubscribersViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(communityId) {
         viewModel.onEvent(CommunitySubscribersEvent.LoadSubscribers(communityId))
     }
 
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is CommunitySubscribersNavEvent.NavigateToProfile -> onPersonClick(event.userId)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is CommunitySubscribersNavEvent.NavigateToProfile -> onPersonClick(event.userId)
+                }
             }
         }
     }
@@ -50,13 +58,14 @@ fun CommunitySubscribersScreen(
                         text = when (uiState) {
                             is CommunitySubscribersUiState.Success ->
                                 (uiState as CommunitySubscribersUiState.Success).communityName
-                            else -> "Подписчики"
+                            else -> stringResource(R.string.community_subscribers_default_title)
                         }
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Назад")
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(
+                            dev.whysoezzy.uikit.R.string.action_back))
                     }
                 },
             )
@@ -80,7 +89,7 @@ fun CommunitySubscribersScreen(
                     onPersonClick = { subscriberId ->
                         viewModel.onEvent(CommunitySubscribersEvent.NavigateToProfile(subscriberId))
                     },
-                    emptyStateText = "Пока нет подписчиков",
+                    emptyStateText = stringResource(R.string.community_subscribers_empty),
                     modifier = Modifier.padding(paddingValues)
                 )
             }

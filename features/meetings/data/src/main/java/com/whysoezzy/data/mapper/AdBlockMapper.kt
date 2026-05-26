@@ -7,7 +7,7 @@ import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.Person
 
-fun AdBlockResponseDto.toDomain(): AdBlock {
+internal fun AdBlockResponseDto.toDomain(): AdBlock {
     return when (type) {
         "COMMUNITIES" -> AdBlock.CommunitiesAd(
             id = id,
@@ -35,17 +35,18 @@ fun AdBlockResponseDto.toDomain(): AdBlock {
     }
 }
 
-fun CommunityInfoDto.toDomain(): CommunityInfo {
+internal fun CommunityInfoDto.toDomain(): CommunityInfo {
     return CommunityInfo(
         id = id,
         name = name,
         description = description ?: "",
         imageUrl = imageUrl,
-        subscribersCount = subscribersCount ?: 0
+        subscribersCount = subscribersCount ?: 0,
+        isSubscribed = isSubscribed
     )
 }
 
-fun UserInfoDto.toDomain(): Person {
+internal fun UserInfoDto.toDomain(): Person {
     return Person(
         id = id,
         name = name,
@@ -56,4 +57,4 @@ fun UserInfoDto.toDomain(): Person {
     )
 }
 
-fun List<AdBlockResponseDto>.toDomain(): List<AdBlock> = map { it.toDomain() }
+internal fun List<AdBlockResponseDto>.toDomain(): List<AdBlock> = map { it.toDomain() }

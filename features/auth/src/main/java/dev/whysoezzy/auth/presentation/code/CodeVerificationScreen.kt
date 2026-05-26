@@ -29,6 +29,13 @@ import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import dev.whysoezzy.auth.R
+import dev.whysoezzy.auth.presentation.name.NameInputNavEvent
+import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun CodeVerificationScreen(
@@ -39,15 +46,18 @@ fun CodeVerificationScreen(
     viewModel: CodeVerificationViewModel = koinViewModel { parametersOf(phoneNumber) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Подписываемся на навигационные события из ViewModel
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is CodeVerificationNavEvent.NavigateToMain ->
-                    onCodeVerifiedExisting()
-                is CodeVerificationNavEvent.NavigateToNameInput ->
-                    onCodeVerifiedNew(event.phone, event.code)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is CodeVerificationNavEvent.NavigateToMain ->
+                        onCodeVerifiedExisting()
+                    is CodeVerificationNavEvent.NavigateToNameInput ->
+                        onCodeVerifiedNew(event.phone, event.code)
+                }
             }
         }
     }
@@ -87,12 +97,12 @@ private fun CodeVerificationContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextHeading1(
-                text = "Введите код",
+                text = stringResource(R.string.auth_code_title),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
             TextBody2(
-                text = "Мы отправили код подтверждения на номер\n$phoneNumber",
+                text = stringResource(R.string.auth_code_subtitle, phoneNumber),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
@@ -119,13 +129,13 @@ private fun CodeVerificationContent(
         if (uiState.canResend) {
             TextButton(onClick = onResendClick) {
                 TextMetadata1(
-                    text = "Отправить код повторно",
+                    text = stringResource(R.string.auth_code_resend),
                     color = ColorTokens.BrandDefault
                 )
             }
         } else {
             TextMetadata1(
-                text = "Отправить повторно через ${uiState.remainingTime} сек",
+                text = stringResource(R.string.auth_code_resend_timer, uiState.remainingTime),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
@@ -134,7 +144,7 @@ private fun CodeVerificationContent(
         Spacer(modifier = Modifier.weight(1f))
 
         UIKitButton(
-            text = "Подтвердить",
+            text = stringResource(R.string.auth_code_confirm),
             onClick = onVerifyClick,
             state = when {
                 uiState.isLoading -> UIKitButtonState.LOADING
@@ -151,7 +161,7 @@ private fun CodeVerificationContent(
 private fun CodeVerificationScreenPreview() {
     UIKitTheme {
         CodeVerificationContent(
-            phoneNumber = "+7 (999) 123-45-67",
+            phoneNumber = stringResource(R.string.auth_code_error_invalid),
             uiState = CodeVerificationUiState(code = "12", remainingTime = 45)
         )
     }
@@ -165,7 +175,7 @@ private fun CodeVerificationScreenErrorPreview() {
             phoneNumber = "+7 (999) 123-45-67",
             uiState = CodeVerificationUiState(
                 code = "1234",
-                error = "Неверный код подтверждения",
+                error = stringResource(R.string.auth_code_error_invalid),
                 canResend = true
             )
         )

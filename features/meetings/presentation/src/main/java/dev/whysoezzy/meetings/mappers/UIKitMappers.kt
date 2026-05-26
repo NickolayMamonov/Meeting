@@ -6,22 +6,27 @@ import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
 import com.whysoezzy.domain.models.MeetingInfo
+import com.whysoezzy.domain.models.MeetingStatus
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.Tag
-import dev.whysoezzy.uikit.mappers.toUIKitMeetingStatus
-import dev.whysoezzy.uikit.mappers.toUIKitMeetingTag
+import com.whysoezzy.domain.models.TagState
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunity
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitHost
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
+import dev.whysoezzy.uikit.models.UIKitMeetingStatus
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 import dev.whysoezzy.uikit.models.UIKitTag
+import dev.whysoezzy.uikit.models.UIKitTagState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ─── Address ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +69,26 @@ fun List<Tag>.toUIKit(
 
 
 
+private fun TagState.toUIKitTagState(): UIKitTagState = when (this) {
+    TagState.ACTIVE -> UIKitTagState.ACTIVE
+    TagState.INACTIVE -> UIKitTagState.INACTIVE
+    TagState.SELECTED -> UIKitTagState.SELECTED
+    TagState.DISABLED -> UIKitTagState.DISABLED
+}
+
+private fun MeetingStatus.toUIKitMeetingStatus(): UIKitMeetingStatus = when (this) {
+    MeetingStatus.ACTIVE -> UIKitMeetingStatus.ACTIVE
+    MeetingStatus.COMPLETED -> UIKitMeetingStatus.COMPLETED
+    MeetingStatus.CANCELLED -> UIKitMeetingStatus.CANCELLED
+    MeetingStatus.FULL -> UIKitMeetingStatus.FULL
+    MeetingStatus.DRAFT -> UIKitMeetingStatus.DRAFT
+}
+
+private fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag = UIKitMeetingTag(
+    id = id,
+    text = text,
+    state = state.toUIKitTagState()
+)
 
 fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> =
     filterNotNull().map { it.toUIKitMeetingTag() }
@@ -105,8 +130,8 @@ fun CommunityHost.toUIKitCommunityHost() = UIKitCommunityHost(
 // ─── Meeting ──────────────────────────────────────────────────────────────────
 
 private fun formatDateTime(timestamp: Long): String {
-    val formatter = java.text.SimpleDateFormat("dd MMMM yyyy, HH:mm", java.util.Locale("ru"))
-    return formatter.format(java.util.Date(timestamp))
+    val formatter = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
+    return formatter.format(Date(timestamp))
 }
 
 /** Полная доменная Meeting → UIKitMeetingInfo */
@@ -117,7 +142,9 @@ fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
     date = if (date.isNotBlank()) date else formatDateTime(time),
     address = address.address,
     tags = tags.toUIKitMeetingTags(),
-    meetingStatus = meetingStatus.toUIKitMeetingStatus()
+    meetingStatus = meetingStatus.toUIKitMeetingStatus(),
+    latitude = address.latitude,
+    longitude = address.longitude
 )
 
 fun List<Meeting>.toUIKitMeetingInfos(): List<UIKitMeetingInfo> =
@@ -131,7 +158,9 @@ fun MeetingInfo.toUIKitMeetingInfo() = UIKitMeetingInfo(
     date = if (time > 0) formatDateTime(time) else "",
     address = address.orEmpty(),
     tags = tags.toUIKitMeetingTags(),
-    meetingStatus = meetingStatus.toUIKitMeetingStatus()
+    meetingStatus = meetingStatus.toUIKitMeetingStatus(),
+    latitude = 0.0,
+    longitude = 0.0
 )
 
 fun List<MeetingInfo>.toUIKitMeetingInfoList(): List<UIKitMeetingInfo> =

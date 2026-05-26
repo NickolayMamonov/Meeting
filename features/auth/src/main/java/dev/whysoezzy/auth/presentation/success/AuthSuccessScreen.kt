@@ -15,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,9 @@ import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
+import androidx.compose.ui.res.stringResource
+import dev.whysoezzy.auth.R
+import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun AuthSuccessScreen(
@@ -53,7 +57,7 @@ private fun AuthSuccessContent(
         // Success icon
         Icon(
             imageVector = Icons.Filled.CheckCircle,
-            contentDescription = "Успех",
+            contentDescription = stringResource(R.string.auth_success_content_description),
             tint = ColorTokens.AccentSuccess,
             modifier = Modifier.size(80.dp)
         )
@@ -66,13 +70,13 @@ private fun AuthSuccessContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextHeading1(
-                text = "Добро пожаловать!",
+                text = stringResource(R.string.auth_success_title),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
 
             TextBody1(
-                text = "Регистрация успешно завершена.\nТеперь вы можете пользоваться всеми возможностями приложения.",
+                text = stringResource(R.string.auth_success_subtitle),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center
             )
@@ -82,7 +86,7 @@ private fun AuthSuccessContent(
 
         // Continue button
         UIKitButton(
-            text = "Продолжить",
+            text = stringResource(UIKitR.string.action_continue),
             onClick = onContinueClicked,
             state = UIKitButtonState.PRIMARY,
             modifier = Modifier.fillMaxWidth()

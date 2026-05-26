@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CommunityDetailsScreen -->
+    <string name="community_details_title">Сообщество</string>
+    <string name="community_details_leave">Покинуть сообщество</string>
+    <string name="community_details_join">Вступить в сообщество</string>
+    <string name="community_details_meetings">Встречи</string>
+    <string name="community_details_meetings_past">Прошлые встречи</string>
+    <string name="community_details_subscribers">Подписаны</string>
+
+    <!-- CommunitySubscribersScreen -->
+    <string name="community_subscribers_default_title">Подписчики</string>
+    <string name="community_subscribers_empty">Пока нет подписчиков</string>
+</resources>
