@@ -1,5 +1,8 @@
 package dev.whysoezzy.uikit.models
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class UIKitMeeting(
     val id: Long,
     val imageUrl: String,

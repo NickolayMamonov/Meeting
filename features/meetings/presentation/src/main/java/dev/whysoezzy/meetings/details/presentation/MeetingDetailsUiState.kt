@@ -1,5 +1,6 @@
 package dev.whysoezzy.meetings.details.presentation
 
+import androidx.compose.runtime.Immutable
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
@@ -7,6 +8,7 @@ import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 
+@Immutable
 sealed class MeetingDetailsUiState {
     data object Loading : MeetingDetailsUiState()
 

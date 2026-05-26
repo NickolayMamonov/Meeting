@@ -1,8 +1,5 @@
 package dev.whysoezzy.meetings.details.presentation
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -24,6 +22,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,7 +42,6 @@ import dev.whysoezzy.uikit.components.blocks.UIKitParticipantsBlock
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
-import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
 import dev.whysoezzy.uikit.components.cards.UIKitHostCard
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
@@ -64,11 +62,11 @@ import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.features_meetings.R
+import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
@@ -313,6 +311,7 @@ private fun MeetingContent(
                     TextHeading2(text = stringResource(R.string.meeting_details_community_other_meetings))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
                         items(uiState.otherMeetings, key = {it.id}) { meeting ->
+                            val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTags() }
                             UIKitEventCard(
                                 imageUrl = meeting.imageUrl,
                                 title = meeting.title,
@@ -322,13 +321,7 @@ private fun MeetingContent(
                                     latitude = 0.0,
                                     longitude = 0.0
                                 ),
-                                tags = meeting.tags.map { tag ->
-                                    UIKitEventCardTag(
-                                        text = tag.text,
-                                        isSelected = tag.state == UIKitTagState.SELECTED,
-                                        isEnabled = tag.state != UIKitTagState.DISABLED
-                                    )
-                                },
+                                tags = eventCardTags,
                                 cardType = UIKitEventCardType.COMPACT,
                                 onCardClick = { onOtherMeetingClick(meeting.id) }
                             )
@@ -344,6 +337,7 @@ private fun MeetingContent(
     }
 }
 
+private val ErrorButtonMaxWidth = 343.dp
 @Composable
 private fun ErrorContent(
     message: String,
@@ -357,8 +351,16 @@ private fun ErrorContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextBody1(text = message, textAlign = TextAlign.Center)
-            UIKitButton(text = stringResource(dev.whysoezzy.uikit.R.string.action_retry), onClick = onRetry)
-            UIKitButton(text = stringResource(dev.whysoezzy.uikit.R.string.action_cancel), onClick = onBackPressed)
+            UIKitButton(
+                text = stringResource(dev.whysoezzy.uikit.R.string.action_retry),
+                onClick = onRetry,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+            )
+            UIKitButton(
+                text = stringResource(dev.whysoezzy.uikit.R.string.action_cancel),
+                onClick = onBackPressed,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+            )
         }
     }
 }

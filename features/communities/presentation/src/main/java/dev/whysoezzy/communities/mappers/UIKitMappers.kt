@@ -5,6 +5,7 @@ import com.whysoezzy.domain.models.MeetingStatus
 import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.models.TagState
+import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingStatus
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
@@ -51,3 +52,18 @@ private fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag = UIKitMeetingTag(
     text = text,
     state = state.toUIKitTagState()
 )
+
+internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
+    map { tag ->
+        UIKitEventCardTag(
+            text = tag.text,
+            isSelected = tag.state == UIKitTagState.SELECTED,
+            isEnabled = tag.state != UIKitTagState.DISABLED
+        )
+    }
+
+internal fun List<UIKitMeetingTag>.toEventCardTagsAllSelected(): List<UIKitEventCardTag> =
+    map { tag -> UIKitEventCardTag(text = tag.text, isSelected = true, isEnabled = false) }
+
+internal fun List<UIKitMeetingTag>.toEventCardTagsAllDisabled(): List<UIKitEventCardTag> =
+    map { tag -> UIKitEventCardTag(text = tag.text, isSelected = false, isEnabled = false) }

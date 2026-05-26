@@ -1,7 +1,9 @@
 package dev.whysoezzy.communities.subscribers
 
+import androidx.compose.runtime.Immutable
 import com.whysoezzy.domain.models.Person
 
+@Immutable
 sealed class CommunitySubscribersUiState {
     object Loading : CommunitySubscribersUiState()
 

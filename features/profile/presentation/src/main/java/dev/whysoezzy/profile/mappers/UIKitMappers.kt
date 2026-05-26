@@ -226,3 +226,12 @@ private fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag = UIKitMeetingTag(
     text = text,
     state = state.toUIKitTagState()
 )
+
+internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
+    map { tag ->
+        UIKitEventCardTag(
+            text = tag.text,
+            isSelected = tag.state == UIKitTagState.SELECTED,
+            isEnabled = tag.state != UIKitTagState.DISABLED
+        )
+    }

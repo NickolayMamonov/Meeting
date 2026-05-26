@@ -1,5 +1,8 @@
 package dev.whysoezzy.auth.presentation.code
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class CodeVerificationUiState(
     val code: String = "",
     val isLoading: Boolean = false,

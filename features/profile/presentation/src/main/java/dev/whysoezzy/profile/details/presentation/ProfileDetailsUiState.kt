@@ -1,9 +1,11 @@
 package dev.whysoezzy.profile.details.presentation
 
+import androidx.compose.runtime.Immutable
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 
+@Immutable
 sealed class ProfileDetailsUiState {
     data object Loading : ProfileDetailsUiState()
     data class Success(

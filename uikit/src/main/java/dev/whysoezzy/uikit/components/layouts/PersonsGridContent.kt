@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.cards.UIKitPersonCard
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -96,6 +98,8 @@ fun PersonsGridLoading(
 /**
  * Error state для списка людей
  */
+private val ErrorButtonMaxWidth = 343.dp
+
 @Composable
 fun PersonsGridError(
     message: String,
@@ -119,12 +123,14 @@ fun PersonsGridError(
 
             UIKitButton(
                 text = "Повторить",
-                onClick = onRetry
+                onClick = onRetry,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
             )
 
             UIKitButton(
                 text = "Назад",
-                onClick = onBackPressed
+                onClick = onBackPressed,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
             )
         }
     }
