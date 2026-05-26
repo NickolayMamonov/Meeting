@@ -13,6 +13,7 @@ import dev.whysoezzy.communities.mappers.toUIKitPerson
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitTagState
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -71,11 +72,12 @@ class CommunityDetailsViewModel(
                     )
                 }
                 .onSuccess { community ->
-                    val meetingsDeferred = async { getCommunityMeetingsUseCase(communityId) }
-                    val subscribersDeferred = async { getCommunitySubscribersUseCase(communityId) }
-
-                    val meetings = meetingsDeferred.await().getOrNull() ?: emptyList()
-                    val subscribers = subscribersDeferred.await().getOrNull() ?: emptyList()
+                    val (meetings, subscribers) = coroutineScope {
+                        val meetingsDeferred = async { getCommunityMeetingsUseCase(communityId) }
+                        val subscribersDeferred = async { getCommunitySubscribersUseCase(communityId) }
+                        (meetingsDeferred.await().getOrNull() ?: emptyList()) to
+                                (subscribersDeferred.await().getOrNull() ?: emptyList())
+                    }
 
                     val currentTime = System.currentTimeMillis()
                     val activeMeetings = meetings.filter { it.time >= currentTime }.sortedBy { it.time }
