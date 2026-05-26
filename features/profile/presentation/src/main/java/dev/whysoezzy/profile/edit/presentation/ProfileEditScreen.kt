@@ -47,7 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import coil.compose.AsyncImage
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
@@ -72,14 +75,17 @@ fun ProfileEditScreen(
     viewModel: ProfileEditViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     var showInterestDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Навигация через navEvent — безопасно при рекомпозиции
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is ProfileEditNavEvent.NavigateBack -> onSaveSuccess()
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is ProfileEditNavEvent.NavigateBack -> onSaveSuccess()
+                }
             }
         }
     }

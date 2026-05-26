@@ -47,6 +47,9 @@ import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitTagState
 import org.koin.androidx.compose.koinViewModel
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.uikit.R as UIKitR
 
@@ -60,12 +63,15 @@ fun MainScreen(
     onUserProfileClick: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is MainScreenNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
-                is MainScreenNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is MainScreenNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
+                    is MainScreenNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
+                }
             }
         }
     }

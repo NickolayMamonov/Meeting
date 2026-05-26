@@ -34,6 +34,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import dev.whysoezzy.uikit.components.blocks.UIKitAddressMapBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitCommunityBlock
@@ -64,6 +66,7 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.uikit.R as UIKitR
@@ -81,6 +84,7 @@ fun MeetingDetailsScreen(
     viewModel: MeetingDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
 
     LaunchedEffect(meetingId) {
@@ -88,16 +92,18 @@ fun MeetingDetailsScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is MeetingDetailsNavEvent.NavigateToProfile -> onUserProfileClick(event.userId)
-                is MeetingDetailsNavEvent.NavigateToMeeting -> onOtherMeetingClick(event.meetingId)
-                is MeetingDetailsNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
-                is MeetingDetailsNavEvent.OpenMap ->
-                    openMapIntent(context, event.latitude, event.longitude, event.address)
-                is MeetingDetailsNavEvent.ShareMeeting ->
-                    shareIntent(context, event.title, event.shareText)
-                MeetingDetailsNavEvent.NavigateToAuth -> onAuthRequired()
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is MeetingDetailsNavEvent.NavigateToProfile -> onUserProfileClick(event.userId)
+                    is MeetingDetailsNavEvent.NavigateToMeeting -> onOtherMeetingClick(event.meetingId)
+                    is MeetingDetailsNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
+                    is MeetingDetailsNavEvent.OpenMap ->
+                        openMapIntent(context, event.latitude, event.longitude, event.address)
+                    is MeetingDetailsNavEvent.ShareMeeting ->
+                        shareIntent(context, event.title, event.shareText)
+                    MeetingDetailsNavEvent.NavigateToAuth -> onAuthRequired()
+                }
             }
         }
     }

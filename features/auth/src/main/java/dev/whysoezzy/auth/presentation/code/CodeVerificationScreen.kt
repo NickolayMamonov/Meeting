@@ -30,7 +30,11 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.auth.R
+import dev.whysoezzy.auth.presentation.name.NameInputNavEvent
 import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
@@ -42,15 +46,18 @@ fun CodeVerificationScreen(
     viewModel: CodeVerificationViewModel = koinViewModel { parametersOf(phoneNumber) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Подписываемся на навигационные события из ViewModel
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is CodeVerificationNavEvent.NavigateToMain ->
-                    onCodeVerifiedExisting()
-                is CodeVerificationNavEvent.NavigateToNameInput ->
-                    onCodeVerifiedNew(event.phone, event.code)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is CodeVerificationNavEvent.NavigateToMain ->
+                        onCodeVerifiedExisting()
+                    is CodeVerificationNavEvent.NavigateToNameInput ->
+                        onCodeVerifiedNew(event.phone, event.code)
+                }
             }
         }
     }

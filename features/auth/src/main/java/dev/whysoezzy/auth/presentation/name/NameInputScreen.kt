@@ -27,6 +27,9 @@ import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.R as UIKitR
 @Composable
@@ -37,11 +40,14 @@ fun NameInputScreen(
     viewModel: NameInputViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is NameInputNavEvent.NavigateToSuccess -> onNameSubmitted()
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is NameInputNavEvent.NavigateToSuccess -> onNameSubmitted()
+                }
             }
         }
     }

@@ -38,7 +38,10 @@ import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.R as UIKitR
 
@@ -55,6 +58,8 @@ fun ProfileDetailsScreen(
     viewModel: ProfileDetailsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     val context = LocalContext.current
 
     LaunchedEffect(userId) {
@@ -62,15 +67,17 @@ fun ProfileDetailsScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is ProfileDetailsNavEvent.NavigateToAuth -> onLogout()
-                is ProfileDetailsNavEvent.NavigateToNameInput -> onNameInput()
-                is ProfileDetailsNavEvent.NavigateToEdit -> onEditClick()
-                is ProfileDetailsNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
-                is ProfileDetailsNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
-                is ProfileDetailsNavEvent.OpenSocialMedia -> openUrlIntent(context, event.url)
-                is ProfileDetailsNavEvent.ShareProfile -> shareProfileIntent(context, event.name, event.shareText)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is ProfileDetailsNavEvent.NavigateToAuth -> onLogout()
+                    is ProfileDetailsNavEvent.NavigateToNameInput -> onNameInput()
+                    is ProfileDetailsNavEvent.NavigateToEdit -> onEditClick()
+                    is ProfileDetailsNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
+                    is ProfileDetailsNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
+                    is ProfileDetailsNavEvent.OpenSocialMedia -> openUrlIntent(context, event.url)
+                    is ProfileDetailsNavEvent.ShareProfile -> shareProfileIntent(context, event.name, event.shareText)
+                }
             }
         }
     }

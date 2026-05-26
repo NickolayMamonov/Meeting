@@ -14,7 +14,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.communities.R
 import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
@@ -31,15 +34,18 @@ fun CommunitySubscribersScreen(
     viewModel: CommunitySubscribersViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(communityId) {
         viewModel.onEvent(CommunitySubscribersEvent.LoadSubscribers(communityId))
     }
 
     LaunchedEffect(Unit) {
-        viewModel.navEvent.collect { event ->
-            when (event) {
-                is CommunitySubscribersNavEvent.NavigateToProfile -> onPersonClick(event.userId)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.navEvent.collect { event ->
+                when (event){
+                    is CommunitySubscribersNavEvent.NavigateToProfile -> onPersonClick(event.userId)
+                }
             }
         }
     }
