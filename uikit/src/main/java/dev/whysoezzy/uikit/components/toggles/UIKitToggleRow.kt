@@ -1,11 +1,11 @@
 package dev.whysoezzy.uikit.components.toggles
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import dev.whysoezzy.uikit.theme.UIKitTheme
@@ -41,17 +43,16 @@ fun UIKitToggleRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(
+            .toggleable(
+                value = checked,
+                onValueChange = onCheckedChange,
                 enabled = enabled,
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = { onCheckedChange(!checked) }
+                role = Role.Switch
             )
             .padding(vertical = SpacingTokens.S),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Label слева
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
@@ -67,11 +68,11 @@ fun UIKitToggleRow(
                 .padding(end = SpacingTokens.M)
         )
 
-        // Toggle справа
         UIKitToggle(
             checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled
+            onCheckedChange = {},
+            enabled = enabled,
+            modifier = Modifier.clearAndSetSemantics { }
         )
     }
 }
