@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,10 +40,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil.compose.AsyncImage
 import dev.whysoezzy.communities.R
+import dev.whysoezzy.communities.mappers.toEventCardTagsAllDisabled
+import dev.whysoezzy.communities.mappers.toEventCardTagsAllSelected
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
-import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
 import dev.whysoezzy.uikit.components.layouts.UIKitOverlappingAvatars
 import dev.whysoezzy.uikit.components.tags.UIKitTag
@@ -234,6 +236,7 @@ private fun CommunityDetailsContent(
             }
 
             items(state.activeMeetings, key = {it.id}) { meeting ->
+                val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTagsAllSelected() }
                 UIKitEventCard(
                     imageUrl = meeting.imageUrl,
                     title = meeting.title,
@@ -243,9 +246,7 @@ private fun CommunityDetailsContent(
                         latitude = meeting.latitude,
                         longitude = meeting.longitude
                     ),
-                    tags = meeting.tags.map { tag ->
-                        UIKitEventCardTag(text = tag.text, isSelected = true, isEnabled = false)
-                    },
+                    tags = eventCardTags,
                     cardType = UIKitEventCardType.WIDE,
                     onCardClick = { onMeetingClick(meeting.id) },
                     modifier = Modifier.fillMaxWidth()
@@ -264,6 +265,7 @@ private fun CommunityDetailsContent(
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
                     items(state.pastMeetings, key = {it.id}) { meeting ->
+                        val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTagsAllDisabled() }
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,
@@ -273,13 +275,7 @@ private fun CommunityDetailsContent(
                                 latitude = meeting.latitude,
                                 longitude = meeting.longitude
                             ),
-                            tags = meeting.tags.map { tag ->
-                                UIKitEventCardTag(
-                                    text = tag.text,
-                                    isSelected = false,
-                                    isEnabled = false
-                                )
-                            },
+                            tags = eventCardTags,
                             cardType = UIKitEventCardType.COMPACT,
                             onCardClick = { onMeetingClick(meeting.id) }
                         )

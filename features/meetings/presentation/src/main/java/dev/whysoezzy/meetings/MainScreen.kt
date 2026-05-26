@@ -37,20 +37,19 @@ import dev.whysoezzy.meetings.presentation.MainScreenUiState
 import dev.whysoezzy.meetings.presentation.MainScreenViewModel
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
-import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
 import dev.whysoezzy.uikit.components.search.UIKitSearchBar
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
-import dev.whysoezzy.uikit.models.UIKitTagState
 import org.koin.androidx.compose.koinViewModel
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.features_meetings.R
+import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.uikit.R as UIKitR
 
 private const val AD_BLOCK_INTERVAL = 3
@@ -186,6 +185,7 @@ private fun MainScreenContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(heroMeetings, key = {it.id}) { meeting ->
+                        val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTags() }
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,
@@ -195,13 +195,7 @@ private fun MainScreenContent(
                                 latitude = 0.0,
                                 longitude = 0.0
                             ),
-                            tags = meeting.tags.map { tag ->
-                                UIKitEventCardTag(
-                                    text = tag.text,
-                                    isSelected = tag.state == UIKitTagState.SELECTED,
-                                    isEnabled = tag.state != UIKitTagState.DISABLED
-                                )
-                            },
+                            tags = eventCardTags,
                             cardType = UIKitEventCardType.WIDE,
                             onCardClick = { onMeetingClick(meeting.id) },
                         )
@@ -225,6 +219,7 @@ private fun MainScreenContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(popularMeetings, key = {it.id}) { meeting ->
+                        val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTags() }
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
                             title = meeting.title,
@@ -234,13 +229,7 @@ private fun MainScreenContent(
                                 latitude = 0.0,
                                 longitude = 0.0
                             ),
-                            tags = meeting.tags.map { tag ->
-                                UIKitEventCardTag(
-                                    text = tag.text,
-                                    isSelected = tag.state == UIKitTagState.SELECTED,
-                                    isEnabled = tag.state != UIKitTagState.DISABLED
-                                )
-                            },
+                            tags = eventCardTags,
                             cardType = UIKitEventCardType.COMPACT,
                             onCardClick = { onMeetingClick(meeting.id) },
                         )
@@ -300,6 +289,7 @@ private fun MainScreenContent(
         ) { item ->
             when (item) {
                 is MeetingOrAd.Meeting -> {
+                    val eventCardTags = remember(item.meeting.tags) { item.meeting.tags.toEventCardTags() }
                     UIKitEventCard(
                         imageUrl = item.meeting.imageUrl,
                         title = item.meeting.title,
@@ -309,13 +299,7 @@ private fun MainScreenContent(
                             latitude = 0.0,
                             longitude = 0.0
                         ),
-                        tags = item.meeting.tags.map { tag ->
-                            UIKitEventCardTag(
-                                text = tag.text,
-                                isSelected = tag.state == UIKitTagState.SELECTED,
-                                isEnabled = tag.state != UIKitTagState.DISABLED
-                            )
-                        },
+                        tags = eventCardTags,
                         cardType = UIKitEventCardType.WIDE,
                         onCardClick = { onMeetingClick(item.meeting.id) },
                         modifier = Modifier

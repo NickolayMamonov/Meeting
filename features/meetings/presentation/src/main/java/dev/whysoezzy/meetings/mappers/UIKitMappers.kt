@@ -12,6 +12,7 @@ import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.TagState
+import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunity
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
@@ -216,3 +217,12 @@ fun List<CommunityInfo>.toUIKitCommunityInfoList(
         )
     }
 }
+
+internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
+    map { tag ->
+        UIKitEventCardTag(
+            text = tag.text,
+            isSelected = tag.state == UIKitTagState.SELECTED,
+            isEnabled = tag.state != UIKitTagState.DISABLED
+        )
+    }
