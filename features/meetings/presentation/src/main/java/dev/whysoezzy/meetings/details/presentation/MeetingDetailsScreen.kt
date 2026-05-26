@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -336,6 +337,7 @@ private fun MeetingContent(
     }
 }
 
+private val ErrorButtonMaxWidth = 343.dp
 @Composable
 private fun ErrorContent(
     message: String,
@@ -349,8 +351,16 @@ private fun ErrorContent(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextBody1(text = message, textAlign = TextAlign.Center)
-            UIKitButton(text = stringResource(dev.whysoezzy.uikit.R.string.action_retry), onClick = onRetry)
-            UIKitButton(text = stringResource(dev.whysoezzy.uikit.R.string.action_cancel), onClick = onBackPressed)
+            UIKitButton(
+                text = stringResource(dev.whysoezzy.uikit.R.string.action_retry),
+                onClick = onRetry,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+            )
+            UIKitButton(
+                text = stringResource(dev.whysoezzy.uikit.R.string.action_cancel),
+                onClick = onBackPressed,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+            )
         }
     }
 }

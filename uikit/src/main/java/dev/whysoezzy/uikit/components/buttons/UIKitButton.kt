@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -46,8 +50,7 @@ fun UIKitButton(
 
     Box(
         modifier = modifier
-            .width(343.dp)
-            .height(56.dp)
+            .defaultMinSize(minHeight = 56.dp)
             .clip(RoundedCornerShape(BorderRadiusTokens.L))
             .then(
                 when (state) {
@@ -66,19 +69,19 @@ fun UIKitButton(
             )
             .clickable(
                 enabled = state != UIKitButtonState.DISABLED && state != UIKitButtonState.LOADING,
+                role = Role.Button,
                 onClick = onClick
-            ),
+            )
+            .semantics { role = Role.Button },
         contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier
                 .padding(
-                    start = SpacingTokens.XL,
-                    end = SpacingTokens.XL,
-                    top = SpacingTokens.M,
-                    bottom = 18.dp
+                    horizontal = SpacingTokens.XL,
+                    vertical = SpacingTokens.M
                 ),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.XS),
             verticalAlignment = Alignment.CenterVertically
         ) {
             when (state) {

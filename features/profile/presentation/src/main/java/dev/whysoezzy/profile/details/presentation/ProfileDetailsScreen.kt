@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -25,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.whysoezzy.uikit.components.blocks.UIKitUserCommunitiesBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitUserMeetingsBlock
@@ -45,6 +47,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.R as UIKitR
 
+private val ErrorButtonMaxWidth = 343.dp
 @Composable
 fun ProfileDetailsScreen(
     modifier: Modifier = Modifier,
@@ -230,14 +233,23 @@ private fun ErrorContent(
     onBackPressed: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
         ) {
             TextBody1(text = message, textAlign = TextAlign.Center)
-            UIKitButton(text = stringResource(UIKitR.string.action_retry), onClick = onRetry)
-            UIKitButton(text = stringResource(UIKitR.string.action_back), onClick = onBackPressed)
+            UIKitButton(
+                text = stringResource(UIKitR.string.action_retry),
+                onClick = onRetry,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+            )
+            UIKitButton(
+                text = stringResource(UIKitR.string.action_back),
+                onClick = onBackPressed,
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+            )
         }
     }
 }
