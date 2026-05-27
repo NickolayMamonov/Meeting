@@ -13,6 +13,8 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import timber.log.Timber
+import kotlin.coroutines.cancellation.CancellationException
 
 interface TokenProvider {
     fun getAccessToken(): String?
@@ -94,7 +96,10 @@ object KtorNetworkModule {
                                         refreshToken = it.second
                                     )
                                 }
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
+                                Timber.e(e, "Bearer refresh callback failed")
                                 null
                             }
                         }

@@ -1,5 +1,6 @@
 package dev.whysoezzy.profile.details.presentation
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.clickable
@@ -45,6 +46,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.profile.R
+import timber.log.Timber
 import dev.whysoezzy.uikit.R as UIKitR
 
 private val ErrorButtonMaxWidth = 343.dp
@@ -257,7 +259,9 @@ private fun ErrorContent(
 private fun openUrlIntent(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-    } catch (_: Exception) { }
+    } catch (e: ActivityNotFoundException) {
+        Timber.w(e, "No activity to handle URL: %s", url)
+    }
 }
 
 private fun shareProfileIntent(context: Context, name: String, text: String) {

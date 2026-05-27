@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import kotlin.coroutines.cancellation.CancellationException
 
 sealed class CommunitySubscribersNavEvent {
     data class NavigateToProfile(val userId: Long) : CommunitySubscribersNavEvent()
@@ -64,7 +66,10 @@ class CommunitySubscribersViewModel(
                     communityName = community.name,
                     subscribers = subscribersResult.getOrThrow()
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                Timber.e(e, "Failed to load community subscribers")
                 _uiState.value = CommunitySubscribersUiState.Error(
                     message = e.toUserMessage()
                 )

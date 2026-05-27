@@ -58,6 +58,8 @@ dependencies {
     implementation(libs.ktor.client.auth)
     api(libs.kotlinx.serialization.json)
 
+    implementation(libs.timber)
+
     // Desugaring for LocalDateTime
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 

@@ -5,7 +5,9 @@ import com.whysoezzy.auth.data.api.AuthApi
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.network.safeApiCall
+import io.ktor.utils.io.CancellationException
 import kotlinx.coroutines.flow.Flow
+import timber.log.Timber
 
 internal class AuthRepositoryImpl(
     private val authApi: AuthApi,
@@ -61,8 +63,10 @@ internal class AuthRepositoryImpl(
     override suspend fun logout() {
         try {
             authApi.logout()
-        } catch (_: Exception) {
-            // Даже если сервер недоступен — очищаем локальные токены
+        } catch (e: CancellationException){
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e,"Server logout failed, clearing local tokens anyway")
         } finally {
             tokenManager.clearTokens()
         }

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import kotlin.coroutines.cancellation.CancellationException
 
 sealed class ProfileEditNavEvent {
     object NavigateBack : ProfileEditNavEvent()
@@ -257,13 +259,17 @@ class ProfileEditViewModel(
                     if (id != null) Tag(id = id, name = name)
                     else user.interests.firstOrNull { it.name == name }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                Timber.e(e, "Failed to prepare profile data for save")
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
                     error = "Ошибка при подготовке данных профиля"
                 )
                 return@launch
             }
+
             updateUserProfileUseCase(
                 user.copy(
                     name = state.name,

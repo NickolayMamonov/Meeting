@@ -13,6 +13,8 @@ import com.whysoezzy.network.KtorNetworkModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import timber.log.Timber
+import kotlin.coroutines.cancellation.CancellationException
 
 val authModule = module {
 
@@ -42,7 +44,10 @@ val authModule = module {
                         tokenManager.clearTokens()
                         null
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
+                    Timber.e(e, "Token refresh failed, clearing tokens — user will be logged out")
                     tokenManager.clearTokens()
                     null
                 }
