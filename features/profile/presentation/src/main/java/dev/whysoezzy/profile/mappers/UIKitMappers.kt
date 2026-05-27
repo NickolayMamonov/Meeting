@@ -25,7 +25,8 @@ import dev.whysoezzy.uikit.models.UIKitSocialMedia
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 import dev.whysoezzy.uikit.models.UIKitTagState
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> {
     return filterNotNull().map { it.toUIKitMeetingTag() }

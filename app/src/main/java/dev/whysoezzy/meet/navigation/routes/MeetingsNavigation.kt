@@ -1,6 +1,5 @@
 package dev.whysoezzy.meet.navigation.routes
 
-import android.util.Log
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
