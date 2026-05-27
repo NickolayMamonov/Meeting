@@ -36,7 +36,7 @@ class MeetingDetailsViewModelTest {
     private val leaveMeetingUseCase: LeaveMeetingUseCase = mockk()
     private val isLoggedInUseCase: IsLoggedInUseCase = mockk()
 
-    // Управляемый Flow для тестирования реактивного isLoggedIn (R-023)
+    // Управляемый Flow для тестирования реактивного isLoggedIn
     private val isLoggedInFlow = MutableStateFlow(false)
 
     private fun viewModel(): MeetingDetailsViewModel {
@@ -98,7 +98,7 @@ class MeetingDetailsViewModelTest {
         }
     }
 
-    // ==================== joinMeeting (R-023 — реактивный isLoggedIn) ====================
+    // ==================== joinMeeting ====================
 
     @Test
     fun `joinMeeting when not logged in emits NavigateToAuth`() = runTest {
