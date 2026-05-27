@@ -6,3 +6,12 @@ plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.jetbrains.kotlin.jvm) apply false
 }
+
+subprojects {
+    afterEvaluate {
+        extensions.findByType(com.android.build.api.dsl.CommonExtension::class.java)
+            ?.lint
+            ?.disable
+            ?.add("NullSafeMutableLiveData")
+    }
+}
