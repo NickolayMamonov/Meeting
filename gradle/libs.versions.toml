@@ -24,6 +24,7 @@ desugarJdkLibs = "2.0.4"
 kotlinxSerialization = "1.6.3"
 ktlintGradle = "12.1.2"
 ktlint = "1.4.1"
+detekt = "1.23.7"
 
 # Testing
 mockk = "1.13.13"
@@ -92,4 +93,5 @@ jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrai
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 

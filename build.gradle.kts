@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.jetbrains.kotlin.jvm) apply false
     alias(libs.plugins.ktlint) apply false
+    alias(libs.plugins.detekt) apply false
 }
 
 subprojects {
@@ -32,5 +33,34 @@ subprojects {
             reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
             reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.HTML)
         }
+    }
+
+    apply(plugin = rootProject.libs.plugins.detekt.get().pluginId)
+
+    extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
+        toolVersion = rootProject.libs.versions.detekt.get()
+        config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+        // baseline auto-resolves to <module>/detekt-baseline.xml (default behavior)
+        buildUponDefaultConfig = true
+        allRules = false
+        autoCorrect = false
+        parallel = true
+        ignoreFailures = false
+    }
+
+    tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+        jvmTarget = "21"
+        reports {
+            html.required.set(true)
+            xml.required.set(true)
+            sarif.required.set(false)
+            md.required.set(false)
+            txt.required.set(false)
+        }
+        exclude("**/build/**", "**/generated/**", "**/build-logic/**")
+    }
+
+    tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
+        jvmTarget = "21"
     }
 }
