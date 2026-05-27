@@ -1,4 +1,4 @@
-package dev.whysoezzy.meetings.presentation
+package com.whysoezzy.testing
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -10,9 +10,9 @@ import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 
 /**
- * JUnit Rule, который подменяет Dispatchers.Main на тестовый.
+ * JUnit Rule, подменяет Dispatchers.Main на [testDispatcher].
  * Без него ViewModel'и под viewModelScope падают с
- * `Module with the Main dispatcher had failed to initialize` в JVM-тестах.
+ * "Module with the Main dispatcher had failed to initialize" в JVM-тестах.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(
