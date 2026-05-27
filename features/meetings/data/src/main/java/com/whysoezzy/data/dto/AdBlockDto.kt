@@ -5,21 +5,18 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 internal data class AdBlockResponseDto(
-    val type: String,  // "COMMUNITIES", "TEXT", "PEOPLE"
+    val type: String, // "COMMUNITIES", "TEXT", "PEOPLE"
     val id: Long,
     val isActive: Boolean,
     val title: String,
     val description: String,
-
     // For COMMUNITIES type
     val communities: List<CommunityInfoDto>? = null,
-
     // For TEXT type
     val actionText: String? = null,
     val actionUrl: String? = null,
-
     // For PEOPLE type
-    val users: List<UserInfoDto>? = null
+    val users: List<UserInfoDto>? = null,
 )
 
 @Serializable
@@ -36,7 +33,7 @@ internal sealed class AdBlockDto {
         val communityDescription: String,
         val communityImageUrl: String,
         val subscribersCount: Int = 0,
-        override val isActive: Boolean = true
+        override val isActive: Boolean = true,
     ) : AdBlockDto()
 
     @Serializable
@@ -47,7 +44,7 @@ internal sealed class AdBlockDto {
         val description: String,
         val actionText: String? = null,
         val actionUrl: String? = null,
-        override val isActive: Boolean = true
+        override val isActive: Boolean = true,
     ) : AdBlockDto()
 
     @Serializable
@@ -58,6 +55,6 @@ internal sealed class AdBlockDto {
         val imageUrl: String,
         val actionUrl: String,
         val backgroundColor: String? = null,
-        override val isActive: Boolean = true
+        override val isActive: Boolean = true,
     ) : AdBlockDto()
 }

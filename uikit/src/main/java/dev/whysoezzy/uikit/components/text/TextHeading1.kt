@@ -18,8 +18,7 @@ fun TextHeading1(
     maxLines: Int = Int.MAX_VALUE,
     lineHeight: TextUnit = TextUnit.Unspecified,
     textAlign: TextAlign? = null,
-
-    ) {
+) {
     Text(
         text = text,
         style = UIKitTheme.typography.heading1,
@@ -28,6 +27,6 @@ fun TextHeading1(
         lineHeight = lineHeight,
         maxLines = maxLines,
         textAlign = textAlign,
-        modifier = modifier
+        modifier = modifier,
     )
 }

@@ -23,10 +23,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 sealed class CommunityDetailsNavEvent {
-    data class NavigateToMeeting(val meetingId: Long) : CommunityDetailsNavEvent()
-    data class NavigateToProfile(val userId: Long) : CommunityDetailsNavEvent()
+    data class NavigateToMeeting(
+        val meetingId: Long,
+    ) : CommunityDetailsNavEvent()
+
+    data class NavigateToProfile(
+        val userId: Long,
+    ) : CommunityDetailsNavEvent()
+
     object NavigateToSubscribers : CommunityDetailsNavEvent()
-    data class ShareCommunity(val title: String, val shareText: String) : CommunityDetailsNavEvent()
+
+    data class ShareCommunity(
+        val title: String,
+        val shareText: String,
+    ) : CommunityDetailsNavEvent()
 }
 
 class CommunityDetailsViewModel(
@@ -34,9 +44,8 @@ class CommunityDetailsViewModel(
     private val getCommunityMeetingsUseCase: GetCommunityMeetingsUseCase,
     private val getCommunitySubscribersUseCase: GetCommunitySubscribersUseCase,
     private val subscribeToCommunityUseCase: SubscribeToCommunityUseCase,
-    private val unsubscribeFromCommunityUseCase: UnsubscribeFromCommunityUseCase
+    private val unsubscribeFromCommunityUseCase: UnsubscribeFromCommunityUseCase,
 ) : ViewModel() {
-
     private val _uiState =
         MutableStateFlow<CommunityDetailsUiState>(CommunityDetailsUiState.Loading)
     val uiState: StateFlow<CommunityDetailsUiState> = _uiState.asStateFlow()
@@ -68,15 +77,14 @@ class CommunityDetailsViewModel(
             getCommunityByIdUseCase(communityId)
                 .onFailure { e ->
                     _uiState.value = CommunityDetailsUiState.Error(
-                        message = e.toUserMessage()
+                        message = e.toUserMessage(),
                     )
-                }
-                .onSuccess { community ->
+                }.onSuccess { community ->
                     val (meetings, subscribers) = coroutineScope {
                         val meetingsDeferred = async { getCommunityMeetingsUseCase(communityId) }
                         val subscribersDeferred = async { getCommunitySubscribersUseCase(communityId) }
                         (meetingsDeferred.await().getOrNull() ?: emptyList()) to
-                                (subscribersDeferred.await().getOrNull() ?: emptyList())
+                            (subscribersDeferred.await().getOrNull() ?: emptyList())
                     }
 
                     val currentTime = System.currentTimeMillis()
@@ -95,8 +103,7 @@ class CommunityDetailsViewModel(
                         subscribersCount = community.subscribersCount,
                         subscribers = subscribers.map { it.toUIKitPerson() },
                         activeMeetings = activeMeetings.map { it.toUIKitMeetingInfo() },
-                        pastMeetings = pastMeetings.map { it.toUIKitMeetingInfo() }
-
+                        pastMeetings = pastMeetings.map { it.toUIKitMeetingInfo() },
                     )
                 }
         }
@@ -105,26 +112,28 @@ class CommunityDetailsViewModel(
     private fun toggleSubscription() {
         val currentState = _uiState.value as? CommunityDetailsUiState.Success ?: return
         val newIsSubscribed = !currentState.isSubscribed
-        val newCount = if (newIsSubscribed)
+        val newCount = if (newIsSubscribed) {
             currentState.subscribersCount + 1
-        else
+        } else {
             (currentState.subscribersCount - 1).coerceAtLeast(0)
+        }
 
         _uiState.value = currentState.copy(
             isSubscribed = newIsSubscribed,
-            subscribersCount = newCount
+            subscribersCount = newCount,
         )
 
         viewModelScope.launch {
-            val result = if (newIsSubscribed)
+            val result = if (newIsSubscribed) {
                 subscribeToCommunityUseCase(currentState.communityId)
-            else
+            } else {
                 unsubscribeFromCommunityUseCase(currentState.communityId)
+            }
 
             result.onFailure {
                 _uiState.value = currentState.copy(
                     isSubscribed = currentState.isSubscribed,
-                    subscribersCount = currentState.subscribersCount
+                    subscribersCount = currentState.subscribersCount,
                 )
             }
         }
@@ -136,8 +145,8 @@ class CommunityDetailsViewModel(
             _navEvent.emit(
                 CommunityDetailsNavEvent.ShareCommunity(
                     title = state.title,
-                    shareText = "Присоединяйся к сообществу «${state.title}» в приложении Meeting!"
-                )
+                    shareText = "Присоединяйся к сообществу «${state.title}» в приложении Meeting!",
+                ),
             )
         }
     }

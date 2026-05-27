@@ -31,8 +31,8 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 import dev.whysoezzy.uikit.tokens.TypographyTokens
 
 enum class UIKitEventCardType {
-    COMPACT,  // Узкая карточка
-    WIDE      // Широкая карточка
+    COMPACT, // Узкая карточка
+    WIDE, // Широкая карточка
 }
 
 data class UIKitEventCardTag(
@@ -41,7 +41,7 @@ data class UIKitEventCardTag(
     val isEnabled: Boolean,
     val size: UIKitTagSize = UIKitTagSize.MEDIUM,
     val modifier: Modifier = Modifier,
-    val onClick: (() -> Unit)? = null
+    val onClick: (() -> Unit)? = null,
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -54,49 +54,53 @@ fun UIKitEventCard(
     tags: List<UIKitEventCardTag> = emptyList(),
     cardType: UIKitEventCardType = UIKitEventCardType.COMPACT,
     modifier: Modifier = Modifier,
-    onCardClick: (() -> Unit)? = null
+    onCardClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
 
-    val cardWidth = when (cardType) {
-        UIKitEventCardType.COMPACT -> 212.dp
-        UIKitEventCardType.WIDE -> 320.dp
-    }
+    val cardWidth =
+        when (cardType) {
+            UIKitEventCardType.COMPACT -> 212.dp
+            UIKitEventCardType.WIDE -> 320.dp
+        }
 
-    val cardHeight = when (cardType) {
-        UIKitEventCardType.WIDE -> 280.dp // Высота для 2-строчного заголовка
-        UIKitEventCardType.COMPACT -> 260.dp
-    }
+    val cardHeight =
+        when (cardType) {
+            UIKitEventCardType.WIDE -> 280.dp // Высота для 2-строчного заголовка
+            UIKitEventCardType.COMPACT -> 260.dp
+        }
 
-    val imageHeight = when (cardType) {
-        UIKitEventCardType.COMPACT -> 148.dp
-        UIKitEventCardType.WIDE -> 180.dp
-    }
-
+    val imageHeight =
+        when (cardType) {
+            UIKitEventCardType.COMPACT -> 148.dp
+            UIKitEventCardType.WIDE -> 180.dp
+        }
 
     Column(
-        modifier = modifier
-            .width(cardWidth)
-            .height(cardHeight)
-            .clip(RoundedCornerShape(BorderRadiusTokens.L))
-            .then(
-                onCardClick?.let {
-                    Modifier.clickable { it() }
-                } ?: Modifier
-            ),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        modifier =
+            modifier
+                .width(cardWidth)
+                .height(cardHeight)
+                .clip(RoundedCornerShape(BorderRadiusTokens.L))
+                .then(
+                    onCardClick?.let {
+                        Modifier.clickable { it() }
+                    } ?: Modifier,
+                ),
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
     ) {
         // Image
         AsyncImage(
             model = imageUrl,
             contentDescription = title,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(imageHeight)
-                .clip(RoundedCornerShape(BorderRadiusTokens.L)),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(imageHeight)
+                    .clip(RoundedCornerShape(BorderRadiusTokens.L)),
             contentScale = ContentScale.Crop,
             placeholder = ColorPainter(ColorTokens.NeutralLine),
-            error = ColorPainter(ColorTokens.NeutralLine)
+            error = ColorPainter(ColorTokens.NeutralLine),
         )
 
         // Title
@@ -108,7 +112,7 @@ fun UIKitEventCard(
             overflow = TextOverflow.Ellipsis,
         )
 
-        Row{
+        Row {
             Text(
                 text = date,
                 style = TypographyTokens.Metadata1,
@@ -130,7 +134,6 @@ fun UIKitEventCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-
         }
         // Subtitle
 //        Text(
@@ -146,9 +149,10 @@ fun UIKitEventCard(
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = SpacingTokens.S)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = SpacingTokens.S),
             ) {
                 tags.forEach { tag ->
                     UIKitTag(
@@ -167,18 +171,20 @@ fun UIKitEventCard(
 @Composable
 fun UIKitEventCardPreview() {
     UIKitTheme {
-        val sampleTags = listOf(
-            UIKitEventCardTag("Android", isSelected = true, isEnabled = false),
-            UIKitEventCardTag("Design", isSelected = true, isEnabled = false),
-            UIKitEventCardTag("Kotlin", isSelected = true, isEnabled = false),
-            UIKitEventCardTag("UI/UX", isSelected = true, isEnabled = false)
-        )
+        val sampleTags =
+            listOf(
+                UIKitEventCardTag("Android", isSelected = true, isEnabled = false),
+                UIKitEventCardTag("Design", isSelected = true, isEnabled = false),
+                UIKitEventCardTag("Kotlin", isSelected = true, isEnabled = false),
+                UIKitEventCardTag("UI/UX", isSelected = true, isEnabled = false),
+            )
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
         ) {
             // Wide card
             UIKitEventCard(
@@ -188,7 +194,7 @@ fun UIKitEventCardPreview() {
                 address = UIKitAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 tags = sampleTags,
                 cardType = UIKitEventCardType.WIDE,
-                onCardClick = { /* handle click */ }
+                onCardClick = { /* handle click */ },
             )
 
             // Compact card
@@ -198,7 +204,7 @@ fun UIKitEventCardPreview() {
                 date = "10 августа",
                 address = UIKitAddress("Кожевенная линия, 40", 49.3345, 55.1234),
                 tags = sampleTags.take(2),
-                cardType = UIKitEventCardType.COMPACT
+                cardType = UIKitEventCardType.COMPACT,
             )
 
             // Card without tags
@@ -207,7 +213,7 @@ fun UIKitEventCardPreview() {
                 title = "Event without tags",
                 date = "10 августа",
                 address = UIKitAddress("Кожевенная линия, 40", 49.3345, 55.1234),
-                cardType = UIKitEventCardType.COMPACT
+                cardType = UIKitEventCardType.COMPACT,
             )
         }
     }

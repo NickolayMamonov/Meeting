@@ -27,13 +27,13 @@ fun UIKitHostCard(
     imageUrl: String,
     modifier: Modifier = Modifier,
     title: String? = null,
-    onCardClick: (() -> Unit)? = null
+    onCardClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         // Optional title
         title?.let {
@@ -42,27 +42,28 @@ fun UIKitHostCard(
 
         // Host content
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    onCardClick?.let {
-                        Modifier.clickable { it() }
-                    } ?: Modifier
-                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        onCardClick?.let {
+                            Modifier.clickable { it() }
+                        } ?: Modifier,
+                    ),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             // Host info
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.XS)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.XS),
             ) {
                 TextSubheading1(
-                    text = "$name $surname"
+                    text = "$name $surname",
                 )
                 TextBody2(
                     text = description,
-                    color = colorScheme.neutralWeak
+                    color = colorScheme.neutralWeak,
                 )
             }
 
@@ -70,7 +71,7 @@ fun UIKitHostCard(
             UIKitAvatar(
                 imageUrl = imageUrl,
                 size = 96.dp,
-                clipType = RoundedCornerShape(8.dp)
+                clipType = RoundedCornerShape(8.dp),
             )
         }
     }
@@ -81,10 +82,11 @@ fun UIKitHostCard(
 fun UIKitHostCardPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.L),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.XL)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.L),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.XL),
         ) {
             // Host card with title
             UIKitHostCard(
@@ -93,7 +95,7 @@ fun UIKitHostCardPreview() {
                 surname = "Петров",
                 description = "Senior Android Developer с 8-летним опытом разработки мобильных приложений",
                 imageUrl = "https://picsum.photos/300/180?random=5",
-                onCardClick = { /* Handle click */ }
+                onCardClick = { /* Handle click */ },
             )
 
             // Host card without title
@@ -101,7 +103,7 @@ fun UIKitHostCardPreview() {
                 name = "Мария",
                 surname = "Иванова",
                 description = "UI/UX Designer, специализируется на создании интуитивных интерфейсов",
-                imageUrl = "https://picsum.photos/300/180?random=5"
+                imageUrl = "https://picsum.photos/300/180?random=5",
             )
 
             // Host card with long description
@@ -109,9 +111,10 @@ fun UIKitHostCardPreview() {
                 title = "Спикер",
                 name = "Дмитрий",
                 surname = "Сидоров",
-                description = "Team Lead и архитектор, ведет команду из 12 разработчиков. Автор популярных статей на Хабре и докладчик на конференциях",
+                description = "Team Lead и архитектор, ведет команду из 12 разработчиков. " +
+                    "Автор популярных статей на Хабре и докладчик на конференциях",
                 imageUrl = "https://picsum.photos/300/180?random=5",
-                onCardClick = { /* Handle click */ }
+                onCardClick = { /* Handle click */ },
             )
         }
     }

@@ -41,53 +41,57 @@ fun UIKitUserProfileBlock(
     avatarUrl: String?,
     city: String = "",
     interests: List<String> = emptyList(),
-    coverHeight: Int = 375
+    coverHeight: Int = 375,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         // Фото — full-width, без горизонтальных отступов
         if (avatarUrl != null) {
             AsyncImage(
                 model = avatarUrl,
                 contentDescription = "Фото профиля",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(coverHeight.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(coverHeight.dp),
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(ColorTokens.NeutralLine),
-                error = ColorPainter(ColorTokens.NeutralLine)
+                error = ColorPainter(ColorTokens.NeutralLine),
             )
         } else {
             // Заглушка без фото — фон с инициалами по центру
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(coverHeight.dp)
-                    .background(ColorTokens.BrandLight),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(coverHeight.dp)
+                        .background(ColorTokens.BrandLight),
+                contentAlignment = Alignment.Center,
             ) {
                 UIKitAvatarWithInitials(
                     initials = "${name.firstOrNull() ?: ""}${surname.firstOrNull() ?: ""}",
-                    size = 120.dp
+                    size = 120.dp,
                 )
             }
         }
 
         // Контент под фото
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = SpacingTokens.L)
-                .padding(top = SpacingTokens.L),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = SpacingTokens.L)
+                    .padding(top = SpacingTokens.L),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
         ) {
             // Имя — Inter SemiBold 49sp, letterSpacing -2.45, цвет NeutralActive (#29183B)
-            val displayName = buildString {
-                append(name)
-                if (surname.isNotBlank()) append(" $surname")
-            }.trim()
+            val displayName =
+                buildString {
+                    append(name)
+                    if (surname.isNotBlank()) append(" $surname")
+                }.trim()
 
             if (displayName.isNotBlank()) {
                 Text(
@@ -97,7 +101,7 @@ fun UIKitUserProfileBlock(
                     fontSize = 49.sp,
                     lineHeight = (49 * 0.9).sp,
                     letterSpacing = (-2.45).sp,
-                    color = ColorTokens.NeutralActive
+                    color = ColorTokens.NeutralActive,
                 )
             }
 
@@ -116,7 +120,7 @@ fun UIKitUserProfileBlock(
                 UIKitTagGroup(
                     tags = interests,
                     size = UIKitTagSize.MEDIUM,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -133,7 +137,7 @@ private fun UIKitUserProfileBlockPreview() {
             city = "Москва",
             description = "Занимаюсь разработкой интерфейсов в eCom. Учу HTML, CSS и JavaScript",
             interests = listOf("Разработка", "Дизайн", "Illustrator", "Backend", "Продакт менеджмент"),
-            avatarUrl = "https://picsum.photos/800/400?random=1"
+            avatarUrl = "https://picsum.photos/800/400?random=1",
         )
     }
 }
@@ -148,7 +152,7 @@ private fun UIKitUserProfileBlockNoAvatarPreview() {
             city = "Санкт-Петербург",
             description = "UX/UI Designer",
             interests = listOf("Дизайн", "Frontend"),
-            avatarUrl = null
+            avatarUrl = null,
         )
     }
 }

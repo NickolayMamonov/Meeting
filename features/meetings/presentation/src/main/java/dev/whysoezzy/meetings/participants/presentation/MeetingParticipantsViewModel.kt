@@ -13,13 +13,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 sealed class MeetingParticipantsNavEvent {
-    data class NavigateToProfile(val userId: Long) : MeetingParticipantsNavEvent()
+    data class NavigateToProfile(
+        val userId: Long,
+    ) : MeetingParticipantsNavEvent()
 }
 
 class MeetingParticipantsViewModel(
-    private val getMeetingParticipantsUseCase: GetMeetingParticipantsUseCase
+    private val getMeetingParticipantsUseCase: GetMeetingParticipantsUseCase,
 ) : ViewModel() {
-
     private val _uiState =
         MutableStateFlow<MeetingParticipantsUiState>(MeetingParticipantsUiState.Loading)
     val uiState: StateFlow<MeetingParticipantsUiState> = _uiState.asStateFlow()
@@ -47,12 +48,11 @@ class MeetingParticipantsViewModel(
                 .onSuccess { participants ->
                     _uiState.value = MeetingParticipantsUiState.Success(
                         meetingTitle = "Участники",
-                        participants = participants
+                        participants = participants,
                     )
-                }
-                .onFailure { exception ->
+                }.onFailure { exception ->
                     _uiState.value = MeetingParticipantsUiState.Error(
-                        message = exception.toUserMessage()
+                        message = exception.toUserMessage(),
                     )
                 }
         }

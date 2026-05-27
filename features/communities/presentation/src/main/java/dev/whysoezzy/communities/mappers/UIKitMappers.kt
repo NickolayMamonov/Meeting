@@ -21,7 +21,7 @@ fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
     latitude = address.latitude,
     longitude = address.longitude,
     tags = tags.map { it.toUIKitMeetingTag() },
-    meetingStatus = meetingStatus.toUIKitMeetingStatus()
+    meetingStatus = meetingStatus.toUIKitMeetingStatus(),
 )
 
 fun Person.toUIKitPerson() = UIKitPerson(
@@ -29,7 +29,7 @@ fun Person.toUIKitPerson() = UIKitPerson(
     name = name,
     surname = surname,
     avatar = avatarUrl,
-    description = bio
+    description = bio,
 )
 
 private fun TagState.toUIKitTagState(): UIKitTagState = when (this) {
@@ -50,7 +50,7 @@ private fun MeetingStatus.toUIKitMeetingStatus(): UIKitMeetingStatus = when (thi
 private fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag = UIKitMeetingTag(
     id = id,
     text = text,
-    state = state.toUIKitTagState()
+    state = state.toUIKitTagState(),
 )
 
 internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
@@ -58,7 +58,7 @@ internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
         UIKitEventCardTag(
             text = tag.text,
             isSelected = tag.state == UIKitTagState.SELECTED,
-            isEnabled = tag.state != UIKitTagState.DISABLED
+            isEnabled = tag.state != UIKitTagState.DISABLED,
         )
     }
 

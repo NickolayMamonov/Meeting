@@ -24,20 +24,19 @@ fun BackShareTopBar(
     title: String,
     onBackClick: () -> Unit,
     onShareClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     TopAppBar(
         title = {
             Box(
                 modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = title,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         },
@@ -51,10 +50,9 @@ fun BackShareTopBar(
                 Icon(Icons.Default.Share, contentDescription = "Share")
             }
         },
-        windowInsets = WindowInsets(0,0,0,0),
-        modifier = modifier
+        windowInsets = WindowInsets(0, 0, 0, 0),
+        modifier = modifier,
     )
-
 }
 
 @Preview
@@ -63,6 +61,6 @@ fun BackShareTopBarPreview() {
     BackShareTopBar(
         title = "Sample Title",
         onBackClick = { /* Handle back click */ },
-        onShareClick = { /* Handle share click */ }
+        onShareClick = { /* Handle share click */ },
     )
 }

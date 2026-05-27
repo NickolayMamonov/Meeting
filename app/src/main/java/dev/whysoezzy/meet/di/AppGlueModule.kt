@@ -16,23 +16,24 @@ import org.koin.dsl.module
  * Это решение для R-040: UseCase'ы оркестрации не место в
  * presentation-DI одной из участвующих фич.
  */
-val appGlueModule = module {
+val appGlueModule =
+    module {
 
-    factory {
-        GetMainScreenDataUseCase(
-            meetingsRepository = get(),
-            getHeroMeetingsUseCase = get<GetHeroMeetingsUseCase>(),
-            getPopularMeetingsUseCase = get<GetPopularMeetingsUseCase>(),
-            getCommunities = { get<GetRecommendedCommunitiesUseCase>().invoke() }
-        )
-    }
+        factory {
+            GetMainScreenDataUseCase(
+                meetingsRepository = get(),
+                getHeroMeetingsUseCase = get<GetHeroMeetingsUseCase>(),
+                getPopularMeetingsUseCase = get<GetPopularMeetingsUseCase>(),
+                getCommunities = { get<GetRecommendedCommunitiesUseCase>().invoke() },
+            )
+        }
 
-    factory {
-        SearchUseCase(
-            meetingsRepository = get(),
-            searchCommunities = { query ->
-                get<SearchCommunitiesUseCase>().invoke(query)
-            }
-        )
+        factory {
+            SearchUseCase(
+                meetingsRepository = get(),
+                searchCommunities = { query ->
+                    get<SearchCommunitiesUseCase>().invoke(query)
+                },
+            )
+        }
     }
-}

@@ -8,6 +8,7 @@ import dev.whysoezzy.uikit.models.UIKitPerson
 @Immutable
 sealed class CommunityDetailsUiState {
     data object Loading : CommunityDetailsUiState()
+
     data class Success(
         val communityId: Long,
         val imageUrl: String,
@@ -18,17 +19,30 @@ sealed class CommunityDetailsUiState {
         val subscribersCount: Int,
         val subscribers: List<UIKitPerson>,
         val activeMeetings: List<UIKitMeetingInfo>,
-        val pastMeetings: List<UIKitMeetingInfo>
+        val pastMeetings: List<UIKitMeetingInfo>,
     ) : CommunityDetailsUiState()
 
-    data class Error(val message: String) : CommunityDetailsUiState()
+    data class Error(
+        val message: String,
+    ) : CommunityDetailsUiState()
 }
 
 sealed class CommunityDetailsEvent {
-    data class LoadCommunity(val communityId: Long) : CommunityDetailsEvent()
+    data class LoadCommunity(
+        val communityId: Long,
+    ) : CommunityDetailsEvent()
+
     data object ToggleSubscription : CommunityDetailsEvent()
-    data class NavigateToMeeting(val meetingId: Long) : CommunityDetailsEvent()
-    data class NavigateToProfile(val userId: Long) : CommunityDetailsEvent()
+
+    data class NavigateToMeeting(
+        val meetingId: Long,
+    ) : CommunityDetailsEvent()
+
+    data class NavigateToProfile(
+        val userId: Long,
+    ) : CommunityDetailsEvent()
+
     data object NavigateToSubscribers : CommunityDetailsEvent()
+
     data object ShareCommunity : CommunityDetailsEvent()
 }

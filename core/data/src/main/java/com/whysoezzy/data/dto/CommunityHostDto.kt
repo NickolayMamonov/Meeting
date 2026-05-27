@@ -9,5 +9,5 @@ data class CommunityHostDto(
     @SerialName("title") val title: String,
     @SerialName("description") val description: String,
     @SerialName("imageUrl") val imageUrl: String,
-    @SerialName("meetingsInfo") val meetingsInfo: List<MeetingInfoDto>
+    @SerialName("meetingsInfo") val meetingsInfo: List<MeetingInfoDto>,
 )

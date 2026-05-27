@@ -7,7 +7,6 @@ import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.repository.MeetingsRepository
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.supervisorScope
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -23,7 +22,7 @@ class GetMainScreenDataUseCase(
     private val meetingsRepository: MeetingsRepository,
     private val getHeroMeetingsUseCase: GetHeroMeetingsUseCase,
     private val getPopularMeetingsUseCase: GetPopularMeetingsUseCase,
-    private val getCommunities: GetCommunitiesAction
+    private val getCommunities: GetCommunitiesAction,
 ) {
     suspend operator fun invoke(): Result<MainScreenData> {
         return try {
@@ -54,8 +53,8 @@ class GetMainScreenDataUseCase(
                         allMeetings = allMeetings,
                         categories = categories,
                         communities = communities,
-                        adBlocks = adBlocks
-                    )
+                        adBlocks = adBlocks,
+                    ),
                 )
             }
         } catch (e: CancellationException) {

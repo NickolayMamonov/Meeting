@@ -7,21 +7,22 @@ import dev.whysoezzy.auth.presentation.phone.PhoneInputViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
-val authFeatureModule = module {
+val authFeatureModule =
+    module {
 
-    viewModel {
-        PhoneInputViewModel(
-            sendOtpUseCase = get()
-        )
+        viewModel {
+            PhoneInputViewModel(
+                sendOtpUseCase = get(),
+            )
+        }
+
+        viewModel { (phoneNumber: String) ->
+            CodeVerificationViewModel(
+                phoneNumber = phoneNumber,
+                verifyOtpUseCase = get(),
+                sendOtpUseCase = get(),
+            )
+        }
+
+        viewModel { NameInputViewModel(get<UserProfilerUpdater>()) }
     }
-
-    viewModel { (phoneNumber: String) ->
-        CodeVerificationViewModel(
-            phoneNumber = phoneNumber,
-            verifyOtpUseCase = get(),
-            sendOtpUseCase = get()
-        )
-    }
-
-    viewModel { NameInputViewModel(get<UserProfilerUpdater>()) }
-}

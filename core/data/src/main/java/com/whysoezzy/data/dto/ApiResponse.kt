@@ -8,12 +8,12 @@ data class ApiResponse<T>(
     @SerialName("success") val success: Boolean,
     @SerialName("data") val data: T? = null,
     @SerialName("error") val error: ErrorResponse? = null,
-    @SerialName("message") val message: String? = null
+    @SerialName("message") val message: String? = null,
 )
 
 @Serializable
 data class ErrorResponse(
     @SerialName("code") val code: String,
     @SerialName("message") val message: String,
-    @SerialName("details") val details: Map<String, String>? = null
+    @SerialName("details") val details: Map<String, String>? = null,
 )

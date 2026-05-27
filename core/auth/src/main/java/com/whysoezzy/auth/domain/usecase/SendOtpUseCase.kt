@@ -4,7 +4,7 @@ import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.common.utils.ValidationUtils
 
 class SendOtpUseCase(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
 ) {
     suspend operator fun invoke(phone: String): Result<Unit> {
         if (!ValidationUtils.isValidPhoneNumber(phone)) {

@@ -67,7 +67,7 @@ fun CommunityDetailsScreen(
     onSubscribersClick: () -> Unit,
     onMeetingClick: (Long) -> Unit,
     onUserProfileClick: (Long) -> Unit = {},
-    viewModel: CommunityDetailsViewModel = koinViewModel()
+    viewModel: CommunityDetailsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -81,7 +81,7 @@ fun CommunityDetailsScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is CommunityDetailsNavEvent.NavigateToMeeting ->
                         onMeetingClick(event.meetingId)
                     is CommunityDetailsNavEvent.NavigateToProfile ->
@@ -103,7 +103,7 @@ fun CommunityDetailsScreen(
                         title = state.title,
                         onBackClick = onBackPressed,
                         onShareClick = { viewModel.onEvent(CommunityDetailsEvent.ShareCommunity) },
-                        modifier = Modifier.statusBarsPadding()
+                        modifier = Modifier.statusBarsPadding(),
                     )
                 }
                 else -> {
@@ -111,11 +111,11 @@ fun CommunityDetailsScreen(
                         title = stringResource(R.string.community_details_title),
                         onBackClick = onBackPressed,
                         onShareClick = {},
-                        modifier = Modifier.statusBarsPadding()
+                        modifier = Modifier.statusBarsPadding(),
                     )
                 }
             }
-        }
+        },
     ) { paddingValues ->
         when (val state = uiState) {
             is CommunityDetailsUiState.Loading -> {
@@ -135,7 +135,7 @@ fun CommunityDetailsScreen(
                         viewModel.onEvent(CommunityDetailsEvent.NavigateToMeeting(meetingId))
                     },
                     paddingValues = paddingValues,
-                    modifier = modifier
+                    modifier = modifier,
                 )
             }
 
@@ -145,7 +145,7 @@ fun CommunityDetailsScreen(
                     onRetry = {
                         viewModel.onEvent(CommunityDetailsEvent.LoadCommunity(communityId))
                     },
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
         }
@@ -166,7 +166,7 @@ private fun CommunityDetailsContent(
     onSubscribersClick: () -> Unit,
     onMeetingClick: (Long) -> Unit,
     paddingValues: PaddingValues,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -174,9 +174,9 @@ private fun CommunityDetailsContent(
             start = SpacingTokens.L,
             end = SpacingTokens.L,
             top = paddingValues.calculateTopPadding(),
-            bottom = paddingValues.calculateBottomPadding() + SpacingTokens.L
+            bottom = paddingValues.calculateBottomPadding() + SpacingTokens.L,
         ),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
     ) {
         item {
             AsyncImage(
@@ -187,7 +187,7 @@ private fun CommunityDetailsContent(
                     .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(ColorTokens.NeutralLine),
-                error = ColorPainter(ColorTokens.NeutralLine)
+                error = ColorPainter(ColorTokens.NeutralLine),
             )
             TextHeading1(text = state.title, modifier = Modifier.fillMaxWidth())
         }
@@ -195,9 +195,9 @@ private fun CommunityDetailsContent(
         item {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
-                contentPadding = PaddingValues(vertical = SpacingTokens.XS)
+                contentPadding = PaddingValues(vertical = SpacingTokens.XS),
             ) {
-                items(state.tags, key = {it.id}) { tag ->
+                items(state.tags, key = { it.id }) { tag ->
                     UIKitTag(text = tag.text, size = UIKitTagSize.MEDIUM)
                 }
             }
@@ -209,14 +209,14 @@ private fun CommunityDetailsContent(
                     text = stringResource(R.string.community_details_leave),
                     onClick = onSubscribeClick,
                     state = UIKitButtonState.SECONDARY,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             } else {
                 UIKitButton(
                     text = stringResource(R.string.community_details_join),
                     onClick = onSubscribeClick,
                     state = UIKitButtonState.PRIMARY,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -236,7 +236,7 @@ private fun CommunityDetailsContent(
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
             }
 
-            items(state.activeMeetings, key = {it.id}) { meeting ->
+            items(state.activeMeetings, key = { it.id }) { meeting ->
                 val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTagsAllSelected() }
                 UIKitEventCard(
                     imageUrl = meeting.imageUrl,
@@ -245,12 +245,12 @@ private fun CommunityDetailsContent(
                     address = UIKitAddress(
                         address = meeting.address,
                         latitude = meeting.latitude,
-                        longitude = meeting.longitude
+                        longitude = meeting.longitude,
                     ),
                     tags = eventCardTags,
                     cardType = UIKitEventCardType.WIDE,
                     onCardClick = { onMeetingClick(meeting.id) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
             }
@@ -265,7 +265,7 @@ private fun CommunityDetailsContent(
 
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-                    items(state.pastMeetings, key = {it.id}) { meeting ->
+                    items(state.pastMeetings, key = { it.id }) { meeting ->
                         val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTagsAllDisabled() }
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
@@ -274,11 +274,11 @@ private fun CommunityDetailsContent(
                             address = UIKitAddress(
                                 address = meeting.address,
                                 latitude = meeting.latitude,
-                                longitude = meeting.longitude
+                                longitude = meeting.longitude,
                             ),
                             tags = eventCardTags,
                             cardType = UIKitEventCardType.COMPACT,
-                            onCardClick = { onMeetingClick(meeting.id) }
+                            onCardClick = { onMeetingClick(meeting.id) },
                         )
                     }
                 }
@@ -291,11 +291,11 @@ private fun CommunityDetailsContent(
 private fun SubscribersSection(
     state: CommunityDetailsUiState.Success,
     onSubscribersClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
     ) {
         TextHeading2(text = stringResource(R.string.community_details_subscribers))
         Row(
@@ -303,20 +303,20 @@ private fun SubscribersSection(
                 .fillMaxWidth()
                 .clickable { onSubscribersClick() },
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             UIKitOverlappingAvatars(
                 avatarUrls = state.subscribers.map { it.avatar },
                 avatarSize = 40.dp,
                 maxVisibleAvatars = 5,
-                showCount = true
+                showCount = true,
             )
 
             if (state.subscribersCount > state.subscribers.size) {
                 Text(
                     text = "+${state.subscribersCount - state.subscribers.size}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -324,26 +324,27 @@ private fun SubscribersSection(
 }
 
 private val ErrorButtonMaxWidth = 343.dp
+
 @Composable
 private fun ErrorContent(
     message: String,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             UIKitButton(
                 text = stringResource(dev.whysoezzy.uikit.R.string.action_retry),
                 onClick = onRetry,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
             )
         }
     }

@@ -12,7 +12,9 @@ import io.ktor.client.request.post
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-internal class CommunitiesApiKtor(private val client: HttpClient): CommunitiesApi {
+internal class CommunitiesApiKtor(
+    private val client: HttpClient,
+) : CommunitiesApi {
     override suspend fun getRecommendedCommunities(): List<CommunityDto> {
         return client.get("communities/recommended").body()
     }
@@ -32,9 +34,10 @@ internal class CommunitiesApiKtor(private val client: HttpClient): CommunitiesAp
     }
 
     override suspend fun searchCommunities(query: String): List<CommunityDto> {
-        return client.get("communities/search") {
-            parameter("query", query)
-        }.body()
+        return client
+            .get("communities/search") {
+                parameter("query", query)
+            }.body()
     }
 
     override suspend fun getCommunityMeetings(id: Long): List<MeetingDto> {

@@ -35,7 +35,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import coil.compose.AsyncImage
+import dev.whysoezzy.features_meetings.R
+import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.uikit.components.blocks.UIKitAddressMapBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitCommunityBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitParticipantsBlock
@@ -60,14 +64,9 @@ import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import dev.whysoezzy.uikit.tokens.ColorTokens
-import dev.whysoezzy.features_meetings.R
-import dev.whysoezzy.meetings.mappers.toEventCardTags
-import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun MeetingDetailsScreen(
@@ -79,7 +78,7 @@ fun MeetingDetailsScreen(
     onUserProfileClick: (Long) -> Unit = {},
     onOtherMeetingClick: (Long) -> Unit = {},
     onAuthRequired: () -> Unit = {},
-    viewModel: MeetingDetailsViewModel = koinViewModel()
+    viewModel: MeetingDetailsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -92,7 +91,7 @@ fun MeetingDetailsScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is MeetingDetailsNavEvent.NavigateToProfile -> onUserProfileClick(event.userId)
                     is MeetingDetailsNavEvent.NavigateToMeeting -> onOtherMeetingClick(event.meetingId)
                     is MeetingDetailsNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
@@ -116,7 +115,7 @@ fun MeetingDetailsScreen(
                 onShareClick = {
                     if (successState != null) viewModel.onEvent(MeetingDetailsEvent.ShareMeeting)
                 },
-                modifier = Modifier.statusBarsPadding()
+                modifier = Modifier.statusBarsPadding(),
             )
         },
         bottomBar = {
@@ -125,15 +124,15 @@ fun MeetingDetailsScreen(
                     totalPlaces = successState.totalPlaces,
                     isUserJoined = successState.isUserJoined,
                     onJoinClick = { viewModel.onEvent(MeetingDetailsEvent.JoinMeeting) },
-                    onLeaveClick = { viewModel.onEvent(MeetingDetailsEvent.LeaveMeeting) }
+                    onLeaveClick = { viewModel.onEvent(MeetingDetailsEvent.LeaveMeeting) },
                 )
             }
-        }
+        },
     ) { paddingValues ->
         when (val state = uiState) {
             is MeetingDetailsUiState.Loading -> {
                 LoadingContent(
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
 
@@ -150,7 +149,7 @@ fun MeetingDetailsScreen(
                     },
                     onMapClick = { viewModel.onEvent(MeetingDetailsEvent.OpenMap) },
                     onParticipantsClick = onParticipantsClick,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
 
@@ -159,7 +158,7 @@ fun MeetingDetailsScreen(
                     message = state.message,
                     onRetry = { viewModel.onEvent(MeetingDetailsEvent.LoadMeeting(meetingId)) },
                     onBackPressed = onBackPressed,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
         }
@@ -172,39 +171,39 @@ private fun BottomActionSection(
     isUserJoined: Boolean,
     onJoinClick: () -> Unit,
     onLeaveClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(SpacingTokens.L),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             TextBody2(
-                text = stringResource(R.string.meeting_details_capacity,totalPlaces),
+                text = stringResource(R.string.meeting_details_capacity, totalPlaces),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
             if (isUserJoined) {
                 UIKitButton(
                     text = stringResource(R.string.meeting_details_leave),
                     onClick = onLeaveClick,
                     state = UIKitButtonState.SECONDARY,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             } else {
                 UIKitButton(
                     text = stringResource(R.string.meeting_details_join),
                     onClick = onJoinClick,
                     state = UIKitButtonState.PRIMARY,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -227,11 +226,11 @@ private fun MeetingContent(
     onOtherMeetingClick: (Long) -> Unit,
     onMapClick: () -> Unit,
     onParticipantsClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = SpacingTokens.L),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         item {
             AsyncImage(
@@ -243,7 +242,7 @@ private fun MeetingContent(
                     .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(ColorTokens.NeutralLine),
-                error = ColorPainter(ColorTokens.NeutralLine)
+                error = ColorPainter(ColorTokens.NeutralLine),
             )
         }
 
@@ -271,7 +270,7 @@ private fun MeetingContent(
                     surname = host.surname,
                     description = host.description,
                     imageUrl = host.imageUrl,
-                    onCardClick = { onHostClick(host.id) }
+                    onCardClick = { onHostClick(host.id) },
                 )
             }
         }
@@ -282,7 +281,7 @@ private fun MeetingContent(
                 latitude = uiState.address.latitude,
                 longitude = uiState.address.longitude,
                 nearestMetro = uiState.nearestMetro,
-                onMapClick = onMapClick
+                onMapClick = onMapClick,
             )
         }
 
@@ -290,7 +289,7 @@ private fun MeetingContent(
             UIKitParticipantsBlock(
                 participantAvatars = uiState.participants.map { it.avatar },
                 participantCount = uiState.participants.size,
-                onParticipantsClick = onParticipantsClick
+                onParticipantsClick = onParticipantsClick,
             )
         }
 
@@ -300,7 +299,7 @@ private fun MeetingContent(
                     communityName = community.title,
                     communityDescription = community.description,
                     communityImageUrl = community.imageUrl,
-                    onCommunityClick = { onCommunityClick(community.id) }
+                    onCommunityClick = { onCommunityClick(community.id) },
                 )
             }
         }
@@ -310,7 +309,7 @@ private fun MeetingContent(
                 Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
                     TextHeading2(text = stringResource(R.string.meeting_details_community_other_meetings))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-                        items(uiState.otherMeetings, key = {it.id}) { meeting ->
+                        items(uiState.otherMeetings, key = { it.id }) { meeting ->
                             val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTags() }
                             UIKitEventCard(
                                 imageUrl = meeting.imageUrl,
@@ -319,11 +318,11 @@ private fun MeetingContent(
                                 address = UIKitAddress(
                                     address = meeting.address,
                                     latitude = 0.0,
-                                    longitude = 0.0
+                                    longitude = 0.0,
                                 ),
                                 tags = eventCardTags,
                                 cardType = UIKitEventCardType.COMPACT,
-                                onCardClick = { onOtherMeetingClick(meeting.id) }
+                                onCardClick = { onOtherMeetingClick(meeting.id) },
                             )
                         }
                     }
@@ -338,33 +337,33 @@ private fun MeetingContent(
 }
 
 private val ErrorButtonMaxWidth = 343.dp
+
 @Composable
 private fun ErrorContent(
     message: String,
     onRetry: () -> Unit,
     onBackPressed: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             TextBody1(text = message, textAlign = TextAlign.Center)
             UIKitButton(
                 text = stringResource(dev.whysoezzy.uikit.R.string.action_retry),
                 onClick = onRetry,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
             )
             UIKitButton(
                 text = stringResource(dev.whysoezzy.uikit.R.string.action_cancel),
                 onClick = onBackPressed,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
             )
         }
     }
 }
-
 
 @Preview
 @Composable
@@ -372,7 +371,7 @@ private fun MeetingDetailsScreenPreview() {
     UIKitTheme {
         val mockTags = listOf(
             UIKitMeetingTag(1, "Android", UIKitTagState.ACTIVE),
-            UIKitMeetingTag(2, "Kotlin", UIKitTagState.ACTIVE)
+            UIKitMeetingTag(2, "Kotlin", UIKitTagState.ACTIVE),
         )
         val mockOtherMeetings = listOf(
             UIKitMeetingInfo(
@@ -384,8 +383,8 @@ private fun MeetingDetailsScreenPreview() {
                 latitude = 0.0,
                 longitude = 0.0,
                 tags = mockTags,
-                meetingStatus = UIKitMeetingStatus.ACTIVE
-            )
+                meetingStatus = UIKitMeetingStatus.ACTIVE,
+            ),
         )
         MeetingContent(
             uiState = MeetingDetailsUiState.Success(
@@ -396,11 +395,16 @@ private fun MeetingDetailsScreenPreview() {
                 address = UIKitAddress("ул. Тверская, 15", 55.7558, 37.6176),
                 tags = mockTags,
                 description = "Обсуждение новых технологий Android",
-                host = UIKitPersonHost(1, "Александр", "Петров", "Senior Android Developer",
-                    "https://picsum.photos/200/200?random=host"),
+                host = UIKitPersonHost(
+                    1,
+                    "Александр",
+                    "Петров",
+                    "Senior Android Developer",
+                    "https://picsum.photos/200/200?random=host",
+                ),
                 nearestMetro = "Охотный ряд",
                 participants = listOf(
-                    UIKitPerson(1, "Анна", "Иванова", "https://picsum.photos/100/100?random=1", "Дизайнер")
+                    UIKitPerson(1, "Анна", "Иванова", "https://picsum.photos/100/100?random=1", "Дизайнер"),
                 ),
                 isUserJoined = false,
                 totalPlaces = 30,
@@ -409,16 +413,16 @@ private fun MeetingDetailsScreenPreview() {
                     title = "Android Developers Moscow",
                     description = "Сообщество разработчиков",
                     imageUrl = "https://picsum.photos/300/300?random=community",
-                    meetingsInfo = mockOtherMeetings
+                    meetingsInfo = mockOtherMeetings,
                 ),
-                otherMeetings = mockOtherMeetings
+                otherMeetings = mockOtherMeetings,
             ),
             onHostClick = {},
             onParticipantClick = {},
             onCommunityClick = {},
             onOtherMeetingClick = {},
             onMapClick = {},
-            onParticipantsClick = {}
+            onParticipantsClick = {},
         )
     }
 }

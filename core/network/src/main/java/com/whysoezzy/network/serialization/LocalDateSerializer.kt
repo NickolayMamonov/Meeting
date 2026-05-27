@@ -16,12 +16,10 @@ object LocalDateSerializer : KSerializer<LocalDate> {
 
     override fun serialize(
         encoder: Encoder,
-        value: LocalDate
+        value: LocalDate,
     ) {
         encoder.encodeString(value.format(formatter))
     }
 
-    override fun deserialize(decoder: Decoder): LocalDate {
-        return LocalDate.parse(decoder.decodeString(), formatter)
-    }
+    override fun deserialize(decoder: Decoder): LocalDate = LocalDate.parse(decoder.decodeString(), formatter)
 }

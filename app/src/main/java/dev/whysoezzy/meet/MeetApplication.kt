@@ -1,10 +1,10 @@
 package dev.whysoezzy.meet
 
 import android.app.Application
+import com.whysoezzy.auth.di.authModule
 import com.whysoezzy.data.di.communitiesModule
 import com.whysoezzy.data.di.meetingsModule
 import com.whysoezzy.data.di.profileDataModule
-import com.whysoezzy.auth.di.authModule
 import dev.whysoezzy.auth.di.authFeatureModule
 import dev.whysoezzy.communities.di.communityModule
 import dev.whysoezzy.meet.di.appGlueModule
@@ -18,7 +18,6 @@ import org.koin.core.logger.Level
 import timber.log.Timber
 
 class MeetApplication : Application() {
-
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) {
@@ -37,7 +36,7 @@ class MeetApplication : Application() {
                 profileDataModule,
                 mainFeatureModule,
                 communityModule,
-                profileFeatureModule
+                profileFeatureModule,
             )
         }
     }

@@ -30,6 +30,6 @@ fun TextBody2(
         fontWeight = fontWeight,
         maxLines = maxLines,
         textAlign = textAlign,
-        modifier = modifier
+        modifier = modifier,
     )
 }

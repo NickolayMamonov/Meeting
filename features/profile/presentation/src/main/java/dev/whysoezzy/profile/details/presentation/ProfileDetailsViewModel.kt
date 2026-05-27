@@ -3,12 +3,12 @@ package dev.whysoezzy.profile.details.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
-import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
 import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
+import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.network.toUserMessage
 import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
@@ -29,9 +29,8 @@ class ProfileDetailsViewModel(
     private val getUserMeetingsUseCase: GetUserMeetingsUseCase,
     private val getUserCommunitiesUseCase: GetUserCommunitiesUseCase,
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
-    private val logoutUseCase: LogoutUseCase
+    private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow<ProfileDetailsUiState>(ProfileDetailsUiState.Loading)
     val uiState: StateFlow<ProfileDetailsUiState> = _uiState.asStateFlow()
 
@@ -71,21 +70,20 @@ class ProfileDetailsViewModel(
                         handleLogout()
                     } else {
                         _uiState.value = ProfileDetailsUiState.Error(
-                            message = exception.toUserMessage()
+                            message = exception.toUserMessage(),
                         )
                     }
-                }
-                .onSuccess { user ->
+                }.onSuccess { user ->
                     if (isOwnProfile && user.name.isBlank()) {
                         _navEvent.emit(ProfileDetailsNavEvent.NavigateToNameInput)
                         return@onSuccess
                     }
 
                     val (meetings, communities) = coroutineScope {
-                        val meetingsDeferred    = async { getUserMeetingsUseCase(user.id) }
+                        val meetingsDeferred = async { getUserMeetingsUseCase(user.id) }
                         val communitiesDeferred = async { getUserCommunitiesUseCase(user.id) }
                         (meetingsDeferred.await().getOrNull() ?: emptyList()) to
-                                (communitiesDeferred.await().getOrNull() ?: emptyList())
+                            (communitiesDeferred.await().getOrNull() ?: emptyList())
                     }
 
                     val subscribedIds = communities.map { it.id }.toSet()
@@ -103,7 +101,7 @@ class ProfileDetailsViewModel(
                         socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
                         userMeetings = meetings.map { it.toUIKitMeetingInfo() },
                         userCommunities = communities.toUIKitCommunityInfoList(
-                            subscribedIds = subscribedIds
+                            subscribedIds = subscribedIds,
                         ),
                     )
                 }
@@ -123,8 +121,8 @@ class ProfileDetailsViewModel(
             _navEvent.emit(
                 ProfileDetailsNavEvent.ShareProfile(
                     name = "${state.name} ${state.surname}".trim(),
-                    shareText = "Посмотри профиль ${state.name} ${state.surname} в приложении Meeting!"
-                )
+                    shareText = "Посмотри профиль ${state.name} ${state.surname} в приложении Meeting!",
+                ),
             )
         }
     }
@@ -150,9 +148,12 @@ class ProfileDetailsViewModel(
         val state = _uiState.value as? ProfileDetailsUiState.Success ?: return
         _uiState.value = state.copy(
             userCommunities = state.userCommunities.map { community ->
-                if (community.id == communityId) community.copy(isSubscribed = isSubscribed)
-                else community
-            }
+                if (community.id == communityId) {
+                    community.copy(isSubscribed = isSubscribed)
+                } else {
+                    community
+                }
+            },
         )
     }
 }

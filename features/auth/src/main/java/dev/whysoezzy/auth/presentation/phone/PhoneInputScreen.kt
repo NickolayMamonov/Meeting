@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.forms.UIKitPhoneInput
@@ -28,16 +29,13 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-import androidx.compose.ui.res.stringResource
-import dev.whysoezzy.auth.R
-import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun PhoneInputScreen(
     onPhoneSubmitted: (String) -> Unit,
     onBackPressed: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: PhoneInputViewModel = koinViewModel()
+    viewModel: PhoneInputViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -50,11 +48,12 @@ fun PhoneInputScreen(
     Scaffold { paddingValues ->
         PhoneInputContent(
             uiState = uiState,
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize(),
             onPhoneNumberChange = { viewModel.onEvent(PhoneInputEvent.UpdatePhoneNumber(it)) },
-            onSendCodeClick = { viewModel.onEvent(PhoneInputEvent.SendCode) }
+            onSendCodeClick = { viewModel.onEvent(PhoneInputEvent.SendCode) },
         )
     }
 }
@@ -64,30 +63,30 @@ private fun PhoneInputContent(
     uiState: PhoneInputUiState,
     modifier: Modifier = Modifier,
     onPhoneNumberChange: (String) -> Unit = {},
-    onSendCodeClick: () -> Unit = {}
+    onSendCodeClick: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.padding(SpacingTokens.L),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
     ) {
         Spacer(modifier = Modifier.height(60.dp))
 
         // Header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             TextHeading1(
                 text = stringResource(R.string.auth_phone_title),
                 color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             TextBody2(
                 text = stringResource(R.string.auth_phone_subtitle),
                 color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
 
@@ -100,7 +99,7 @@ private fun PhoneInputContent(
             placeholder = stringResource(R.string.auth_phone_placeholder),
             state = if (uiState.error != null) UIKitInputState.ERROR else UIKitInputState.FILLED,
             errorMessage = uiState.error,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -109,12 +108,13 @@ private fun PhoneInputContent(
         UIKitButton(
             text = stringResource(R.string.auth_phone_send_code),
             onClick = onSendCodeClick,
-            state = when {
-                uiState.isLoading -> UIKitButtonState.LOADING
-                uiState.isValid -> UIKitButtonState.PRIMARY
-                else -> UIKitButtonState.DISABLED
-            },
-            modifier = Modifier.fillMaxWidth()
+            state =
+                when {
+                    uiState.isLoading -> UIKitButtonState.LOADING
+                    uiState.isValid -> UIKitButtonState.PRIMARY
+                    else -> UIKitButtonState.DISABLED
+                },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -124,9 +124,10 @@ private fun PhoneInputContent(
 private fun PhoneInputScreenPreview() {
     UIKitTheme {
         PhoneInputContent(
-            uiState = PhoneInputUiState(
-                phoneNumber = "+7 (999) 123-45"
-            )
+            uiState =
+                PhoneInputUiState(
+                    phoneNumber = "+7 (999) 123-45",
+                ),
         )
     }
 }
@@ -136,10 +137,11 @@ private fun PhoneInputScreenPreview() {
 private fun PhoneInputScreenErrorPreview() {
     UIKitTheme {
         PhoneInputContent(
-            uiState = PhoneInputUiState(
-                phoneNumber = "+7 (999) 123",
-                error = stringResource(R.string.auth_phone_error_invalid)
-            )
+            uiState =
+                PhoneInputUiState(
+                    phoneNumber = "+7 (999) 123",
+                    error = stringResource(R.string.auth_phone_error_invalid),
+                ),
         )
     }
 }

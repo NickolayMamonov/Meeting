@@ -10,7 +10,7 @@ internal interface AuthApi {
         phone: String,
         code: String,
         name: String? = null,
-        surname: String? = null
+        surname: String? = null,
     ): AuthResponse
 
     suspend fun refreshToken(refreshToken: String): RefreshTokenResponse

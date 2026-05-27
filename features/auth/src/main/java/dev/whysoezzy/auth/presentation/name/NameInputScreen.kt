@@ -13,10 +13,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
@@ -26,18 +31,14 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.R as UIKitR
+
 @Composable
 fun NameInputScreen(
     onNameSubmitted: () -> Unit,
     onBackPressed: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: NameInputViewModel = koinViewModel()
+    viewModel: NameInputViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -45,7 +46,7 @@ fun NameInputScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is NameInputNavEvent.NavigateToSuccess -> onNameSubmitted()
                 }
             }
@@ -55,12 +56,13 @@ fun NameInputScreen(
     Scaffold { paddingValues ->
         NameInputContent(
             uiState = uiState,
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize(),
             onNameChange = { viewModel.onEvent(NameInputEvent.UpdateName(it)) },
             onSurnameChange = { viewModel.onEvent(NameInputEvent.UpdateSurname(it)) },
-            onContinueClick = { viewModel.onEvent(NameInputEvent.Continue) }
+            onContinueClick = { viewModel.onEvent(NameInputEvent.Continue) },
         )
     }
 }
@@ -71,28 +73,28 @@ private fun NameInputContent(
     modifier: Modifier = Modifier,
     onNameChange: (String) -> Unit = {},
     onSurnameChange: (String) -> Unit = {},
-    onContinueClick: () -> Unit = {}
+    onContinueClick: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.padding(SpacingTokens.L),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
     ) {
         Spacer(modifier = Modifier.height(60.dp))
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             TextHeading1(
                 text = stringResource(R.string.auth_name_title),
                 color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             TextBody2(
                 text = stringResource(R.string.auth_name_subtitle),
                 color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
 
@@ -105,7 +107,7 @@ private fun NameInputContent(
                 hint = stringResource(R.string.auth_name_hint_first),
                 isError = uiState.nameError != null,
                 errorMessage = uiState.nameError ?: "",
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
             UIKitInput(
                 value = uiState.surname,
@@ -113,7 +115,7 @@ private fun NameInputContent(
                 hint = stringResource(R.string.auth_name_hint_last),
                 isError = uiState.surnameError != null,
                 errorMessage = uiState.surnameError ?: "",
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
@@ -122,12 +124,13 @@ private fun NameInputContent(
         UIKitButton(
             text = stringResource(UIKitR.string.action_continue),
             onClick = onContinueClick,
-            state = when {
-                uiState.isLoading -> UIKitButtonState.LOADING
-                uiState.isValid -> UIKitButtonState.PRIMARY
-                else -> UIKitButtonState.DISABLED
-            },
-            modifier = Modifier.fillMaxWidth()
+            state =
+                when {
+                    uiState.isLoading -> UIKitButtonState.LOADING
+                    uiState.isValid -> UIKitButtonState.PRIMARY
+                    else -> UIKitButtonState.DISABLED
+                },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -145,12 +148,13 @@ private fun NameInputScreenPreview() {
 private fun NameInputScreenErrorPreview() {
     UIKitTheme {
         NameInputContent(
-            uiState = NameInputUiState(
-                name = "И",
-                surname = "",
-                nameError = "Имя должно содержать минимум 2 символа",
-                surnameError = "Фамилия не может быть пустой"
-            )
+            uiState =
+                NameInputUiState(
+                    name = "И",
+                    surname = "",
+                    nameError = "Имя должно содержать минимум 2 символа",
+                    surnameError = "Фамилия не может быть пустой",
+                ),
         )
     }
 }

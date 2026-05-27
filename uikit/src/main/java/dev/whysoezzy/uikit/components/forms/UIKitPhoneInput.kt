@@ -17,7 +17,7 @@ fun UIKitPhoneInput(
     modifier: Modifier = Modifier,
     placeholder: String = "Номер телефона",
     state: UIKitInputState = UIKitInputState.EMPTY,
-    errorMessage: String? = null
+    errorMessage: String? = null,
 ) {
     UIKitInput(
         value = value,
@@ -30,7 +30,7 @@ fun UIKitPhoneInput(
         hint = "",
         errorMessage = errorMessage ?: "",
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-        maxLines = 1
+        maxLines = 1,
     )
 }
 
@@ -40,10 +40,11 @@ private fun formatPhoneNumber(input: String): String {
 
     // Нормализуем: убираем ведущую 7/8 если она есть,
     // чтобы работать с 10-значным номером (без кода страны)
-    val local = when {
-        digits.startsWith("7") || digits.startsWith("8") -> digits.drop(1)
-        else -> digits
-    }.take(10)
+    val local =
+        when {
+            digits.startsWith("7") || digits.startsWith("8") -> digits.drop(1)
+            else -> digits
+        }.take(10)
 
     // Строим форматированную строку по мере ввода
     return buildString {
@@ -73,7 +74,7 @@ private fun UIKitPhoneInputPreview() {
         UIKitPhoneInput(
             value = "+7 (999) 123-45-67",
             onValueChange = {},
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

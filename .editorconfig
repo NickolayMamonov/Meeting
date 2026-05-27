@@ -1,0 +1,36 @@
+[*.{kt,kts}]
+# Базовые правила ktlint
+ktlint_standard = enabled
+ktlint_experimental = disabled
+
+# === Compose-конвенции ===
+ktlint_standard_filename = disabled
+ktlint_standard_function-naming = disabled
+ktlint_standard_property-naming = disabled
+
+# === Стилистические правила (отключены для меньшего шума) ===
+# Не навязываем expression body для функций (= vs { return }):
+# для UseCase и Composable читаемость зависит от случая, оставляем на ревью.
+ktlint_standard_function-expression-body = disabled
+
+# Не навязываем перенос всего выражения на новую строку после = (для val/fun):
+# конфликтует с короткими expression-body после многострочной сигнатуры.
+ktlint_standard_multiline-expression-wrapping = disabled
+
+# Не форсируем структуру сигнатуры функции (одна строка vs multi-line):
+# Compose API часто имеет несколько коротких параметров, формат подбирается ситуативно.
+ktlint_standard_function-signature = disabled
+
+# === Что остаётся включённым (важное) ===
+# - trailing-comma-on-call-site / -declaration-site (стабильные diff'ы)
+# - final-newline (POSIX)
+# - no-unused-imports (R-052)
+# - import-ordering
+# - blank-line-between-declarations
+# - parameter-list-wrapping (multi-line должен корректно переноситься)
+
+# === Прочее ===
+ij_kotlin_packages_to_use_import_on_demand = unset
+max_line_length = unset
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true

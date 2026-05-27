@@ -16,22 +16,24 @@ android {
 
     buildTypes {
         debug {
-            val baseUrl = (project.findProperty("BASE_URL_DEBUG") as? String)
-                ?: "http://10.0.2.2:8080"
+            val baseUrl =
+                (project.findProperty("BASE_URL_DEBUG") as? String)
+                    ?: "http://10.0.2.2:8080"
             buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
         }
         release {
-            val baseUrl = (project.findProperty("BASE_URL_RELEASE") as? String)
-                ?: "https://api.example.com"
+            val baseUrl =
+                (project.findProperty("BASE_URL_RELEASE") as? String)
+                    ?: "https://api.example.com"
             check(baseUrl.startsWith("https://")) {
                 "BASE_URL_RELEASE must use https:// (got: $baseUrl). " +
-                        "Set it in ~/.gradle/gradle.properties or via CI environment."
+                    "Set it in ~/.gradle/gradle.properties or via CI environment."
             }
             buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }

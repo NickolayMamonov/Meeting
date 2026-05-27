@@ -29,6 +29,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.components.blocks.UIKitUserCommunitiesBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitUserMeetingsBlock
 import dev.whysoezzy.uikit.components.blocks.UIKitUserProfileBlock
@@ -40,16 +46,11 @@ import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-import androidx.core.net.toUri
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import dev.whysoezzy.profile.R
 import timber.log.Timber
 import dev.whysoezzy.uikit.R as UIKitR
 
 private val ErrorButtonMaxWidth = 343.dp
+
 @Composable
 fun ProfileDetailsScreen(
     modifier: Modifier = Modifier,
@@ -60,7 +61,7 @@ fun ProfileDetailsScreen(
     onNameInput: () -> Unit = {},
     onMeetingClick: (Long) -> Unit = {},
     onCommunityClick: (Long) -> Unit = {},
-    viewModel: ProfileDetailsViewModel = koinViewModel()
+    viewModel: ProfileDetailsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -74,7 +75,7 @@ fun ProfileDetailsScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is ProfileDetailsNavEvent.NavigateToAuth -> onLogout()
                     is ProfileDetailsNavEvent.NavigateToNameInput -> onNameInput()
                     is ProfileDetailsNavEvent.NavigateToEdit -> onEditClick()
@@ -99,13 +100,13 @@ fun ProfileDetailsScreen(
                 onCommunitySubscribeClick = { id, subscribed ->
                     viewModel.onEvent(ProfileDetailsEvent.ToggleCommunitySubscription(id, subscribed))
                 },
-                onLogoutClick = { viewModel.onEvent(ProfileDetailsEvent.Logout) }
+                onLogoutClick = { viewModel.onEvent(ProfileDetailsEvent.Logout) },
             )
 
             is ProfileDetailsUiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.onEvent(ProfileDetailsEvent.LoadProfile(userId)) },
-                onBackPressed = onBackPressed
+                onBackPressed = onBackPressed,
             )
         }
 
@@ -118,7 +119,7 @@ fun ProfileDetailsScreen(
             onShareClick = { viewModel.onEvent(ProfileDetailsEvent.ShareProfile) },
             containerColor = Color.Transparent,
             contentColor = Color.White,
-            applyStatusBarPadding = true
+            applyStatusBarPadding = true,
         )
     }
 }
@@ -138,10 +139,10 @@ private fun ProfileContent(
     onSocialMediaClick: (String) -> Unit,
     onCommunitySubscribeClick: (Long, Boolean) -> Unit,
     onLogoutClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
     ) {
         // 1. Фото + основная инфо — edge-to-edge, без верхнего padding
         item {
@@ -154,7 +155,7 @@ private fun ProfileContent(
                 },
                 avatarUrl = uiState.avatarUrl,
                 interests = uiState.interests,
-                coverHeight = 375
+                coverHeight = 375,
             )
         }
 
@@ -166,8 +167,8 @@ private fun ProfileContent(
                     onSocialMediaClick = onSocialMediaClick,
                     modifier = Modifier.padding(
                         horizontal = SpacingTokens.L,
-                        vertical = SpacingTokens.M
-                    )
+                        vertical = SpacingTokens.M,
+                    ),
                 )
             }
         }
@@ -177,13 +178,14 @@ private fun ProfileContent(
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
                 UIKitUserMeetingsBlock(
-                    title = if (uiState.isOwnProfile)
+                    title = if (uiState.isOwnProfile) {
                         stringResource(R.string.profile_details_meetings_self)
-                    else
-                        stringResource(R.string.profile_details_meetings_other),
+                    } else {
+                        stringResource(R.string.profile_details_meetings_other)
+                    },
                     meetings = uiState.userMeetings,
                     onMeetingClick = onMeetingClick,
-                    modifier = Modifier.padding(horizontal = SpacingTokens.L)
+                    modifier = Modifier.padding(horizontal = SpacingTokens.L),
                 )
             }
         }
@@ -193,12 +195,18 @@ private fun ProfileContent(
             item {
                 Spacer(modifier = Modifier.height(SpacingTokens.M))
                 UIKitUserCommunitiesBlock(
-                    title = if (uiState.isOwnProfile) stringResource(R.string.profile_details_communities_self) else stringResource(R.string.profile_details_communities_other),
+                    title = if (uiState.isOwnProfile) {
+                        stringResource(
+                            R.string.profile_details_communities_self,
+                        )
+                    } else {
+                        stringResource(R.string.profile_details_communities_other)
+                    },
                     communities = uiState.userCommunities,
                     subscribedCommunityIds = emptySet(),
                     onCommunityClick = onCommunityClick,
                     onSubscribeClick = { _, _ -> },
-                    modifier = Modifier.padding(horizontal = SpacingTokens.L)
+                    modifier = Modifier.padding(horizontal = SpacingTokens.L),
                 )
             }
         }
@@ -212,12 +220,12 @@ private fun ProfileContent(
                     fontFamily = SFProDisplayFontFamily,
                     fontWeight = FontWeight.Medium,
                     fontSize = 18.sp,
-                    color = ColorTokens.NeutralWeak,   // #A4A4A4 — серый по дизайну
+                    color = ColorTokens.NeutralWeak, // #A4A4A4 — серый по дизайну
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onLogoutClick() }
-                        .padding(vertical = SpacingTokens.M)
+                        .padding(vertical = SpacingTokens.M),
                 )
             }
         }
@@ -233,24 +241,23 @@ private fun ErrorContent(
     message: String,
     onRetry: () -> Unit,
     onBackPressed: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             TextBody1(text = message, textAlign = TextAlign.Center)
             UIKitButton(
                 text = stringResource(UIKitR.string.action_retry),
                 onClick = onRetry,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
             )
             UIKitButton(
                 text = stringResource(UIKitR.string.action_back),
                 onClick = onBackPressed,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
             )
         }
     }

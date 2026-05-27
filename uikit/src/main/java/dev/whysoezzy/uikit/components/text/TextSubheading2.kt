@@ -20,8 +20,7 @@ fun TextSubheading2(
     maxLines: Int = Int.MAX_VALUE,
     textAlign: TextAlign? = null,
     lineHeight: TextUnit = TextUnit.Unspecified,
-
-    ) {
+) {
     Text(
         text = text,
         style = UIKitTheme.typography.subheading2,
@@ -31,6 +30,6 @@ fun TextSubheading2(
         maxLines = maxLines,
         fontWeight = fontWeight,
         textAlign = textAlign,
-        modifier = modifier
+        modifier = modifier,
     )
 }

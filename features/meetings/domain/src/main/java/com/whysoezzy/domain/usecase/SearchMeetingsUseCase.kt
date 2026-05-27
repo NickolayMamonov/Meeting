@@ -8,7 +8,7 @@ import com.whysoezzy.domain.repository.MeetingsRepository
  * Объединение результатов происходит в SearchUseCase из meetings:presentation через MainFeatureModule.
  */
 class SearchMeetingsUseCase(
-    private val meetingsRepository: MeetingsRepository
+    private val meetingsRepository: MeetingsRepository,
 ) {
     suspend operator fun invoke(query: String): Result<SearchData> {
         return try {

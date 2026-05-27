@@ -12,5 +12,5 @@ data class UIKitMeetingInfo(
     val latitude: Double,
     val longitude: Double,
     val tags: List<UIKitMeetingTag>,
-    val meetingStatus: UIKitMeetingStatus? = null
+    val meetingStatus: UIKitMeetingStatus? = null,
 )

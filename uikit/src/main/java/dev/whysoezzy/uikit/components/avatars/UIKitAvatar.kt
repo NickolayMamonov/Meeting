@@ -39,22 +39,23 @@ fun UIKitAvatar(
     size: Dp = 40.dp,
     clipType: Shape = CircleShape,
     placeholder: @Composable (() -> Unit)? = null,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
 
     Box(
-        modifier = modifier
-            .size(size)
-            .clip(clipType)
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(onClick = onClick)
-                } else {
-                    Modifier
-                }
-            ),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .size(size)
+                .clip(clipType)
+                .then(
+                    if (onClick != null) {
+                        Modifier.clickable(onClick = onClick)
+                    } else {
+                        Modifier
+                    },
+                ),
+        contentAlignment = Alignment.Center,
     ) {
         if (imageUrl.isNotEmpty()) {
             AsyncImage(
@@ -63,20 +64,21 @@ fun UIKitAvatar(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(ColorTokens.NeutralLine),
-                error = ColorPainter(ColorTokens.NeutralLine)
+                error = ColorPainter(ColorTokens.NeutralLine),
             )
         } else {
             placeholder?.invoke() ?: Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(colorScheme.neutralLine),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(colorScheme.neutralLine),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = "Default Avatar",
                     tint = colorScheme.neutralWeak,
-                    modifier = Modifier.size(size * 0.6f)
+                    modifier = Modifier.size(size * 0.6f),
                 )
             }
         }
@@ -88,33 +90,35 @@ fun UIKitAvatarWithInitials(
     initials: String,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
 
     Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(colorScheme.brandLight)
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(onClick = onClick)
-                } else {
-                    Modifier
-                }
-            ),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(colorScheme.brandLight)
+                .then(
+                    if (onClick != null) {
+                        Modifier.clickable(onClick = onClick)
+                    } else {
+                        Modifier
+                    },
+                ),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = initials.take(2).uppercase(),
             color = colorScheme.brandDark,
-            fontSize = when {
-                size <= 32.dp -> 12.sp
-                size <= 48.dp -> 16.sp
-                else -> 20.sp
-            },
-            fontWeight = FontWeight.Medium
+            fontSize =
+                when {
+                    size <= 32.dp -> 12.sp
+                    size <= 48.dp -> 16.sp
+                    else -> 20.sp
+                },
+            fontWeight = FontWeight.Medium,
         )
     }
 }
@@ -124,43 +128,44 @@ fun UIKitAvatarWithInitials(
 fun UIKitAvatarPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Small avatar with image
             UIKitAvatar(
                 imageUrl = "https://picsum.photos/200",
                 clipType = RoundedCornerShape(8.dp),
-                size = 40.dp
+                size = 40.dp,
             )
 
             // Medium avatar without image
             UIKitAvatar(
                 imageUrl = "",
                 clipType = RoundedCornerShape(2.dp),
-                size = 64.dp
+                size = 64.dp,
             )
 
             // Large avatar with image and click handler
             UIKitAvatar(
                 imageUrl = "https://picsum.photos/200",
                 size = 80.dp,
-                onClick = { /* handle click */ }
+                onClick = { /* handle click */ },
             )
 
             // Avatar with initials
             UIKitAvatarWithInitials(
                 initials = "AB",
-                size = 56.dp
+                size = 56.dp,
             )
 
             // Small avatar with initials
             UIKitAvatarWithInitials(
                 initials = "John Doe",
-                size = 32.dp
+                size = 32.dp,
             )
         }
     }

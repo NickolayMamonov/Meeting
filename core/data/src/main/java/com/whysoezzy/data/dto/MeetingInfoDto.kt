@@ -8,5 +8,5 @@ data class MeetingInfoDto(
     @SerialName("id") val id: Long,
     @SerialName("title") val title: String,
     @SerialName("imageUrl") val imageUrl: String,
-    @SerialName("date") val date: String
+    @SerialName("date") val date: String,
 )

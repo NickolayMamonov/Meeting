@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.text.TextBody1
@@ -26,20 +27,17 @@ import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
-import androidx.compose.ui.res.stringResource
-import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
-fun AuthSuccessScreen(
-    onContinueClicked: () -> Unit
-) {
+fun AuthSuccessScreen(onContinueClicked: () -> Unit) {
     Scaffold { paddingValues ->
         AuthSuccessContent(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize(),
-            onContinueClicked = onContinueClicked
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize(),
+            onContinueClicked = onContinueClicked,
         )
     }
 }
@@ -47,19 +45,19 @@ fun AuthSuccessScreen(
 @Composable
 private fun AuthSuccessContent(
     modifier: Modifier = Modifier,
-    onContinueClicked: () -> Unit = {}
+    onContinueClicked: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.padding(SpacingTokens.L),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         // Success icon
         Icon(
             imageVector = Icons.Filled.CheckCircle,
             contentDescription = stringResource(R.string.auth_success_content_description),
             tint = ColorTokens.AccentSuccess,
-            modifier = Modifier.size(80.dp)
+            modifier = Modifier.size(80.dp),
         )
 
         Spacer(modifier = Modifier.height(SpacingTokens.L))
@@ -67,18 +65,18 @@ private fun AuthSuccessContent(
         // Header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             TextHeading1(
                 text = stringResource(R.string.auth_success_title),
                 color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             TextBody1(
                 text = stringResource(R.string.auth_success_subtitle),
                 color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
 
@@ -89,7 +87,7 @@ private fun AuthSuccessContent(
             text = stringResource(UIKitR.string.action_continue),
             onClick = onContinueClicked,
             state = UIKitButtonState.PRIMARY,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

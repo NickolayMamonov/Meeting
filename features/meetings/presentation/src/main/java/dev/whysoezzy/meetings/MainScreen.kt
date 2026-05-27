@@ -28,9 +28,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.whysoezzy.domain.models.AdBlock
+import dev.whysoezzy.features_meetings.R
+import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.meetings.presentation.MainScreenEvent
 import dev.whysoezzy.meetings.presentation.MainScreenNavEvent
 import dev.whysoezzy.meetings.presentation.MainScreenUiState
@@ -44,22 +50,17 @@ import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import org.koin.androidx.compose.koinViewModel
-import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import dev.whysoezzy.features_meetings.R
-import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.uikit.R as UIKitR
 
 private const val AD_BLOCK_INTERVAL = 3
+
 @Composable
 fun MainScreen(
     viewModel: MainScreenViewModel = koinViewModel(),
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit,
     onProfileClick: () -> Unit,
-    onUserProfileClick: (Long) -> Unit
+    onUserProfileClick: (Long) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -67,7 +68,7 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is MainScreenNavEvent.NavigateToCommunity -> onCommunityClick(event.communityId)
                     is MainScreenNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)
                 }
@@ -83,14 +84,14 @@ fun MainScreen(
                     viewModel.onEvent(MainScreenEvent.Search(query))
                 },
                 onProfileClick = onProfileClick,
-                modifier = Modifier.statusBarsPadding()
+                modifier = Modifier.statusBarsPadding(),
             )
-        }
+        },
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
         ) {
             when (val state = uiState) {
                 is MainScreenUiState.Loading -> {
@@ -109,9 +110,9 @@ fun MainScreen(
                         onUserProfileClick = onUserProfileClick,
                         onCommunitySubscribeClick = { communityId, isSubscribed ->
                             viewModel.onEvent(
-                                MainScreenEvent.CommunitySubscriptionChanged(communityId, isSubscribed)
+                                MainScreenEvent.CommunitySubscriptionChanged(communityId, isSubscribed),
                             )
-                        }
+                        },
                     )
                 }
 
@@ -120,7 +121,7 @@ fun MainScreen(
                         message = state.message,
                         onRetry = {
                             viewModel.onEvent(MainScreenEvent.Retry)
-                        }
+                        },
                     )
                 }
             }
@@ -133,7 +134,7 @@ private fun MainScreenTopBar(
     modifier: Modifier = Modifier,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
 ) {
     UIKitSearchBar(
         query = searchQuery,
@@ -141,7 +142,7 @@ private fun MainScreenTopBar(
         placeholder = stringResource(R.string.meetings_main_search_placeholder),
         onProfileClick = onProfileClick,
         onCancelClick = {},
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -149,7 +150,7 @@ private fun MainScreenTopBar(
 private fun LoadingContent() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator()
     }
@@ -165,7 +166,7 @@ private fun MainScreenContent(
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit,
     onUserProfileClick: (Long) -> Unit,
-    onCommunitySubscribeClick: (Long, Boolean) -> Unit
+    onCommunitySubscribeClick: (Long, Boolean) -> Unit,
 ) {
     // Генерируем бесконечный циклический список рекламных блоков, чтобы типы чередовались
     val cyclingAdBlocks = rememberCyclingAdBlocks(adBlocks)
@@ -175,16 +176,16 @@ private fun MainScreenContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 16.dp)
+        contentPadding = PaddingValues(vertical = 16.dp),
     ) {
         // Блок Hero-встреч: широкие карточки вверху
         if (heroMeetings.isNotEmpty()) {
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(heroMeetings, key = {it.id}) { meeting ->
+                    items(heroMeetings, key = { it.id }) { meeting ->
                         val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTags() }
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
@@ -193,7 +194,7 @@ private fun MainScreenContent(
                             address = UIKitAddress(
                                 address = meeting.address,
                                 latitude = 0.0,
-                                longitude = 0.0
+                                longitude = 0.0,
                             ),
                             tags = eventCardTags,
                             cardType = UIKitEventCardType.WIDE,
@@ -210,15 +211,15 @@ private fun MainScreenContent(
             item {
                 TextHeading2(
                     text = stringResource(R.string.meetings_main_section_upcoming),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(popularMeetings, key = {it.id}) { meeting ->
+                    items(popularMeetings, key = { it.id }) { meeting ->
                         val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTags() }
                         UIKitEventCard(
                             imageUrl = meeting.imageUrl,
@@ -227,7 +228,7 @@ private fun MainScreenContent(
                             address = UIKitAddress(
                                 address = meeting.address,
                                 latitude = 0.0,
-                                longitude = 0.0
+                                longitude = 0.0,
                             ),
                             tags = eventCardTags,
                             cardType = UIKitEventCardType.COMPACT,
@@ -244,26 +245,25 @@ private fun MainScreenContent(
             item {
                 TextHeading2(
                     text = stringResource(R.string.meetings_main_section_communities),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(communities, key = {it.id}) { community ->
+                    items(communities, key = { it.id }) { community ->
                         UIKitCommunityCard(
                             imageUrl = community.imageUrl,
                             title = community.title,
                             isSubscribed = community.isSubscribed,
                             onSubscribeClick = { isSubscribed ->
-                                onCommunitySubscribeClick(community.id,isSubscribed)
+                                onCommunitySubscribeClick(community.id, isSubscribed)
                             },
                             onCardClick = {
                                 onCommunityClick(community.id)
-                            }
-
+                            },
                         )
                     }
                 }
@@ -275,17 +275,18 @@ private fun MainScreenContent(
         item {
             TextHeading2(
                 text = stringResource(R.string.meetings_main_section_all),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
 
-        items(items = meetingsWithAds,
+        items(
+            items = meetingsWithAds,
             key = { item ->
                 when (item) {
                     is MeetingOrAd.Meeting -> "meeting_${item.meeting.id}"
                     is MeetingOrAd.Ad -> "ad_${item.adBlock.id}"
                 }
-            }
+            },
         ) { item ->
             when (item) {
                 is MeetingOrAd.Meeting -> {
@@ -297,14 +298,14 @@ private fun MainScreenContent(
                         address = UIKitAddress(
                             address = item.meeting.address,
                             latitude = 0.0,
-                            longitude = 0.0
+                            longitude = 0.0,
                         ),
                         tags = eventCardTags,
                         cardType = UIKitEventCardType.WIDE,
                         onCardClick = { onMeetingClick(item.meeting.id) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
                 is MeetingOrAd.Ad -> {
@@ -315,7 +316,7 @@ private fun MainScreenContent(
                             .padding(vertical = 8.dp),
                         onUserClick = onUserProfileClick,
                         onCommunitySubscribe = onCommunitySubscribeClick,
-                        onCommunityClick = onCommunityClick
+                        onCommunityClick = onCommunityClick,
                     )
                 }
             }
@@ -326,27 +327,27 @@ private fun MainScreenContent(
 @Composable
 private fun ErrorContent(
     message: String,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(48.dp),
             )
 
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Button(onClick = onRetry) {
@@ -357,8 +358,13 @@ private fun ErrorContent(
 }
 
 private sealed class MeetingOrAd {
-    data class Meeting(val meeting: UIKitMeetingInfo) : MeetingOrAd()
-    data class Ad(val adBlock: AdBlock) : MeetingOrAd()
+    data class Meeting(
+        val meeting: UIKitMeetingInfo,
+    ) : MeetingOrAd()
+
+    data class Ad(
+        val adBlock: AdBlock,
+    ) : MeetingOrAd()
 }
 
 /**
@@ -382,7 +388,7 @@ private fun rememberCyclingAdBlocks(adBlocks: List<AdBlock>): List<AdBlock> {
  */
 private fun buildMeetingsWithAdsList(
     meetings: List<UIKitMeetingInfo>,
-    adBlocks: List<AdBlock>
+    adBlocks: List<AdBlock>,
 ): List<MeetingOrAd> {
     if (adBlocks.isEmpty()) return meetings.map { MeetingOrAd.Meeting(it) }
 

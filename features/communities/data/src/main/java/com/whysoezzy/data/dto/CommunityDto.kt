@@ -11,5 +11,5 @@ internal data class CommunityDto(
     @SerialName("imageUrl") val imageUrl: String,
     @SerialName("subscribersCount") val subscribersCount: Int,
     @SerialName("isSubscribed") val isSubscribed: Boolean,
-    @SerialName("tags") val tags: List<TagDto>
+    @SerialName("tags") val tags: List<TagDto>,
 )

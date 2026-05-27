@@ -33,18 +33,18 @@ fun UIKitCodeInput(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     codeLength: Int = 4,
-    isError: Boolean = false
+    isError: Boolean = false,
 ) {
     Box(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S, Alignment.CenterHorizontally)
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S, Alignment.CenterHorizontally),
         ) {
             repeat(codeLength) { index ->
                 CodeDigitBox(
                     digit = value.getOrNull(index)?.toString() ?: "",
                     isActive = index == value.length,
-                    isError = isError
+                    isError = isError,
                 )
             }
         }
@@ -57,12 +57,13 @@ fun UIKitCodeInput(
                     onValueChange(filtered)
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .alpha(0f),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .alpha(0f),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            cursorBrush = SolidColor(ColorTokens.BrandDark)
+            cursorBrush = SolidColor(ColorTokens.BrandDark),
         )
     }
 }
@@ -72,36 +73,39 @@ private fun CodeDigitBox(
     digit: String,
     isActive: Boolean,
     isError: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val borderColor = when {
-        isError -> ColorTokens.AccentDanger
-        isActive -> ColorTokens.BrandDark
-        digit.isNotEmpty() -> ColorTokens.NeutralWeak
-        else -> ColorTokens.NeutralWeak
-    }
+    val borderColor =
+        when {
+            isError -> ColorTokens.AccentDanger
+            isActive -> ColorTokens.BrandDark
+            digit.isNotEmpty() -> ColorTokens.NeutralWeak
+            else -> ColorTokens.NeutralWeak
+        }
 
-    val backgroundColor = when {
-        isError -> ColorTokens.AccentDanger
-        else -> ColorTokens.NeutralWhite
-    }
+    val backgroundColor =
+        when {
+            isError -> ColorTokens.AccentDanger
+            else -> ColorTokens.NeutralWhite
+        }
 
     Box(
-        modifier = modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(BorderRadiusTokens.M))
-            .background(backgroundColor)
-            .border(
-                width = 2.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(BorderRadiusTokens.M)
-            ),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(BorderRadiusTokens.M))
+                .background(backgroundColor)
+                .border(
+                    width = 2.dp,
+                    color = borderColor,
+                    shape = RoundedCornerShape(BorderRadiusTokens.M),
+                ),
+        contentAlignment = Alignment.Center,
     ) {
         TextHeading2(
             text = digit,
             color = ColorTokens.NeutralWeak,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -112,7 +116,7 @@ private fun UIKitCodeInputPreview() {
     UIKitTheme {
         UIKitCodeInput(
             value = "12",
-            onValueChange = {}
+            onValueChange = {},
         )
     }
 }
@@ -124,7 +128,7 @@ private fun UIKitCodeInputErrorPreview() {
         UIKitCodeInput(
             value = "1234",
             onValueChange = {},
-            isError = true
+            isError = true,
         )
     }
 }

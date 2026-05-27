@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,6 +51,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil.compose.AsyncImage
+import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
@@ -62,9 +62,7 @@ import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
-import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.R as UIKitR
-
 
 @Composable
 fun ProfileEditScreen(
@@ -72,7 +70,7 @@ fun ProfileEditScreen(
     onBackPressed: () -> Unit,
     onSaveSuccess: () -> Unit,
     onEditInterests: (List<String>) -> Unit = {},
-    viewModel: ProfileEditViewModel = koinViewModel()
+    viewModel: ProfileEditViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -83,7 +81,7 @@ fun ProfileEditScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is ProfileEditNavEvent.NavigateBack -> onSaveSuccess()
                 }
             }
@@ -103,14 +101,16 @@ fun ProfileEditScreen(
                 Snackbar(
                     snackbarData = data,
                     containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
-        }
+        },
     ) { innerPadding ->
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
             // Форма всегда показывается — пустые поля отображают hint-тексты,
             // структура экрана (аватар-заглушка, секции, тогглы) видна с первого кадра
             EditContent(
@@ -127,7 +127,7 @@ fun ProfileEditScreen(
                 onToggleShowCommunities = { viewModel.onEvent(ProfileEditEvent.ToggleShowCommunities) },
                 onToggleShowMeetings = { viewModel.onEvent(ProfileEditEvent.ToggleShowMeetings) },
                 onToggleNotifications = { viewModel.onEvent(ProfileEditEvent.ToggleNotifications) },
-                onDeleteProfile = { viewModel.onEvent(ProfileEditEvent.DeleteProfile) }
+                onDeleteProfile = { viewModel.onEvent(ProfileEditEvent.DeleteProfile) },
             )
 
             // Лёгкий оверлей-спиннер во время первоначальной загрузки данных
@@ -136,7 +136,7 @@ fun ProfileEditScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.25f)),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(color = Color.White)
                 }
@@ -149,7 +149,7 @@ fun ProfileEditScreen(
                 isSaveEnabled = uiState.isValid && !uiState.isSaving,
                 containerColor = Color.Transparent,
                 contentColor = Color.White,
-                applyStatusBarPadding = true
+                applyStatusBarPadding = true,
             )
         }
 
@@ -170,20 +170,19 @@ fun ProfileEditScreen(
                                         .fillMaxWidth()
                                         .clickable {
                                             viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
-                                        }
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        }.padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Checkbox(
                                         checked = isSelected,
                                         onCheckedChange = {
-                                            viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId,tagName))
-                                        }
+                                            viewModel.onEvent(ProfileEditEvent.ToggleTag(tagId, tagName))
+                                        },
                                     )
                                     Text(
                                         text = tagName,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.padding(start = 8.dp)
+                                        modifier = Modifier.padding(start = 8.dp),
                                     )
                                 }
                             }
@@ -192,7 +191,7 @@ fun ProfileEditScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { showInterestDialog = false }) { Text(stringResource(dev.whysoezzy.uikit.R.string.action_done)) }
-                }
+                },
             )
         }
 
@@ -211,7 +210,7 @@ fun ProfileEditScreen(
                     TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) }) {
                         Text(stringResource(dev.whysoezzy.uikit.R.string.action_cancel))
                     }
-                }
+                },
             )
         }
     }
@@ -231,15 +230,14 @@ private fun EditContent(
     onToggleShowMeetings: () -> Unit,
     onToggleNotifications: () -> Unit,
     onDeleteProfile: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier.fillMaxSize()) {
-
         // 1. Фото + кнопка "Изменить фото"
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().height(280.dp),
-                contentAlignment = Alignment.BottomCenter
+                contentAlignment = Alignment.BottomCenter,
             ) {
                 if (uiState.avatarUrl != null) {
                     AsyncImage(
@@ -248,12 +246,13 @@ private fun EditContent(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
+                        error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     )
                 } else {
                     Box(
-                        modifier = Modifier.fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
                     )
                 }
                 Box(
@@ -262,14 +261,14 @@ private fun EditContent(
                         .clip(RoundedCornerShape(BorderRadiusTokens.S))
                         .background(Color.Black.copy(alpha = 0.6f))
                         .clickable { onAvatarClick() }
-                        .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S)
+                        .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S),
                 ) {
                     Text(
                         text = stringResource(R.string.profile_edit_photo_change),
                         color = Color.White,
                         fontFamily = SFProDisplayFontFamily,
                         fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
                     )
                 }
             }
@@ -282,7 +281,7 @@ private fun EditContent(
                     .fillMaxWidth()
                     .padding(horizontal = SpacingTokens.L)
                     .padding(top = SpacingTokens.M),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
             ) {
                 // Единое поле "Имя Фамилия"
                 UIKitInput(
@@ -291,7 +290,7 @@ private fun EditContent(
                     hint = stringResource(R.string.profile_edit_field_fullname),
                     isError = uiState.nameError != null,
                     errorMessage = uiState.nameError ?: "",
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 // Телефон — readOnly
@@ -299,7 +298,7 @@ private fun EditContent(
                     value = uiState.phone,
                     onValueChange = {},
                     hint = "+7 000 000-00-00",
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 // Город
@@ -307,7 +306,7 @@ private fun EditContent(
                     value = uiState.city,
                     onValueChange = onCityChange,
                     hint = stringResource(R.string.profile_edit_field_city),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 // О себе
@@ -318,7 +317,7 @@ private fun EditContent(
                     isError = uiState.descriptionError != null,
                     errorMessage = uiState.descriptionError ?: "",
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
+                    minLines = 3,
                 )
             }
         }
@@ -330,14 +329,14 @@ private fun EditContent(
                     .fillMaxWidth()
                     .padding(horizontal = SpacingTokens.L)
                     .padding(top = SpacingTokens.L),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
             ) {
                 Text(
                     text = stringResource(R.string.profile_edit_section_interests),
                     fontFamily = SFProDisplayFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 22.sp,
-                    color = ColorTokens.NeutralActive
+                    color = ColorTokens.NeutralActive,
                 )
                 if (uiState.interests.isNotEmpty()) {
                     UIKitTagGroup(
@@ -345,7 +344,7 @@ private fun EditContent(
                         selectedTags = uiState.interests.toSet(),
                         size = UIKitTagSize.MEDIUM,
                         onTagClick = onRemoveInterest,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 Text(
@@ -354,7 +353,7 @@ private fun EditContent(
                     fontWeight = FontWeight.Normal,
                     fontSize = 14.sp,
                     color = ColorTokens.BrandDefault,
-                    modifier = Modifier.clickable { onAddInterest() }
+                    modifier = Modifier.clickable { onAddInterest() },
                 )
             }
         }
@@ -366,26 +365,26 @@ private fun EditContent(
                     .fillMaxWidth()
                     .padding(horizontal = SpacingTokens.L)
                     .padding(top = SpacingTokens.L),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
             ) {
                 Text(
                     text = stringResource(R.string.profile_edit_section_social),
                     fontFamily = SFProDisplayFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 22.sp,
-                    color = ColorTokens.NeutralActive
+                    color = ColorTokens.NeutralActive,
                 )
                 SocialField(
                     icon = painterResource(UIKitR.drawable.habr_icon),
                     value = uiState.socialMedias["habr"] ?: "",
                     onValueChange = { onSocialMediaChange("habr", it) },
-                    hint = stringResource(R.string.profile_edit_social_habr)
+                    hint = stringResource(R.string.profile_edit_social_habr),
                 )
                 SocialField(
                     icon = painterResource(UIKitR.drawable.telegram_logo),
                     value = uiState.socialMedias["telegram"] ?: "",
                     onValueChange = { onSocialMediaChange("telegram", it) },
-                    hint = stringResource(R.string.profile_edit_social_telegram)
+                    hint = stringResource(R.string.profile_edit_social_telegram),
                 )
             }
         }
@@ -397,22 +396,22 @@ private fun EditContent(
                     .fillMaxWidth()
                     .padding(horizontal = SpacingTokens.L)
                     .padding(top = SpacingTokens.L),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
             ) {
                 UIKitToggleRow(
                     label = stringResource(R.string.profile_edit_toggle_show_communities),
                     checked = uiState.showCommunities,
-                    onCheckedChange = { onToggleShowCommunities() }
+                    onCheckedChange = { onToggleShowCommunities() },
                 )
                 UIKitToggleRow(
                     label = stringResource(R.string.profile_edit_toggle_show_meetings),
                     checked = uiState.showMeetings,
-                    onCheckedChange = { onToggleShowMeetings() }
+                    onCheckedChange = { onToggleShowMeetings() },
                 )
                 UIKitToggleRow(
                     label = stringResource(R.string.profile_edit_toggle_notifications),
                     checked = uiState.notificationsEnabled,
-                    onCheckedChange = { onToggleNotifications() }
+                    onCheckedChange = { onToggleNotifications() },
                 )
             }
         }
@@ -430,7 +429,7 @@ private fun EditContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onDeleteProfile() }
-                    .padding(vertical = SpacingTokens.M)
+                    .padding(vertical = SpacingTokens.M),
             )
         }
 
@@ -446,24 +445,24 @@ private fun SocialField(
     value: String,
     onValueChange: (String) -> Unit,
     hint: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         Icon(
             painter = icon,
             contentDescription = hint,
             tint = ColorTokens.NeutralWeak,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(20.dp),
         )
         UIKitInput(
             value = value,
             onValueChange = onValueChange,
             hint = hint,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

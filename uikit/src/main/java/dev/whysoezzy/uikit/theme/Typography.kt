@@ -18,18 +18,20 @@ data class UIKitTypography(
     val metadata3: TextStyle,
 )
 
-val DefaultTypography = UIKitTypography(
-    heading1 = TypographyTokens.Heading1,
-    heading2 = TypographyTokens.Heading2,
-    subheading1 = TypographyTokens.Subheading1,
-    subheading2 = TypographyTokens.Subheading2,
-    bodyText1 = TypographyTokens.BodyText1,
-    bodyText2 = TypographyTokens.BodyText2,
-    metadata1 = TypographyTokens.Metadata1,
-    metadata2 = TypographyTokens.Metadata2,
-    metadata3 = TypographyTokens.Metadata3
-)
+val DefaultTypography =
+    UIKitTypography(
+        heading1 = TypographyTokens.Heading1,
+        heading2 = TypographyTokens.Heading2,
+        subheading1 = TypographyTokens.Subheading1,
+        subheading2 = TypographyTokens.Subheading2,
+        bodyText1 = TypographyTokens.BodyText1,
+        bodyText2 = TypographyTokens.BodyText2,
+        metadata1 = TypographyTokens.Metadata1,
+        metadata2 = TypographyTokens.Metadata2,
+        metadata3 = TypographyTokens.Metadata3,
+    )
 
-val LocalUIKitTypography = staticCompositionLocalOf {
-    DefaultTypography
-}
+val LocalUIKitTypography =
+    staticCompositionLocalOf {
+        DefaultTypography
+    }

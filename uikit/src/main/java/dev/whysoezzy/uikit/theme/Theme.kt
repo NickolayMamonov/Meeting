@@ -12,18 +12,18 @@ import androidx.compose.runtime.CompositionLocalProvider
 fun UIKitTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     typography: UIKitTypography = DefaultTypography,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val uiKitColors = if (darkTheme) DarkColorScheme else LightColorScheme
     val materialColorScheme = uiKitColors.toMaterial3ColorScheme(darkTheme)
 
     CompositionLocalProvider(
         LocalUIKitColorScheme provides uiKitColors,
-        LocalUIKitTypography provides typography
+        LocalUIKitTypography provides typography,
     ) {
         MaterialTheme(
             colorScheme = materialColorScheme,
-            content = content
+            content = content,
         )
     }
 }
@@ -54,28 +54,22 @@ private fun UIKitColorScheme.toMaterial3ColorScheme(isDark: Boolean): ColorSchem
         onPrimary = neutralWhite,
         primaryContainer = brandLight,
         onPrimaryContainer = if (isDark) brandDarkMode else brandDark,
-
         secondary = brandDarkMode,
         onSecondary = neutralWhite,
         secondaryContainer = brandBackground,
         onSecondaryContainer = neutralDark,
-
         tertiary = accentSafe,
         onTertiary = neutralWhite,
-
         background = neutralWhite,
         onBackground = neutralDark,
-
         surface = neutralWhite,
         onSurface = neutralDark,
         surfaceVariant = neutralSecondaryBackground,
         onSurfaceVariant = neutralBody,
-
         error = accentDanger,
         onError = neutralWhite,
         errorContainer = accentDanger.copy(alpha = if (isDark) 0.20f else 0.12f),
         onErrorContainer = accentDanger,
-
         outline = neutralLine,
         outlineVariant = neutralLine.copy(alpha = 0.5f),
     )

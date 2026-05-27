@@ -5,11 +5,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RefreshTokenRequest(
-    @SerialName("refreshToken") val refreshToken: String
+    @SerialName("refreshToken") val refreshToken: String,
 )
 
 @Serializable
 data class RefreshTokenResponse(
     @SerialName("accessToken") val accessToken: String,
-    @SerialName("refreshToken") val refreshToken: String? = null
+    @SerialName("refreshToken") val refreshToken: String? = null,
 )

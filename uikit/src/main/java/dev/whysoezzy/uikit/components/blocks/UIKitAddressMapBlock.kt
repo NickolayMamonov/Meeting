@@ -38,20 +38,20 @@ fun UIKitAddressMapBlock(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         // Адрес
         TextHeading2(text = address)
 
         // Информация о ближайшем метро
-        if(nearestMetro != "Не указано"){
+        if (nearestMetro != "Не указано") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+                horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
             ) {
                 Text(
                     text = "🚇 : $nearestMetro",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }
@@ -61,7 +61,7 @@ fun UIKitAddressMapBlock(
             address = address,
             latitude = latitude,
             longitude = longitude,
-            onMapClick = onMapClick
+            onMapClick = onMapClick,
         )
     }
 }
@@ -75,7 +75,7 @@ private fun UIKitAddressMapBlockPreview() {
             latitude = 55.7558,
             longitude = 37.6176,
             nearestMetro = "М. Охотный ряд",
-            onMapClick = { }
+            onMapClick = { },
         )
     }
 }
@@ -90,7 +90,7 @@ private fun UIKitAddressMapBlockWithoutMetroPreview() {
             latitude = 55.7558,
             longitude = 37.6176,
             nearestMetro = "Не указано",
-            onMapClick = { }
+            onMapClick = { },
         )
     }
 }

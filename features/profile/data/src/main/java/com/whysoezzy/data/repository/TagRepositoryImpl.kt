@@ -6,9 +6,8 @@ import com.whysoezzy.domain.repository.TagRepository
 import com.whysoezzy.network.safeApiCall
 
 internal class TagRepositoryImpl(
-    private val tagsApi: TagsApi
+    private val tagsApi: TagsApi,
 ) : TagRepository {
-
     override suspend fun getAllTags(): Result<List<Tag>> {
         return safeApiCall {
             val response = tagsApi.getAllTags()

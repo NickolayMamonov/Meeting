@@ -21,7 +21,7 @@ private val isoFormatters = listOf(
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-    DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    DateTimeFormatter.ofPattern("yyyy-MM-dd"),
 )
 
 internal fun UserProfileDto.toDomain(): User = User(
@@ -37,7 +37,7 @@ internal fun UserProfileDto.toDomain(): User = User(
     interests = interests.map { it.toDomain() },
     showCommunities = showCommunities,
     showMeetings = showMeetings,
-    notificationsEnabled = notificationsEnabled
+    notificationsEnabled = notificationsEnabled,
 )
 
 internal fun User.toUpdateDto(interestIds: List<Long>? = null): UpdateUserDto = UpdateUserDto(
@@ -51,7 +51,7 @@ internal fun User.toUpdateDto(interestIds: List<Long>? = null): UpdateUserDto = 
     socialMedias = socialMedias.takeIf { it.isNotEmpty() }?.map { it.toDto() },
     showCommunities = showCommunities,
     showMeetings = showMeetings,
-    notificationsEnabled = notificationsEnabled
+    notificationsEnabled = notificationsEnabled,
 )
 
 /**
@@ -66,7 +66,7 @@ internal fun MeetingInfoDto.toMeetingInfo(): MeetingInfo = MeetingInfo(
     time = parseDateToTimestamp(date),
     address = "",
     tags = emptyList(),
-    meetingStatus = MeetingStatus.ACTIVE
+    meetingStatus = MeetingStatus.ACTIVE,
 )
 
 /**
@@ -80,25 +80,25 @@ internal fun CommunityInfoDto.toCommunityInfo(): CommunityInfo = CommunityInfo(
     description = description ?: "",
     imageUrl = imageUrl,
     subscribersCount = subscribersCount ?: 0,
-    isSubscribed = isSubscribed
+    isSubscribed = isSubscribed,
 )
 
 // ==================== Private ====================
 
 private fun TagDto.toDomain(): Tag = Tag(
     id = id,
-    name = name
+    name = name,
 )
 
 private fun SocialMediaDto.toDomain(): SocialMediaInfo = SocialMediaInfo(
     type = mapSocialMediaType(type),
     url = url,
-    username = extractUsername(url)
+    username = extractUsername(url),
 )
 
 private fun SocialMediaInfo.toDto(): SocialMediaDto = SocialMediaDto(
     type = type.name.lowercase(),
-    url = url
+    url = url,
 )
 
 private fun mapSocialMediaType(platform: String): SocialMediaType =
@@ -120,9 +120,11 @@ private fun parseDateToTimestamp(dateString: String?): Long {
     if (dateString.isNullOrBlank()) return 0L
     for (formatter in isoFormatters) {
         try {
-            return LocalDateTime.parse(dateString, formatter)
+            return LocalDateTime
+                .parse(dateString, formatter)
                 .toEpochSecond(ZoneOffset.UTC) * 1000
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
     return 0L
 }

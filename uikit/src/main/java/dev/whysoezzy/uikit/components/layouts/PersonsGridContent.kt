@@ -21,7 +21,6 @@ import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.cards.UIKitPersonCard
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
-
 /**
  * Переиспользуемый компонент для отображения списка людей (участники, подписчики и т.д.)
  */
@@ -32,13 +31,14 @@ fun PersonsGridContent(
     onPersonClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
     emptyStateText: String = "Пока никого нет",
-    maxItemsInRow: Int = 3
+    maxItemsInRow: Int = 3,
 ) {
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = SpacingTokens.L),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(horizontal = SpacingTokens.L),
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
     ) {
         item {
             if (persons.isNotEmpty()) {
@@ -46,30 +46,31 @@ fun PersonsGridContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-                    maxItemsInEachRow = maxItemsInRow
+                    maxItemsInEachRow = maxItemsInRow,
                 ) {
                     persons.forEach { person ->
                         UIKitPersonCard(
                             name = person.name,
                             role = person.role,
                             imageUrl = person.imageUrl,
-                            onCardClick = { onPersonClick(person.id) }
+                            onCardClick = { onPersonClick(person.id) },
                         )
                     }
                 }
             } else {
                 // Empty state
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(SpacingTokens.XL),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(SpacingTokens.XL),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = emptyStateText,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -84,12 +85,10 @@ fun PersonsGridContent(
  * Loading state для списка людей
  */
 @Composable
-fun PersonsGridLoading(
-    modifier: Modifier = Modifier
-) {
+fun PersonsGridLoading(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator()
     }
@@ -105,32 +104,32 @@ fun PersonsGridError(
     message: String,
     onRetry: () -> Unit,
     onBackPressed: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         androidx.compose.foundation.layout.Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             UIKitButton(
                 text = "Повторить",
                 onClick = onRetry,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
             )
 
             UIKitButton(
                 text = "Назад",
                 onClick = onBackPressed,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth()
+                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
             )
         }
     }
@@ -143,5 +142,5 @@ data class PersonItem(
     val id: Long,
     val name: String,
     val role: String,
-    val imageUrl: String
+    val imageUrl: String,
 )

@@ -11,15 +11,15 @@ import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.TagState
-import dev.whysoezzy.uikit.models.UIKitMeetingInfo
-import dev.whysoezzy.uikit.models.UIKitMeetingTag
+import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunity
-import dev.whysoezzy.uikit.models.UIKitPerson
-import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
+import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingStatus
+import dev.whysoezzy.uikit.models.UIKitMeetingTag
+import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 import dev.whysoezzy.uikit.models.UIKitSocialMedia
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
@@ -32,16 +32,14 @@ fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> {
     return filterNotNull().map { it.toUIKitMeetingTag() }
 }
 
-
-
 fun MeetingTag.toUIKitEventCardTag(
     isSelected: Boolean = state == TagState.SELECTED,
-    isEnabled: Boolean = state != TagState.DISABLED
+    isEnabled: Boolean = state != TagState.DISABLED,
 ): UIKitEventCardTag {
     return UIKitEventCardTag(
         text = text,
         isSelected = isSelected,
-        isEnabled = isEnabled
+        isEnabled = isEnabled,
     )
 }
 
@@ -49,7 +47,7 @@ fun MeetingInfo.toUIKitAddress(): UIKitAddress {
     return UIKitAddress(
         address = address,
         latitude = 0.0,
-        longitude = 0.0
+        longitude = 0.0,
     )
 }
 
@@ -59,7 +57,7 @@ fun Person.toUIKitPerson(): UIKitPerson {
         name = name,
         surname = surname,
         avatar = avatarUrl,
-        description = bio
+        description = bio,
     )
 }
 
@@ -68,7 +66,7 @@ fun CommunityInfo.toUIKitCommunity(): UIKitCommunity {
         id = id,
         name = name,
         description = description,
-        imageUrl = imageUrl
+        imageUrl = imageUrl,
     )
 }
 
@@ -83,7 +81,7 @@ fun SocialMediaInfo.toUIKitSocialMediaInfo(): UIKitSocialMediaInfo {
     return UIKitSocialMediaInfo(
         type = type.toUIKitSocialMedia(),
         url = url,
-        username = username
+        username = username,
     )
 }
 
@@ -92,28 +90,28 @@ fun Map<SocialMediaType, String>.toUIKitSocialMediaInfoList(): List<UIKitSocialM
         UIKitSocialMediaInfo(
             type = type.toUIKitSocialMedia(),
             url = url,
-            username = extractUsername(url)
+            username = extractUsername(url),
         )
     }
 }
 
 fun CommunityInfo.toUIKitCommunityInfo(
-    isSubscribed: Boolean = false
+    isSubscribed: Boolean = false,
 ): UIKitCommunityInfo {
     return UIKitCommunityInfo(
         id = id,
         title = name,
         imageUrl = imageUrl,
-        isSubscribed = isSubscribed
+        isSubscribed = isSubscribed,
     )
 }
 
 fun List<CommunityInfo>.toUIKitCommunityInfoList(
-    subscribedIds: Set<Long> = emptySet()
+    subscribedIds: Set<Long> = emptySet(),
 ): List<UIKitCommunityInfo> {
     return map { community ->
         community.toUIKitCommunityInfo(
-            isSubscribed = subscribedIds.contains(community.id)
+            isSubscribed = subscribedIds.contains(community.id),
         )
     }
 }
@@ -123,7 +121,7 @@ fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map {
         id = community.id,
         title = community.name,
         imageUrl = community.imageUrl,
-        isSubscribed = community.isSubscribed
+        isSubscribed = community.isSubscribed,
     )
 }
 
@@ -146,16 +144,14 @@ fun formatTime(timestamp: Long): String {
     return formatter.format(Date(timestamp))
 }
 
-
-
 fun List<MeetingTag?>.toUIKitEventCardTags(
     isSelected: Boolean = false,
-    isEnabled: Boolean = true
+    isEnabled: Boolean = true,
 ): List<UIKitEventCardTag> {
     return filterNotNull().map { tag ->
         tag.toUIKitEventCardTag(
             isSelected = isSelected || tag.state == TagState.SELECTED,
-            isEnabled = isEnabled && tag.state != TagState.DISABLED
+            isEnabled = isEnabled && tag.state != TagState.DISABLED,
         )
     }
 }
@@ -174,7 +170,7 @@ fun PersonHost.toUIKitPersonHost(): UIKitPersonHost {
         name = name,
         surname = surname,
         description = description,
-        imageUrl = imageUrl
+        imageUrl = imageUrl,
     )
 }
 
@@ -184,7 +180,7 @@ fun CommunityHost.toUIKitCommunityHost(): UIKitCommunityHost {
         title = title,
         description = description,
         imageUrl = imageUrl,
-        meetingsInfo = meetingsInfo.map { it.toUIKitMeetingInfo() }
+        meetingsInfo = meetingsInfo.map { it.toUIKitMeetingInfo() },
     )
 }
 
@@ -198,7 +194,7 @@ fun MeetingInfo.toUIKitMeetingInfo(): UIKitMeetingInfo {
         latitude = 0.0,
         longitude = 0.0,
         tags = tags.toUIKitMeetingTags(),
-        meetingStatus = meetingStatus.toUIKitMeetingStatus()
+        meetingStatus = meetingStatus.toUIKitMeetingStatus(),
     )
 }
 
@@ -225,7 +221,7 @@ private fun MeetingStatus.toUIKitMeetingStatus(): UIKitMeetingStatus = when (thi
 private fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag = UIKitMeetingTag(
     id = id,
     text = text,
-    state = state.toUIKitTagState()
+    state = state.toUIKitTagState(),
 )
 
 internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
@@ -233,6 +229,6 @@ internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
         UIKitEventCardTag(
             text = tag.text,
             isSelected = tag.state == UIKitTagState.SELECTED,
-            isEnabled = tag.state != UIKitTagState.DISABLED
+            isEnabled = tag.state != UIKitTagState.DISABLED,
         )
     }

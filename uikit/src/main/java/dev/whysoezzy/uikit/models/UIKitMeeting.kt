@@ -17,5 +17,5 @@ data class UIKitMeeting(
     val meetingStatus: UIKitMeetingStatus,
     val isUserInParticipants: Boolean,
     val date: String,
-    val capacity: Int
+    val capacity: Int,
 )

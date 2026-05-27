@@ -6,12 +6,12 @@ import androidx.compose.runtime.Immutable
 data class UIKitMeetingTag(
     val id: Long,
     val text: String,
-    val state: UIKitTagState
+    val state: UIKitTagState,
 )
 
 enum class UIKitTagState {
     ACTIVE,
     INACTIVE,
     SELECTED,
-    DISABLED
+    DISABLED,
 }

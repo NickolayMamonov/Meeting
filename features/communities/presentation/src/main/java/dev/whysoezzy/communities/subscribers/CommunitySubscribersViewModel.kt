@@ -16,14 +16,15 @@ import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
 sealed class CommunitySubscribersNavEvent {
-    data class NavigateToProfile(val userId: Long) : CommunitySubscribersNavEvent()
+    data class NavigateToProfile(
+        val userId: Long,
+    ) : CommunitySubscribersNavEvent()
 }
 
 class CommunitySubscribersViewModel(
     private val getCommunityByIdUseCase: GetCommunityByIdUseCase,
-    private val getCommunitySubscribersUseCase: GetCommunitySubscribersUseCase
+    private val getCommunitySubscribersUseCase: GetCommunitySubscribersUseCase,
 ) : ViewModel() {
-
     private val _uiState =
         MutableStateFlow<CommunitySubscribersUiState>(CommunitySubscribersUiState.Loading)
     val uiState: StateFlow<CommunitySubscribersUiState> = _uiState.asStateFlow()
@@ -48,7 +49,7 @@ class CommunitySubscribersViewModel(
                 val communityResult = getCommunityByIdUseCase(communityId)
                 if (communityResult.isFailure) {
                     _uiState.value = CommunitySubscribersUiState.Error(
-                        message = "Не удалось загрузить информацию о сообществе"
+                        message = "Не удалось загрузить информацию о сообществе",
                     )
                     return@launch
                 }
@@ -57,21 +58,21 @@ class CommunitySubscribersViewModel(
                 val subscribersResult = getCommunitySubscribersUseCase(communityId)
                 if (subscribersResult.isFailure) {
                     _uiState.value = CommunitySubscribersUiState.Error(
-                        message = "Не удалось загрузить подписчиков"
+                        message = "Не удалось загрузить подписчиков",
                     )
                     return@launch
                 }
 
                 _uiState.value = CommunitySubscribersUiState.Success(
                     communityName = community.name,
-                    subscribers = subscribersResult.getOrThrow()
+                    subscribers = subscribersResult.getOrThrow(),
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load community subscribers")
                 _uiState.value = CommunitySubscribersUiState.Error(
-                    message = e.toUserMessage()
+                    message = e.toUserMessage(),
                 )
             }
         }

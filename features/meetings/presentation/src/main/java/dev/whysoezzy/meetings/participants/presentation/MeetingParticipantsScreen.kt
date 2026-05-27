@@ -18,12 +18,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading
 import org.koin.androidx.compose.koinViewModel
-import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.uikit.R as UIKitR
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +32,7 @@ fun MeetingParticipantsScreen(
     meetingId: Long,
     onBackPressed: () -> Unit,
     onPersonClick: (Long) -> Unit = {},
-    viewModel: MeetingParticipantsViewModel = koinViewModel()
+    viewModel: MeetingParticipantsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -44,7 +44,7 @@ fun MeetingParticipantsScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is MeetingParticipantsNavEvent.NavigateToProfile -> onPersonClick(event.userId)
                 }
             }
@@ -60,7 +60,7 @@ fun MeetingParticipantsScreen(
                             is MeetingParticipantsUiState.Success ->
                                 (uiState as MeetingParticipantsUiState.Success).meetingTitle
                             else -> stringResource(R.string.meeting_participants_default_title)
-                        }
+                        },
                     )
                 },
                 navigationIcon = {
@@ -69,7 +69,7 @@ fun MeetingParticipantsScreen(
                     }
                 },
             )
-        }
+        },
     ) { paddingValues ->
         when (val state = uiState) {
             is MeetingParticipantsUiState.Loading -> {
@@ -83,14 +83,14 @@ fun MeetingParticipantsScreen(
                             id = participant.id,
                             name = "${participant.name} ${participant.surname}",
                             role = participant.role,
-                            imageUrl = participant.avatarUrl
+                            imageUrl = participant.avatarUrl,
                         )
                     },
                     onPersonClick = { participantId ->
                         viewModel.onEvent(MeetingParticipantsEvent.NavigateToProfile(participantId))
                     },
                     emptyStateText = stringResource(R.string.meeting_participants_empty),
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
 
@@ -101,7 +101,7 @@ fun MeetingParticipantsScreen(
                         viewModel.onEvent(MeetingParticipantsEvent.LoadParticipants(meetingId))
                     },
                     onBackPressed = onBackPressed,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
         }

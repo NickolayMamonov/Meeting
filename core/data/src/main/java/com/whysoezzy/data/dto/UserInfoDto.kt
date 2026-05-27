@@ -10,5 +10,5 @@ data class UserInfoDto(
     @SerialName("surname") val surname: String,
     @SerialName("avatarUrl") val avatarUrl: String,
     @SerialName("bio") val bio: String,
-    @SerialName("role") val role: String
+    @SerialName("role") val role: String,
 )

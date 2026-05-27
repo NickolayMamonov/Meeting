@@ -14,13 +14,13 @@ data class Meeting(
     val participants: List<Person>,
     val meetingStatus: MeetingStatus,
     val isUserInParticipants: Boolean,
-    val capacity: Int
+    val capacity: Int,
 )
 
 data class MeetingAddress(
     val address: String,
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
 )
 
 data class PersonHost(
@@ -28,7 +28,7 @@ data class PersonHost(
     val name: String,
     val surname: String,
     val description: String,
-    val imageUrl: String
+    val imageUrl: String,
 )
 
 data class CommunityHost(
@@ -36,5 +36,5 @@ data class CommunityHost(
     val title: String,
     val description: String,
     val imageUrl: String,
-    val meetingsInfo: List<MeetingInfo>
+    val meetingsInfo: List<MeetingInfo>,
 )

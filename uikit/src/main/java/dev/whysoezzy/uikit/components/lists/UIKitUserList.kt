@@ -29,16 +29,16 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 fun UIKitUserList(
     users: List<UIKitPerson>,
     modifier: Modifier = Modifier,
-    onUserClick: (UIKitPerson) -> Unit = {}
+    onUserClick: (UIKitPerson) -> Unit = {},
 ) {
     LazyColumn(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
     ) {
-        items(users, key = {it.id}) { user ->
+        items(users, key = { it.id }) { user ->
             UIKitUserListItem(
                 user = user,
-                onClick = { onUserClick(user) }
+                onClick = { onUserClick(user) },
             )
         }
     }
@@ -48,37 +48,39 @@ fun UIKitUserList(
 private fun UIKitUserListItem(
     user: UIKitPerson,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() }
-                .padding(SpacingTokens.M),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onClick() }
+                    .padding(SpacingTokens.M),
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             UIKitAvatar(
                 imageUrl = user.avatar,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape),
             )
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.XS)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.XS),
             ) {
                 TextBody1(
                     text = "${user.name} ${user.surname}",
-                    color = ColorTokens.NeutralDark
+                    color = ColorTokens.NeutralDark,
                 )
 
                 if (user.description.isNotEmpty()) {
                     TextMetadata2(
                         text = user.description.orEmpty(),
-                        color = ColorTokens.NeutralWeak
+                        color = ColorTokens.NeutralWeak,
                     )
                 }
             }
@@ -86,7 +88,7 @@ private fun UIKitUserListItem(
 
         HorizontalDivider(
             color = ColorTokens.NeutralWeak,
-            thickness = 1.dp
+            thickness = 1.dp,
         )
     }
 }
@@ -96,29 +98,30 @@ private fun UIKitUserListItem(
 private fun UIKitUserListPreview() {
     UIKitTheme {
         UIKitUserList(
-            users = listOf(
-                UIKitPerson(
-                    id = 1,
-                    name = "Иван",
-                    surname = "Петров",
-                    avatar = "",
-                    description = "Android разработчик"
+            users =
+                listOf(
+                    UIKitPerson(
+                        id = 1,
+                        name = "Иван",
+                        surname = "Петров",
+                        avatar = "",
+                        description = "Android разработчик",
+                    ),
+                    UIKitPerson(
+                        id = 2,
+                        name = "Мария",
+                        surname = "Сидорова",
+                        avatar = "",
+                        description = "UI/UX дизайнер",
+                    ),
+                    UIKitPerson(
+                        id = 3,
+                        name = "Александр",
+                        surname = "Козлов",
+                        avatar = "",
+                        description = "",
+                    ),
                 ),
-                UIKitPerson(
-                    id = 2,
-                    name = "Мария",
-                    surname = "Сидорова",
-                    avatar = "",
-                    description = "UI/UX дизайнер"
-                ),
-                UIKitPerson(
-                    id = 3,
-                    name = "Александр",
-                    surname = "Козлов",
-                    avatar = "",
-                    description = ""
-                )
-            )
         )
     }
 }

@@ -18,5 +18,5 @@ data class MeetingDto(
     @SerialName("participants") val participants: List<PersonDto>,
     @SerialName("meetingStatus") val meetingStatus: String,
     @SerialName("isUserInParticipants") val isUserInParticipants: Boolean,
-    @SerialName("capacity") val capacity: Int?
+    @SerialName("capacity") val capacity: Int?,
 )

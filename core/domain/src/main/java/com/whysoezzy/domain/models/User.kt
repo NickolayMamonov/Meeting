@@ -13,5 +13,5 @@ data class User(
     val interests: List<Tag> = emptyList(),
     val showCommunities: Boolean = true,
     val showMeetings: Boolean = true,
-    val notificationsEnabled: Boolean = true
+    val notificationsEnabled: Boolean = true,
 )

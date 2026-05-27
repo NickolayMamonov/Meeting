@@ -27,6 +27,6 @@ fun TextBody1(
         maxLines = maxLines,
         lineHeight = lineHeight,
         textAlign = textAlign,
-        modifier = modifier
+        modifier = modifier,
     )
 }

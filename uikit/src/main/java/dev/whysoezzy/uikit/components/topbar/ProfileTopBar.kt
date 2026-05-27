@@ -47,39 +47,39 @@ fun ProfileTopBar(
     onShareClick: () -> Unit = {},
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    applyStatusBarPadding: Boolean = true
+    applyStatusBarPadding: Boolean = true,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(containerColor)
-            .then(
-                if (applyStatusBarPadding) {
-                    Modifier.statusBarsPadding()
-                } else {
-                    Modifier
-                }
-            )
-            .padding(horizontal = 4.dp, vertical = 0.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(containerColor)
+                .then(
+                    if (applyStatusBarPadding) {
+                        Modifier.statusBarsPadding()
+                    } else {
+                        Modifier
+                    },
+                ).padding(horizontal = 4.dp, vertical = 0.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Левая часть: кнопка назад + заголовок
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         ) {
             // Кнопка "Назад"
             IconButton(
                 onClick = onBackClick,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Назад",
                     tint = contentColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
 
@@ -92,9 +92,10 @@ fun ProfileTopBar(
                     color = contentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp)
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
                 )
             }
         }
@@ -103,25 +104,25 @@ fun ProfileTopBar(
         if (isOwnProfile) {
             IconButton(
                 onClick = onEditClick,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Редактировать",
                     tint = contentColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
         } else {
             IconButton(
                 onClick = onShareClick,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.Share,
                     contentDescription = "Поделиться",
                     tint = contentColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -154,7 +155,7 @@ private fun ProfileTopBarTransparentPreview() {
             onShareClick = { },
             containerColor = Color.Transparent,
             contentColor = Color.White,
-            applyStatusBarPadding = true
+            applyStatusBarPadding = true,
         )
     }
 }
@@ -171,7 +172,7 @@ private fun ProfileTopBarTransparentNoPaddingPreview() {
             onShareClick = { },
             containerColor = Color.Transparent,
             contentColor = Color.White,
-            applyStatusBarPadding = false
+            applyStatusBarPadding = false,
         )
     }
 }
@@ -184,7 +185,7 @@ private fun ProfileTopBarOtherProfilePreview() {
             title = "Анна Иванова",
             isOwnProfile = false,
             onBackClick = { },
-            onShareClick = { }
+            onShareClick = { },
         )
     }
 }
@@ -198,7 +199,7 @@ private fun ProfileTopBarLongNamePreview() {
             isOwnProfile = true,
             onBackClick = { },
             onEditClick = { },
-            onShareClick = { }
+            onShareClick = { },
         )
     }
 }

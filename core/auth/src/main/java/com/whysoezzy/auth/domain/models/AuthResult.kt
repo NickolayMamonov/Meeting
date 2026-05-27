@@ -4,5 +4,5 @@ data class AuthResult(
     val accessToken: String,
     val refreshToken: String,
     val userId: Long,
-    val isNewUser: Boolean
+    val isNewUser: Boolean,
 )

@@ -4,7 +4,7 @@ import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.repository.UserRepository
 
 class UpdateUserProfileUseCase(
-    private val repository: UserRepository
+    private val repository: UserRepository,
 ) {
     suspend operator fun invoke(user: User): Result<User> {
         // Минимальная проверка: имя не должно быть пустым

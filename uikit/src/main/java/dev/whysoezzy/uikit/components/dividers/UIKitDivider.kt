@@ -23,13 +23,14 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 fun UIKitDivider(
     modifier: Modifier = Modifier,
     color: Color = UIKitTheme.colors.neutralLine,
-    thickness: Dp = 1.dp
+    thickness: Dp = 1.dp,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(thickness)
-            .background(color)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(thickness)
+                .background(color),
     )
 }
 
@@ -38,13 +39,14 @@ fun UIKitVerticalDivider(
     modifier: Modifier = Modifier,
     color: Color = UIKitTheme.colors.neutralLine,
     thickness: Dp = 1.dp,
-    height: Dp = 24.dp
+    height: Dp = 24.dp,
 ) {
     Box(
-        modifier = modifier
-            .width(thickness)
-            .height(height)
-            .background(color)
+        modifier =
+            modifier
+                .width(thickness)
+                .height(height)
+                .background(color),
     )
 }
 
@@ -53,26 +55,27 @@ fun UIKitVerticalDivider(
 fun UIKitDividerPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             TextBody1(text = "Section 1")
-            
+
             UIKitDivider()
-            
+
             TextBody1(text = "Section 2")
-            
+
             UIKitDivider(
                 color = UIKitTheme.colors.brandDefault,
-                thickness = 2.dp
+                thickness = 2.dp,
             )
-            
+
             TextBody1(text = "Section 3")
-            
+
             Row(
-                horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+                horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
             ) {
                 TextBody1(text = "Left")
                 UIKitVerticalDivider()

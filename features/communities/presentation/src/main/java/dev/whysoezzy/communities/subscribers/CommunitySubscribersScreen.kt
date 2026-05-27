@@ -31,7 +31,7 @@ fun CommunitySubscribersScreen(
     communityId: Long,
     onBackPressed: () -> Unit,
     onPersonClick: (Long) -> Unit = {},
-    viewModel: CommunitySubscribersViewModel = koinViewModel()
+    viewModel: CommunitySubscribersViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -43,7 +43,7 @@ fun CommunitySubscribersScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
-                when (event){
+                when (event) {
                     is CommunitySubscribersNavEvent.NavigateToProfile -> onPersonClick(event.userId)
                 }
             }
@@ -59,17 +59,21 @@ fun CommunitySubscribersScreen(
                             is CommunitySubscribersUiState.Success ->
                                 (uiState as CommunitySubscribersUiState.Success).communityName
                             else -> stringResource(R.string.community_subscribers_default_title)
-                        }
+                        },
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(
-                            dev.whysoezzy.uikit.R.string.action_back))
+                        Icon(
+                            Icons.Default.KeyboardArrowLeft,
+                            contentDescription = stringResource(
+                                dev.whysoezzy.uikit.R.string.action_back,
+                            ),
+                        )
                     }
                 },
             )
-        }
+        },
     ) { paddingValues ->
         when (val state = uiState) {
             is CommunitySubscribersUiState.Loading -> {
@@ -83,14 +87,14 @@ fun CommunitySubscribersScreen(
                             id = subscriber.id,
                             name = "${subscriber.name} ${subscriber.surname}",
                             role = subscriber.role,
-                            imageUrl = subscriber.avatarUrl
+                            imageUrl = subscriber.avatarUrl,
                         )
                     },
                     onPersonClick = { subscriberId ->
                         viewModel.onEvent(CommunitySubscribersEvent.NavigateToProfile(subscriberId))
                     },
                     emptyStateText = stringResource(R.string.community_subscribers_empty),
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
 
@@ -101,7 +105,7 @@ fun CommunitySubscribersScreen(
                         viewModel.onEvent(CommunitySubscribersEvent.LoadSubscribers(communityId))
                     },
                     onBackPressed = onBackPressed,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
         }

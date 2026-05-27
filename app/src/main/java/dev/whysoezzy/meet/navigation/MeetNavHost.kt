@@ -15,7 +15,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun MeetNavHost(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val authViewModel: AuthCheckViewModel = koinViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
@@ -26,16 +26,17 @@ fun MeetNavHost(
         return
     }
 
-    val startDestination = if (isLoggedIn == true) {
-        MeetRoute.Main.route
-    } else {
-        MeetRoute.Auth.route
-    }
+    val startDestination =
+        if (isLoggedIn == true) {
+            MeetRoute.Main.route
+        } else {
+            MeetRoute.Auth.route
+        }
 
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier
+        modifier = modifier,
     ) {
         authNavigation(navController)
         meetingsNavigation(navController)

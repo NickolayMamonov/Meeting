@@ -5,5 +5,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SendOtpRequest(
-    @SerialName("phone") val phone: String
+    @SerialName("phone") val phone: String,
 )

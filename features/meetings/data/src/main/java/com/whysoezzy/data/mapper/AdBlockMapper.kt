@@ -14,7 +14,7 @@ internal fun AdBlockResponseDto.toDomain(): AdBlock {
             title = title,
             description = description,
             communities = communities?.map { it.toDomain() } ?: emptyList(),
-            isActive = isActive
+            isActive = isActive,
         )
         "TEXT" -> AdBlock.TextAd(
             id = id,
@@ -22,14 +22,14 @@ internal fun AdBlockResponseDto.toDomain(): AdBlock {
             description = description,
             actionText = actionText,
             actionUrl = actionUrl,
-            isActive = isActive
+            isActive = isActive,
         )
         "PEOPLE" -> AdBlock.PeopleAd(
             id = id,
             title = title,
             description = description,
             users = users?.map { it.toDomain() } ?: emptyList(),
-            isActive = isActive
+            isActive = isActive,
         )
         else -> throw IllegalArgumentException("Unknown AdBlock type: $type")
     }
@@ -42,7 +42,7 @@ internal fun CommunityInfoDto.toDomain(): CommunityInfo {
         description = description ?: "",
         imageUrl = imageUrl,
         subscribersCount = subscribersCount ?: 0,
-        isSubscribed = isSubscribed
+        isSubscribed = isSubscribed,
     )
 }
 
@@ -53,7 +53,7 @@ internal fun UserInfoDto.toDomain(): Person {
         surname = surname,
         avatarUrl = avatarUrl,
         bio = bio,
-        role = role
+        role = role,
     )
 }
 

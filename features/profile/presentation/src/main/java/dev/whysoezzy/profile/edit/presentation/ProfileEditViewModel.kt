@@ -27,9 +27,8 @@ sealed class ProfileEditNavEvent {
 class ProfileEditViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val updateUserProfileUseCase: UpdateUserProfileUseCase,
-    private val getAllTagsUseCase: GetAllTagsUseCase
+    private val getAllTagsUseCase: GetAllTagsUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ProfileEditUiState())
     val uiState: StateFlow<ProfileEditUiState> = _uiState.asStateFlow()
 
@@ -67,7 +66,6 @@ class ProfileEditViewModel(
         }
     }
 
-
     private fun loadProfile() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -87,13 +85,12 @@ class ProfileEditViewModel(
                         showCommunities = user.showCommunities,
                         showMeetings = user.showMeetings,
                         notificationsEnabled = user.notificationsEnabled,
-                        isLoading = false
+                        isLoading = false,
                     )
-                }
-                .onFailure { e ->
+                }.onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.toUserMessage()
+                        error = e.toUserMessage(),
                     )
                 }
         }
@@ -104,7 +101,7 @@ class ProfileEditViewModel(
             getAllTagsUseCase()
                 .onSuccess { tags ->
                     _uiState.value = _uiState.value.copy(
-                        availableTags = tags.associate { it.id to it.name }
+                        availableTags = tags.associate { it.id to it.name },
                     )
                 }
         }
@@ -122,7 +119,7 @@ class ProfileEditViewModel(
             surname = surname,
             nameError = validateName(name),
             surnameError = validateSurname(surname),
-            isSaved = false
+            isSaved = false,
         )
     }
 
@@ -130,7 +127,7 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(
             name = name,
             nameError = validateName(name),
-            isSaved = false
+            isSaved = false,
         )
     }
 
@@ -138,7 +135,7 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(
             surname = surname,
             surnameError = validateSurname(surname),
-            isSaved = false
+            isSaved = false,
         )
     }
 
@@ -146,7 +143,7 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(
             email = email,
             emailError = validateEmail(email),
-            isSaved = false
+            isSaved = false,
         )
     }
 
@@ -158,7 +155,7 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(
             description = description,
             descriptionError = validateDescription(description),
-            isSaved = false
+            isSaved = false,
         )
     }
 
@@ -198,19 +195,22 @@ class ProfileEditViewModel(
 
     private fun toggleShowCommunities() {
         _uiState.value = _uiState.value.copy(
-            showCommunities = !_uiState.value.showCommunities, isSaved = false
+            showCommunities = !_uiState.value.showCommunities,
+            isSaved = false,
         )
     }
 
     private fun toggleShowMeetings() {
         _uiState.value = _uiState.value.copy(
-            showMeetings = !_uiState.value.showMeetings, isSaved = false
+            showMeetings = !_uiState.value.showMeetings,
+            isSaved = false,
         )
     }
 
     private fun toggleNotifications() {
         _uiState.value = _uiState.value.copy(
-            notificationsEnabled = !_uiState.value.notificationsEnabled, isSaved = false
+            notificationsEnabled = !_uiState.value.notificationsEnabled,
+            isSaved = false,
         )
     }
 
@@ -225,10 +225,15 @@ class ProfileEditViewModel(
             nameError = nameError,
             surnameError = surnameError,
             emailError = emailError,
-            descriptionError = descriptionError
+            descriptionError = descriptionError,
         )
-        if (nameError != null || surnameError != null ||
-            emailError != null || descriptionError != null) return
+        if (nameError != null ||
+            surnameError != null ||
+            emailError != null ||
+            descriptionError != null
+        ) {
+            return
+        }
 
         val user = currentUser ?: run {
             _uiState.value = _uiState.value.copy(error = "Профиль ещё не загружен, попробуйте позже")
@@ -242,22 +247,29 @@ class ProfileEditViewModel(
             val updatedInterests: List<Tag>
 
             try {
-                socialMediasList = state.socialMedias.mapNotNull { (type,username) ->
+                socialMediasList = state.socialMedias.mapNotNull { (type, username) ->
                     if (username.isBlank()) return@mapNotNull null
                     try {
                         val smType = SocialMediaType.valueOf(type.uppercase())
                         SocialMediaInfo(
                             type = smType,
                             url = generateSocialMediaUrl(smType, username),
-                            username = username
+                            username = username,
                         )
-                    } catch (_: IllegalArgumentException) { null }
+                    } catch (_: IllegalArgumentException) {
+                        null
+                    }
                 }
 
                 updatedInterests = state.interests.mapNotNull { name ->
-                    val id = state.availableTags.entries.firstOrNull { it.value == name }?.key
-                    if (id != null) Tag(id = id, name = name)
-                    else user.interests.firstOrNull { it.name == name }
+                    val id = state.availableTags.entries
+                        .firstOrNull { it.value == name }
+                        ?.key
+                    if (id != null) {
+                        Tag(id = id, name = name)
+                    } else {
+                        user.interests.firstOrNull { it.name == name }
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -265,7 +277,7 @@ class ProfileEditViewModel(
                 Timber.e(e, "Failed to prepare profile data for save")
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    error = "Ошибка при подготовке данных профиля"
+                    error = "Ошибка при подготовке данных профиля",
                 )
                 return@launch
             }
@@ -283,15 +295,15 @@ class ProfileEditViewModel(
                     interests = updatedInterests,
                     showCommunities = state.showCommunities,
                     showMeetings = state.showMeetings,
-                    notificationsEnabled = state.notificationsEnabled
-                )
+                    notificationsEnabled = state.notificationsEnabled,
+                ),
             ).onSuccess {
                 _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
                 _navEvent.tryEmit(ProfileEditNavEvent.NavigateBack)
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    error = e.toUserMessage()
+                    error = e.toUserMessage(),
                 )
             }
         }
@@ -323,7 +335,7 @@ class ProfileEditViewModel(
     }
 
     private fun validateEmail(email: String): String? = when {
-        email.isBlank() -> null  // email опционален
+        email.isBlank() -> null // email опционален
         !email.contains("@") -> "Введите корректный email"
         else -> null
     }

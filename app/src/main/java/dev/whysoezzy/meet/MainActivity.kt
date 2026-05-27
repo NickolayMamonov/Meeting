@@ -31,7 +31,7 @@ fun MeetApp() {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = MaterialTheme.colorScheme.background,
     ) {
         MeetNavHost(navController = navController)
     }

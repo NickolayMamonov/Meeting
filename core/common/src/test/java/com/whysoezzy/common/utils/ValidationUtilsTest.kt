@@ -9,7 +9,6 @@ import org.junit.Test
 * Покрывают публичный контракт: phone / OTP / name / surname.
 */
 class ValidationUtilsTest {
-
     // ==================== isValidPhoneNumber ====================
 
     @Test

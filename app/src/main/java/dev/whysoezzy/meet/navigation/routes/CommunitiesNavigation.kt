@@ -10,10 +10,9 @@ import dev.whysoezzy.communities.subscribers.CommunitySubscribersScreen
 import dev.whysoezzy.meet.navigation.MeetRoute
 
 fun NavGraphBuilder.communitiesNavigation(navController: NavController) {
-
     composable(
         route = MeetRoute.CommunityDetails.route,
-        arguments = listOf(navArgument("communityId") { type = NavType.LongType })
+        arguments = listOf(navArgument("communityId") { type = NavType.LongType }),
     ) { backStackEntry ->
         val communityId = backStackEntry.arguments?.getLong("communityId") ?: 0L
         CommunityDetailsScreen(
@@ -27,13 +26,13 @@ fun NavGraphBuilder.communitiesNavigation(navController: NavController) {
             },
             onUserProfileClick = { userId ->
                 navController.navigate(MeetRoute.UserProfile.createRoute(userId))
-            }
+            },
         )
     }
 
     composable(
         route = MeetRoute.CommunitySubscribers.route,
-        arguments = listOf(navArgument("communityId") { type = NavType.LongType })
+        arguments = listOf(navArgument("communityId") { type = NavType.LongType }),
     ) { backStackEntry ->
         val communityId = backStackEntry.arguments?.getLong("communityId") ?: 0L
         CommunitySubscribersScreen(
@@ -41,7 +40,7 @@ fun NavGraphBuilder.communitiesNavigation(navController: NavController) {
             onBackPressed = { navController.popBackStack() },
             onPersonClick = { userId ->
                 navController.navigate(MeetRoute.UserProfile.createRoute(userId))
-            }
+            },
         )
     }
 }

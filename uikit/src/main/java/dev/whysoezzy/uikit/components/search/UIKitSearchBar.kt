@@ -53,7 +53,7 @@ fun UIKitSearchBar(
     backgroundColor: Color? = null,
     placeholder: String = "Search",
     onProfileClick: (() -> Unit)? = null,
-    onCancelClick: (() -> Unit)? = null
+    onCancelClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
     var isActive by remember { mutableStateOf(false) }
@@ -64,11 +64,12 @@ fun UIKitSearchBar(
     val contentColor = colorScheme.neutralDisabled
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = SpacingTokens.M),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = SpacingTokens.M),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.XS)
+        horizontalArrangement = Arrangement.spacedBy(SpacingTokens.XS),
     ) {
         // Search field
         BasicTextField(
@@ -79,27 +80,28 @@ fun UIKitSearchBar(
             cursorBrush = SolidColor(colorScheme.brandDefault),
             decorationBox = { innerTextField ->
                 Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .defaultMinSize(minHeight = 36.dp)
-                        .clip(shape = RoundedCornerShape(BorderRadiusTokens.L))
-                        .background(bgColor)
-                        .border(
-                            width = 1.dp,
-                            color = when {
-                                isActive -> colorScheme.neutralLine
-                                else -> bgColor
-                            },
-                            shape = RoundedCornerShape(BorderRadiusTokens.L)
-                        )
-                        .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .defaultMinSize(minHeight = 36.dp)
+                            .clip(shape = RoundedCornerShape(BorderRadiusTokens.L))
+                            .background(bgColor)
+                            .border(
+                                width = 1.dp,
+                                color =
+                                    when {
+                                        isActive -> colorScheme.neutralLine
+                                        else -> bgColor
+                                    },
+                                shape = RoundedCornerShape(BorderRadiusTokens.L),
+                            ).padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = "Search",
                         tint = if (query.isEmpty()) contentColor else activeContentColor,
-                        modifier = Modifier.padding(end = SpacingTokens.S)
+                        modifier = Modifier.padding(end = SpacingTokens.S),
                     )
 
                     Box(modifier = Modifier.weight(1f)) {
@@ -107,61 +109,65 @@ fun UIKitSearchBar(
                             Text(
                                 text = placeholder,
                                 style = TypographyTokens.BodyText1,
-                                color = contentColor
+                                color = contentColor,
                             )
                         }
                         innerTextField()
                     }
 
                     Box(
-                        modifier = Modifier
-                            .size(24.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(24.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (query.isNotEmpty()) {
                             Icon(
                                 imageVector = Icons.Default.Clear,
                                 contentDescription = "Clear",
                                 tint = contentColor,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable { onQueryChange("") }
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .clickable { onQueryChange("") },
                             )
                         }
                     }
                 }
             },
-            modifier = Modifier
-                .weight(1f)
-                .focusRequester(focusRequester)
-                .onFocusChanged { focusState ->
-                    isActive = focusState.isFocused
-                }
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { focusState ->
+                        isActive = focusState.isFocused
+                    },
         )
 
         // Profile button
         if (onProfileClick != null && onCancelClick != null) {
             Box(
-                modifier = Modifier
-                    .width(68.dp)
-                    .height(40.dp),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .width(68.dp)
+                        .height(40.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 if (query.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable { onProfileClick() },
+                        modifier =
+                            Modifier
+                                .clip(CircleShape)
+                                .clickable { onProfileClick() },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Person,
                             contentDescription = "Profile",
                             tint = Color.Black,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(32.dp),
                         )
                     }
-
                 } else {
                     TextButton(
                         onClick = {
@@ -170,16 +176,15 @@ fun UIKitSearchBar(
                             onCancelClick()
                         },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.defaultMinSize(minHeight = 1.dp)
+                        modifier = Modifier.defaultMinSize(minHeight = 1.dp),
                     ) {
                         Text(
                             text = "Отмена",
-                            color = UIKitTheme.colors.brandDefault
+                            color = UIKitTheme.colors.brandDefault,
                         )
                     }
                 }
             }
-
         }
     }
 }
@@ -192,24 +197,25 @@ fun UIKitSearchBarPreview() {
         var searchQuery2 by remember { mutableStateOf("") }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.S),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.S),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             UIKitSearchBar(
                 query = searchQuery1,
                 onQueryChange = { searchQuery1 = it },
                 placeholder = "Search events...",
                 onProfileClick = {},
-                onCancelClick = {}
+                onCancelClick = {},
             )
 
             UIKitSearchBar(
                 query = searchQuery2,
                 onQueryChange = { searchQuery2 = it },
                 placeholder = "Search without profile",
-                backgroundColor = UIKitTheme.colors.brandBackground
+                backgroundColor = UIKitTheme.colors.brandBackground,
             )
         }
     }

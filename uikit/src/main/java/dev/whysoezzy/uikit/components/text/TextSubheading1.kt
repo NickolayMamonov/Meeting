@@ -27,6 +27,6 @@ fun TextSubheading1(
         lineHeight = lineHeight,
         maxLines = maxLines,
         textAlign = textAlign,
-        modifier = modifier
+        modifier = modifier,
     )
 }

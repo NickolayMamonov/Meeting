@@ -27,6 +27,6 @@ fun TextMetadata2(
         lineHeight = lineHeight,
         maxLines = maxLines,
         textAlign = textAlign,
-        modifier = modifier
+        modifier = modifier,
     )
 }

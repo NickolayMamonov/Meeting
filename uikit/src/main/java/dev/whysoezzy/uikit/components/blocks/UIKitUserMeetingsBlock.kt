@@ -9,19 +9,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-
-
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitAddress
-import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
-import dev.whysoezzy.uikit.models.UIKitMeetingTag
-import dev.whysoezzy.uikit.models.UIKitTagState
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,11 +36,11 @@ fun UIKitUserMeetingsBlock(
     title: String = "Мои встречи",
     meetings: List<UIKitMeetingInfo>,
     onMeetingClick: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         // Заголовок
         TextHeading2(text = title)
@@ -52,29 +48,30 @@ fun UIKitUserMeetingsBlock(
         if (meetings.isEmpty()) {
             TextBody2(
                 text = "Вы пока не записаны ни на одну встречу",
-                color = ColorTokens.NeutralWeak
+                color = ColorTokens.NeutralWeak,
             )
         } else {
             // Горизонтальный список встреч
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-                contentPadding = PaddingValues(horizontal = SpacingTokens.XS)
+                contentPadding = PaddingValues(horizontal = SpacingTokens.XS),
             ) {
-                items(meetings, key = {it.id}) { meeting ->
+                items(meetings, key = { it.id }) { meeting ->
                     UIKitEventCard(
                         imageUrl = meeting.imageUrl,
                         title = meeting.title,
                         date = meeting.date,
                         address = UIKitAddress(meeting.address, 0.0, 0.0),
-                        tags = meeting.tags.map { tag ->
-                            UIKitEventCardTag(
-                                text = tag.text,
-                                isSelected = false,
-                                isEnabled = false
-                            )
-                        },
+                        tags =
+                            meeting.tags.map { tag ->
+                                UIKitEventCardTag(
+                                    text = tag.text,
+                                    isSelected = false,
+                                    isEnabled = false,
+                                )
+                            },
                         cardType = UIKitEventCardType.COMPACT,
-                        onCardClick = { onMeetingClick(meeting.id) }
+                        onCardClick = { onMeetingClick(meeting.id) },
                     )
                 }
             }
@@ -90,9 +87,9 @@ private fun formatMeetingDate(timestamp: Long): String {
     return dateFormat.format(Date(timestamp))
 }
 
-//@Preview
-//@Composable
-//private fun UIKitUserMeetingsBlockPreview() {
+// @Preview
+// @Composable
+// private fun UIKitUserMeetingsBlockPreview() {
 //    UIKitTheme {
 //        val mockTags = listOf(
 //            UIKitMeetingTag(1,"Android", UIKitTagState.ACTIVE),
@@ -131,7 +128,7 @@ private fun formatMeetingDate(timestamp: Long): String {
 //            onMeetingClick = { }
 //        )
 //    }
-//}
+// }
 
 @Preview
 @Composable
@@ -140,7 +137,7 @@ private fun UIKitUserMeetingsBlockEmptyPreview() {
         UIKitUserMeetingsBlock(
             title = "Предстоящие встречи",
             meetings = emptyList(),
-            onMeetingClick = { }
+            onMeetingClick = { },
         )
     }
 }

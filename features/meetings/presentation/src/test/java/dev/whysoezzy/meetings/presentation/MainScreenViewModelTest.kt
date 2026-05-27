@@ -24,7 +24,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainScreenViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -47,7 +46,7 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
 
         viewModel.uiState.test {
@@ -69,13 +68,13 @@ class MainScreenViewModelTest {
     @Test
     fun `loadData failure emits Error state with user-friendly message`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.failure(
-            ApiException.NetworkError("connection lost")
+            ApiException.NetworkError("connection lost"),
         )
 
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
 
         viewModel.uiState.test {
@@ -100,7 +99,7 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
         advanceUntilIdle() // дождаться loadMainScreenData из init
 
@@ -119,7 +118,7 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
         advanceUntilIdle()
 
@@ -141,7 +140,7 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
         advanceUntilIdle()
 
@@ -150,7 +149,12 @@ class MainScreenViewModelTest {
 
         val state = viewModel.uiState.value as MainScreenUiState.Success
         assertEquals(1, state.allMeetings.size)
-        assertTrue(state.allMeetings.first().tags.any { it.id == KOTLIN_TAG_ID })
+        assertTrue(
+            state.allMeetings
+                .first()
+                .tags
+                .any { it.id == KOTLIN_TAG_ID },
+        )
     }
 
     @Test
@@ -160,7 +164,7 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
         advanceUntilIdle()
 
@@ -183,13 +187,13 @@ class MainScreenViewModelTest {
     private val kotlinTag = MeetingTag(
         id = KOTLIN_TAG_ID,
         text = "Kotlin",
-        state = TagState.ACTIVE
+        state = TagState.ACTIVE,
     )
 
     private val androidTag = MeetingTag(
         id = ANDROID_TAG_ID,
         text = "Android",
-        state = TagState.ACTIVE
+        state = TagState.ACTIVE,
     )
 
     private val meeting1 = Meeting(
@@ -206,13 +210,13 @@ class MainScreenViewModelTest {
         participants = emptyList(),
         meetingStatus = MeetingStatus.ACTIVE,
         isUserInParticipants = false,
-        capacity = 20
+        capacity = 20,
     )
 
     private val meeting2 = meeting1.copy(
         id = 2L,
         title = "Android meetup",
-        tags = listOf(androidTag)
+        tags = listOf(androidTag),
     )
 
     private val sampleData = MainScreenData(
@@ -221,6 +225,6 @@ class MainScreenViewModelTest {
         allMeetings = listOf(meeting1, meeting2),
         categories = listOf(kotlinTag),
         communities = emptyList(),
-        adBlocks = emptyList()
+        adBlocks = emptyList(),
     )
 }

@@ -33,30 +33,30 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 fun UIKitSubscribeButton(
     selected: Boolean,
     onSelectedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colorScheme = UIKitTheme.colors
 
     Box(
-        modifier = modifier
-            .height(37.dp)
-            .clip(RoundedCornerShape(BorderRadiusTokens.M))
-            .then(
-                if (selected) {
-                    Modifier.background(colorScheme.brandDefault)
-                } else {
-                    Modifier.background(SecondaryGradient)
-                }
-            )
-            .clickable { onSelectedChange(!selected) }
-            .padding(vertical = 10.dp, horizontal = SpacingTokens.S),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .height(37.dp)
+                .clip(RoundedCornerShape(BorderRadiusTokens.M))
+                .then(
+                    if (selected) {
+                        Modifier.background(colorScheme.brandDefault)
+                    } else {
+                        Modifier.background(SecondaryGradient)
+                    },
+                ).clickable { onSelectedChange(!selected) }
+                .padding(vertical = 10.dp, horizontal = SpacingTokens.S),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = if (selected) Icons.Default.Check else Icons.Default.Add,
             contentDescription = if (selected) "Unsubscribe" else "Subscribe",
             tint = if (selected) colorScheme.neutralWhite else colorScheme.brandDefault,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -68,27 +68,28 @@ fun UIKitSubscribeButtonPreview() {
         var isSubscribed by remember { mutableStateOf(false) }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             // Unselected state
             UIKitSubscribeButton(
                 selected = false,
-                onSelectedChange = { }
+                onSelectedChange = { },
             )
 
             // Selected state
             UIKitSubscribeButton(
                 selected = true,
-                onSelectedChange = { }
+                onSelectedChange = { },
             )
 
             // Interactive example
             UIKitSubscribeButton(
                 selected = isSubscribed,
-                onSelectedChange = { isSubscribed = it }
+                onSelectedChange = { isSubscribed = it },
             )
         }
     }

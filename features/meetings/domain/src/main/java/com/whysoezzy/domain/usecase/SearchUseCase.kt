@@ -6,7 +6,7 @@ import com.whysoezzy.domain.repository.MeetingsRepository
 
 class SearchUseCase(
     private val meetingsRepository: MeetingsRepository,
-    private val searchCommunities: suspend (String) -> Result<List<Community>> = { Result.success(emptyList()) }
+    private val searchCommunities: suspend (String) -> Result<List<Community>> = { Result.success(emptyList()) },
 ) {
     suspend operator fun invoke(query: String): Result<SearchData> {
         return try {
@@ -16,8 +16,8 @@ class SearchUseCase(
             Result.success(
                 SearchData(
                     meetings = meetings,
-                    communities = communities
-                )
+                    communities = communities,
+                ),
             )
         } catch (e: Exception) {
             Result.failure(e)
