@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>UnusedParameter:CodeVerificationScreen.kt$onBackPressed: () -&gt; Unit</ID>
+    <ID>UnusedParameter:NameInputScreen.kt$modifier: Modifier = Modifier</ID>
+    <ID>UnusedParameter:NameInputScreen.kt$onBackPressed: () -&gt; Unit</ID>
+    <ID>UnusedParameter:PhoneInputScreen.kt$modifier: Modifier = Modifier</ID>
+    <ID>UnusedParameter:PhoneInputScreen.kt$onBackPressed: () -&gt; Unit</ID>
+  </CurrentIssues>
+</SmellBaseline>

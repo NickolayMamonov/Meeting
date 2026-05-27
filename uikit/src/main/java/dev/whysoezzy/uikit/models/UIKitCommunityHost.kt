@@ -8,5 +8,5 @@ data class UIKitCommunityHost(
     val title: String,
     val description: String,
     val imageUrl: String,
-    val meetingsInfo: List<UIKitMeetingInfo>
+    val meetingsInfo: List<UIKitMeetingInfo>,
 )

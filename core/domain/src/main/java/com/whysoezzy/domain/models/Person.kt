@@ -6,5 +6,5 @@ data class Person(
     val surname: String,
     val avatarUrl: String,
     val bio: String,
-    val role: String
+    val role: String,
 )

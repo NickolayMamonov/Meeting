@@ -8,5 +8,5 @@ data class UIKitPerson(
     val name: String,
     val surname: String,
     val avatar: String,
-    val description: String = ""
+    val description: String = "",
 )

@@ -11,7 +11,7 @@ sealed class AdBlock {
         override val title: String,
         override val description: String,
         val communities: List<CommunityInfo>,
-        override val isActive: Boolean = true
+        override val isActive: Boolean = true,
     ) : AdBlock()
 
     data class TextAd(
@@ -20,7 +20,7 @@ sealed class AdBlock {
         override val description: String,
         val actionText: String? = null,
         val actionUrl: String? = null,
-        override val isActive: Boolean = true
+        override val isActive: Boolean = true,
     ) : AdBlock()
 
     data class PeopleAd(
@@ -28,6 +28,6 @@ sealed class AdBlock {
         override val title: String,
         override val description: String,
         val users: List<Person>,
-        override val isActive: Boolean = true
+        override val isActive: Boolean = true,
     ) : AdBlock()
 }

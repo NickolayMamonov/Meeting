@@ -12,7 +12,9 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
-internal class UserApiKtor(private val client: HttpClient): UserApi {
+internal class UserApiKtor(
+    private val client: HttpClient,
+) : UserApi {
     override suspend fun getCurrentUserProfile(): UserProfileDto {
         return client.get("profile").body()
     }
@@ -22,10 +24,11 @@ internal class UserApiKtor(private val client: HttpClient): UserApi {
     }
 
     override suspend fun updateUserProfile(updateDto: UpdateUserDto): UserProfileDto {
-        return client.put("profile") {
-            contentType(ContentType.Application.Json)
-            setBody(updateDto)
-        }.body()
+        return client
+            .put("profile") {
+                contentType(ContentType.Application.Json)
+                setBody(updateDto)
+            }.body()
     }
 
     override suspend fun getUserMeetings(userId: Long): List<MeetingInfoDto> {

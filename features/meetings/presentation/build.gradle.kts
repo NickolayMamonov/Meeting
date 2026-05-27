@@ -20,7 +20,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -38,7 +38,7 @@ android {
 
 composeCompiler {
     stabilityConfigurationFile.set(
-        rootProject.layout.projectDirectory.file("compose-stability.conf")
+        rootProject.layout.projectDirectory.file("compose-stability.conf"),
     )
 }
 
@@ -68,11 +68,11 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    
+
     // Navigation
     implementation(libs.androidx.navigation.compose)
     implementation(libs.coil)
-    
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

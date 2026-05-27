@@ -8,10 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -36,7 +34,7 @@ enum class UIKitButtonState {
     PRIMARY,
     SECONDARY,
     LOADING,
-    DISABLED
+    DISABLED,
 }
 
 @Composable
@@ -44,65 +42,69 @@ fun UIKitButton(
     text: String,
     modifier: Modifier = Modifier,
     state: UIKitButtonState = UIKitButtonState.PRIMARY,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
 ) {
     val colorScheme = UIKitTheme.colors
 
     Box(
-        modifier = modifier
-            .defaultMinSize(minHeight = 56.dp)
-            .clip(RoundedCornerShape(BorderRadiusTokens.L))
-            .then(
-                when (state) {
-                    UIKitButtonState.PRIMARY, UIKitButtonState.LOADING -> Modifier.background(
-                        brush = PrimaryGradient,
-                    )
+        modifier =
+            modifier
+                .defaultMinSize(minHeight = 56.dp)
+                .clip(RoundedCornerShape(BorderRadiusTokens.L))
+                .then(
+                    when (state) {
+                        UIKitButtonState.PRIMARY, UIKitButtonState.LOADING ->
+                            Modifier.background(
+                                brush = PrimaryGradient,
+                            )
 
-                    UIKitButtonState.SECONDARY -> Modifier.background(
-                        brush = SecondaryGradient,
-                    )
+                        UIKitButtonState.SECONDARY ->
+                            Modifier.background(
+                                brush = SecondaryGradient,
+                            )
 
-                    UIKitButtonState.DISABLED -> Modifier.background(
-                        color = colorScheme.neutralLine,
-                    )
-                }
-            )
-            .clickable(
-                enabled = state != UIKitButtonState.DISABLED && state != UIKitButtonState.LOADING,
-                role = Role.Button,
-                onClick = onClick
-            )
-            .semantics { role = Role.Button },
-        contentAlignment = Alignment.Center
+                        UIKitButtonState.DISABLED ->
+                            Modifier.background(
+                                color = colorScheme.neutralLine,
+                            )
+                    },
+                ).clickable(
+                    enabled = state != UIKitButtonState.DISABLED && state != UIKitButtonState.LOADING,
+                    role = Role.Button,
+                    onClick = onClick,
+                ).semantics { role = Role.Button },
+        contentAlignment = Alignment.Center,
     ) {
         Row(
-            modifier = Modifier
-                .padding(
-                    horizontal = SpacingTokens.XL,
-                    vertical = SpacingTokens.M
-                ),
+            modifier =
+                Modifier
+                    .padding(
+                        horizontal = SpacingTokens.XL,
+                        vertical = SpacingTokens.M,
+                    ),
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.XS),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             when (state) {
                 UIKitButtonState.LOADING -> {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = colorScheme.neutralWhite,
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 }
 
                 else -> {
                     Text(
                         text = text,
-                        color = when (state) {
-                            UIKitButtonState.SECONDARY -> colorScheme.brandDark
-                            UIKitButtonState.DISABLED -> colorScheme.neutralDisabled
-                            else -> colorScheme.neutralWhite
-                        },
+                        color =
+                            when (state) {
+                                UIKitButtonState.SECONDARY -> colorScheme.brandDark
+                                UIKitButtonState.DISABLED -> colorScheme.neutralDisabled
+                                else -> colorScheme.neutralWhite
+                            },
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                 }
             }
@@ -115,29 +117,30 @@ fun UIKitButton(
 fun UIKitButtonPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             UIKitButton(
                 text = "Primary Button",
-                state = UIKitButtonState.PRIMARY
+                state = UIKitButtonState.PRIMARY,
             )
 
             UIKitButton(
                 text = "Secondary Button",
-                state = UIKitButtonState.SECONDARY
+                state = UIKitButtonState.SECONDARY,
             )
 
             UIKitButton(
                 text = "Loading",
-                state = UIKitButtonState.LOADING
+                state = UIKitButtonState.LOADING,
             )
 
             UIKitButton(
                 text = "Disabled Button",
-                state = UIKitButtonState.DISABLED
+                state = UIKitButtonState.DISABLED,
             )
         }
     }

@@ -8,9 +8,9 @@ import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunityMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.domain.usecase.GetRecommendedCommunitiesUseCase
+import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.domain.usecase.SearchCommunitiesUseCase
 import com.whysoezzy.domain.usecase.SubscribeToCommunityUseCase
-import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.domain.usecase.UnsubscribeFromCommunityUseCase
 import org.koin.core.qualifier.named
 import org.koin.dsl.module

@@ -9,13 +9,20 @@ sealed class CommunitySubscribersUiState {
 
     data class Success(
         val communityName: String,
-        val subscribers: List<Person>
+        val subscribers: List<Person>,
     ) : CommunitySubscribersUiState()
 
-    data class Error(val message: String) : CommunitySubscribersUiState()
+    data class Error(
+        val message: String,
+    ) : CommunitySubscribersUiState()
 }
 
 sealed class CommunitySubscribersEvent {
-    data class LoadSubscribers(val communityId: Long) : CommunitySubscribersEvent()
-    data class NavigateToProfile(val userId: Long) : CommunitySubscribersEvent()
+    data class LoadSubscribers(
+        val communityId: Long,
+    ) : CommunitySubscribersEvent()
+
+    data class NavigateToProfile(
+        val userId: Long,
+    ) : CommunitySubscribersEvent()
 }

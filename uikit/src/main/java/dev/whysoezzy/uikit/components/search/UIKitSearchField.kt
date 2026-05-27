@@ -48,7 +48,7 @@ fun UIKitSearchField(
     modifier: Modifier = Modifier,
     placeholder: String = "Search...",
     onClear: (() -> Unit)? = null,
-    onFocusChange: ((Boolean) -> Unit)? = null
+    onFocusChange: ((Boolean) -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
     val focusManager = LocalFocusManager.current
@@ -57,41 +57,44 @@ fun UIKitSearchField(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(BorderRadiusTokens.S))
-            .background(color = colorScheme.neutralSecondaryBackground)
-            .onFocusChanged { focusState ->
-                isFocused = focusState.isFocused
-                onFocusChange?.invoke(focusState.isFocused)
-            },
+        modifier =
+            modifier
+                .height(44.dp)
+                .clip(RoundedCornerShape(BorderRadiusTokens.S))
+                .background(color = colorScheme.neutralSecondaryBackground)
+                .onFocusChanged { focusState ->
+                    isFocused = focusState.isFocused
+                    onFocusChange?.invoke(focusState.isFocused)
+                },
         textStyle = TypographyTokens.Subheading2.copy(color = colorScheme.neutralBody),
         cursorBrush = SolidColor(colorScheme.brandDefault),
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(
-            onSearch = { focusManager.clearFocus() }
-        ),
+        keyboardActions =
+            KeyboardActions(
+                onSearch = { focusManager.clearFocus() },
+            ),
         decorationBox = { innerTextField ->
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = SpacingTokens.XS),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = SpacingTokens.XS),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = "Search",
                         tint = colorScheme.neutralWeak,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(22.dp),
                     )
-                    
+
                     Spacer(modifier = Modifier.width(SpacingTokens.XS))
 
                     Box(modifier = Modifier.weight(1f)) {
@@ -102,7 +105,7 @@ fun UIKitSearchField(
                                     style = TypographyTokens.Subheading2,
                                     color = colorScheme.neutralWeak,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                             else -> {
@@ -118,15 +121,16 @@ fun UIKitSearchField(
                         imageVector = Icons.Outlined.Clear,
                         contentDescription = "Clear",
                         tint = colorScheme.neutralWeak,
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clickable {
-                                onClear?.invoke() ?: onValueChange("")
-                            }
+                        modifier =
+                            Modifier
+                                .size(22.dp)
+                                .clickable {
+                                    onClear?.invoke() ?: onValueChange("")
+                                },
                     )
                 }
             }
-        }
+        },
     )
 }
 
@@ -135,23 +139,24 @@ fun UIKitSearchField(
 fun UIKitSearchFieldPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             var searchText1 by remember { mutableStateOf("") }
             UIKitSearchField(
                 value = searchText1,
                 onValueChange = { searchText1 = it },
-                placeholder = "Search users..."
+                placeholder = "Search users...",
             )
 
             var searchText2 by remember { mutableStateOf("Sample search query") }
             UIKitSearchField(
                 value = searchText2,
                 onValueChange = { searchText2 = it },
-                placeholder = "Search events..."
+                placeholder = "Search events...",
             )
 
             var searchText3 by remember { mutableStateOf("") }
@@ -161,7 +166,7 @@ fun UIKitSearchFieldPreview() {
                 placeholder = "Custom placeholder",
                 onFocusChange = { focused ->
                     // Handle focus change
-                }
+                },
             )
         }
     }

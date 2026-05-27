@@ -7,7 +7,7 @@ data class MeetingInfo(
     val time: Long = 0L,
     val tags: List<MeetingTag> = emptyList(),
     val address: String = "",
-    val meetingStatus: MeetingStatus = MeetingStatus.ACTIVE
+    val meetingStatus: MeetingStatus = MeetingStatus.ACTIVE,
 )
 
 enum class MeetingStatus {
@@ -15,5 +15,5 @@ enum class MeetingStatus {
     COMPLETED,
     CANCELLED,
     FULL,
-    DRAFT
+    DRAFT,
 }

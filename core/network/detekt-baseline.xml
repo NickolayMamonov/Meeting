@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>CognitiveComplexMethod:KtorNetworkModule.kt$KtorNetworkModule$fun provideHttpClient( tokenProvider: TokenProvider? = null, onRefreshToken: (suspend () -&gt; Pair&lt;String, String&gt;?)? = null, ): HttpClient</ID>
+    <ID>SwallowedException:ApiCallExtensions.kt$parseException: Exception</ID>
+  </CurrentIssues>
+</SmellBaseline>

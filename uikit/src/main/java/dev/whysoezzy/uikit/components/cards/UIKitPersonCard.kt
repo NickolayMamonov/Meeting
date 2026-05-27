@@ -36,36 +36,36 @@ fun UIKitPersonCard(
     modifier: Modifier = Modifier,
     isTagSelected: Boolean = false,
     onTagClick: (() -> Unit)? = null,
-    onCardClick: (() -> Unit)? = null
+    onCardClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
 
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(BorderRadiusTokens.L))
-            .then(
-                onCardClick?.let {
-                    Modifier.clickable { it() }
-                } ?: Modifier
-            )
-            .padding(SpacingTokens.M)
-            .width(68.dp),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(BorderRadiusTokens.L))
+                .then(
+                    onCardClick?.let {
+                        Modifier.clickable { it() }
+                    } ?: Modifier,
+                ).padding(SpacingTokens.M)
+                .width(68.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
     ) {
         // Avatar
         UIKitAvatar(
             imageUrl = imageUrl,
-            size = 64.dp
+            size = 64.dp,
         )
-        
+
         // Name
         Text(
             text = name,
             style = TypographyTokens.BodyText2,
             color = colorScheme.neutralBody,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
         )
 
         // Role Tag
@@ -74,7 +74,7 @@ fun UIKitPersonCard(
             size = UIKitTagSize.SMALL,
             selected = isTagSelected,
             onClick = onTagClick,
-            modifier = Modifier.widthIn(max = 64.dp)
+            modifier = Modifier.widthIn(max = 64.dp),
         )
     }
 }
@@ -86,23 +86,24 @@ fun UIKitPersonCardPreview() {
         var isTagSelected by remember { mutableStateOf(false) }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
         ) {
             // Simple card
             UIKitPersonCard(
                 name = "John",
                 role = "Designer",
-                imageUrl = "https://picsum.photos/200"
+                imageUrl = "https://picsum.photos/200",
             )
 
             // Card with long name
             UIKitPersonCard(
                 name = "John",
                 role = "UX Designer",
-                imageUrl = "https://picsum.photos/201"
+                imageUrl = "https://picsum.photos/201",
             )
 
             // Interactive card
@@ -112,14 +113,14 @@ fun UIKitPersonCardPreview() {
                 imageUrl = "https://picsum.photos/202",
                 isTagSelected = isTagSelected,
                 onTagClick = { isTagSelected = !isTagSelected },
-                onCardClick = { /* handle card click */ }
+                onCardClick = { /* handle card click */ },
             )
 
             // Card without image
             UIKitPersonCard(
                 name = "Alex",
                 role = "Manager",
-                imageUrl = ""
+                imageUrl = "",
             )
         }
     }

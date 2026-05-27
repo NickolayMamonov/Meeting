@@ -26,19 +26,36 @@ sealed class MeetingDetailsUiState {
         val isUserJoined: Boolean,
         val totalPlaces: Int,
         val community: UIKitCommunityHost?,
-        val otherMeetings: List<UIKitMeetingInfo>
+        val otherMeetings: List<UIKitMeetingInfo>,
     ) : MeetingDetailsUiState()
 
-    data class Error(val message: String) : MeetingDetailsUiState()
+    data class Error(
+        val message: String,
+    ) : MeetingDetailsUiState()
 }
 
 sealed class MeetingDetailsEvent {
-    data class LoadMeeting(val meetingId: Long) : MeetingDetailsEvent()
+    data class LoadMeeting(
+        val meetingId: Long,
+    ) : MeetingDetailsEvent()
+
     data object JoinMeeting : MeetingDetailsEvent()
+
     data object LeaveMeeting : MeetingDetailsEvent()
-    data class NavigateToProfile(val userId: Long) : MeetingDetailsEvent()
-    data class NavigateToCommunity(val communityId: Long) : MeetingDetailsEvent()
-    data class NavigateToMeeting(val meetingId: Long) : MeetingDetailsEvent()
+
+    data class NavigateToProfile(
+        val userId: Long,
+    ) : MeetingDetailsEvent()
+
+    data class NavigateToCommunity(
+        val communityId: Long,
+    ) : MeetingDetailsEvent()
+
+    data class NavigateToMeeting(
+        val meetingId: Long,
+    ) : MeetingDetailsEvent()
+
     data object OpenMap : MeetingDetailsEvent()
+
     data object ShareMeeting : MeetingDetailsEvent()
 }

@@ -23,9 +23,8 @@ sealed class NameInputNavEvent {
  * Здесь просто обновляем имя/фамилию через PUT /profile.
  */
 class NameInputViewModel(
-    private val userProfilerUpdater: UserProfilerUpdater
+    private val userProfilerUpdater: UserProfilerUpdater,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(NameInputUiState())
     val uiState: StateFlow<NameInputUiState> = _uiState.asStateFlow()
 
@@ -41,34 +40,38 @@ class NameInputViewModel(
     }
 
     private fun updateName(name: String) {
-        _uiState.value = _uiState.value.copy(
-            name = name,
-            nameError = null,
-            isSubmitted = false
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                name = name,
+                nameError = null,
+                isSubmitted = false,
+            )
     }
 
     private fun updateSurname(surname: String) {
-        _uiState.value = _uiState.value.copy(
-            surname = surname,
-            surnameError = null,
-            isSubmitted = false
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                surname = surname,
+                surnameError = null,
+                isSubmitted = false,
+            )
     }
 
-    private fun validateName(name: String): String? = when {
-        name.isBlank() -> "Имя не может быть пустым"
-        name.length < 2 -> "Минимум 2 символа"
-        !name.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
-        else -> null
-    }
+    private fun validateName(name: String): String? =
+        when {
+            name.isBlank() -> "Имя не может быть пустым"
+            name.length < 2 -> "Минимум 2 символа"
+            !name.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
+            else -> null
+        }
 
-    private fun validateSurname(surname: String): String? = when {
-        surname.isBlank() -> "Фамилия не может быть пустой"
-        surname.length < 2 -> "Минимум 2 символа"
-        !surname.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
-        else -> null
-    }
+    private fun validateSurname(surname: String): String? =
+        when {
+            surname.isBlank() -> "Фамилия не может быть пустой"
+            surname.length < 2 -> "Минимум 2 символа"
+            !surname.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
+            else -> null
+        }
 
     private fun validateAndSubmit() {
         val state = _uiState.value
@@ -79,28 +82,30 @@ class NameInputViewModel(
         if (nameError != null || surnameError != null) return
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                nameError = null,
-                surnameError = null
-            )
+            _uiState.value =
+                _uiState.value.copy(
+                    isLoading = true,
+                    nameError = null,
+                    surnameError = null,
+                )
 
-            userProfilerUpdater.updateName(
-                name = _uiState.value.name,
-                surname = _uiState.value.surname
-            )
-                .onSuccess {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isSubmitted = true
-                    )
+            userProfilerUpdater
+                .updateName(
+                    name = _uiState.value.name,
+                    surname = _uiState.value.surname,
+                ).onSuccess {
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isLoading = false,
+                            isSubmitted = true,
+                        )
                     _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
-                }
-                .onFailure { throwable ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        nameError = throwable.toUserMessage()
-                    )
+                }.onFailure { throwable ->
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isLoading = false,
+                            nameError = throwable.toUserMessage(),
+                        )
                 }
         }
     }

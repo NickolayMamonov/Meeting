@@ -9,9 +9,8 @@ import com.whysoezzy.domain.repository.MeetingsRepository
 import com.whysoezzy.network.safeApiCall
 
 internal class MeetingsRepositoryImpl(
-    private val meetingsApi: MeetingsApi
+    private val meetingsApi: MeetingsApi,
 ) : MeetingsRepository {
-
     override suspend fun getHeroEvents(): Result<List<Meeting>> = safeApiCall {
         meetingsApi.getHeroEvents().map { it.toDomain() }
     }
@@ -22,7 +21,6 @@ internal class MeetingsRepositoryImpl(
 
     override suspend fun getAllEvents(page: Int, limit: Int, tagId: Long?): Result<List<Meeting>> = safeApiCall {
         meetingsApi.getAllEvents(page = page, limit = limit, tagId = tagId).map { it.toDomain() }
-
     }
 
     override suspend fun searchEvents(query: String): Result<List<Meeting>> = safeApiCall {
@@ -41,7 +39,7 @@ internal class MeetingsRepositoryImpl(
                 surname = dto.surname,
                 avatarUrl = dto.avatarUrl,
                 bio = dto.bio,
-                role = dto.role
+                role = dto.role,
             )
         }
     }

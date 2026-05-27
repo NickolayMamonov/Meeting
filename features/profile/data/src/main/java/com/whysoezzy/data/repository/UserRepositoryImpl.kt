@@ -1,7 +1,6 @@
 package com.whysoezzy.data.repository
 
 import com.whysoezzy.data.api.UserApi
-
 import com.whysoezzy.data.mapper.toCommunityInfo
 import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.data.mapper.toMeetingInfo
@@ -13,9 +12,8 @@ import com.whysoezzy.domain.repository.UserRepository
 import com.whysoezzy.network.safeApiCall
 
 internal class UserRepositoryImpl(
-    private val userApi: UserApi
+    private val userApi: UserApi,
 ) : UserRepository {
-
     override suspend fun getCurrentUser(): Result<User> = safeApiCall {
         userApi.getCurrentUserProfile().toDomain()
     }

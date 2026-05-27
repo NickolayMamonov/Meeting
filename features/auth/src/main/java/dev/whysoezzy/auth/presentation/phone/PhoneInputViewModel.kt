@@ -10,9 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class PhoneInputViewModel(
-    private val sendOtpUseCase: SendOtpUseCase
+    private val sendOtpUseCase: SendOtpUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(PhoneInputUiState())
     val uiState: StateFlow<PhoneInputUiState> = _uiState.asStateFlow()
 
@@ -25,11 +24,12 @@ class PhoneInputViewModel(
 
     private fun updatePhoneNumber(phoneNumber: String) {
         val error = validatePhoneNumber(phoneNumber)
-        _uiState.value = _uiState.value.copy(
-            phoneNumber = phoneNumber,
-            error = error,
-            isCodeSent = false
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                phoneNumber = phoneNumber,
+                error = error,
+                isCodeSent = false,
+            )
     }
 
     private fun validatePhoneNumber(phoneNumber: String): String? {
@@ -50,16 +50,17 @@ class PhoneInputViewModel(
 
             sendOtpUseCase(_uiState.value.phoneNumber)
                 .onSuccess {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isCodeSent = true
-                    )
-                }
-                .onFailure { exception ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = exception.toUserMessage()
-                    )
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isLoading = false,
+                            isCodeSent = true,
+                        )
+                }.onFailure { exception ->
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isLoading = false,
+                            error = exception.toUserMessage(),
+                        )
                 }
         }
     }

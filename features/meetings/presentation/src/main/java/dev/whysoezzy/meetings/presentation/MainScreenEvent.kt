@@ -2,13 +2,27 @@ package dev.whysoezzy.meetings.presentation
 
 sealed class MainScreenEvent {
     data object LoadData : MainScreenEvent()
-    data class Search(val query: String) : MainScreenEvent()
-    data class FilterByTag(val tagId: Long?) : MainScreenEvent()  // null = сбросить фильтр
+
+    data class Search(
+        val query: String,
+    ) : MainScreenEvent()
+
+    data class FilterByTag(
+        val tagId: Long?,
+    ) : MainScreenEvent() // null = сбросить фильтр
+
     data class CommunitySubscriptionChanged(
         val communityId: Long,
-        val isSubscribed: Boolean
+        val isSubscribed: Boolean,
     ) : MainScreenEvent()
+
     data object Retry : MainScreenEvent()
-    data class NavigateToCommunity(val communityId: Long) : MainScreenEvent()
-    data class NavigateToMeeting(val meetingId: Long) : MainScreenEvent()
+
+    data class NavigateToCommunity(
+        val communityId: Long,
+    ) : MainScreenEvent()
+
+    data class NavigateToMeeting(
+        val meetingId: Long,
+    ) : MainScreenEvent()
 }

@@ -14,7 +14,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class UIKitHostCardTest {
-
     @get:Rule
     val composeTestRule = createComposeRule()
 
@@ -28,9 +27,10 @@ class UIKitHostCardTest {
                     surname = "Петров",
                     description = "Senior Android Developer",
                     imageUrl = "",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(SpacingTokens.M)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(SpacingTokens.M),
                 )
             }
         }
@@ -49,9 +49,10 @@ class UIKitHostCardTest {
                     surname = "Иванова",
                     description = "UX Designer",
                     imageUrl = "",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(SpacingTokens.M)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(SpacingTokens.M),
                 )
             }
         }

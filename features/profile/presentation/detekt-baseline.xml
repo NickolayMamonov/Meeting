@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>CognitiveComplexMethod:ProfileDetailsScreen.kt$@Composable private fun ProfileContent( uiState: ProfileDetailsUiState.Success, onMeetingClick: (Long) -&gt; Unit, onCommunityClick: (Long) -&gt; Unit, onSocialMediaClick: (String) -&gt; Unit, onCommunitySubscribeClick: (Long, Boolean) -&gt; Unit, onLogoutClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:ProfileEditScreen.kt$@Composable fun ProfileEditScreen( modifier: Modifier = Modifier, onBackPressed: () -&gt; Unit, onSaveSuccess: () -&gt; Unit, onEditInterests: (List&lt;String&gt;) -&gt; Unit = {}, viewModel: ProfileEditViewModel = koinViewModel(), )</ID>
+    <ID>LongMethod:ProfileEditScreen.kt$@Composable private fun EditContent( uiState: ProfileEditUiState, onAvatarClick: () -&gt; Unit, onNameSurnameChange: (String) -&gt; Unit, onCityChange: (String) -&gt; Unit, onDescriptionChange: (String) -&gt; Unit, onAddInterest: () -&gt; Unit, onRemoveInterest: (String) -&gt; Unit, onSocialMediaChange: (String, String) -&gt; Unit, onToggleShowCommunities: () -&gt; Unit, onToggleShowMeetings: () -&gt; Unit, onToggleNotifications: () -&gt; Unit, onDeleteProfile: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongParameterList:ProfileEditScreen.kt$( uiState: ProfileEditUiState, onAvatarClick: () -&gt; Unit, onNameSurnameChange: (String) -&gt; Unit, onCityChange: (String) -&gt; Unit, onDescriptionChange: (String) -&gt; Unit, onAddInterest: () -&gt; Unit, onRemoveInterest: (String) -&gt; Unit, onSocialMediaChange: (String, String) -&gt; Unit, onToggleShowCommunities: () -&gt; Unit, onToggleShowMeetings: () -&gt; Unit, onToggleNotifications: () -&gt; Unit, onDeleteProfile: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>UnusedParameter:ProfileDetailsScreen.kt$onCommunitySubscribeClick: (Long, Boolean) -&gt; Unit</ID>
+    <ID>UnusedParameter:ProfileEditScreen.kt$onEditInterests: (List&lt;String&gt;) -&gt; Unit = {}</ID>
+    <ID>UnusedParameter:ProfileEditViewModel.kt$ProfileEditViewModel$tagId: Long</ID>
+  </CurrentIssues>
+</SmellBaseline>

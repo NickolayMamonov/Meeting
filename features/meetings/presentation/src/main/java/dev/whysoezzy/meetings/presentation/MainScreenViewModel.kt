@@ -21,16 +21,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 sealed class MainScreenNavEvent {
-    data class NavigateToCommunity(val communityId: Long) : MainScreenNavEvent()
-    data class NavigateToMeeting(val meetingId: Long) : MainScreenNavEvent()
+    data class NavigateToCommunity(
+        val communityId: Long,
+    ) : MainScreenNavEvent()
+
+    data class NavigateToMeeting(
+        val meetingId: Long,
+    ) : MainScreenNavEvent()
 }
 
 class MainScreenViewModel(
     private val getMainScreenDataUseCase: GetMainScreenDataUseCase,
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
-    private val dispatchers: DispatcherProvider
+    private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow<MainScreenUiState>(MainScreenUiState.Loading)
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
@@ -67,16 +71,16 @@ class MainScreenViewModel(
 
             getMainScreenDataUseCase()
                 .onSuccess { data ->
-                    val mapped = withContext(dispatchers.default){
+                    val mapped = withContext(dispatchers.default) {
                         val allMeetings = data.allMeetings.toUIKitMeetingInfos()
                         val heroMeetings = data.heroMeetings.toUIKitMeetingInfos()
                         val popularMeetings = data.popularMeetings.toUIKitMeetingInfos()
                         val categories = data.categories.toUIKitMeetingTags()
-                        Triple(allMeetings,heroMeetings to popularMeetings,categories)
+                        Triple(allMeetings, heroMeetings to popularMeetings, categories)
                     }
 
                     val (allMeetingsMapped, heroPair, categories) = mapped
-                    val (heroMeetings,popularMeetings) = heroPair
+                    val (heroMeetings, popularMeetings) = heroPair
 
                     cachedAllMeetings = allMeetingsMapped
 
@@ -88,12 +92,11 @@ class MainScreenViewModel(
                         allMeetings = allMeetingsMapped,
                         categories = categories,
                         communities = communities,
-                        adBlocks = data.adBlocks
+                        adBlocks = data.adBlocks,
                     )
-                }
-                .onFailure { exception ->
+                }.onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
-                        exception.toUserMessage()
+                        exception.toUserMessage(),
                     )
                 }
         }
@@ -102,7 +105,7 @@ class MainScreenViewModel(
     private fun performSearch(query: String) {
         val currentState = _uiState.value
 
-        if (currentState is MainScreenUiState.Success){
+        if (currentState is MainScreenUiState.Success) {
             _uiState.value = currentState.copy(searchQuery = query)
         }
 
@@ -118,15 +121,15 @@ class MainScreenViewModel(
 
         viewModelScope.launch {
             val lowerQuery = query.lowercase()
-            val filtered = withContext(dispatchers.default){
+            val filtered = withContext(dispatchers.default) {
                 cachedAllMeetings.filter { meeting ->
                     meeting.title.lowercase().contains(lowerQuery) ||
-                            meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
-                            meeting.address.lowercase().contains(lowerQuery)
+                        meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
+                        meeting.address.lowercase().contains(lowerQuery)
                 }
             }
             val latestState = _uiState.value as? MainScreenUiState.Success ?: return@launch
-            if (latestState.searchQuery == query){
+            if (latestState.searchQuery == query) {
                 _uiState.value = latestState.copy(allMeetings = filtered)
             }
         }
@@ -153,7 +156,7 @@ class MainScreenViewModel(
 
             _uiState.value = currentState.copy(
                 allMeetings = filtered,
-                categories = updatedCategories
+                categories = updatedCategories,
             )
         }
     }
@@ -177,9 +180,12 @@ class MainScreenViewModel(
         val state = _uiState.value as? MainScreenUiState.Success ?: return
         _uiState.value = state.copy(
             communities = state.communities.map { community ->
-                if (community.id == communityId) community.copy(isSubscribed = isSubscribed)
-                else community
-            }
+                if (community.id == communityId) {
+                    community.copy(isSubscribed = isSubscribed)
+                } else {
+                    community
+                }
+            },
         )
     }
 }

@@ -10,9 +10,8 @@ import com.whysoezzy.domain.repository.CommunitiesRepository
 import com.whysoezzy.network.safeApiCall
 
 internal class CommunitiesRepositoryImpl(
-    private val communitiesApi: CommunitiesApi
+    private val communitiesApi: CommunitiesApi,
 ) : CommunitiesRepository {
-
     override suspend fun getRecommendedCommunities(): Result<List<Community>> = safeApiCall {
         communitiesApi.getRecommendedCommunities().map { it.toDomain() }
     }

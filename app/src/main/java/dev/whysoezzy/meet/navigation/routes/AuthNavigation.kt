@@ -13,18 +13,17 @@ import dev.whysoezzy.meet.navigation.MeetRoute
 fun NavGraphBuilder.authNavigation(navController: NavController) {
     navigation(
         startDestination = MeetRoute.PhoneInput.route,
-        route = MeetRoute.Auth.route
+        route = MeetRoute.Auth.route,
     ) {
-
         // 1. Ввод телефона
         composable(MeetRoute.PhoneInput.route) {
             PhoneInputScreen(
                 onPhoneSubmitted = { phoneNumber ->
                     navController.navigate(
-                        MeetRoute.CodeVerification.createRoute(phoneNumber)
+                        MeetRoute.CodeVerification.createRoute(phoneNumber),
                     )
                 },
-                onBackPressed = { navController.popBackStack() }
+                onBackPressed = { navController.popBackStack() },
             )
         }
 
@@ -45,7 +44,7 @@ fun NavGraphBuilder.authNavigation(navController: NavController) {
                     // Новый пользователь — нужно ввести имя
                     navController.navigate(MeetRoute.NameInput.createRoute(p, code))
                 },
-                onBackPressed = { navController.popBackStack() }
+                onBackPressed = { navController.popBackStack() },
             )
         }
 
@@ -55,7 +54,7 @@ fun NavGraphBuilder.authNavigation(navController: NavController) {
                 onNameSubmitted = {
                     navController.navigate(MeetRoute.AuthSuccess.route)
                 },
-                onBackPressed = { navController.popBackStack() }
+                onBackPressed = { navController.popBackStack() },
             )
         }
 
@@ -66,7 +65,7 @@ fun NavGraphBuilder.authNavigation(navController: NavController) {
                     navController.navigate(MeetRoute.Main.route) {
                         popUpTo(MeetRoute.Auth.route) { inclusive = true }
                     }
-                }
+                },
             )
         }
     }

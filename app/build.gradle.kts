@@ -24,7 +24,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -44,7 +44,7 @@ android {
 
 composeCompiler {
     stabilityConfigurationFile.set(
-        rootProject.layout.projectDirectory.file("compose-stability.conf")
+        rootProject.layout.projectDirectory.file("compose-stability.conf"),
     )
 }
 
@@ -66,10 +66,11 @@ dependencies {
     implementation(project(":features:profile:domain"))
     implementation(project(":features:profile:presentation"))
 
-
     implementation(project(":features:auth"))
 
     implementation(project(":uikit"))
+
+    implementation(libs.timber)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 

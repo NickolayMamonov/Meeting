@@ -6,5 +6,5 @@ import androidx.compose.runtime.Immutable
 data class UIKitTag(
     val text: String,
     val isSelected: Boolean = false,
-    val isEnabled: Boolean = true
+    val isEnabled: Boolean = true,
 )

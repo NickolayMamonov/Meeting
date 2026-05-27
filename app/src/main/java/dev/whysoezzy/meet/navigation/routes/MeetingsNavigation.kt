@@ -1,6 +1,5 @@
 package dev.whysoezzy.meet.navigation.routes
 
-import android.util.Log
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
@@ -12,7 +11,6 @@ import dev.whysoezzy.meetings.details.presentation.MeetingDetailsScreen
 import dev.whysoezzy.meetings.participants.presentation.MeetingParticipantsScreen
 
 fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
-
     composable(MeetRoute.Main.route) {
         MainScreen(
             onMeetingClick = { meetingId ->
@@ -26,13 +24,13 @@ fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
             },
             onUserProfileClick = { userId ->
                 navController.navigate(MeetRoute.UserProfile.createRoute(userId))
-            }
+            },
         )
     }
 
     composable(
         route = MeetRoute.MeetingDetails.route,
-        arguments = listOf(navArgument("meetingId") { type = NavType.LongType })
+        arguments = listOf(navArgument("meetingId") { type = NavType.LongType }),
     ) { backStackEntry ->
         val meetingId = backStackEntry.arguments?.getLong("meetingId") ?: 0L
         MeetingDetailsScreen(
@@ -55,13 +53,13 @@ fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
             },
             onAuthRequired = {
                 navController.navigate(MeetRoute.Auth.route)
-            }
+            },
         )
     }
 
     composable(
         route = MeetRoute.MeetingParticipants.route,
-        arguments = listOf(navArgument("meetingId") { type = NavType.LongType })
+        arguments = listOf(navArgument("meetingId") { type = NavType.LongType }),
     ) { backStackEntry ->
         val meetingId = backStackEntry.arguments?.getLong("meetingId") ?: 0L
         MeetingParticipantsScreen(
@@ -69,7 +67,7 @@ fun NavGraphBuilder.meetingsNavigation(navController: NavController) {
             onBackPressed = { navController.popBackStack() },
             onPersonClick = { userId ->
                 navController.navigate(MeetRoute.UserProfile.createRoute(userId))
-            }
+            },
         )
     }
 }

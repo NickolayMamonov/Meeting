@@ -9,18 +9,13 @@ import java.util.Locale
 object DateUtils {
     private val dateFormatter = DateTimeFormatter.ofPattern("dd MMMM", Locale.getDefault())
 
-    fun formatDate(dateTime: LocalDateTime): String {
-        return dateTime.format(dateFormatter)
-    }
+    fun formatDate(dateTime: LocalDateTime): String = dateTime.format(dateFormatter)
 
-    fun toTimestamp(dateTime: LocalDateTime): Long {
-        return dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    }
+    fun toTimestamp(dateTime: LocalDateTime): Long = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-    fun fromTimestamp(timestamp: Long): LocalDateTime {
-        return LocalDateTime.ofInstant(
+    fun fromTimestamp(timestamp: Long): LocalDateTime =
+        LocalDateTime.ofInstant(
             ofEpochMilli(timestamp),
-            ZoneId.systemDefault()
+            ZoneId.systemDefault(),
         )
-    }
 }

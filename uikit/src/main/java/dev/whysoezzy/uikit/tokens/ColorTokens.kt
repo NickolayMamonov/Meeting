@@ -13,7 +13,7 @@ object ColorTokens {
     val BrandDarkMode = Color(0xFF8207E8)
     val BrandLight = Color(0xFFECDAFF)
     val BrandBackground = Color(0xFFF5ECFF)
-    
+
     // Neutral Colors
     val NeutralActive = Color(0xFF29183B)
     val NeutralDark = Color(0xFF190E26)
@@ -23,21 +23,35 @@ object ColorTokens {
     val NeutralLine = Color(0xFFEDEDED)
     val NeutralSecondaryBackground = Color(0xFFF7F7FC)
     val NeutralWhite = Color(0xFFFFFFFF)
-    
+
     // Accent Colors
     val AccentDanger = Color(0xFFE94242)
     val AccentWarning = Color(0xFFFDCF41)
     val AccentSuccess = Color(0xFF2CC069)
     val AccentSafe = Color(0xFF7BCBCF)
-    
+
     // Gradient Colors
-    val PrimaryGradientColors = listOf(
-        Color(0xFFED3CCA), Color(0xFFDF34D2), Color(0xFFD02BD9), Color(0xFFBF22E1),
-        Color(0xFFAE1AE8), Color(0xFF9A10F0), Color(0xFF8306F7), Color(0xFF6600FF)
-    )
-    
-    val SecondaryGradientColors = listOf(
-        Color(0xFFFEF1FB), Color(0xFFFDF1FC), Color(0xFFFCF0FC), Color(0xFFFBF0FD),
-        Color(0xFFF9EFFD), Color(0xFFF8EEFE), Color(0xFFF6EEFE), Color(0xFFF4EDFF)
-    )
+    val PrimaryGradientColors =
+        listOf(
+            Color(0xFFED3CCA),
+            Color(0xFFDF34D2),
+            Color(0xFFD02BD9),
+            Color(0xFFBF22E1),
+            Color(0xFFAE1AE8),
+            Color(0xFF9A10F0),
+            Color(0xFF8306F7),
+            Color(0xFF6600FF),
+        )
+
+    val SecondaryGradientColors =
+        listOf(
+            Color(0xFFFEF1FB),
+            Color(0xFFFDF1FC),
+            Color(0xFFFCF0FC),
+            Color(0xFFFBF0FD),
+            Color(0xFFF9EFFD),
+            Color(0xFFF8EEFE),
+            Color(0xFFF6EEFE),
+            Color(0xFFF4EDFF),
+        )
 }

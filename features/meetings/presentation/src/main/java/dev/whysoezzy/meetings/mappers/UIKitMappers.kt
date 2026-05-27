@@ -34,7 +34,7 @@ import java.util.Locale
 fun MeetingAddress.toUIKit() = UIKitAddress(
     address = address,
     latitude = latitude,
-    longitude = longitude
+    longitude = longitude,
 )
 
 // ─── Person ───────────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ fun Person.toUIKit() = UIKitPerson(
     name = name,
     surname = surname,
     avatar = avatarUrl,
-    description = bio
+    description = bio,
 )
 
 fun List<Person>.toUIKitPersons() = map { it.toUIKit() }
@@ -55,20 +55,17 @@ fun List<Person>.toAvatarUrls() = map { it.avatarUrl }
 
 fun Tag.toUIKit(
     isSelected: Boolean = false,
-    isEnabled: Boolean = true
+    isEnabled: Boolean = true,
 ) = UIKitTag(
     text = name,
     isSelected = isSelected,
-    isEnabled = isEnabled
+    isEnabled = isEnabled,
 )
 
 fun List<Tag>.toUIKit(
     isSelected: Boolean = false,
-    isEnabled: Boolean = true
+    isEnabled: Boolean = true,
 ) = map { it.toUIKit(isSelected, isEnabled) }
-
-
-
 
 private fun TagState.toUIKitTagState(): UIKitTagState = when (this) {
     TagState.ACTIVE -> UIKitTagState.ACTIVE
@@ -88,12 +85,11 @@ private fun MeetingStatus.toUIKitMeetingStatus(): UIKitMeetingStatus = when (thi
 private fun MeetingTag.toUIKitMeetingTag(): UIKitMeetingTag = UIKitMeetingTag(
     id = id,
     text = text,
-    state = state.toUIKitTagState()
+    state = state.toUIKitTagState(),
 )
 
 fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> =
     filterNotNull().map { it.toUIKitMeetingTag() }
-
 
 // ─── Hosts ────────────────────────────────────────────────────────────────────
 
@@ -102,7 +98,7 @@ fun PersonHost.toUIKit() = UIKitHost(
     name = name,
     surname = surname,
     description = description,
-    imageUrl = imageUrl
+    imageUrl = imageUrl,
 )
 
 fun PersonHost.toUIKitPersonHost() = UIKitPersonHost(
@@ -110,14 +106,14 @@ fun PersonHost.toUIKitPersonHost() = UIKitPersonHost(
     name = name,
     surname = surname,
     description = description,
-    imageUrl = imageUrl
+    imageUrl = imageUrl,
 )
 
 fun CommunityHost.toUIKit() = UIKitCommunity(
     id = id,
     name = title,
     description = description,
-    imageUrl = imageUrl
+    imageUrl = imageUrl,
 )
 
 fun CommunityHost.toUIKitCommunityHost() = UIKitCommunityHost(
@@ -125,7 +121,7 @@ fun CommunityHost.toUIKitCommunityHost() = UIKitCommunityHost(
     title = title,
     description = description,
     imageUrl = imageUrl,
-    meetingsInfo = meetingsInfo.map { it.toUIKitMeetingInfo() }
+    meetingsInfo = meetingsInfo.map { it.toUIKitMeetingInfo() },
 )
 
 // ─── Meeting ──────────────────────────────────────────────────────────────────
@@ -145,7 +141,7 @@ fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
     tags = tags.toUIKitMeetingTags(),
     meetingStatus = meetingStatus.toUIKitMeetingStatus(),
     latitude = address.latitude,
-    longitude = address.longitude
+    longitude = address.longitude,
 )
 
 fun List<Meeting>.toUIKitMeetingInfos(): List<UIKitMeetingInfo> =
@@ -161,7 +157,7 @@ fun MeetingInfo.toUIKitMeetingInfo() = UIKitMeetingInfo(
     tags = tags.toUIKitMeetingTags(),
     meetingStatus = meetingStatus.toUIKitMeetingStatus(),
     latitude = 0.0,
-    longitude = 0.0
+    longitude = 0.0,
 )
 
 fun List<MeetingInfo>.toUIKitMeetingInfoList(): List<UIKitMeetingInfo> =
@@ -170,7 +166,7 @@ fun List<MeetingInfo>.toUIKitMeetingInfoList(): List<UIKitMeetingInfo> =
 fun MeetingInfo.toUIKitAddress() = UIKitAddress(
     address = address.orEmpty(),
     latitude = 0.0,
-    longitude = 0.0
+    longitude = 0.0,
 )
 
 // ─── Community ────────────────────────────────────────────────────────────────
@@ -182,7 +178,6 @@ fun CommunityInfo.toUIKitCommunityInfo(
     title = name,
     imageUrl = imageUrl,
     isSubscribed = isSubscribed,
-
 )
 
 /**
@@ -193,7 +188,7 @@ fun Community.toUIKitCommunityInfo() = UIKitCommunityInfo(
     id = id,
     title = name,
     imageUrl = imageUrl,
-    isSubscribed = isSubscribed
+    isSubscribed = isSubscribed,
 )
 
 /** Маппер для List<Community> — isSubscribed из модели, callbacks через DI */
@@ -202,18 +197,17 @@ fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map {
         id = community.id,
         title = community.name,
         imageUrl = community.imageUrl,
-        isSubscribed = community.isSubscribed
+        isSubscribed = community.isSubscribed,
     )
 }
 
-
 /** Маппер для List<CommunityInfo> — isSubscribed из внешнего Set */
 fun List<CommunityInfo>.toUIKitCommunityInfoList(
-    subscribedIds: Set<Long> = emptySet()
+    subscribedIds: Set<Long> = emptySet(),
 ): List<UIKitCommunityInfo> {
     return map { community ->
         community.toUIKitCommunityInfo(
-            isSubscribed = subscribedIds.contains(community.id)
+            isSubscribed = subscribedIds.contains(community.id),
         )
     }
 }
@@ -223,6 +217,6 @@ internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
         UIKitEventCardTag(
             text = tag.text,
             isSelected = tag.state == UIKitTagState.SELECTED,
-            isEnabled = tag.state != UIKitTagState.DISABLED
+            isEnabled = tag.state != UIKitTagState.DISABLED,
         )
     }

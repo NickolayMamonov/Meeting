@@ -34,7 +34,7 @@ fun UIKitOverlappingAvatars(
     maxVisibleAvatars: Int = 5,
     showCount: Boolean = true,
     borderColor: Color = UIKitTheme.colors.neutralWhite,
-    borderWidth: Dp = 2.dp
+    borderWidth: Dp = 2.dp,
 ) {
     val visibleAvatars = avatarUrls.take(maxVisibleAvatars)
     val remainingCount = (avatarUrls.size - maxVisibleAvatars).coerceAtLeast(0)
@@ -48,32 +48,34 @@ fun UIKitOverlappingAvatars(
                 UIKitAvatar(
                     imageUrl = url,
                     size = avatarSize,
-                    modifier = Modifier
-                        .border(borderWidth, borderColor, CircleShape)
-                        .clip(CircleShape)
+                    modifier =
+                        Modifier
+                            .border(borderWidth, borderColor, CircleShape)
+                            .clip(CircleShape),
                 )
             }
-            
+
             // Show count if there are more avatars
             if (showCount && remainingCount > 0) {
                 Box(
-                    modifier = Modifier
-                        .size(avatarSize)
-                        .border(borderWidth, borderColor, CircleShape)
-                        .background(UIKitTheme.colors.neutralLine, CircleShape),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .size(avatarSize)
+                            .border(borderWidth, borderColor, CircleShape)
+                            .background(UIKitTheme.colors.neutralLine, CircleShape),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "+$remainingCount",
                         style = TypographyTokens.Metadata3.copy(fontWeight = FontWeight.Medium),
-                        color = UIKitTheme.colors.neutralBody
+                        color = UIKitTheme.colors.neutralBody,
                     )
                 }
             }
         },
         measurePolicy = { measurables, constraints ->
             val placeables = measurables.map { it.measure(constraints) }
-            
+
             if (placeables.isEmpty()) {
                 layout(0, 0) {}
             } else {
@@ -81,20 +83,20 @@ fun UIKitOverlappingAvatars(
                 val remainingWidths = placeables.drop(1).sumOf { it.width }
                 val totalWidth = (firstWidth + remainingWidths * factor).toInt()
                 val height = placeables.maxOf { it.height }
-                
+
                 layout(totalWidth, height) {
                     var x = 0
                     placeables.forEachIndexed { index, placeable ->
                         placeable.placeRelative(
                             x = x,
                             y = 0,
-                            zIndex = (placeables.size - index).toFloat()
+                            zIndex = (placeables.size - index).toFloat(),
                         )
                         x += (placeable.width * factor).toInt()
                     }
                 }
             }
-        }
+        },
     )
 }
 
@@ -102,62 +104,64 @@ fun UIKitOverlappingAvatars(
 @Composable
 fun UIKitOverlappingAvatarsPreview() {
     UIKitTheme {
-        val sampleAvatars = listOf(
-            "https://picsum.photos/300/100",
-            "https://picsum.photos/300/100",
-            "https://picsum.photos/300/100",
-            "https://picsum.photos/300/100",
-            "https://picsum.photos/100/100?random=5",
-            "https://picsum.photos/100/100?random=6",
-            "https://picsum.photos/100/100?random=7",
-            "https://picsum.photos/100/100?random=8"
-        )
+        val sampleAvatars =
+            listOf(
+                "https://picsum.photos/300/100",
+                "https://picsum.photos/300/100",
+                "https://picsum.photos/300/100",
+                "https://picsum.photos/300/100",
+                "https://picsum.photos/100/100?random=5",
+                "https://picsum.photos/100/100?random=6",
+                "https://picsum.photos/100/100?random=7",
+                "https://picsum.photos/100/100?random=8",
+            )
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
         ) {
             Text(
                 text = "Overlapping Avatars Examples",
                 style = TypographyTokens.Heading2,
-                color = UIKitTheme.colors.neutralBody
+                color = UIKitTheme.colors.neutralBody,
             )
-            
+
             // 3 avatars
             UIKitOverlappingAvatars(
                 avatarUrls = sampleAvatars.take(3),
-                avatarSize = 40.dp
+                avatarSize = 40.dp,
             )
-            
+
             // 5 avatars
             UIKitOverlappingAvatars(
                 avatarUrls = sampleAvatars.take(5),
-                avatarSize = 48.dp
+                avatarSize = 48.dp,
             )
-            
+
             // More than max (shows count)
             UIKitOverlappingAvatars(
                 avatarUrls = sampleAvatars,
                 avatarSize = 40.dp,
-                overlappingPercentage = 0.4f
+                overlappingPercentage = 0.4f,
             )
-            
+
             // Custom styling
             UIKitOverlappingAvatars(
                 avatarUrls = sampleAvatars.take(4),
                 avatarSize = 56.dp,
                 overlappingPercentage = 0.2f,
                 borderColor = UIKitTheme.colors.brandDefault,
-                borderWidth = 3.dp
+                borderWidth = 3.dp,
             )
-            
+
             // Without count
             UIKitOverlappingAvatars(
                 avatarUrls = sampleAvatars,
                 showCount = false,
-                maxVisibleAvatars = 6
+                maxVisibleAvatars = 6,
             )
         }
     }

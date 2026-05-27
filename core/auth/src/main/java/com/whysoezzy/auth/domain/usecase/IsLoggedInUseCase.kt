@@ -4,7 +4,7 @@ import com.whysoezzy.auth.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.Flow
 
 class IsLoggedInUseCase(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
 ) {
     operator fun invoke(): Flow<Boolean> = authRepository.isLoggedInFlow
 }

@@ -24,11 +24,29 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed class MeetingDetailsNavEvent {
-    data class NavigateToProfile(val userId: Long) : MeetingDetailsNavEvent()
-    data class NavigateToMeeting(val meetingId: Long) : MeetingDetailsNavEvent()
-    data class NavigateToCommunity(val communityId: Long) : MeetingDetailsNavEvent()
-    data class OpenMap(val latitude: Double, val longitude: Double, val address: String) : MeetingDetailsNavEvent()
-    data class ShareMeeting(val title: String, val shareText: String) : MeetingDetailsNavEvent()
+    data class NavigateToProfile(
+        val userId: Long,
+    ) : MeetingDetailsNavEvent()
+
+    data class NavigateToMeeting(
+        val meetingId: Long,
+    ) : MeetingDetailsNavEvent()
+
+    data class NavigateToCommunity(
+        val communityId: Long,
+    ) : MeetingDetailsNavEvent()
+
+    data class OpenMap(
+        val latitude: Double,
+        val longitude: Double,
+        val address: String,
+    ) : MeetingDetailsNavEvent()
+
+    data class ShareMeeting(
+        val title: String,
+        val shareText: String,
+    ) : MeetingDetailsNavEvent()
+
     object NavigateToAuth : MeetingDetailsNavEvent()
 }
 
@@ -36,9 +54,8 @@ class MeetingDetailsViewModel(
     private val getMeetingByIdUseCase: GetMeetingByIdUseCase,
     private val joinMeetingUseCase: JoinMeetingUseCase,
     private val leaveMeetingUseCase: LeaveMeetingUseCase,
-    private val isLoggedInUseCase: IsLoggedInUseCase
+    private val isLoggedInUseCase: IsLoggedInUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow<MeetingDetailsUiState>(MeetingDetailsUiState.Loading)
     val uiState: StateFlow<MeetingDetailsUiState> = _uiState.asStateFlow()
 
@@ -51,7 +68,7 @@ class MeetingDetailsViewModel(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = false
+            initialValue = false,
         )
 
     fun onEvent(event: MeetingDetailsEvent) {
@@ -95,12 +112,11 @@ class MeetingDetailsViewModel(
                         totalPlaces = meeting.capacity,
                         community = meeting.communityHost?.toUIKitCommunityHost(),
                         otherMeetings = meeting.communityHost?.meetingsInfo?.toUIKitMeetingInfoList()
-                            ?: emptyList()
+                            ?: emptyList(),
                     )
-                }
-                .onFailure { exception ->
+                }.onFailure { exception ->
                     _uiState.value = MeetingDetailsUiState.Error(
-                        message = exception.toUserMessage()
+                        message = exception.toUserMessage(),
                     )
                 }
         }
@@ -144,8 +160,8 @@ class MeetingDetailsViewModel(
                     MeetingDetailsNavEvent.OpenMap(
                         latitude = state.address.latitude,
                         longitude = state.address.longitude,
-                        address = state.address.address
-                    )
+                        address = state.address.address,
+                    ),
                 )
             }
         }
@@ -157,11 +173,9 @@ class MeetingDetailsViewModel(
             _navEvent.emit(
                 MeetingDetailsNavEvent.ShareMeeting(
                     title = state.title,
-                    shareText = "Приходи на встречу «${state.title}»! ${state.dateTime}, ${state.address.address}"
-                )
+                    shareText = "Приходи на встречу «${state.title}»! ${state.dateTime}, ${state.address.address}",
+                ),
             )
         }
     }
-
-
 }

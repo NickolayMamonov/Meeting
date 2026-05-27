@@ -20,7 +20,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -38,7 +38,7 @@ android {
 
 composeCompiler {
     stabilityConfigurationFile.set(
-        rootProject.layout.projectDirectory.file("compose-stability.conf")
+        rootProject.layout.projectDirectory.file("compose-stability.conf"),
     )
 }
 
@@ -66,7 +66,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
-    
+
     // Debug
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)

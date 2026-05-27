@@ -7,7 +7,7 @@ data class PhoneInputUiState(
     val phoneNumber: String = "",
     val isLoading: Boolean = false,
     val isCodeSent: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 ) {
     val isValid: Boolean
         // +7 (999) 999-99-99 = 18 символов, или 11 цифр (без форматирования)
@@ -15,6 +15,9 @@ data class PhoneInputUiState(
 }
 
 sealed class PhoneInputEvent {
-    data class UpdatePhoneNumber(val phoneNumber: String) : PhoneInputEvent()
+    data class UpdatePhoneNumber(
+        val phoneNumber: String,
+    ) : PhoneInputEvent()
+
     data object SendCode : PhoneInputEvent()
 }

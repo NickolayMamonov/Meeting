@@ -32,11 +32,11 @@ fun UIKitUserCommunitiesBlock(
     communities: List<UIKitCommunityInfo>,
     subscribedCommunityIds: Set<Long> = emptySet(),
     onCommunityClick: (Long) -> Unit,
-    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> }
+    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         // Заголовок
         TextHeading2(text = title)
@@ -44,15 +44,15 @@ fun UIKitUserCommunitiesBlock(
         if (communities.isEmpty()) {
             TextBody2(
                 text = "Вы пока не состоите ни в одном сообществе",
-                color = ColorTokens.NeutralWeak
+                color = ColorTokens.NeutralWeak,
             )
         } else {
             // Горизонтальный список сообществ
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-                contentPadding = PaddingValues(horizontal = SpacingTokens.XS)
+                contentPadding = PaddingValues(horizontal = SpacingTokens.XS),
             ) {
-                items(communities, key = {it.id}) { community ->
+                items(communities, key = { it.id }) { community ->
                     UIKitCommunityCard(
                         imageUrl = community.imageUrl,
                         title = community.title,
@@ -60,7 +60,7 @@ fun UIKitUserCommunitiesBlock(
                         onSubscribeClick = { isSubscribed ->
                             onSubscribeClick(community.id, isSubscribed)
                         },
-                        onCardClick = { onCommunityClick(community.id) }
+                        onCardClick = { onCommunityClick(community.id) },
                     )
                 }
             }

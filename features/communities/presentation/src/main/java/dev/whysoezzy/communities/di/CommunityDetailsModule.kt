@@ -12,15 +12,13 @@ val communityModule = module {
             getCommunityMeetingsUseCase = get(),
             getCommunitySubscribersUseCase = get(),
             subscribeToCommunityUseCase = get(),
-            unsubscribeFromCommunityUseCase = get()
+            unsubscribeFromCommunityUseCase = get(),
         )
-
-
     }
     viewModel {
         CommunitySubscribersViewModel(
             getCommunityByIdUseCase = get(),
-            getCommunitySubscribersUseCase = get()
+            getCommunitySubscribersUseCase = get(),
         )
     }
 }

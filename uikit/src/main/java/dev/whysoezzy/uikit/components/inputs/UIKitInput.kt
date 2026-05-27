@@ -36,7 +36,7 @@ enum class UIKitInputState {
     EMPTY,
     FOCUSED,
     FILLED,
-    ERROR
+    ERROR,
 }
 
 @Composable
@@ -51,70 +51,77 @@ fun UIKitInput(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     maxLines: Int = 1,
     minLines: Int = 1,
-    errorMessage: String = ""
+    errorMessage: String = "",
 ) {
     val colorScheme = UIKitTheme.colors
     var isFocused by remember { mutableStateOf(false) }
 
     val displayHint = if (hint.isNotEmpty()) hint else placeholder
 
-    val inputState = when {
-        isError -> UIKitInputState.ERROR
-        isFocused -> UIKitInputState.FOCUSED
-        value.isNotEmpty() -> UIKitInputState.FILLED
-        else -> UIKitInputState.EMPTY
-    }
+    val inputState =
+        when {
+            isError -> UIKitInputState.ERROR
+            isFocused -> UIKitInputState.FOCUSED
+            value.isNotEmpty() -> UIKitInputState.FILLED
+            else -> UIKitInputState.EMPTY
+        }
 
     Column(modifier = modifier) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (minLines > 1) (48 * minLines).dp else 48.dp)
-                .clip(RoundedCornerShape(BorderRadiusTokens.L))
-                .background(
-                    when (inputState) {
-                        UIKitInputState.ERROR -> Color(0xFFFDE7ED)
-                        else -> colorScheme.neutralSecondaryBackground
-                    },
-                    shape = RoundedCornerShape(BorderRadiusTokens.L)
-                )
-                .then(
-                    when (inputState) {
-                        UIKitInputState.FOCUSED -> Modifier.border(
-                            width = 1.dp,
-                            color = colorScheme.brandDefault,
-                            shape = RoundedCornerShape(BorderRadiusTokens.L)
-                        )
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(if (minLines > 1) (48 * minLines).dp else 48.dp)
+                    .clip(RoundedCornerShape(BorderRadiusTokens.L))
+                    .background(
+                        when (inputState) {
+                            UIKitInputState.ERROR -> Color(0xFFFDE7ED)
+                            else -> colorScheme.neutralSecondaryBackground
+                        },
+                        shape = RoundedCornerShape(BorderRadiusTokens.L),
+                    ).then(
+                        when (inputState) {
+                            UIKitInputState.FOCUSED ->
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = colorScheme.brandDefault,
+                                    shape = RoundedCornerShape(BorderRadiusTokens.L),
+                                )
 
-                        UIKitInputState.ERROR -> Modifier.border(
-                            width = 1.dp,
-                            color = colorScheme.accentDanger,
-                            shape = RoundedCornerShape(BorderRadiusTokens.L)
-                        )
+                            UIKitInputState.ERROR ->
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = colorScheme.accentDanger,
+                                    shape = RoundedCornerShape(BorderRadiusTokens.L),
+                                )
 
-                        else -> Modifier
-                    }
-                )
+                            else -> Modifier
+                        },
+                    ),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S),
-                verticalArrangement = Arrangement.Center
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S),
+                verticalArrangement = Arrangement.Center,
             ) {
                 BasicTextField(
                     value = value,
                     onValueChange = onValueChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { isFocused = it.isFocused },
-                    textStyle = TextStyle(
-                        fontSize = 16.sp,
-                        color = when {
-                            isError -> colorScheme.accentDanger
-                            else -> colorScheme.neutralBody
-                        }
-                    ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { isFocused = it.isFocused },
+                    textStyle =
+                        TextStyle(
+                            fontSize = 16.sp,
+                            color =
+                                when {
+                                    isError -> colorScheme.accentDanger
+                                    else -> colorScheme.neutralBody
+                                },
+                        ),
                     cursorBrush = SolidColor(colorScheme.brandDefault),
                     keyboardOptions = keyboardOptions,
                     visualTransformation = visualTransformation,
@@ -125,12 +132,12 @@ fun UIKitInput(
                                 Text(
                                     text = displayHint,
                                     color = colorScheme.neutralWeak,
-                                    fontSize = 16.sp
+                                    fontSize = 16.sp,
                                 )
                             }
                             innerTextField()
                         }
-                    }
+                    },
                 )
             }
         }
@@ -140,7 +147,7 @@ fun UIKitInput(
                 text = errorMessage,
                 color = colorScheme.accentDanger,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(start = SpacingTokens.M, top = SpacingTokens.XS)
+                modifier = Modifier.padding(start = SpacingTokens.M, top = SpacingTokens.XS),
             )
         }
     }
@@ -151,17 +158,18 @@ fun UIKitInput(
 fun UIKitInputEmptyPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             var text by remember { mutableStateOf("") }
             UIKitInput(
                 value = text,
                 onValueChange = { text = it },
                 hint = "Enter text",
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -172,17 +180,18 @@ fun UIKitInputEmptyPreview() {
 fun UIKitInputFilledPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             var text by remember { mutableStateOf("Some text") }
             UIKitInput(
                 value = text,
                 onValueChange = { text = it },
                 hint = "Enter text",
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -193,10 +202,11 @@ fun UIKitInputFilledPreview() {
 fun UIKitInputErrorPreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             var text by remember { mutableStateOf("Invalid") }
             UIKitInput(
@@ -205,7 +215,7 @@ fun UIKitInputErrorPreview() {
                 hint = "Enter text",
                 isError = true,
                 errorMessage = "Error message",
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -216,10 +226,11 @@ fun UIKitInputErrorPreview() {
 fun UIKitInputMultilinePreview() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             var text by remember { mutableStateOf("") }
             UIKitInput(
@@ -227,7 +238,7 @@ fun UIKitInputMultilinePreview() {
                 onValueChange = { text = it },
                 hint = "Enter multiline text",
                 minLines = 3,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

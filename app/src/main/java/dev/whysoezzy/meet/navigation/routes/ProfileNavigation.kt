@@ -1,9 +1,7 @@
 package dev.whysoezzy.meet.navigation.routes
 
-import android.util.Log
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
@@ -17,9 +15,7 @@ import dev.whysoezzy.profile.details.presentation.ProfileDetailsScreen
 import dev.whysoezzy.profile.edit.presentation.ProfileEditScreen
 import org.koin.compose.koinInject
 
-
 fun NavGraphBuilder.profileNavigation(navController: NavController) {
-
     // Собственный профиль — требует авторизации
     composable(MeetRoute.Profile.route) {
         val isLoggedInUseCase: IsLoggedInUseCase = koinInject()
@@ -53,7 +49,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
                     },
                     onCommunityClick = { communityId ->
                         navController.navigate(MeetRoute.CommunityDetails.createRoute(communityId))
-                    }
+                    },
                 )
             }
         }
@@ -62,7 +58,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
     // Профиль другого пользователя
     composable(
         route = MeetRoute.UserProfile.route,
-        arguments = listOf(navArgument("userId") { type = NavType.LongType })
+        arguments = listOf(navArgument("userId") { type = NavType.LongType }),
     ) { backStackEntry ->
         val userId = backStackEntry.arguments?.getLong("userId") ?: 0L
         ProfileDetailsScreen(
@@ -73,7 +69,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
             },
             onCommunityClick = { communityId ->
                 navController.navigate(MeetRoute.CommunityDetails.createRoute(communityId))
-            }
+            },
         )
     }
 
@@ -81,7 +77,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
     composable(MeetRoute.ProfileEdit.route) {
         ProfileEditScreen(
             onBackPressed = { navController.popBackStack() },
-            onSaveSuccess = { navController.popBackStack() }
+            onSaveSuccess = { navController.popBackStack() },
         )
     }
 
@@ -94,7 +90,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
                     popUpTo(MeetRoute.NameInputFromProfile.route) { inclusive = true }
                 }
             },
-            onBackPressed = { navController.popBackStack() }
+            onBackPressed = { navController.popBackStack() },
         )
     }
 }

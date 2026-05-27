@@ -18,9 +18,9 @@ internal fun CommunityDto.toDomain(): Community = Community(
     tags = tags.map { tagDto ->
         Tag(
             id = tagDto.id,
-            name = tagDto.name
+            name = tagDto.name,
         )
-    }
+    },
 )
 
 /**
@@ -33,7 +33,7 @@ internal fun CommunityInfoDto.toCommunityInfo(): CommunityInfo = CommunityInfo(
     description = description ?: "",
     imageUrl = imageUrl,
     subscribersCount = subscribersCount ?: 0,
-    isSubscribed = isSubscribed
+    isSubscribed = isSubscribed,
 )
 
 /**
@@ -46,5 +46,5 @@ internal fun UserInfoDto.toPerson(): Person = Person(
     surname = surname,
     avatarUrl = avatarUrl,
     bio = bio,
-    role = role
+    role = role,
 )

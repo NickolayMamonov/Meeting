@@ -40,18 +40,18 @@ fun UIKitParticipantsBlock(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         // Заголовок с количеством участников
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             TextHeading2(text = title)
             TextMetadata2(
                 text = "$participantCount ${getParticipantCountText(participantCount)}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -60,7 +60,7 @@ fun UIKitParticipantsBlock(
             avatarUrls = participantAvatars,
             avatarSize = avatarSize.dp,
             maxVisibleAvatars = maxVisibleAvatars,
-            modifier = Modifier.clickable { onParticipantsClick() }
+            modifier = Modifier.clickable { onParticipantsClick() },
         )
     }
 }
@@ -68,28 +68,28 @@ fun UIKitParticipantsBlock(
 /**
  * Возвращает правильную форму слова "участник" в зависимости от количества
  */
-private fun getParticipantCountText(count: Int): String {
-    return when {
+private fun getParticipantCountText(count: Int): String =
+    when {
         count % 10 == 1 && count % 100 != 11 -> "участник"
         count % 10 in 2..4 && count % 100 !in 12..14 -> "участника"
         else -> "участников"
     }
-}
 
 @Preview
 @Composable
 private fun UIKitParticipantsBlockPreview() {
     UIKitTheme {
         UIKitParticipantsBlock(
-            participantAvatars = listOf(
-                "https://picsum.photos/100/100?random=1",
-                "https://picsum.photos/100/100?random=2",
-                "https://picsum.photos/100/100?random=3",
-                "https://picsum.photos/100/100?random=4",
-                "https://picsum.photos/100/100?random=5"
-            ),
+            participantAvatars =
+                listOf(
+                    "https://picsum.photos/100/100?random=1",
+                    "https://picsum.photos/100/100?random=2",
+                    "https://picsum.photos/100/100?random=3",
+                    "https://picsum.photos/100/100?random=4",
+                    "https://picsum.photos/100/100?random=5",
+                ),
             participantCount = 15,
-            onParticipantsClick = { }
+            onParticipantsClick = { },
         )
     }
 }
@@ -101,7 +101,7 @@ private fun UIKitParticipantsBlockSingleParticipantPreview() {
         UIKitParticipantsBlock(
             participantAvatars = listOf("https://picsum.photos/300/180?random=1"),
             participantCount = 1,
-            onParticipantsClick = { }
+            onParticipantsClick = { },
         )
     }
 }
@@ -116,7 +116,7 @@ private fun UIKitParticipantsBlockManyParticipantsPreview() {
             participantCount = 42,
             avatarSize = 48,
             maxVisibleAvatars = 10,
-            onParticipantsClick = { }
+            onParticipantsClick = { },
         )
     }
 }

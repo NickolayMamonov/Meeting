@@ -6,8 +6,12 @@ import com.whysoezzy.domain.models.User
 
 interface UserRepository {
     suspend fun getCurrentUser(): Result<User>
+
     suspend fun getUserById(id: Long): Result<User>
+
     suspend fun updateUserProfile(user: User): Result<User>
+
     suspend fun getUserMeetings(userId: Long): Result<List<MeetingInfo>>
+
     suspend fun getUserCommunities(userId: Long): Result<List<CommunityInfo>>
 }

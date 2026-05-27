@@ -8,5 +8,5 @@ data class UIKitHost(
     val name: String,
     val surname: String,
     val description: String,
-    val imageUrl: String
+    val imageUrl: String,
 )

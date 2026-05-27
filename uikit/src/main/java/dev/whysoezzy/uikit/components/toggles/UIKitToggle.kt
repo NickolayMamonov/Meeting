@@ -31,44 +31,44 @@ fun UIKitToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
 ) {
     val colorScheme = UIKitTheme.colors
 
     Box(
-        modifier = modifier
-            .minimumInteractiveComponentSize()
-            .toggleable(
-                value = checked,
-                onValueChange = onCheckedChange,
-                enabled = enabled,
-                role = Role.Switch
-            )
-            .width(48.dp)
-            .height(24.dp)
-            .background(
-                color = if (checked) colorScheme.brandDefault else colorScheme.neutralLine,
-                shape = RoundedCornerShape(68.dp)
-            ),
-        contentAlignment = Alignment.CenterStart
+        modifier =
+            modifier
+                .minimumInteractiveComponentSize()
+                .toggleable(
+                    value = checked,
+                    onValueChange = onCheckedChange,
+                    enabled = enabled,
+                    role = Role.Switch,
+                ).width(48.dp)
+                .height(24.dp)
+                .background(
+                    color = if (checked) colorScheme.brandDefault else colorScheme.neutralLine,
+                    shape = RoundedCornerShape(68.dp),
+                ),
+        contentAlignment = Alignment.CenterStart,
     ) {
         val thumbOffset by animateFloatAsState(
             targetValue = if (checked) 26.dp.value else 2.dp.value,
-            label = "thumb position"
+            label = "thumb position",
         )
 
         Box(
-            modifier = Modifier
-                .padding(
-                    start = thumbOffset.dp,
-                    top = 1.71.dp,
-                    bottom = 1.72.dp
-                )
-                .size(20.dp)
-                .background(
-                    color = colorScheme.neutralWhite,
-                    shape = RoundedCornerShape(68.dp)
-                )
+            modifier =
+                Modifier
+                    .padding(
+                        start = thumbOffset.dp,
+                        top = 1.71.dp,
+                        bottom = 1.72.dp,
+                    ).size(20.dp)
+                    .background(
+                        color = colorScheme.neutralWhite,
+                        shape = RoundedCornerShape(68.dp),
+                    ),
         )
     }
 }
@@ -80,34 +80,35 @@ fun UIKitTogglePreview() {
         var checked by remember { mutableStateOf(false) }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             // Enabled Toggle - unchecked
             UIKitToggle(
                 checked = false,
-                onCheckedChange = { }
+                onCheckedChange = { },
             )
 
             // Enabled Toggle - checked
             UIKitToggle(
                 checked = true,
-                onCheckedChange = { }
+                onCheckedChange = { },
             )
 
             // Interactive Toggle
             UIKitToggle(
                 checked = checked,
-                onCheckedChange = { checked = it }
+                onCheckedChange = { checked = it },
             )
 
             // Disabled Toggle
             UIKitToggle(
                 checked = true,
                 onCheckedChange = { },
-                enabled = false
+                enabled = false,
             )
         }
     }

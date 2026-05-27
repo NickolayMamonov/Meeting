@@ -50,11 +50,12 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 fun UIKitShowcase() {
     UIKitTheme {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(SpacingTokens.M)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(SpacingTokens.M)
+                    .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
         ) {
             // Typography Section
             TextHeading1(text = "UIKit Showcase")
@@ -99,61 +100,62 @@ fun UIKitShowcase() {
 @Composable
 fun CardSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Cards")
 
         TextBody1(text = "Event Cards")
         Row(
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             UIKitEventCard(
                 imageUrl = "https://picsum.photos/212/148",
                 title = "Android Meetup",
                 date = "10 августа",
                 address = UIKitAddress("ул. Пушкина, 10", 55.7558, 37.6176),
-                tags = listOf(
-                    UIKitEventCardTag("Android", isSelected = false, isEnabled = true),
-                    UIKitEventCardTag("Kotlin", isSelected = false, isEnabled = true)
-                ),
-                cardType = UIKitEventCardType.COMPACT
+                tags =
+                    listOf(
+                        UIKitEventCardTag("Android", isSelected = false, isEnabled = true),
+                        UIKitEventCardTag("Kotlin", isSelected = false, isEnabled = true),
+                    ),
+                cardType = UIKitEventCardType.COMPACT,
             )
         }
 
         TextBody1(text = "Community Cards")
         Row(
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             var isSubscribed1 by remember { mutableStateOf(false) }
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Design",
                 isSubscribed = isSubscribed1,
-                onSubscribeClick = { isSubscribed1 = it }
+                onSubscribeClick = { isSubscribed1 = it },
             )
 
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Android Dev",
                 isSubscribed = true,
-                onSubscribeClick = { }
+                onSubscribeClick = { },
             )
         }
 
         TextBody1(text = "Person Cards")
         Row(
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             UIKitPersonCard(
                 name = "John Doe",
                 role = "Designer",
-                imageUrl = "https://picsum.photos/100/100?random=1"
+                imageUrl = "https://picsum.photos/100/100?random=1",
             )
 
             UIKitPersonCard(
                 name = "Jane Smith",
                 role = "Developer",
-                imageUrl = "https://picsum.photos/100/100?random=2"
+                imageUrl = "https://picsum.photos/100/100?random=2",
             )
         }
     }
@@ -162,22 +164,23 @@ fun CardSection() {
 @Composable
 fun LayoutSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Layouts")
 
         TextBody1(text = "Overlapping Avatars")
-        val sampleAvatars = listOf(
-            "https://picsum.photos/100/100?random=1",
-            "https://picsum.photos/100/100?random=2",
-            "https://picsum.photos/100/100?random=3",
-            "https://picsum.photos/100/100?random=4",
-            "https://picsum.photos/100/100?random=5",
-            "https://picsum.photos/100/100?random=6"
-        )
+        val sampleAvatars =
+            listOf(
+                "https://picsum.photos/100/100?random=1",
+                "https://picsum.photos/100/100?random=2",
+                "https://picsum.photos/100/100?random=3",
+                "https://picsum.photos/100/100?random=4",
+                "https://picsum.photos/100/100?random=5",
+                "https://picsum.photos/100/100?random=6",
+            )
 
         UIKitOverlappingAvatars(
-            avatarUrls = sampleAvatars
+            avatarUrls = sampleAvatars,
         )
 
         TextBody1(text = "Dividers")
@@ -192,7 +195,7 @@ fun LayoutSection() {
 @Composable
 fun SearchSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Search Components")
 
@@ -200,22 +203,22 @@ fun SearchSection() {
         UIKitSearchField(
             value = searchText1,
             onValueChange = { searchText1 = it },
-            placeholder = "Search users..."
+            placeholder = "Search users...",
         )
 
         var searchText2 by remember { mutableStateOf("Sample query") }
         UIKitSearchField(
             value = searchText2,
             onValueChange = { searchText2 = it },
-            placeholder = "Search events..."
+            placeholder = "Search events...",
         )
 
         UIKitSearchBar(
             query = "test",
             onQueryChange = {},
             placeholder = "Поиск встреч и сообществ",
-            onProfileClick = {  },
-            modifier = Modifier.fillMaxWidth()
+            onProfileClick = { },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -223,7 +226,7 @@ fun SearchSection() {
 @Composable
 fun ToggleSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Toggles")
 
@@ -232,34 +235,34 @@ fun ToggleSection() {
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             UIKitToggle(
                 checked = toggle1,
-                onCheckedChange = { toggle1 = it }
+                onCheckedChange = { toggle1 = it },
             )
             TextBody2(text = "Enable notifications")
         }
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             UIKitToggle(
                 checked = toggle2,
-                onCheckedChange = { toggle2 = it }
+                onCheckedChange = { toggle2 = it },
             )
             TextBody2(text = "Dark mode")
         }
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             UIKitToggle(
                 checked = true,
                 onCheckedChange = { },
-                enabled = false
+                enabled = false,
             )
             TextBody2(text = "Disabled toggle")
         }
@@ -270,26 +273,26 @@ fun ToggleSection() {
 @Composable
 fun TagSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Tags")
 
         TextBody1(text = "Different sizes")
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
         ) {
             UIKitTag(
                 text = "Small",
-                size = UIKitTagSize.SMALL
+                size = UIKitTagSize.SMALL,
             )
             UIKitTag(
                 text = "Medium",
-                size = UIKitTagSize.MEDIUM
+                size = UIKitTagSize.MEDIUM,
             )
             UIKitTag(
                 text = "Large",
-                size = UIKitTagSize.LARGE
+                size = UIKitTagSize.LARGE,
             )
         }
 
@@ -303,21 +306,21 @@ fun TagSection() {
             selectedTags = selectedTags,
             size = UIKitTagSize.MEDIUM,
             onTagClick = { tag ->
-                selectedTags = if (selectedTags.contains(tag)) {
-                    selectedTags - tag
-                } else {
-                    selectedTags + tag
-                }
-            }
+                selectedTags =
+                    if (selectedTags.contains(tag)) {
+                        selectedTags - tag
+                    } else {
+                        selectedTags + tag
+                    }
+            },
         )
     }
 }
 
-
 @Composable
 fun TextSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
     ) {
         TextHeading2(text = "Typography")
 
@@ -331,44 +334,44 @@ fun TextSection() {
 @Composable
 fun ButtonSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Buttons")
 
         UIKitButton(
             text = "Primary Button",
-            state = UIKitButtonState.PRIMARY
+            state = UIKitButtonState.PRIMARY,
         )
 
         UIKitButton(
             text = "Secondary Button",
-            state = UIKitButtonState.SECONDARY
+            state = UIKitButtonState.SECONDARY,
         )
 
         UIKitButton(
             text = "Loading",
-            state = UIKitButtonState.LOADING
+            state = UIKitButtonState.LOADING,
         )
 
         UIKitButton(
             text = "Disabled Button",
-            state = UIKitButtonState.DISABLED
+            state = UIKitButtonState.DISABLED,
         )
 
         TextBody1(text = "Subscribe Buttons")
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             var subscribed1 by remember { mutableStateOf(false) }
             UIKitSubscribeButton(
                 selected = subscribed1,
-                onSelectedChange = { subscribed1 = it }
+                onSelectedChange = { subscribed1 = it },
             )
 
             UIKitSubscribeButton(
                 selected = true,
-                onSelectedChange = { }
+                onSelectedChange = { },
             )
         }
     }
@@ -377,7 +380,7 @@ fun ButtonSection() {
 @Composable
 fun InputSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Input Fields")
 
@@ -385,14 +388,14 @@ fun InputSection() {
         UIKitInput(
             value = text1,
             onValueChange = { text1 = it },
-            hint = "Enter your name"
+            hint = "Enter your name",
         )
 
         var text2 by remember { mutableStateOf("Filled input") }
         UIKitInput(
             value = text2,
             onValueChange = { text2 = it },
-            hint = "Hint text"
+            hint = "Hint text",
         )
 
         var text3 by remember { mutableStateOf("Invalid input") }
@@ -401,7 +404,7 @@ fun InputSection() {
             onValueChange = { text3 = it },
             hint = "Enter text",
             isError = true,
-            errorMessage = "This field is required"
+            errorMessage = "This field is required",
         )
     }
 }
@@ -409,33 +412,33 @@ fun InputSection() {
 @Composable
 fun AvatarSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         TextHeading2(text = "Avatars")
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             UIKitAvatar(
                 imageUrl = "https://picsum.photos/200",
-                size = SpacingTokens.XL
+                size = SpacingTokens.XL,
             )
 
             UIKitAvatar(
                 imageUrl = "",
-                size = SpacingTokens.XL
+                size = SpacingTokens.XL,
             )
 
             UIKitAvatarWithInitials(
                 initials = "AB",
-                size = SpacingTokens.XL
+                size = SpacingTokens.XL,
             )
 
             UIKitAvatarWithInitials(
                 initials = "John Doe",
-                size = SpacingTokens.L
+                size = SpacingTokens.L,
             )
         }
     }

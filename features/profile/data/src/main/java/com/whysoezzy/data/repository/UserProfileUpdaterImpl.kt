@@ -6,13 +6,12 @@ import com.whysoezzy.data.dto.UpdateUserDto
 import com.whysoezzy.network.safeApiCall
 
 internal class UserProfileUpdaterImpl(
-    private val userApi: UserApi
+    private val userApi: UserApi,
 ) : UserProfilerUpdater {
     override suspend fun updateName(name: String, surname: String): Result<Unit> =
         safeApiCall {
             userApi.updateUserProfile(
-                UpdateUserDto(name = name, surname = surname)
+                UpdateUserDto(name = name, surname = surname),
             )
-
         }
 }

@@ -53,37 +53,39 @@ fun UIKitCommunityBlock(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         // Заголовок
         TextHeading2(text = title)
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onCommunityClick() },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onCommunityClick() },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)
+            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 TextSubheading1(text = communityName, color = Color.Black)
                 TextBody2(
                     text = communityDescription,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             AsyncImage(
                 model = communityImageUrl,
                 contentDescription = "Лого сообщества",
-                modifier = Modifier
-                    .size(imageSize.dp)
-                    .clip(RoundedCornerShape(cornerRadius.dp)),
+                modifier =
+                    Modifier
+                        .size(imageSize.dp)
+                        .clip(RoundedCornerShape(cornerRadius.dp)),
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(ColorTokens.NeutralLine),
-                error = ColorPainter(ColorTokens.NeutralLine)
+                error = ColorPainter(ColorTokens.NeutralLine),
             )
         }
     }
@@ -95,9 +97,10 @@ private fun UIKitCommunityBlockPreview() {
     UIKitTheme {
         UIKitCommunityBlock(
             communityName = "Android Developers Moscow",
-            communityDescription = "Сообщество разработчиков Android в Москве. Мы организуем регулярные встречи, мастер-классы и конференции.",
+            communityDescription = "Сообщество разработчиков Android в Москве. " +
+                "Мы организуем регулярные встречи, мастер-классы и конференции.",
             communityImageUrl = "https://picsum.photos/300/300?random=community",
-            onCommunityClick = { }
+            onCommunityClick = { },
         )
     }
 }
@@ -114,7 +117,7 @@ private fun UIKitCommunityBlockCustomPreview() {
             imageSize = 64,
             cornerRadius = 16,
             backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-            onCommunityClick = { }
+            onCommunityClick = { },
         )
     }
 }
@@ -125,9 +128,11 @@ private fun UIKitCommunityBlockLongDescriptionPreview() {
     UIKitTheme {
         UIKitCommunityBlock(
             communityName = "Flutter Community",
-            communityDescription = "Очень длинное описание сообщества, которое должно обрезаться после двух строк. Здесь мы рассказываем о том, что делаем и какие у нас цели. Еще больше текста для проверки обрезки.",
+            communityDescription = "Очень длинное описание сообщества, которое должно " +
+                "обрезаться после двух строк. Здесь мы рассказываем о том, что " +
+                "делаем и какие у нас цели. Еще больше текста для проверки обрезки.",
             communityImageUrl = "https://picsum.photos/300/300?random=flutter",
-            onCommunityClick = { }
+            onCommunityClick = { },
         )
     }
 }

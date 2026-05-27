@@ -1,6 +1,5 @@
 package dev.whysoezzy.uikit.components.toggles
 
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,41 +37,43 @@ fun UIKitToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .toggleable(
-                value = checked,
-                onValueChange = onCheckedChange,
-                enabled = enabled,
-                role = Role.Switch
-            )
-            .padding(vertical = SpacingTokens.S),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = checked,
+                    onValueChange = onCheckedChange,
+                    enabled = enabled,
+                    role = Role.Switch,
+                ).padding(vertical = SpacingTokens.S),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color = if (enabled) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-            },
+            color =
+                if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                },
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = SpacingTokens.M)
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(end = SpacingTokens.M),
         )
 
         UIKitToggle(
             checked = checked,
             onCheckedChange = {},
             enabled = enabled,
-            modifier = Modifier.clearAndSetSemantics { }
+            modifier = Modifier.clearAndSetSemantics { },
         )
     }
 }
@@ -84,7 +85,7 @@ private fun UIKitToggleRowUncheckedPreview() {
         UIKitToggleRow(
             label = "Показывать мои сообщества",
             checked = false,
-            onCheckedChange = { }
+            onCheckedChange = { },
         )
     }
 }
@@ -96,7 +97,7 @@ private fun UIKitToggleRowCheckedPreview() {
         UIKitToggleRow(
             label = "Включить уведомления",
             checked = true,
-            onCheckedChange = { }
+            onCheckedChange = { },
         )
     }
 }
@@ -109,7 +110,7 @@ private fun UIKitToggleRowInteractivePreview() {
         UIKitToggleRow(
             label = "Показывать мои встречи",
             checked = checked,
-            onCheckedChange = { checked = it }
+            onCheckedChange = { checked = it },
         )
     }
 }
@@ -122,7 +123,7 @@ private fun UIKitToggleRowDisabledPreview() {
             label = "Отключенная опция",
             checked = true,
             onCheckedChange = { },
-            enabled = false
+            enabled = false,
         )
     }
 }
@@ -134,9 +135,7 @@ private fun UIKitToggleRowLongLabelPreview() {
         UIKitToggleRow(
             label = "Очень длинная метка которая может не поместиться в одну строку и перейти на вторую",
             checked = true,
-            onCheckedChange = { }
+            onCheckedChange = { },
         )
     }
 }
-
-

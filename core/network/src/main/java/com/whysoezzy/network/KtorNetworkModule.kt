@@ -13,19 +13,21 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import timber.log.Timber
+import kotlin.coroutines.cancellation.CancellationException
 
 interface TokenProvider {
     fun getAccessToken(): String?
+
     fun getRefreshToken(): String?
 }
 
 object KtorNetworkModule {
-
     fun provideHttpClient(
         tokenProvider: TokenProvider? = null,
-        onRefreshToken: (suspend () -> Pair<String, String>?)? = null
-    ): HttpClient {
-        return HttpClient(Android) {
+        onRefreshToken: (suspend () -> Pair<String, String>?)? = null,
+    ): HttpClient =
+        HttpClient(Android) {
             defaultRequest {
                 url(BuildConfig.BASE_URL)
             }
@@ -44,7 +46,7 @@ object KtorNetworkModule {
                         ignoreUnknownKeys = true
                         coerceInputValues = true
                         encodeDefaults = false
-                    }
+                    },
                 )
             }
             install(HttpRequestRetry) {
@@ -69,7 +71,7 @@ object KtorNetworkModule {
                             if (accessToken != null && refreshToken != null) {
                                 BearerTokens(
                                     accessToken = accessToken,
-                                    refreshToken = refreshToken
+                                    refreshToken = refreshToken,
                                 )
                             } else {
                                 null
@@ -77,11 +79,12 @@ object KtorNetworkModule {
                         }
 
                         sendWithoutRequest { request ->
-                            val baseHost = BuildConfig.BASE_URL
-                                .removePrefix("https://")
-                                .removePrefix("http://")
-                                .substringBefore("/")
-                                .substringBefore(":")
+                            val baseHost =
+                                BuildConfig.BASE_URL
+                                    .removePrefix("https://")
+                                    .removePrefix("http://")
+                                    .substringBefore("/")
+                                    .substringBefore(":")
                             request.url.host == baseHost
                         }
 
@@ -91,10 +94,13 @@ object KtorNetworkModule {
                                 tokens?.let {
                                     BearerTokens(
                                         accessToken = it.first,
-                                        refreshToken = it.second
+                                        refreshToken = it.second,
                                     )
                                 }
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
+                                Timber.e(e, "Bearer refresh callback failed")
                                 null
                             }
                         }
@@ -102,5 +108,4 @@ object KtorNetworkModule {
                 }
             }
         }
-    }
 }

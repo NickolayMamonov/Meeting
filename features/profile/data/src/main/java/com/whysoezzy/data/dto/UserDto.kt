@@ -17,13 +17,13 @@ internal data class UserProfileDto(
     @SerialName("socialMedias") val socialMedias: List<SocialMediaDto> = emptyList(),
     @SerialName("showCommunities") val showCommunities: Boolean = true,
     @SerialName("showMeetings") val showMeetings: Boolean = true,
-    @SerialName("notificationsEnabled") val notificationsEnabled: Boolean = true
+    @SerialName("notificationsEnabled") val notificationsEnabled: Boolean = true,
 )
 
 @Serializable
 internal data class SocialMediaDto(
     @SerialName("type") val type: String,
-    @SerialName("url") val url: String
+    @SerialName("url") val url: String,
 )
 
 @Serializable
@@ -38,5 +38,5 @@ internal data class UpdateUserDto(
     @SerialName("socialMedias") val socialMedias: List<SocialMediaDto>? = null,
     @SerialName("showCommunities") val showCommunities: Boolean? = null,
     @SerialName("showMeetings") val showMeetings: Boolean? = null,
-    @SerialName("notificationsEnabled") val notificationsEnabled: Boolean? = null
+    @SerialName("notificationsEnabled") val notificationsEnabled: Boolean? = null,
 )

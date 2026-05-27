@@ -7,5 +7,5 @@ data class Community(
     val imageUrl: String,
     val subscribersCount: Int,
     val isSubscribed: Boolean,
-    val tags: List<Tag>
+    val tags: List<Tag>,
 )

@@ -46,33 +46,33 @@ fun EditTopBar(
     isSaveEnabled: Boolean = true,
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    applyStatusBarPadding: Boolean = true
+    applyStatusBarPadding: Boolean = true,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(containerColor)
-            .then(
-                if (applyStatusBarPadding) {
-                    Modifier.statusBarsPadding()
-                } else {
-                    Modifier
-                }
-            )
-            .padding(horizontal = 4.dp, vertical = 0.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(containerColor)
+                .then(
+                    if (applyStatusBarPadding) {
+                        Modifier.statusBarsPadding()
+                    } else {
+                        Modifier
+                    },
+                ).padding(horizontal = 4.dp, vertical = 0.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Кнопка "Отмена" (крестик) слева
         IconButton(
             onClick = onCancelClick,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(48.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = "Отмена",
                 tint = contentColor,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
         }
 
@@ -84,28 +84,30 @@ fun EditTopBar(
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 color = contentColor,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
         } else {
             // Пустое пространство если заголовка нет
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+            androidx.compose.foundation.layout
+                .Spacer(modifier = Modifier.weight(1f))
         }
 
         // Кнопка "Сохранить" (галочка) справа
         IconButton(
             onClick = onSaveClick,
             enabled = isSaveEnabled,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(48.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = "Сохранить",
-                tint = if (isSaveEnabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    contentColor.copy(alpha = 0.38f)
-                },
-                modifier = Modifier.size(24.dp)
+                tint =
+                    if (isSaveEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        contentColor.copy(alpha = 0.38f)
+                    },
+                modifier = Modifier.size(24.dp),
             )
         }
     }
@@ -119,7 +121,7 @@ private fun EditTopBarDefaultPreview() {
             title = "Редактирование профиля",
             onCancelClick = { },
             onSaveClick = { },
-            isSaveEnabled = true
+            isSaveEnabled = true,
         )
     }
 }
@@ -129,9 +131,10 @@ private fun EditTopBarDefaultPreview() {
 private fun EditTopBarTransparentPreview() {
     UIKitTheme {
         androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.DarkGray)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color.DarkGray),
         ) {
             EditTopBar(
                 title = "",
@@ -140,7 +143,7 @@ private fun EditTopBarTransparentPreview() {
                 isSaveEnabled = true,
                 containerColor = Color.Transparent,
                 contentColor = Color.White,
-                applyStatusBarPadding = false
+                applyStatusBarPadding = false,
             )
         }
     }
@@ -154,7 +157,7 @@ private fun EditTopBarDisabledPreview() {
             title = "Редактирование профиля",
             onCancelClick = { },
             onSaveClick = { },
-            isSaveEnabled = false
+            isSaveEnabled = false,
         )
     }
 }

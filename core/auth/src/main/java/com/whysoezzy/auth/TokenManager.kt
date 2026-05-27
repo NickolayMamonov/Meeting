@@ -9,24 +9,32 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-internal class TokenManager(context: Context) : TokenProvider {
+internal class TokenManager(
+    context: Context,
+) : TokenProvider {
+    private val masterKey =
+        MasterKey
+            .Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
 
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
-        "secure_auth_prefs",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val prefs: SharedPreferences =
+        EncryptedSharedPreferences.create(
+            context,
+            "secure_auth_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
 
     private val _isLoggedInFlow = MutableStateFlow(prefs.getString(KEY_ACCESS_TOKEN, null) != null)
     val isLoggedInFlow: StateFlow<Boolean> = _isLoggedInFlow.asStateFlow()
 
-    fun saveTokens(accessToken: String, refreshToken: String, userId: Long? = null) {
+    fun saveTokens(
+        accessToken: String,
+        refreshToken: String,
+        userId: Long? = null,
+    ) {
         prefs.edit().apply {
             putString(KEY_ACCESS_TOKEN, accessToken)
             putString(KEY_REFRESH_TOKEN, refreshToken)
@@ -37,6 +45,7 @@ internal class TokenManager(context: Context) : TokenProvider {
     }
 
     override fun getAccessToken(): String? = prefs.getString(KEY_ACCESS_TOKEN, null)
+
     override fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
 
     fun getUserId(): Long? {

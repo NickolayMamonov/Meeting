@@ -20,7 +20,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -38,7 +38,7 @@ android {
 
 composeCompiler {
     stabilityConfigurationFile.set(
-        rootProject.layout.projectDirectory.file("compose-stability.conf")
+        rootProject.layout.projectDirectory.file("compose-stability.conf"),
     )
 }
 
@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
+
+    implementation(libs.timber)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))

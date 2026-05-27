@@ -5,5 +5,5 @@ enum class UIKitMeetingStatus {
     COMPLETED,
     CANCELLED,
     FULL,
-    DRAFT
+    DRAFT,
 }

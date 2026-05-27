@@ -6,12 +6,12 @@ enum class UIKitSocialMedia {
     TELEGRAM,
     HABR,
     GITHUB,
-    LINKEDIN
+    LINKEDIN,
 }
 
 @Immutable
 data class UIKitSocialMediaInfo(
     val type: UIKitSocialMedia,
     val url: String,
-    val username: String
+    val username: String,
 )

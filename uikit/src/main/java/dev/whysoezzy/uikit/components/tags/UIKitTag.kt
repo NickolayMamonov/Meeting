@@ -33,7 +33,7 @@ import dev.whysoezzy.uikit.tokens.TypographyTokens
 enum class UIKitTagSize {
     SMALL,
     MEDIUM,
-    LARGE
+    LARGE,
 }
 
 @Composable
@@ -43,39 +43,43 @@ fun UIKitTag(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     enabled: Boolean = true,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
 
-    val backgroundColor = when {
-        selected -> colorScheme.brandDefault
-        else -> colorScheme.neutralLine
-    }
+    val backgroundColor =
+        when {
+            selected -> colorScheme.brandDefault
+            else -> colorScheme.neutralLine
+        }
 
-    val textColor = when {
-        selected -> colorScheme.neutralWhite
-        else -> colorScheme.brandDefault
-    }
+    val textColor =
+        when {
+            selected -> colorScheme.neutralWhite
+            else -> colorScheme.brandDefault
+        }
 
-    val tagModifier = when (size) {
-        UIKitTagSize.SMALL -> Modifier.height(22.dp)
-        UIKitTagSize.MEDIUM -> Modifier.height(35.dp)
-        UIKitTagSize.LARGE -> Modifier.height(46.dp)
-    }
+    val tagModifier =
+        when (size) {
+            UIKitTagSize.SMALL -> Modifier.height(22.dp)
+            UIKitTagSize.MEDIUM -> Modifier.height(35.dp)
+            UIKitTagSize.LARGE -> Modifier.height(46.dp)
+        }
 
     Box(
-        modifier = modifier
-            .then(tagModifier)
-            .clip(RoundedCornerShape(BorderRadiusTokens.S))
-            .background(backgroundColor)
-            .then(
-                if (onClick != null && enabled) {
-                    Modifier.clickable(onClick = onClick)
-                } else {
-                    Modifier
-                }
-            ),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .then(tagModifier)
+                .clip(RoundedCornerShape(BorderRadiusTokens.S))
+                .background(backgroundColor)
+                .then(
+                    if (onClick != null && enabled) {
+                        Modifier.clickable(onClick = onClick)
+                    } else {
+                        Modifier
+                    },
+                ),
+        contentAlignment = Alignment.Center,
     ) {
         when (size) {
             UIKitTagSize.LARGE -> {
@@ -83,10 +87,11 @@ fun UIKitTag(
                     text = text,
                     style = TypographyTokens.Heading2.copy(fontWeight = FontWeight.Medium),
                     color = textColor,
-                    modifier = Modifier.padding(
-                        horizontal = SpacingTokens.M,
-                        vertical = 10.dp
-                    )
+                    modifier =
+                        Modifier.padding(
+                            horizontal = SpacingTokens.M,
+                            vertical = 10.dp,
+                        ),
                 )
             }
 
@@ -95,7 +100,7 @@ fun UIKitTag(
                     text = text,
                     style = TypographyTokens.Subheading2.copy(fontWeight = FontWeight.Medium),
                     color = textColor,
-                    modifier = Modifier.padding(SpacingTokens.S)
+                    modifier = Modifier.padding(SpacingTokens.S),
                 )
             }
 
@@ -106,10 +111,11 @@ fun UIKitTag(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = textColor,
-                    modifier = Modifier.padding(
-                        horizontal = 4.dp,
-                        vertical = 3.dp
-                    )
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 4.dp,
+                            vertical = 3.dp,
+                        ),
                 )
             }
         }
@@ -123,19 +129,19 @@ fun UIKitTagGroup(
     tags: List<String>,
     selectedTags: Set<String> = emptySet(),
     size: UIKitTagSize = UIKitTagSize.MEDIUM,
-    onTagClick: ((String) -> Unit)? = null
+    onTagClick: ((String) -> Unit)? = null,
 ) {
     FlowRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
     ) {
         tags.forEach { tag ->
             UIKitTag(
                 text = tag,
                 size = size,
                 selected = selectedTags.contains(tag),
-                onClick = onTagClick?.let { { it(tag) } }
+                onClick = onTagClick?.let { { it(tag) } },
             )
         }
     }
@@ -151,62 +157,63 @@ fun UIKitTagPreview() {
         var selectedTagsInGroup by remember { mutableStateOf(setOf<String>()) }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
         ) {
             TextHeading2(text = "Individual Tags")
 
             // Small tags
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
             ) {
                 UIKitTag(
                     text = "Small",
-                    size = UIKitTagSize.SMALL
+                    size = UIKitTagSize.SMALL,
                 )
                 UIKitTag(
                     text = "Selected",
                     size = UIKitTagSize.SMALL,
-                    selected = true
+                    selected = true,
                 )
             }
 
             // Medium tags
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
             ) {
                 UIKitTag(
                     text = "Medium",
                     size = UIKitTagSize.MEDIUM,
                     selected = selectedMedium,
-                    onClick = { selectedMedium = !selectedMedium }
+                    onClick = { selectedMedium = !selectedMedium },
                 )
                 UIKitTag(
                     text = "Selected",
                     size = UIKitTagSize.MEDIUM,
-                    selected = true
+                    selected = true,
                 )
             }
 
             // Large tags
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.S),
-                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
             ) {
                 UIKitTag(
                     text = "Large",
                     size = UIKitTagSize.LARGE,
                     selected = selectedLarge,
-                    onClick = { selectedLarge = !selectedLarge }
+                    onClick = { selectedLarge = !selectedLarge },
                 )
                 UIKitTag(
                     text = "Selected",
                     size = UIKitTagSize.LARGE,
-                    selected = true
+                    selected = true,
                 )
             }
 
@@ -217,12 +224,13 @@ fun UIKitTagPreview() {
                 selectedTags = selectedTagsInGroup,
                 size = UIKitTagSize.MEDIUM,
                 onTagClick = { tag ->
-                    selectedTagsInGroup = if (selectedTagsInGroup.contains(tag)) {
-                        selectedTagsInGroup - tag
-                    } else {
-                        selectedTagsInGroup + tag
-                    }
-                }
+                    selectedTagsInGroup =
+                        if (selectedTagsInGroup.contains(tag)) {
+                            selectedTagsInGroup - tag
+                        } else {
+                            selectedTagsInGroup + tag
+                        }
+                },
             )
         }
     }

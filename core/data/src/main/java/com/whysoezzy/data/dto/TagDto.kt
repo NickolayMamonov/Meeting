@@ -7,5 +7,5 @@ import kotlinx.serialization.Serializable
 data class TagDto(
     @SerialName("id") val id: Long,
     @SerialName("text") val name: String,
-    @SerialName("state") val state: String? = null
+    @SerialName("state") val state: String? = null,
 )

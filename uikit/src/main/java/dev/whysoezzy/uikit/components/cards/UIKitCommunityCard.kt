@@ -36,33 +36,35 @@ fun UIKitCommunityCard(
     isSubscribed: Boolean,
     onSubscribeClick: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    onCardClick: (() -> Unit)? = null
+    onCardClick: (() -> Unit)? = null,
 ) {
     val colorScheme = UIKitTheme.colors
-    
+
     Column(
-        modifier = modifier
-            .width(104.dp)
-            .clip(RoundedCornerShape(BorderRadiusTokens.L))
-            .then(
-                onCardClick?.let {
-                    Modifier.clickable { it() }
-                } ?: Modifier
-            ),
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.XS)
+        modifier =
+            modifier
+                .width(104.dp)
+                .clip(RoundedCornerShape(BorderRadiusTokens.L))
+                .then(
+                    onCardClick?.let {
+                        Modifier.clickable { it() }
+                    } ?: Modifier,
+                ),
+        verticalArrangement = Arrangement.spacedBy(SpacingTokens.XS),
     ) {
         // Community Image
         AsyncImage(
             model = imageUrl,
             contentDescription = title,
-            modifier = Modifier
-                .size(104.dp)
-                .clip(RoundedCornerShape(BorderRadiusTokens.L)),
+            modifier =
+                Modifier
+                    .size(104.dp)
+                    .clip(RoundedCornerShape(BorderRadiusTokens.L)),
             contentScale = ContentScale.Crop,
             placeholder = ColorPainter(ColorTokens.NeutralLine),
-            error = ColorPainter(ColorTokens.NeutralLine)
+            error = ColorPainter(ColorTokens.NeutralLine),
         )
-        
+
         // Community Title
         Text(
             text = title,
@@ -71,12 +73,12 @@ fun UIKitCommunityCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        
+
         // Subscribe Button
         UIKitSubscribeButton(
             selected = isSubscribed,
             onSelectedChange = onSubscribeClick,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -87,36 +89,37 @@ fun UIKitCommunityCardPreview() {
     UIKitTheme {
         var isSubscribed1 by remember { mutableStateOf(false) }
         var isSubscribed2 by remember { mutableStateOf(true) }
-        
+
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(SpacingTokens.M),
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
         ) {
             // Short title
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Design",
                 isSubscribed = false,
-                onSubscribeClick = { }
+                onSubscribeClick = { },
             )
-            
+
             // Long title
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Очень длинный текст сообщества, который должен обрезаться",
                 isSubscribed = true,
-                onSubscribeClick = { }
+                onSubscribeClick = { },
             )
-            
+
             // Interactive card
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Android Dev",
                 isSubscribed = isSubscribed1,
                 onSubscribeClick = { isSubscribed1 = it },
-                onCardClick = { /* handle card click */ }
+                onCardClick = { /* handle card click */ },
             )
         }
     }

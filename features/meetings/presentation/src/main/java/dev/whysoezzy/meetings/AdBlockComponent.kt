@@ -23,7 +23,6 @@ import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.theme.UIKitTheme
-
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 @Composable
@@ -33,60 +32,61 @@ fun AdBlockComponent(
     onCommunitySubscribe: (Long, Boolean) -> Unit = { _, _ -> },
     onCommunityClick: (Long) -> Unit = {},
     onUserClick: (Long) -> Unit = {},
-    onAdClick: () -> Unit = {}
+    onAdClick: () -> Unit = {},
 ) {
     when (adBlock) {
         is AdBlock.CommunitiesAd -> CommunitiesAdBlock(
             adBlock = adBlock,
             modifier = modifier,
             onCommunitySubscribe = onCommunitySubscribe,
-            onCommunityClick = onCommunityClick
+            onCommunityClick = onCommunityClick,
         )
 
         is AdBlock.TextAd -> TextAdBlock(
             adBlock = adBlock,
             modifier = modifier,
-            onClick = onAdClick
+            onClick = onAdClick,
         )
 
         is AdBlock.PeopleAd -> PeopleAdBlock(
             adBlock = adBlock,
             modifier = modifier,
-            onUserClick = onUserClick
+            onUserClick = onUserClick,
         )
     }
 }
+
 @Composable
 private fun CommunitiesAdBlock(
     adBlock: AdBlock.CommunitiesAd,
     modifier: Modifier = Modifier,
     onCommunitySubscribe: (Long, Boolean) -> Unit,
-    onCommunityClick: (Long) -> Unit
+    onCommunityClick: (Long) -> Unit,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TextHeading2(text = adBlock.title)
             if (adBlock.description.isNotEmpty()) {
                 TextBody2(
                     text = adBlock.description,
-                    color = UIKitTheme.colors.neutralWeak
+                    color = UIKitTheme.colors.neutralWeak,
                 )
             }
         }
 
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(adBlock.communities, key = {it.id}) { community ->
+            items(adBlock.communities, key = { it.id }) { community ->
                 UIKitCommunityCard(
                     imageUrl = community.imageUrl,
                     title = community.name,
@@ -105,7 +105,7 @@ private fun CommunitiesAdBlock(
 private fun TextAdBlock(
     adBlock: AdBlock.TextAd,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Card(
         modifier = modifier
@@ -113,23 +113,23 @@ private fun TextAdBlock(
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(SpacingTokens.M),
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)
+            verticalArrangement = Arrangement.spacedBy(SpacingTokens.S),
         ) {
             TextHeading2(
                 text = adBlock.title,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
 
             TextBody1(
                 text = adBlock.description,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
 
             adBlock.actionText?.let { actionText ->
@@ -137,7 +137,7 @@ private fun TextAdBlock(
                     text = actionText,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.End)
+                    modifier = Modifier.align(Alignment.End),
                 )
             }
         }
@@ -148,30 +148,30 @@ private fun TextAdBlock(
 private fun PeopleAdBlock(
     adBlock: AdBlock.PeopleAd,
     modifier: Modifier = Modifier,
-    onUserClick: (Long) -> Unit
+    onUserClick: (Long) -> Unit,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TextHeading2(text = adBlock.title)
             if (adBlock.description.isNotEmpty()) {
                 TextBody2(
                     text = adBlock.description,
-                    color = UIKitTheme.colors.neutralWeak
+                    color = UIKitTheme.colors.neutralWeak,
                 )
             }
         }
 
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(adBlock.users) { user ->
                 UIKitPersonCard(

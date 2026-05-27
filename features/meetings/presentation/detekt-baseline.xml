@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>LongMethod:MainScreen.kt$@Composable private fun MainScreenContent( heroMeetings: List&lt;UIKitMeetingInfo&gt;, popularMeetings: List&lt;UIKitMeetingInfo&gt;, allMeetings: List&lt;UIKitMeetingInfo&gt;, communities: List&lt;UIKitCommunityInfo&gt;, adBlocks: List&lt;AdBlock&gt;, onMeetingClick: (Long) -&gt; Unit, onCommunityClick: (Long) -&gt; Unit, onUserProfileClick: (Long) -&gt; Unit, onCommunitySubscribeClick: (Long, Boolean) -&gt; Unit, )</ID>
+    <ID>UnusedParameter:MeetingDetailsScreen.kt$onParticipantClick: (Long) -&gt; Unit</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -1,6 +1,5 @@
 package com.whysoezzy.data.dto
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,5 +9,5 @@ data class CommunityInfoDto(
     val description: String? = null,
     val imageUrl: String,
     val subscribersCount: Int? = null,
-    val isSubscribed: Boolean = false
+    val isSubscribed: Boolean = false,
 )

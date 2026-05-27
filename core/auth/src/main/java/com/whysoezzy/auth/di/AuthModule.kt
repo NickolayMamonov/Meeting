@@ -13,45 +13,51 @@ import com.whysoezzy.network.KtorNetworkModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import timber.log.Timber
+import kotlin.coroutines.cancellation.CancellationException
 
-val authModule = module {
+val authModule =
+    module {
 
-    single { TokenManager(androidContext()) }
+        single { TokenManager(androidContext()) }
 
-    single(qualifier = named("publicClient")) {
-        KtorNetworkModule.provideHttpClient()
-    }
+        single(qualifier = named("publicClient")) {
+            KtorNetworkModule.provideHttpClient()
+        }
 
-    single<AuthApi> { AuthApiKtor(get(named("publicClient"))) }
+        single<AuthApi> { AuthApiKtor(get(named("publicClient"))) }
 
-    single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
+        single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
 
-    single(qualifier = named("authorizedClient")) {
-        val tokenManager: TokenManager = get()
+        single(qualifier = named("authorizedClient")) {
+            val tokenManager: TokenManager = get()
 
-        KtorNetworkModule.provideHttpClient(
-            tokenProvider = tokenManager,
-            onRefreshToken = {
-                try {
-                    val authRepo = get<AuthRepository>()
-                    val newAccessToken = authRepo.refreshToken().getOrNull()
-                    if (newAccessToken != null) {
-                        val refresh = tokenManager.getRefreshToken() ?: ""
-                        Pair(newAccessToken, refresh)
-                    } else {
+            KtorNetworkModule.provideHttpClient(
+                tokenProvider = tokenManager,
+                onRefreshToken = {
+                    try {
+                        val authRepo = get<AuthRepository>()
+                        val newAccessToken = authRepo.refreshToken().getOrNull()
+                        if (newAccessToken != null) {
+                            val refresh = tokenManager.getRefreshToken() ?: ""
+                            Pair(newAccessToken, refresh)
+                        } else {
+                            tokenManager.clearTokens()
+                            null
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.e(e, "Token refresh failed, clearing tokens — user will be logged out")
                         tokenManager.clearTokens()
                         null
                     }
-                } catch (e: Exception) {
-                    tokenManager.clearTokens()
-                    null
-                }
-            }
-        )
-    }
+                },
+            )
+        }
 
-    factory { SendOtpUseCase(get()) }
-    factory { VerifyOtpUseCase(get()) }
-    factory { LogoutUseCase(get()) }
-    factory { IsLoggedInUseCase(get()) }
-}
+        factory { SendOtpUseCase(get()) }
+        factory { VerifyOtpUseCase(get()) }
+        factory { LogoutUseCase(get()) }
+        factory { IsLoggedInUseCase(get()) }
+    }

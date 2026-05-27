@@ -2,38 +2,30 @@
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# ===== kotlinx.serialization =====
--keepattributes *Annotation*, InnerClasses
--dontnote kotlinx.serialization.AnnotationsKt
--keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
--keepclasseswithmembers class kotlinx.serialization.json.** {
-    kotlinx.serialization.KSerializer serializer(...);
-}
--keep,includedescriptorclasses class com.whysoezzy.**$$serializer { *; }
--keepclassmembers class com.whysoezzy.** { *** Companion; }
--keepclasseswithmembers class com.whysoezzy.** {
-    kotlinx.serialization.KSerializer serializer(...);
-}
--keep,includedescriptorclasses class dev.whysoezzy.**$$serializer { *; }
--keepclassmembers class dev.whysoezzy.** { *** Companion; }
--keepclasseswithmembers class dev.whysoezzy.** {
-    kotlinx.serialization.KSerializer serializer(...);
-}
-
-# ===== Ktor =====
--keep class io.ktor.** { *; }
--keepclassmembers class io.ktor.** { *; }
--dontwarn io.ktor.**
--keep class kotlinx.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
-
 # ===== Koin =====
+# Koin использует рефлексию для definition resolution во всех модулях с module { }.
+# Семантически принадлежит каждому DI-модулю, но прагматично оставляем в :app
+# как единую точку DI runtime'а (избегаем дублирования в 11 consumer-rules).
 -keep class org.koin.** { *; }
 -keepclassmembers class org.koin.** { *; }
 -dontwarn org.koin.**
 
-# ===== Kotlin =====
+# ===== Kotlin runtime =====
+# Общая поддержка kotlin-stdlib (метаданные, lazy delegate, when-mappings).
 -keep class kotlin.Metadata { *; }
 -dontwarn kotlin.**
 -keepclassmembers class **$WhenMappings { <fields>; }
 -keepclassmembers class kotlin.Lazy { *; }
+
+# ===== kotlinx.coroutines =====
+# :core:common — java-library без consumer-rules; coroutines используются повсеместно,
+# поэтому правила живут в :app.
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
+
+# ===== Библиотечные правила =====
+# kotlinx.serialization / Ktor / DTO-namespace'ы — в consumer-rules модулей:
+#   :core:network         → Ktor + ErrorResponse serializer + kotlinx.serialization base
+#   :core:auth            → com.whysoezzy.auth.data.dto.**$$serializer
+#   :core:data            → com.whysoezzy.data.dto.**$$serializer (split-package owner)
+#   :features:*/data      → ничего (split-package с :core:data покрывает)
