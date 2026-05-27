@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>CognitiveComplexMethod:UIKitInput.kt$@Composable fun UIKitInput( value: String, onValueChange: (String) -&gt; Unit, modifier: Modifier = Modifier, hint: String = "", placeholder: String = hint, isError: Boolean = false, keyboardOptions: KeyboardOptions = KeyboardOptions.Default, visualTransformation: VisualTransformation = VisualTransformation.None, maxLines: Int = 1, minLines: Int = 1, errorMessage: String = "", )</ID>
+    <ID>CognitiveComplexMethod:UIKitSearchBar.kt$@Composable fun UIKitSearchBar( query: String, onQueryChange: (String) -&gt; Unit, modifier: Modifier = Modifier, backgroundColor: Color? = null, placeholder: String = "Search", onProfileClick: (() -&gt; Unit)? = null, onCancelClick: (() -&gt; Unit)? = null, )</ID>
+    <ID>LongMethod:UIKitSearchBar.kt$@Composable fun UIKitSearchBar( query: String, onQueryChange: (String) -&gt; Unit, modifier: Modifier = Modifier, backgroundColor: Color? = null, placeholder: String = "Search", onProfileClick: (() -&gt; Unit)? = null, onCancelClick: (() -&gt; Unit)? = null, )</ID>
+    <ID>UnusedParameter:UIKitAddressMapBlock.kt$title: String = "Адрес"</ID>
+    <ID>UnusedParameter:UIKitCommunityBlock.kt$backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant</ID>
+    <ID>UnusedParameter:UIKitMapView.kt$address: String</ID>
+    <ID>UnusedParameter:UIKitMapView.kt$latitude: Double</ID>
+    <ID>UnusedParameter:UIKitMapView.kt$longitude: Double</ID>
+    <ID>UnusedParameter:UIKitPhoneInput.kt$placeholder: String = "Номер телефона"</ID>
+    <ID>UnusedParameter:UIKitPhoneInput.kt$state: UIKitInputState = UIKitInputState.EMPTY</ID>
+    <ID>UnusedPrivateMember:UIKitUserMeetingsBlock.kt$private fun formatMeetingDate(timestamp: Long): String</ID>
+  </CurrentIssues>
+</SmellBaseline>

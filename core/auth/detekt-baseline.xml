@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>TooGenericExceptionThrown:AuthRepositoryImpl.kt$AuthRepositoryImpl$throw Exception("No refresh token available")</ID>
+  </CurrentIssues>
+</SmellBaseline>
