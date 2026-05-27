@@ -71,6 +71,8 @@ dependencies {
 
     implementation(project(":uikit"))
 
+    implementation(libs.timber)
+
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     implementation(platform(libs.koin.bom))
