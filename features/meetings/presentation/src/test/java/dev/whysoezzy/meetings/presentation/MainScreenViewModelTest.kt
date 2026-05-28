@@ -1,7 +1,8 @@
 package dev.whysoezzy.meetings.presentation
 
 import app.cash.turbine.test
-import com.whysoezzy.common.dispatcher.DispatcherProvider
+import com.whysoezzy.testing.MainDispatcherRule
+import com.whysoezzy.testing.TestDispatcherProvider
 import com.whysoezzy.domain.models.MainScreenData
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
@@ -13,7 +14,6 @@ import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.error.ApiException
 import io.mockk.coEvery
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -30,12 +30,8 @@ class MainScreenViewModelTest {
     private val getMainScreenDataUseCase: GetMainScreenDataUseCase = mockk()
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase = mockk()
 
-    private val testDispatchers = object : DispatcherProvider {
-        override val main: CoroutineDispatcher get() = mainDispatcherRule.testDispatcher
-        override val default: CoroutineDispatcher get() = mainDispatcherRule.testDispatcher
-        override val io: CoroutineDispatcher get() = mainDispatcherRule.testDispatcher
-        override val unconfined: CoroutineDispatcher get() = mainDispatcherRule.testDispatcher
-    }
+    private val testDispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher)
+
 
     // ==================== loadData ====================
 

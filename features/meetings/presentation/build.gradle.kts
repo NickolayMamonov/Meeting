@@ -74,8 +74,7 @@ dependencies {
     implementation(libs.coil)
 
     // Testing
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(project(":core:testing"))
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.junit)
