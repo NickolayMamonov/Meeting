@@ -1,5 +1,6 @@
 package dev.whysoezzy.profile.mappers
 
+import com.whysoezzy.common.utils.DateUtils.formatDateTime
 import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.CommunityHost
 import com.whysoezzy.domain.models.CommunityInfo
@@ -24,9 +25,6 @@ import dev.whysoezzy.uikit.models.UIKitPersonHost
 import dev.whysoezzy.uikit.models.UIKitSocialMedia
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 import dev.whysoezzy.uikit.models.UIKitTagState
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 fun List<MeetingTag?>.toUIKitMeetingTags(): List<UIKitMeetingTag> {
     return filterNotNull().map { it.toUIKitMeetingTag() }
@@ -127,21 +125,6 @@ fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map {
 
 private fun extractUsername(url: String): String {
     return url.substringAfterLast('/').substringBefore('?')
-}
-
-fun formatDateTime(timestamp: Long): String {
-    val formatter = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
-    return formatter.format(Date(timestamp))
-}
-
-fun formatDate(timestamp: Long): String {
-    val formatter = SimpleDateFormat("dd MMMM", Locale("ru"))
-    return formatter.format(Date(timestamp))
-}
-
-fun formatTime(timestamp: Long): String {
-    val formatter = SimpleDateFormat("HH:mm", Locale("ru"))
-    return formatter.format(Date(timestamp))
 }
 
 fun List<MeetingTag?>.toUIKitEventCardTags(

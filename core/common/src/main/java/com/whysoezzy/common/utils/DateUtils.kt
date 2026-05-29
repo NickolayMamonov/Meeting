@@ -1,21 +1,22 @@
 package com.whysoezzy.common.utils
 
-import java.time.Instant.ofEpochMilli
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 object DateUtils {
-    private val dateFormatter = DateTimeFormatter.ofPattern("dd MMMM", Locale.getDefault())
+    private const val DATE_TIME_PATTERN = "dd MMMM yyyy, HH:mm"
+    private val ruLocale = Locale("ru")
+    private val utc: TimeZone = TimeZone.getTimeZone("UTC")
 
-    fun formatDate(dateTime: LocalDateTime): String = dateTime.format(dateFormatter)
-
-    fun toTimestamp(dateTime: LocalDateTime): Long = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-
-    fun fromTimestamp(timestamp: Long): LocalDateTime =
-        LocalDateTime.ofInstant(
-            ofEpochMilli(timestamp),
-            ZoneId.systemDefault(),
-        )
+    /**
+     * Форматирует epoch-millis в "dd MMMM yyyy, HH:mm" в зоне UTC.
+     * UTC согласован с parseDateToTimestamp (R-036): naive-время бэкенда
+     * показываем без сдвига на TZ устройства.
+     */
+    fun formatDateTime(timestamp: Long): String =
+        SimpleDateFormat(DATE_TIME_PATTERN, ruLocale)
+            .apply { timeZone = utc }
+            .format(Date(timestamp))
 }

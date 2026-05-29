@@ -48,6 +48,7 @@ dependencies {
     implementation(project(":features:profile:domain"))
     implementation(project(":core:domain"))
     implementation(project(":core:auth"))
+    implementation(project(":core:common"))
 
     // Koin for DI
     implementation(platform(libs.koin.bom))
