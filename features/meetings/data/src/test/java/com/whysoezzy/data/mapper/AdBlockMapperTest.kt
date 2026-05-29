@@ -7,6 +7,7 @@ import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.Person
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -103,12 +104,12 @@ class AdBlockMapperTest {
     // ==================== unknown type ====================
 
     @Test(expected = IllegalArgumentException::class)
-    fun `toDomain unknown type throws IllegalArgumentException`() {
-        // R-034 — после фикса это поведение изменится на null + mapNotNull.
-        // Тест документирует ТЕКУЩИЙ контракт (throw).
+    fun `toDomain unknown type returns null`() {
         val dto = baseDto(type = "UNKNOWN")
-        dto.toDomain()
+        assertNull(dto.toDomain())
     }
+
+
 
     // ==================== CommunityInfoDto.toDomain ====================
 
@@ -177,6 +178,21 @@ class AdBlockMapperTest {
         assertTrue(result[0] is AdBlock.CommunitiesAd)
         assertTrue(result[1] is AdBlock.TextAd)
         assertTrue(result[2] is AdBlock.PeopleAd)
+    }
+
+    @Test
+    fun `list toDomain filters out unknown types`() {
+        val dtos = listOf(
+            communitiesDto(id = 1L),
+            baseDto(type = "UNKNOWN", id = 99L),
+            peopleDto(id = 3L),
+        )
+
+        val result = dtos.toDomain()
+
+        assertEquals(2, result.size)
+        assertTrue(result[0] is AdBlock.CommunitiesAd)
+        assertTrue(result[1] is AdBlock.PeopleAd)
     }
 
     // ==================== Fixtures ====================

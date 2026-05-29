@@ -7,7 +7,7 @@ import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.Person
 
-internal fun AdBlockResponseDto.toDomain(): AdBlock {
+internal fun AdBlockResponseDto.toDomain(): AdBlock? {
     return when (type) {
         "COMMUNITIES" -> AdBlock.CommunitiesAd(
             id = id,
@@ -31,7 +31,7 @@ internal fun AdBlockResponseDto.toDomain(): AdBlock {
             users = users?.map { it.toDomain() } ?: emptyList(),
             isActive = isActive,
         )
-        else -> throw IllegalArgumentException("Unknown AdBlock type: $type")
+        else -> null
     }
 }
 
@@ -57,4 +57,4 @@ internal fun UserInfoDto.toDomain(): Person {
     )
 }
 
-internal fun List<AdBlockResponseDto>.toDomain(): List<AdBlock> = map { it.toDomain() }
+internal fun List<AdBlockResponseDto>.toDomain(): List<AdBlock> = mapNotNull { it.toDomain() }

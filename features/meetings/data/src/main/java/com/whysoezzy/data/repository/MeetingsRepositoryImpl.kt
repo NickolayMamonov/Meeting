@@ -57,8 +57,6 @@ internal class MeetingsRepositoryImpl(
     }
 
     override suspend fun getAdBlocks(): Result<List<AdBlock>> = safeApiCall {
-        val raw = meetingsApi.getAdBlocks()
-        val mapped = raw.map { it.toDomain() }
-        mapped
+        meetingsApi.getAdBlocks().toDomain()
     }
 }
