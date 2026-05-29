@@ -90,7 +90,9 @@ class MeetingDetailsViewModelTest {
         vm.uiState.test {
             assertEquals(MeetingDetailsUiState.Loading, awaitItem())
             vm.onEvent(MeetingDetailsEvent.LoadMeeting(MEETING_ID))
-            // Loading снова при каждом loadMeeting
+            advanceUntilIdle()
+            assertTrue(awaitItem() is MeetingDetailsUiState.Success)
+            vm.onEvent(MeetingDetailsEvent.LoadMeeting(MEETING_ID))
             assertEquals(MeetingDetailsUiState.Loading, awaitItem())
             advanceUntilIdle()
             assertTrue(awaitItem() is MeetingDetailsUiState.Success)

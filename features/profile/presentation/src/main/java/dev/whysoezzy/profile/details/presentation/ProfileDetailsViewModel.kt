@@ -86,7 +86,7 @@ class ProfileDetailsViewModel(
                             (communitiesDeferred.await().getOrNull() ?: emptyList())
                     }
 
-                    val subscribedIds = communities.map { it.id }.toSet()
+                    val subscribedIds = communities.filter { it.isSubscribed }.map { it.id }.toSet()
 
                     _uiState.value = ProfileDetailsUiState.Success(
                         userId = user.id,
