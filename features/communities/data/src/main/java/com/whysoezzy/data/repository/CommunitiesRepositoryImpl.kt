@@ -2,7 +2,6 @@ package com.whysoezzy.data.repository
 
 import com.whysoezzy.data.api.CommunitiesApi
 import com.whysoezzy.data.mapper.toDomain
-import com.whysoezzy.data.mapper.toPerson
 import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.Person
@@ -37,6 +36,6 @@ internal class CommunitiesRepositoryImpl(
     }
 
     override suspend fun getCommunitySubscribers(id: Long): Result<List<Person>> = safeApiCall {
-        communitiesApi.getCommunitySubscribers(id).map { it.toPerson() }
+        communitiesApi.getCommunitySubscribers(id).map { it.toDomain() }
     }
 }
