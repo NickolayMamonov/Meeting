@@ -15,10 +15,10 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
-sealed class CommunitySubscribersNavEvent {
+sealed interface CommunitySubscribersNavEvent {
     data class NavigateToProfile(
         val userId: Long,
-    ) : CommunitySubscribersNavEvent()
+    ) : CommunitySubscribersNavEvent
 }
 
 class CommunitySubscribersViewModel(

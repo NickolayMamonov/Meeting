@@ -15,14 +15,14 @@ data class NameInputUiState(
         get() = name.isNotBlank() && surname.isNotBlank() && nameError == null && surnameError == null
 }
 
-sealed class NameInputEvent {
+sealed interface NameInputEvent {
     data class UpdateName(
         val name: String,
-    ) : NameInputEvent()
+    ) : NameInputEvent
 
     data class UpdateSurname(
         val surname: String,
-    ) : NameInputEvent()
+    ) : NameInputEvent
 
-    data object Continue : NameInputEvent()
+    data object Continue : NameInputEvent
 }

@@ -16,15 +16,15 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-sealed class CodeVerificationNavEvent {
+sealed interface CodeVerificationNavEvent {
     /** Пользователь существующий — сразу в Main */
-    data object NavigateToMain : CodeVerificationNavEvent()
+    data object NavigateToMain : CodeVerificationNavEvent
 
     /** Новый пользователь — нужно ввести имя */
     data class NavigateToNameInput(
         val phone: String,
         val code: String,
-    ) : CodeVerificationNavEvent()
+    ) : CodeVerificationNavEvent
 }
 
 class CodeVerificationViewModel(

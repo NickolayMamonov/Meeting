@@ -1,4 +1,4 @@
-package dev.whysoezzy.meetings
+package dev.whysoezzy.meetings.presentation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

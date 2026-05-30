@@ -7,8 +7,8 @@ import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 
 @Immutable
-sealed class MainScreenUiState {
-    data object Loading : MainScreenUiState()
+sealed interface MainScreenUiState {
+    data object Loading : MainScreenUiState
 
     data class Success(
         val heroMeetings: List<UIKitMeetingInfo>,
@@ -18,9 +18,9 @@ sealed class MainScreenUiState {
         val communities: List<UIKitCommunityInfo>,
         val adBlocks: List<AdBlock> = emptyList(),
         val searchQuery: String = "",
-    ) : MainScreenUiState()
+    ) : MainScreenUiState
 
     data class Error(
         val message: String,
-    ) : MainScreenUiState()
+    ) : MainScreenUiState
 }

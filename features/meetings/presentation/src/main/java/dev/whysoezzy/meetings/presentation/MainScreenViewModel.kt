@@ -20,14 +20,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-sealed class MainScreenNavEvent {
+sealed interface MainScreenNavEvent {
     data class NavigateToCommunity(
         val communityId: Long,
-    ) : MainScreenNavEvent()
+    ) : MainScreenNavEvent
 
     data class NavigateToMeeting(
         val meetingId: Long,
-    ) : MainScreenNavEvent()
+    ) : MainScreenNavEvent
 }
 
 class MainScreenViewModel(

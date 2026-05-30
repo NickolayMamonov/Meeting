@@ -1,10 +1,10 @@
 package com.whysoezzy.domain.models
 
-sealed class AdBlock {
-    abstract val id: Long
-    abstract val isActive: Boolean
-    abstract val title: String
-    abstract val description: String
+sealed interface AdBlock {
+    val id: Long
+    val isActive: Boolean
+    val title: String
+    val description: String
 
     data class CommunitiesAd(
         override val id: Long,
@@ -12,7 +12,7 @@ sealed class AdBlock {
         override val description: String,
         val communities: List<CommunityInfo>,
         override val isActive: Boolean = true,
-    ) : AdBlock()
+    ) : AdBlock
 
     data class TextAd(
         override val id: Long,
@@ -21,7 +21,7 @@ sealed class AdBlock {
         val actionText: String? = null,
         val actionUrl: String? = null,
         override val isActive: Boolean = true,
-    ) : AdBlock()
+    ) : AdBlock
 
     data class PeopleAd(
         override val id: Long,
@@ -29,5 +29,5 @@ sealed class AdBlock {
         override val description: String,
         val users: List<Person>,
         override val isActive: Boolean = true,
-    ) : AdBlock()
+    ) : AdBlock
 }

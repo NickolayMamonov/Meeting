@@ -23,31 +23,31 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-sealed class MeetingDetailsNavEvent {
+sealed interface MeetingDetailsNavEvent {
     data class NavigateToProfile(
         val userId: Long,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class NavigateToMeeting(
         val meetingId: Long,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class NavigateToCommunity(
         val communityId: Long,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class OpenMap(
         val latitude: Double,
         val longitude: Double,
         val address: String,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class ShareMeeting(
         val title: String,
         val shareText: String,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
-    object NavigateToAuth : MeetingDetailsNavEvent()
+    data object NavigateToAuth : MeetingDetailsNavEvent
 }
 
 class MeetingDetailsViewModel(

@@ -15,12 +15,12 @@ data class CodeVerificationUiState(
         get() = code.length == 4 && error == null
 }
 
-sealed class CodeVerificationEvent {
+sealed interface CodeVerificationEvent {
     data class UpdateCode(
         val code: String,
-    ) : CodeVerificationEvent()
+    ) : CodeVerificationEvent
 
-    data object VerifyCode : CodeVerificationEvent()
+    data object VerifyCode : CodeVerificationEvent
 
-    data object ResendCode : CodeVerificationEvent()
+    data object ResendCode : CodeVerificationEvent
 }

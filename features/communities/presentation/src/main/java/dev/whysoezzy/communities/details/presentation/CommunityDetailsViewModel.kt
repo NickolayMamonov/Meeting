@@ -22,21 +22,21 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-sealed class CommunityDetailsNavEvent {
+sealed interface CommunityDetailsNavEvent {
     data class NavigateToMeeting(
         val meetingId: Long,
-    ) : CommunityDetailsNavEvent()
+    ) : CommunityDetailsNavEvent
 
     data class NavigateToProfile(
         val userId: Long,
-    ) : CommunityDetailsNavEvent()
+    ) : CommunityDetailsNavEvent
 
-    object NavigateToSubscribers : CommunityDetailsNavEvent()
+    data object NavigateToSubscribers : CommunityDetailsNavEvent
 
     data class ShareCommunity(
         val title: String,
         val shareText: String,
-    ) : CommunityDetailsNavEvent()
+    ) : CommunityDetailsNavEvent
 }
 
 class CommunityDetailsViewModel(

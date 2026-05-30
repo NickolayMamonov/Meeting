@@ -4,25 +4,25 @@ import androidx.compose.runtime.Immutable
 import com.whysoezzy.domain.models.Person
 
 @Immutable
-sealed class CommunitySubscribersUiState {
-    object Loading : CommunitySubscribersUiState()
+sealed interface CommunitySubscribersUiState {
+    data object Loading : CommunitySubscribersUiState
 
     data class Success(
         val communityName: String,
         val subscribers: List<Person>,
-    ) : CommunitySubscribersUiState()
+    ) : CommunitySubscribersUiState
 
     data class Error(
         val message: String,
-    ) : CommunitySubscribersUiState()
+    ) : CommunitySubscribersUiState
 }
 
-sealed class CommunitySubscribersEvent {
+sealed interface CommunitySubscribersEvent {
     data class LoadSubscribers(
         val communityId: Long,
-    ) : CommunitySubscribersEvent()
+    ) : CommunitySubscribersEvent
 
     data class NavigateToProfile(
         val userId: Long,
-    ) : CommunitySubscribersEvent()
+    ) : CommunitySubscribersEvent
 }

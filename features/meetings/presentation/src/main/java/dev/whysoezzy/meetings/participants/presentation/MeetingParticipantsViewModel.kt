@@ -12,10 +12,10 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-sealed class MeetingParticipantsNavEvent {
+sealed interface MeetingParticipantsNavEvent {
     data class NavigateToProfile(
         val userId: Long,
-    ) : MeetingParticipantsNavEvent()
+    ) : MeetingParticipantsNavEvent
 }
 
 class MeetingParticipantsViewModel(

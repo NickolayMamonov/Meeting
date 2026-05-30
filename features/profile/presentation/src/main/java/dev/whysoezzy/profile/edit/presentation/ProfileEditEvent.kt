@@ -1,70 +1,69 @@
 package dev.whysoezzy.profile.edit.presentation
 
-sealed class ProfileEditEvent {
+sealed interface ProfileEditEvent {
     // Основная информация — единое поле "Имя Фамилия"
     data class UpdateNameSurname(
         val nameSurname: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     // Раздельные — для совместимости
     data class UpdateName(
         val name: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     data class UpdateSurname(
         val surname: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     data class UpdateEmail(
         val email: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     data class UpdateCity(
         val city: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     data class UpdateDescription(
         val description: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     // Аватар
-    data object ChangeAvatar : ProfileEditEvent()
+    data object ChangeAvatar : ProfileEditEvent
 
     // Интересы
-    data object AddInterest : ProfileEditEvent()
+    data object AddInterest : ProfileEditEvent
 
     data class AddInterestWithText(
         val interest: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     data class RemoveInterest(
         val interest: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     data class ToggleTag(
         val tagId: Long,
         val tagName: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     // Социальные сети
     data class UpdateSocialMedia(
         val type: String,
         val username: String,
-    ) : ProfileEditEvent()
+    ) : ProfileEditEvent
 
     // Настройки приватности
-    data object ToggleShowCommunities : ProfileEditEvent()
+    data object ToggleShowCommunities : ProfileEditEvent
 
-    data object ToggleShowMeetings : ProfileEditEvent()
+    data object ToggleShowMeetings : ProfileEditEvent
 
-    data object ToggleNotifications : ProfileEditEvent()
+    data object ToggleNotifications : ProfileEditEvent
 
     // Действия
-    data object Save : ProfileEditEvent()
+    data object Save : ProfileEditEvent
+    data object DeleteProfile : ProfileEditEvent
 
-    data object DeleteProfile : ProfileEditEvent()
+    data object ConfirmDeleteProfile : ProfileEditEvent
 
-    data object ConfirmDeleteProfile : ProfileEditEvent()
-
-    data object DismissDeleteProfile : ProfileEditEvent()
+    data object DismissDeleteProfile : ProfileEditEvent
 }

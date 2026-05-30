@@ -14,10 +14,10 @@ data class PhoneInputUiState(
         get() = phoneNumber.filter { it.isDigit() }.length == 11 && error == null
 }
 
-sealed class PhoneInputEvent {
+sealed interface PhoneInputEvent {
     data class UpdatePhoneNumber(
         val phoneNumber: String,
-    ) : PhoneInputEvent()
+    ) : PhoneInputEvent
 
-    data object SendCode : PhoneInputEvent()
+    data object SendCode : PhoneInputEvent
 }

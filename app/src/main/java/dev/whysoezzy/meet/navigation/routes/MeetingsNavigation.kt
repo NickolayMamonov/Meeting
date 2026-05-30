@@ -6,7 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import dev.whysoezzy.meet.navigation.MeetRoute
-import dev.whysoezzy.meetings.MainScreen
+import dev.whysoezzy.meetings.presentation.MainScreen
 import dev.whysoezzy.meetings.details.presentation.MeetingDetailsScreen
 import dev.whysoezzy.meetings.participants.presentation.MeetingParticipantsScreen
 

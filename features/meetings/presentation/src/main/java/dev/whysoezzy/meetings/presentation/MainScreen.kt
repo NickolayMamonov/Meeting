@@ -1,4 +1,4 @@
-package dev.whysoezzy.meetings
+package dev.whysoezzy.meetings.presentation
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,10 +37,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.meetings.mappers.toEventCardTags
-import dev.whysoezzy.meetings.presentation.MainScreenEvent
-import dev.whysoezzy.meetings.presentation.MainScreenNavEvent
-import dev.whysoezzy.meetings.presentation.MainScreenUiState
-import dev.whysoezzy.meetings.presentation.MainScreenViewModel
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
@@ -357,14 +353,14 @@ private fun ErrorContent(
     }
 }
 
-private sealed class MeetingOrAd {
+private sealed interface MeetingOrAd {
     data class Meeting(
         val meeting: UIKitMeetingInfo,
-    ) : MeetingOrAd()
+    ) : MeetingOrAd
 
     data class Ad(
         val adBlock: AdBlock,
-    ) : MeetingOrAd()
+    ) : MeetingOrAd
 }
 
 /**

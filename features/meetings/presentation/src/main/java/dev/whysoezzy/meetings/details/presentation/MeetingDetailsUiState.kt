@@ -9,8 +9,8 @@ import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 
 @Immutable
-sealed class MeetingDetailsUiState {
-    data object Loading : MeetingDetailsUiState()
+sealed interface MeetingDetailsUiState {
+    data object Loading : MeetingDetailsUiState
 
     data class Success(
         val meetingId: Long,
@@ -27,35 +27,35 @@ sealed class MeetingDetailsUiState {
         val totalPlaces: Int,
         val community: UIKitCommunityHost?,
         val otherMeetings: List<UIKitMeetingInfo>,
-    ) : MeetingDetailsUiState()
+    ) : MeetingDetailsUiState
 
     data class Error(
         val message: String,
-    ) : MeetingDetailsUiState()
+    ) : MeetingDetailsUiState
 }
 
-sealed class MeetingDetailsEvent {
+sealed interface MeetingDetailsEvent {
     data class LoadMeeting(
         val meetingId: Long,
-    ) : MeetingDetailsEvent()
+    ) : MeetingDetailsEvent
 
-    data object JoinMeeting : MeetingDetailsEvent()
+    data object JoinMeeting : MeetingDetailsEvent
 
-    data object LeaveMeeting : MeetingDetailsEvent()
+    data object LeaveMeeting : MeetingDetailsEvent
 
     data class NavigateToProfile(
         val userId: Long,
-    ) : MeetingDetailsEvent()
+    ) : MeetingDetailsEvent
 
     data class NavigateToCommunity(
         val communityId: Long,
-    ) : MeetingDetailsEvent()
+    ) : MeetingDetailsEvent
 
     data class NavigateToMeeting(
         val meetingId: Long,
-    ) : MeetingDetailsEvent()
+    ) : MeetingDetailsEvent
 
-    data object OpenMap : MeetingDetailsEvent()
+    data object OpenMap : MeetingDetailsEvent
 
-    data object ShareMeeting : MeetingDetailsEvent()
+    data object ShareMeeting : MeetingDetailsEvent
 }

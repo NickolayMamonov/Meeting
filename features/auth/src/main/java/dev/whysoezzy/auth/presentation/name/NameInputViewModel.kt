@@ -12,8 +12,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-sealed class NameInputNavEvent {
-    data object NavigateToSuccess : NameInputNavEvent()
+sealed interface NameInputNavEvent {
+    data object NavigateToSuccess : NameInputNavEvent
 }
 
 /**

@@ -20,8 +20,8 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
-sealed class ProfileEditNavEvent {
-    object NavigateBack : ProfileEditNavEvent()
+sealed interface ProfileEditNavEvent {
+    data object NavigateBack : ProfileEditNavEvent
 }
 
 class ProfileEditViewModel(
