@@ -23,6 +23,12 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
+private val MapBackgroundTop = Color(0xFFF0F4F8)
+private val MapWater = Color(0xFFAAD3DF)
+private val MapPlaceholder = Color(0xFFE1E5E9)
+private val GoogleMarkerRed = Color(0xFFEA4335)
+private val GoogleMarkerBlue = Color(0xFF4285F4)
+private val GoogleMarkerYellow = Color(0xFFFBBC04)
 @Composable
 fun UIKitMapView(
     address: String,
@@ -44,7 +50,7 @@ fun UIKitMapView(
                     .clip(RoundedCornerShape(BorderRadiusTokens.M))
                     .background(
                         // Имитация цветов карты Google Maps
-                        Color(0xFFF0F4F8),
+                        MapBackgroundTop,
                     ).clickable { onMapClick() },
         ) {
             // Имитация водного объекта (залива)
@@ -54,7 +60,7 @@ fun UIKitMapView(
                         .fillMaxSize()
                         .background(
                             // Цвет воды
-                            Color(0xFFAAD3DF),
+                            MapWater,
                         ),
             )
 
@@ -65,7 +71,7 @@ fun UIKitMapView(
                         .fillMaxSize()
                         .padding(start = 120.dp, top = 60.dp, end = 40.dp, bottom = 100.dp)
                         .background(
-                            Color(0xFFF0F4F8),
+                            MapBackgroundTop,
                             RoundedCornerShape(20.dp),
                         ),
             )
@@ -76,7 +82,7 @@ fun UIKitMapView(
                     Modifier
                         .fillMaxWidth()
                         .height(2.dp)
-                        .background(Color(0xFFE1E5E9))
+                        .background(MapPlaceholder)
                         .align(Alignment.Center),
             )
 
@@ -84,7 +90,7 @@ fun UIKitMapView(
                 modifier =
                     Modifier
                         .size(2.dp, 120.dp)
-                        .background(Color(0xFFE1E5E9))
+                        .background(MapPlaceholder)
                         .align(Alignment.Center),
             )
 
@@ -112,7 +118,7 @@ fun UIKitMapView(
                         Modifier
                             .size(32.dp)
                             .background(
-                                Color(0xFFEA4335), // Красный цвет Google
+                                GoogleMarkerRed, // Красный цвет Google
                                 CircleShape,
                             ).align(Alignment.TopCenter),
                 ) {
@@ -132,7 +138,7 @@ fun UIKitMapView(
                 modifier =
                     Modifier
                         .size(20.dp)
-                        .background(Color(0xFF4285F4), CircleShape)
+                        .background(GoogleMarkerBlue, CircleShape)
                         .align(Alignment.TopEnd)
                         .padding(end = 60.dp, top = 40.dp),
             ) {
@@ -149,7 +155,7 @@ fun UIKitMapView(
                 modifier =
                     Modifier
                         .size(16.dp)
-                        .background(Color(0xFFFBBC04), CircleShape)
+                        .background(GoogleMarkerYellow, CircleShape)
                         .align(Alignment.BottomStart)
                         .padding(start = 180.dp, bottom = 80.dp),
             ) {

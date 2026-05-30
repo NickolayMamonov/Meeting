@@ -24,6 +24,7 @@ import dev.whysoezzy.uikit.models.UIKitSocialMedia
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 /**
@@ -62,7 +63,7 @@ private fun UIKitSocialMediaButton(
             modifier
                 .size(52.dp)
                 .clip(RoundedCornerShape(BorderRadiusTokens.M))
-                .background(Color(0xFF9A10F0))
+                .background(ColorTokens.SocialButtonBackground)
                 .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
