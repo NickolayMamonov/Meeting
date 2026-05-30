@@ -1,28 +1,28 @@
 package com.whysoezzy.data.mapper
 
-import com.whysoezzy.data.dto.CommunityInfoDto
 import com.whysoezzy.data.dto.MeetingInfoDto
 import com.whysoezzy.data.dto.SocialMediaDto
 import com.whysoezzy.data.dto.TagDto
 import com.whysoezzy.data.dto.UpdateUserDto
 import com.whysoezzy.data.dto.UserProfileDto
-import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.MeetingStatus
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-private val isoFormatters = listOf(
+private val dateTimeFormatters = listOf(
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-    DateTimeFormatter.ofPattern("yyyy-MM-dd"),
 )
+
+private val dateOnlyFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 internal fun UserProfileDto.toDomain(): User = User(
     id = id,
@@ -69,20 +69,6 @@ internal fun MeetingInfoDto.toMeetingInfo(): MeetingInfo = MeetingInfo(
     meetingStatus = MeetingStatus.ACTIVE,
 )
 
-/**
- * Локальное имя `toCommunityInfo`: в :features:meetings:data есть своя
- * CommunityInfoDto.toDomain() (R-035 / R-037 — устранение дубликатов
- * в будущем).
- */
-internal fun CommunityInfoDto.toCommunityInfo(): CommunityInfo = CommunityInfo(
-    id = id,
-    name = name,
-    description = description ?: "",
-    imageUrl = imageUrl,
-    subscribersCount = subscribersCount ?: 0,
-    isSubscribed = isSubscribed,
-)
-
 // ==================== Private ====================
 
 private fun TagDto.toDomain(): Tag = Tag(
@@ -118,13 +104,18 @@ private fun extractUsername(url: String): String =
  */
 private fun parseDateToTimestamp(dateString: String?): Long {
     if (dateString.isNullOrBlank()) return 0L
-    for (formatter in isoFormatters) {
+    for (formatter in dateTimeFormatters) {
         try {
-            return LocalDateTime
-                .parse(dateString, formatter)
+            return LocalDateTime.parse(dateString, formatter)
                 .toEpochSecond(ZoneOffset.UTC) * 1000
         } catch (_: Exception) {
         }
     }
-    return 0L
+    return try {
+        LocalDate.parse(dateString, dateOnlyFormatter)
+            .atStartOfDay()
+            .toEpochSecond(ZoneOffset.UTC) * 1000
+    } catch (_: Exception) {
+        0L
+    }
 }

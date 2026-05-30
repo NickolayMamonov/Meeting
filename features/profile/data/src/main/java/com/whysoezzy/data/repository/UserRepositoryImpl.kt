@@ -1,7 +1,6 @@
 package com.whysoezzy.data.repository
 
 import com.whysoezzy.data.api.UserApi
-import com.whysoezzy.data.mapper.toCommunityInfo
 import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.data.mapper.toMeetingInfo
 import com.whysoezzy.data.mapper.toUpdateDto
@@ -33,6 +32,6 @@ internal class UserRepositoryImpl(
     }
 
     override suspend fun getUserCommunities(userId: Long): Result<List<CommunityInfo>> = safeApiCall {
-        userApi.getUserCommunities(userId).map { it.toCommunityInfo() }
+        userApi.getUserCommunities(userId).map { it.toDomain() }
     }
 }

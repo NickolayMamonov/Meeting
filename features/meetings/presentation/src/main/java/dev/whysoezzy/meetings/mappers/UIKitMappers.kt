@@ -1,5 +1,6 @@
 package dev.whysoezzy.meetings.mappers
 
+import com.whysoezzy.common.utils.DateUtils.formatDateTime
 import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.CommunityHost
 import com.whysoezzy.domain.models.CommunityInfo
@@ -25,9 +26,6 @@ import dev.whysoezzy.uikit.models.UIKitPerson
 import dev.whysoezzy.uikit.models.UIKitPersonHost
 import dev.whysoezzy.uikit.models.UIKitTag
 import dev.whysoezzy.uikit.models.UIKitTagState
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 // ─── Address ─────────────────────────────────────────────────────────────────
 
@@ -126,10 +124,7 @@ fun CommunityHost.toUIKitCommunityHost() = UIKitCommunityHost(
 
 // ─── Meeting ──────────────────────────────────────────────────────────────────
 
-private fun formatDateTime(timestamp: Long): String {
-    val formatter = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
-    return formatter.format(Date(timestamp))
-}
+
 
 /** Полная доменная Meeting → UIKitMeetingInfo */
 fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
