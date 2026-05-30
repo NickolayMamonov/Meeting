@@ -217,7 +217,7 @@ class ProfileDetailsViewModelTest {
     }
 
     @Test
-    fun `subscribedIds are correctly reflected in userCommunities`() = runTest {
+    fun `community isSubscribed is reflected in userCommunities`() = runTest {
         // communities возвращаются с isSubscribed=true для id=2
         val communities = listOf(
             sampleCommunities[0].copy(isSubscribed = false),

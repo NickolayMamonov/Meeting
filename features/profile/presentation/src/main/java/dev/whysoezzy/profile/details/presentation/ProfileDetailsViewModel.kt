@@ -86,8 +86,6 @@ class ProfileDetailsViewModel(
                             (communitiesDeferred.await().getOrNull() ?: emptyList())
                     }
 
-                    val subscribedIds = communities.filter { it.isSubscribed }.map { it.id }.toSet()
-
                     _uiState.value = ProfileDetailsUiState.Success(
                         userId = user.id,
                         name = user.name,
@@ -100,9 +98,7 @@ class ProfileDetailsViewModel(
                         isOwnProfile = isOwnProfile,
                         socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
                         userMeetings = meetings.map { it.toUIKitMeetingInfo() },
-                        userCommunities = communities.toUIKitCommunityInfoList(
-                            subscribedIds = subscribedIds,
-                        ),
+                        userCommunities = communities.toUIKitCommunityInfoList(),
                     )
                 }
         }

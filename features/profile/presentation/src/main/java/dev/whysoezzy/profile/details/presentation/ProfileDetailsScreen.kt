@@ -206,7 +206,6 @@ private fun ProfileContent(
                         stringResource(R.string.profile_details_communities_other)
                     },
                     communities = uiState.userCommunities,
-                    subscribedCommunityIds = emptySet(),
                     onCommunityClick = onCommunityClick,
                     onSubscribeClick = { _, _ -> },
                     modifier = Modifier.padding(horizontal = SpacingTokens.L),

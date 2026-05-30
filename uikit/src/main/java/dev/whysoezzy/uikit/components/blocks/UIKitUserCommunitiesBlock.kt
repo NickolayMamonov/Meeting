@@ -30,7 +30,6 @@ fun UIKitUserCommunitiesBlock(
     modifier: Modifier = Modifier,
     title: String = "Мои сообщества",
     communities: List<UIKitCommunityInfo>,
-    subscribedCommunityIds: Set<Long> = emptySet(),
     onCommunityClick: (Long) -> Unit,
     onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
@@ -56,7 +55,7 @@ fun UIKitUserCommunitiesBlock(
                     UIKitCommunityCard(
                         imageUrl = community.imageUrl,
                         title = community.title,
-                        isSubscribed = community.id in subscribedCommunityIds,
+                        isSubscribed = community.isSubscribed,
                         onSubscribeClick = { isSubscribed ->
                             onSubscribeClick(community.id, isSubscribed)
                         },

@@ -104,15 +104,8 @@ fun CommunityInfo.toUIKitCommunityInfo(
     )
 }
 
-fun List<CommunityInfo>.toUIKitCommunityInfoList(
-    subscribedIds: Set<Long> = emptySet(),
-): List<UIKitCommunityInfo> {
-    return map { community ->
-        community.toUIKitCommunityInfo(
-            isSubscribed = subscribedIds.contains(community.id),
-        )
-    }
-}
+fun List<CommunityInfo>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> =
+    map { it.toUIKitCommunityInfo(isSubscribed = it.isSubscribed) }
 
 fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map { community ->
     UIKitCommunityInfo(
