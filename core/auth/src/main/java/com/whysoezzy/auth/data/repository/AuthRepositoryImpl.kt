@@ -6,7 +6,9 @@ import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.network.safeApiCall
 import io.ktor.utils.io.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 internal class AuthRepositoryImpl(
@@ -66,7 +68,9 @@ internal class AuthRepositoryImpl(
         } catch (e: Exception) {
             Timber.w(e, "Server logout failed, clearing local tokens anyway")
         } finally {
-            tokenManager.clearTokens()
+            withContext(NonCancellable) {
+                tokenManager.clearTokens()
+            }
         }
     }
 
