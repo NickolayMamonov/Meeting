@@ -1,7 +1,7 @@
 package dev.whysoezzy.auth.presentation.name
 
 import app.cash.turbine.test
-import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
+import com.whysoezzy.auth.domain.repository.UserProfileUpdater
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -22,9 +22,9 @@ class NameInputViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val userProfilerUpdater: UserProfilerUpdater = mockk()
+    private val userProfileUpdater: UserProfileUpdater = mockk()
 
-    private fun viewModel() = NameInputViewModel(userProfilerUpdater)
+    private fun viewModel() = NameInputViewModel(userProfileUpdater)
 
     // ==================== updateName / updateSurname ====================
 
@@ -102,7 +102,7 @@ class NameInputViewModelTest {
     @Test
     fun `Continue with valid name and surname calls updater and emits NavigateToSuccess`() =
         runTest {
-            coEvery { userProfilerUpdater.updateName(any(), any()) } returns Result.success(Unit)
+            coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
             val vm = viewModel()
             vm.onEvent(NameInputEvent.UpdateName("Иван"))
             vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -115,12 +115,12 @@ class NameInputViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
 
-            coVerify(exactly = 1) { userProfilerUpdater.updateName("Иван", "Иванов") }
+            coVerify(exactly = 1) { userProfileUpdater.updateName("Иван", "Иванов") }
         }
 
     @Test
     fun `Continue success sets isSubmitted = true and isLoading = false`() = runTest {
-        coEvery { userProfilerUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
         val vm = viewModel()
         vm.onEvent(NameInputEvent.UpdateName("Иван"))
         vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -137,7 +137,7 @@ class NameInputViewModelTest {
 
     @Test
     fun `Continue failure sets nameError from server message`() = runTest {
-        coEvery { userProfilerUpdater.updateName(any(), any()) } returns
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns
                 Result.failure(RuntimeException("Server error"))
         val vm = viewModel()
         vm.onEvent(NameInputEvent.UpdateName("Иван"))

@@ -1,6 +1,6 @@
 package com.whysoezzy.data.di
 
-import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
+import com.whysoezzy.auth.domain.repository.UserProfileUpdater
 import com.whysoezzy.data.api.TagsApi
 import com.whysoezzy.data.api.TagsApiKtor
 import com.whysoezzy.data.api.UserApi
@@ -27,7 +27,7 @@ val profileDataModule = module {
     single<UserRepository> { UserRepositoryImpl(get()) }
     single<TagRepository> { TagRepositoryImpl(get()) }
 
-    single<UserProfilerUpdater> { UserProfileUpdaterImpl(get<UserApi>()) }
+    single<UserProfileUpdater> { UserProfileUpdaterImpl(get<UserApi>()) }
     // Use Cases
     factory { GetCurrentUserUseCase(get()) }
     factory { GetUserByIdUseCase(get()) }
