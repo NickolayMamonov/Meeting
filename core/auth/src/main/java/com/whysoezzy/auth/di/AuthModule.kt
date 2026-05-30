@@ -1,5 +1,6 @@
 package com.whysoezzy.auth.di
 
+import com.whysoezzy.auth.DataStoreTokenManager
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.data.api.AuthApi
 import com.whysoezzy.auth.data.api.AuthApiKtor
@@ -19,7 +20,7 @@ import kotlin.coroutines.cancellation.CancellationException
 val authModule =
     module {
 
-        single { TokenManager(androidContext()) }
+        single<TokenManager> { DataStoreTokenManager(androidContext()) }
 
         single(qualifier = named("publicClient")) {
             KtorNetworkModule.provideHttpClient()

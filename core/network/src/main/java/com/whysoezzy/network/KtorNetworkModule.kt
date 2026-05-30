@@ -17,9 +17,8 @@ import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
 interface TokenProvider {
-    fun getAccessToken(): String?
-
-    fun getRefreshToken(): String?
+    suspend fun getAccessToken(): String?
+    suspend fun getRefreshToken(): String?
 }
 
 object KtorNetworkModule {
