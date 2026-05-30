@@ -12,7 +12,11 @@ val mainFeatureModule = module {
     factory { ManageCommunitySubscriptionUseCase(get()) }
 
     // ViewModels
-    viewModel { MainScreenViewModel(get(), get(), get()) }
+    viewModel { MainScreenViewModel(
+        getMainScreenDataUseCase = get(),
+        manageCommunitySubscriptionUseCase = get(),
+        dispatchers = get()
+    ) }
     viewModel {
         MeetingDetailsViewModel(
             getMeetingByIdUseCase = get(),

@@ -2,7 +2,7 @@ package dev.whysoezzy.auth.presentation.name
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.whysoezzy.auth.domain.repository.UserProfilerUpdater
+import com.whysoezzy.auth.domain.repository.UserProfileUpdater
 import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +23,7 @@ sealed class NameInputNavEvent {
  * Здесь просто обновляем имя/фамилию через PUT /profile.
  */
 class NameInputViewModel(
-    private val userProfilerUpdater: UserProfilerUpdater,
+    private val userProfileUpdater: UserProfileUpdater,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NameInputUiState())
     val uiState: StateFlow<NameInputUiState> = _uiState.asStateFlow()
@@ -89,7 +89,7 @@ class NameInputViewModel(
                     surnameError = null,
                 )
 
-            userProfilerUpdater
+            userProfileUpdater
                 .updateName(
                     name = _uiState.value.name,
                     surname = _uiState.value.surname,

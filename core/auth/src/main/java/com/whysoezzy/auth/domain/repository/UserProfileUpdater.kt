@@ -1,6 +1,6 @@
 package com.whysoezzy.auth.domain.repository
 
-interface UserProfilerUpdater {
+interface UserProfileUpdater {
     suspend fun updateName(
         name: String,
         surname: String,

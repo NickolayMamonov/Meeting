@@ -34,7 +34,7 @@ class CodeVerificationViewModel(
 ) : ViewModel() {
     companion object {
         private const val OTP_RESEND_TIMEOUT_SECONDS = 60
-        private const val TIMER_POLL_INTERVAL_MS = 200L
+        private const val TIMER_POLL_INTERVAL_MS = 1000L
         private const val TIMER_DURATION_MS = OTP_RESEND_TIMEOUT_SECONDS * 1000L
     }
 
