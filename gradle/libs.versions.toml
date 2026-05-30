@@ -19,7 +19,8 @@ lottie = "5.2.0"
 koin-bom = "3.5.6"
 ksp = "2.0.0-1.0.22"
 ktor = "3.0.2"
-securityCrypto = "1.1.0-alpha07"
+datastore = "1.2.1"
+tink = "1.19.0"
 desugarJdkLibs = "2.0.4"
 kotlinxSerialization = "1.6.3"
 ktlintGradle = "12.1.2"
@@ -73,7 +74,8 @@ ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "k
 ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
 
 # Security
-androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+google-tink-android = { module = "com.google.crypto.tink:tink-android", version.ref = "tink" }
 
 # Desugaring
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdkLibs" }

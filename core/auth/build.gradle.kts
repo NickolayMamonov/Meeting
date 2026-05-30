@@ -43,7 +43,8 @@ dependencies {
     api(project(":core:network"))
     implementation(project(":core:common"))
 
-    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.google.tink.android)
     implementation(libs.timber)
 
     implementation(platform(libs.koin.bom))
