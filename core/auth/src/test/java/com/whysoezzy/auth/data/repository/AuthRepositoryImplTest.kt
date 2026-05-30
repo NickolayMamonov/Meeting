@@ -13,9 +13,11 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
-import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,7 +31,6 @@ class AuthRepositoryImplTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val authApi: AuthApi = mockk()
-    // TokenManager — internal class, мокаем через mockkClass
     private val tokenManager: TokenManager = mockk(relaxed = true)
 
     private fun repository(): AuthRepositoryImpl {
@@ -63,7 +64,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `verifyOtp success saves tokens and returns AuthResult`() = runTest {
         coEvery { authApi.verifyOtp(any(), any(), any(), any()) } returns successAuthResponse()
-        every { tokenManager.saveTokens(any(), any(), any()) } just runs
+        coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
         val result = repository().verifyOtp("+79991234567", "1234")
 
@@ -74,14 +75,14 @@ class AuthRepositoryImplTest {
         assertEquals(1L, authResult.userId)
 
         // Проверяем что saveTokens вызван с правильными токенами
-        verify { tokenManager.saveTokens("access123", "refresh456", 1L) }
+        coVerify { tokenManager.saveTokens("access123", "refresh456", 1L) }
     }
 
     @Test
     fun `verifyOtp isNewUser=true propagates to AuthResult`() = runTest {
         coEvery { authApi.verifyOtp(any(), any(), any(), any()) } returns
                 successAuthResponse(isNewUser = true)
-        every { tokenManager.saveTokens(any(), any(), any()) } just runs
+        coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
         val result = repository().verifyOtp("+79991234567", "1234")
 
@@ -96,29 +97,29 @@ class AuthRepositoryImplTest {
         val result = repository().verifyOtp("+79991234567", "0000")
 
         assertTrue(result.isFailure)
-        verify(exactly = 0) { tokenManager.saveTokens(any(), any(), any()) }
+        coVerify(exactly = 0) { tokenManager.saveTokens(any(), any(), any()) }
     }
 
     // ==================== refreshToken ====================
 
     @Test
     fun `refreshToken success saves new tokens and returns access token`() = runTest {
-        every { tokenManager.getRefreshToken() } returns "oldRefresh"
-        every { tokenManager.getUserId() } returns 1L
+        coEvery { tokenManager.getRefreshToken() } returns "oldRefresh"
+        coEvery { tokenManager.getUserId() } returns 1L
         coEvery { authApi.refreshToken("oldRefresh") } returns
                 RefreshTokenResponse(accessToken = "newAccess", refreshToken = "newRefresh")
-        every { tokenManager.saveTokens(any(), any(), any()) } just runs
+        coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
         val result = repository().refreshToken()
 
         assertTrue(result.isSuccess)
         assertEquals("newAccess", result.getOrThrow())
-        verify { tokenManager.saveTokens("newAccess", "newRefresh", 1L) }
+        coVerify { tokenManager.saveTokens("newAccess", "newRefresh", 1L) }
     }
 
     @Test
     fun `refreshToken with null stored token returns failure`() = runTest {
-        every { tokenManager.getRefreshToken() } returns null
+        coEvery { tokenManager.getRefreshToken() } returns null
 
         val result = repository().refreshToken()
 
@@ -128,7 +129,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `refreshToken API failure returns Result failure`() = runTest {
-        every { tokenManager.getRefreshToken() } returns "oldRefresh"
+        coEvery { tokenManager.getRefreshToken() } returns "oldRefresh"
         coEvery { authApi.refreshToken(any()) } throws RuntimeException("Server error")
 
         val result = repository().refreshToken()
@@ -142,21 +143,21 @@ class AuthRepositoryImplTest {
     fun `logout always clears tokens even if API call fails`() = runTest {
         // Сервер вернул ошибку — токены всё равно должны быть удалены
         coEvery { authApi.logout() } throws RuntimeException("Server error")
-        every { tokenManager.clearTokens() } just runs
+        coEvery { tokenManager.clearTokens() } just runs
 
         repository().logout()
 
-        verify(exactly = 1) { tokenManager.clearTokens() }
+        coVerify(exactly = 1) { tokenManager.clearTokens() }
     }
 
     @Test
     fun `logout on success also clears tokens`() = runTest {
         coEvery { authApi.logout() } returns mapOf("message" to "ok")
-        every { tokenManager.clearTokens() } just runs
+        coEvery { tokenManager.clearTokens() } just runs
 
         repository().logout()
 
-        verify(exactly = 1) { tokenManager.clearTokens() }
+        coVerify(exactly = 1) { tokenManager.clearTokens() }
     }
 
     // ==================== isLoggedInFlow ====================
@@ -169,6 +170,23 @@ class AuthRepositoryImplTest {
         val repo = AuthRepositoryImpl(authApi, tokenManager)
 
         assertEquals(flow, repo.isLoggedInFlow)
+    }
+
+    @Test
+    fun `logout clears tokens even when scope is cancelled`() = runTest {
+        coEvery { authApi.logout() } coAnswers {
+            // эмулируем долгий серверный logout, во время которого корутину отменят
+            kotlinx.coroutines.delay(10_000)
+            mapOf("message" to "ok")
+        }
+        coEvery { tokenManager.clearTokens() } just runs
+
+        val job = launch { repository().logout() }
+        advanceTimeBy(100)
+        job.cancelAndJoin()
+
+        // clearTokens должен выполниться несмотря на отмену (NonCancellable в finally)
+        coVerify(exactly = 1) { tokenManager.clearTokens() }
     }
 
     // ==================== Fixtures ====================
