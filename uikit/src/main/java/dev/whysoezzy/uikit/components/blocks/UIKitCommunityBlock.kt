@@ -15,10 +15,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.text.TextSubheading1
@@ -78,7 +80,7 @@ fun UIKitCommunityBlock(
             }
             AsyncImage(
                 model = communityImageUrl,
-                contentDescription = "Лого сообщества",
+                contentDescription = stringResource(R.string.a11y_community_logo),
                 modifier =
                     Modifier
                         .size(imageSize.dp)

@@ -13,11 +13,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.avatars.UIKitAvatarWithInitials
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
@@ -51,7 +53,7 @@ fun UIKitUserProfileBlock(
         if (avatarUrl != null) {
             AsyncImage(
                 model = avatarUrl,
-                contentDescription = "Фото профиля",
+                contentDescription = stringResource(R.string.a11y_profile_photo),
                 modifier =
                     Modifier
                         .fillMaxWidth()
