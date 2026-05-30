@@ -63,6 +63,7 @@ class NameInputViewModelTest {
         vm.onEvent(NameInputEvent.Continue)
 
         assertNotNull(vm.uiState.value.nameError)
+        assertEquals(NameFieldError.Blank, vm.uiState.value.nameError)
     }
 
     @Test
@@ -74,6 +75,7 @@ class NameInputViewModelTest {
         vm.onEvent(NameInputEvent.Continue)
 
         assertNotNull(vm.uiState.value.nameError)
+        assertEquals(NameFieldError.TooShort, vm.uiState.value.nameError)
     }
 
     @Test
@@ -85,6 +87,7 @@ class NameInputViewModelTest {
         vm.onEvent(NameInputEvent.Continue)
 
         assertNotNull(vm.uiState.value.nameError)
+        assertEquals(NameFieldError.NonLetter, vm.uiState.value.nameError)
     }
 
     @Test
@@ -95,6 +98,8 @@ class NameInputViewModelTest {
         vm.onEvent(NameInputEvent.Continue)
 
         assertNotNull(vm.uiState.value.surnameError)
+        assertEquals(NameFieldError.Blank, vm.uiState.value.surnameError)
+
     }
 
     // ==================== success submit ====================
@@ -149,5 +154,7 @@ class NameInputViewModelTest {
         val state = vm.uiState.value
         assertNotNull(state.nameError)
         assertTrue(!state.isLoading)
+        assertTrue(vm.uiState.value.nameError is NameFieldError.Remote)
+
     }
 }
