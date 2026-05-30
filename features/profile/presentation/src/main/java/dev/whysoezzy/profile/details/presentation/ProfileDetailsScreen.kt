@@ -42,6 +42,7 @@ import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.social.UIKitSocialMediaList
 import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.topbar.ProfileTopBar
+import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -67,6 +68,8 @@ fun ProfileDetailsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val context = LocalContext.current
+
+    SecureScreenEffect()
 
     LaunchedEffect(userId) {
         viewModel.onEvent(ProfileDetailsEvent.LoadProfile(userId))

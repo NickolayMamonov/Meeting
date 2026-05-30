@@ -57,6 +57,7 @@ import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
 import dev.whysoezzy.uikit.components.toggles.UIKitToggleRow
 import dev.whysoezzy.uikit.components.topbar.EditTopBar
+import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
@@ -72,8 +73,11 @@ fun ProfileEditScreen(
     onEditInterests: (List<String>) -> Unit = {},
     viewModel: ProfileEditViewModel = koinViewModel(),
 ) {
+    SecureScreenEffect()
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+
 
     var showInterestDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }

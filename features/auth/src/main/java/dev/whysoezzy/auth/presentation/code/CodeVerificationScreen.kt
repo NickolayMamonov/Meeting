@@ -29,6 +29,7 @@ import dev.whysoezzy.uikit.components.forms.UIKitCodeInput
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextMetadata1
+import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -45,6 +46,7 @@ fun CodeVerificationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    SecureScreenEffect()
 
     // Подписываемся на навигационные события из ViewModel
     LaunchedEffect(Unit) {
