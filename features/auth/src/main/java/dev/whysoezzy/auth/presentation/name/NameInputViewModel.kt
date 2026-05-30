@@ -57,21 +57,19 @@ class NameInputViewModel(
             )
     }
 
-    private fun validateName(name: String): String? =
-        when {
-            name.isBlank() -> "Имя не может быть пустым"
-            name.length < 2 -> "Минимум 2 символа"
-            !name.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
-            else -> null
-        }
+    private fun validateName(name: String): NameFieldError? = when {
+        name.isBlank() -> NameFieldError.Blank
+        name.length < 2 -> NameFieldError.TooShort
+        !name.all { it.isLetter() || it.isWhitespace() } -> NameFieldError.NonLetter
+        else -> null
+    }
 
-    private fun validateSurname(surname: String): String? =
-        when {
-            surname.isBlank() -> "Фамилия не может быть пустой"
-            surname.length < 2 -> "Минимум 2 символа"
-            !surname.all { it.isLetter() || it.isWhitespace() } -> "Только буквы"
-            else -> null
-        }
+    private fun validateSurname(surname: String): NameFieldError? = when {
+        surname.isBlank() -> NameFieldError.Blank
+        surname.length < 2 -> NameFieldError.TooShort
+        !surname.all { it.isLetter() || it.isWhitespace() } -> NameFieldError.NonLetter
+        else -> null
+    }
 
     private fun validateAndSubmit() {
         val state = _uiState.value
@@ -101,11 +99,10 @@ class NameInputViewModel(
                         )
                     _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
                 }.onFailure { throwable ->
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isLoading = false,
-                            nameError = throwable.toUserMessage(),
-                        )
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        nameError = NameFieldError.Remote(throwable.toUserMessage()),
+                    )
                 }
         }
     }

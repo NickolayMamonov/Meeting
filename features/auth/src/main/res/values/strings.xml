@@ -25,4 +25,9 @@
     <string name="auth_success_content_description">Успех</string>
     <string name="auth_success_title">Добро пожаловать!</string>
     <string name="auth_success_subtitle">Регистрация успешно завершена.\nТеперь вы можете пользоваться всеми возможностями приложения.</string>
+
+    <string name="auth_name_error_blank">Имя не может быть пустым</string>
+    <string name="auth_surname_error_blank">Фамилия не может быть пустой</string>
+    <string name="auth_name_error_too_short">Минимум 2 символа</string>
+    <string name="auth_name_error_only_letters">Только буквы</string>
 </resources>

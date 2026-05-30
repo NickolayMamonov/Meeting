@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.presentation.name
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -101,12 +102,14 @@ private fun NameInputContent(
         Spacer(modifier = Modifier.height(SpacingTokens.L))
 
         Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
+            val nameErr = nameErrorText(uiState.nameError, blankRes = R.string.auth_name_error_blank)
+            val surnameErr = nameErrorText(uiState.surnameError, blankRes = R.string.auth_surname_error_blank)
             UIKitInput(
                 value = uiState.name,
                 onValueChange = onNameChange,
                 hint = stringResource(R.string.auth_name_hint_first),
                 isError = uiState.nameError != null,
-                errorMessage = uiState.nameError ?: "",
+                errorMessage = nameErr ?: "",
                 modifier = Modifier.fillMaxWidth(),
             )
             UIKitInput(
@@ -114,7 +117,7 @@ private fun NameInputContent(
                 onValueChange = onSurnameChange,
                 hint = stringResource(R.string.auth_name_hint_last),
                 isError = uiState.surnameError != null,
-                errorMessage = uiState.surnameError ?: "",
+                errorMessage = surnameErr ?: "",
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -152,9 +155,18 @@ private fun NameInputScreenErrorPreview() {
                 NameInputUiState(
                     name = "И",
                     surname = "",
-                    nameError = "Имя должно содержать минимум 2 символа",
-                    surnameError = "Фамилия не может быть пустой",
+                    nameError = NameFieldError.TooShort,
+                    surnameError = NameFieldError.Blank,
                 ),
         )
     }
+}
+
+@Composable
+private fun nameErrorText(error: NameFieldError?, @StringRes blankRes: Int): String? = when (error) {
+    null -> null
+    NameFieldError.Blank -> stringResource(blankRes)
+    NameFieldError.TooShort -> stringResource(R.string.auth_name_error_too_short)
+    NameFieldError.NonLetter -> stringResource(R.string.auth_name_error_only_letters)
+    is NameFieldError.Remote -> error.message
 }

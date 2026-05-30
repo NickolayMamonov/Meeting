@@ -8,8 +8,8 @@ data class NameInputUiState(
     val surname: String = "",
     val isLoading: Boolean = false,
     val isSubmitted: Boolean = false,
-    val nameError: String? = null,
-    val surnameError: String? = null,
+    val nameError: NameFieldError? = null,
+    val surnameError: NameFieldError? = null,
 ) {
     val isValid: Boolean
         get() = name.isNotBlank() && surname.isNotBlank() && nameError == null && surnameError == null
