@@ -24,8 +24,7 @@
 -dontwarn kotlinx.coroutines.**
 
 # ===== Библиотечные правила =====
-# kotlinx.serialization / Ktor / DTO-namespace'ы — в consumer-rules модулей:
-#   :core:network         → Ktor + ErrorResponse serializer + kotlinx.serialization base
-#   :core:auth            → com.whysoezzy.auth.data.dto.**$$serializer
-#   :core:data            → com.whysoezzy.data.dto.**$$serializer (split-package owner)
-#   :features:*/data      → ничего (split-package с :core:data покрывает)
+# kotlinx.serialization / Ktor — в consumer-rules модулей:
+#   :core:network → Ktor + conditional @Serializable-правила (R-045). Пакет-агностичны,
+#                   покрывают все DTO во всех модулях одной копией (consumer-rules
+#                   мерджатся в единый R8-ран). Имена DTO и $$serializer обфусцируются.
