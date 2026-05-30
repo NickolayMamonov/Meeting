@@ -27,7 +27,7 @@ val authModule =
 
         single<AuthApi> { AuthApiKtor(get(named("publicClient"))) }
 
-        single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
+        single<AuthRepository> { AuthRepositoryImpl(authApi = get(), tokenManager = get()) }
 
         single(qualifier = named("authorizedClient")) {
             val tokenManager: TokenManager = get()
