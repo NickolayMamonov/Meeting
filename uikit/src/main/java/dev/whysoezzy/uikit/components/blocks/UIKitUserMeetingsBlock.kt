@@ -8,7 +8,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.cards.UIKitEventCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
@@ -19,9 +21,6 @@ import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Блок с встречами пользователя
@@ -33,7 +32,7 @@ import java.util.Locale
  */
 @Composable
 fun UIKitUserMeetingsBlock(
-    title: String = "Мои встречи",
+    title: String = stringResource(R.string.uikit_user_meetings_title),
     meetings: List<UIKitMeetingInfo>,
     onMeetingClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -47,7 +46,7 @@ fun UIKitUserMeetingsBlock(
 
         if (meetings.isEmpty()) {
             TextBody2(
-                text = "Вы пока не записаны ни на одну встречу",
+                text = stringResource(R.string.uikit_user_meetings_empty),
                 color = ColorTokens.NeutralWeak,
             )
         } else {
@@ -79,13 +78,6 @@ fun UIKitUserMeetingsBlock(
     }
 }
 
-/**
- * Форматирует время встречи для отображения
- */
-private fun formatMeetingDate(timestamp: Long): String {
-    val dateFormat = SimpleDateFormat("d MMM", Locale.getDefault())
-    return dateFormat.format(Date(timestamp))
-}
 
 // @Preview
 // @Composable
