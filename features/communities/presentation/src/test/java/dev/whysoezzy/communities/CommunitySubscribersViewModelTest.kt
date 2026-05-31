@@ -20,7 +20,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommunitySubscribersViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -30,7 +29,7 @@ class CommunitySubscribersViewModelTest {
     private fun viewModel() = CommunitySubscribersViewModel(
         getCommunityByIdUseCase = getCommunityByIdUseCase,
         getCommunitySubscribersUseCase = getCommunitySubscribersUseCase,
-        dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher),   // NEW
+        dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher), // NEW
     )
 
     @Test
@@ -50,7 +49,7 @@ class CommunitySubscribersViewModelTest {
     @Test
     fun `community load failure produces Error state`() = runTest {
         coEvery { getCommunityByIdUseCase(COMMUNITY_ID) } returns
-                Result.failure(RuntimeException("boom"))
+            Result.failure(RuntimeException("boom"))
 
         val vm = viewModel()
         vm.onEvent(CommunitySubscribersEvent.LoadSubscribers(COMMUNITY_ID))
@@ -63,7 +62,7 @@ class CommunitySubscribersViewModelTest {
     fun `subscribers load failure produces Error state`() = runTest {
         coEvery { getCommunityByIdUseCase(COMMUNITY_ID) } returns Result.success(sampleCommunity)
         coEvery { getCommunitySubscribersUseCase(COMMUNITY_ID) } returns
-                Result.failure(RuntimeException("boom"))
+            Result.failure(RuntimeException("boom"))
 
         val vm = viewModel()
         vm.onEvent(CommunitySubscribersEvent.LoadSubscribers(COMMUNITY_ID))

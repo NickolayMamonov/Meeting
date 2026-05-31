@@ -19,6 +19,7 @@ class PhoneInputViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
     private val sendOtpUseCase: SendOtpUseCase = mockk()
+
     private fun viewModel() = PhoneInputViewModel(sendOtpUseCase)
 
     @Test
@@ -28,22 +29,26 @@ class PhoneInputViewModelTest {
         assertTrue(vm.uiState.value.isValid)
         assertNull(vm.uiState.value.error)
     }
+
     @Test fun `10 digits is valid (aligned with use-case gate)`() = runTest {
         val vm = viewModel()
         vm.onEvent(PhoneInputEvent.UpdatePhoneNumber("9991234567"))
         assertTrue(vm.uiState.value.isValid)
     }
+
     @Test fun `11 digits not starting 7 or 8 sets Invalid`() = runTest {
         val vm = viewModel()
         vm.onEvent(PhoneInputEvent.UpdatePhoneNumber("99991234567"))
         assertEquals(PhoneInputError.Invalid, vm.uiState.value.error)
         assertFalse(vm.uiState.value.isValid)
     }
+
     @Test fun `partial input shows no error`() = runTest {
         val vm = viewModel()
         vm.onEvent(PhoneInputEvent.UpdatePhoneNumber("+7 (999) 12"))
         assertNull(vm.uiState.value.error)
     }
+
     @Test fun `sendCode failure sets Remote error`() = runTest {
         coEvery { sendOtpUseCase(any()) } returns Result.failure(RuntimeException("Server"))
         val vm = viewModel()

@@ -78,7 +78,6 @@ fun UIKitUserMeetingsBlock(
     }
 }
 
-
 // @Preview
 // @Composable
 // private fun UIKitUserMeetingsBlockPreview() {

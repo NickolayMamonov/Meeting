@@ -1,8 +1,6 @@
 package dev.whysoezzy.meetings.presentation
 
 import app.cash.turbine.test
-import com.whysoezzy.testing.MainDispatcherRule
-import com.whysoezzy.testing.TestDispatcherProvider
 import com.whysoezzy.domain.models.MainScreenData
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
@@ -12,6 +10,8 @@ import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.error.ApiException
+import com.whysoezzy.testing.MainDispatcherRule
+import com.whysoezzy.testing.TestDispatcherProvider
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,7 +31,6 @@ class MainScreenViewModelTest {
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase = mockk()
 
     private val testDispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher)
-
 
     // ==================== loadData ====================
 

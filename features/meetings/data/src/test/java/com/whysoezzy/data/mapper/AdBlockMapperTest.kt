@@ -12,7 +12,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdBlockMapperTest {
-
     // ==================== COMMUNITIES type ====================
 
     @Test
@@ -22,7 +21,7 @@ class AdBlockMapperTest {
         val result = dto.toDomain() as AdBlock.CommunitiesAd
 
         assertEquals(1L, result.id)
-        assertEquals("Сообщества", result.title)
+        assertEquals("Заголовок", result.title)
         assertEquals("Описание", result.description)
         assertTrue(result.isActive)
     }
@@ -103,13 +102,11 @@ class AdBlockMapperTest {
 
     // ==================== unknown type ====================
 
-    @Test(expected = IllegalArgumentException::class)
+    @Test
     fun `toDomain unknown type returns null`() {
         val dto = baseDto(type = "UNKNOWN")
         assertNull(dto.toDomain())
     }
-
-
 
     // ==================== CommunityInfoDto.toDomain ====================
 

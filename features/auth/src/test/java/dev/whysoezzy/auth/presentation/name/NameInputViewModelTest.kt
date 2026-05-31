@@ -18,7 +18,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NameInputViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -99,7 +98,6 @@ class NameInputViewModelTest {
 
         assertNotNull(vm.uiState.value.surnameError)
         assertEquals(NameFieldError.Blank, vm.uiState.value.surnameError)
-
     }
 
     // ==================== success submit ====================
@@ -143,7 +141,7 @@ class NameInputViewModelTest {
     @Test
     fun `Continue failure sets nameError from server message`() = runTest {
         coEvery { userProfileUpdater.updateName(any(), any()) } returns
-                Result.failure(RuntimeException("Server error"))
+            Result.failure(RuntimeException("Server error"))
         val vm = viewModel()
         vm.onEvent(NameInputEvent.UpdateName("Иван"))
         vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -155,6 +153,5 @@ class NameInputViewModelTest {
         assertNotNull(state.nameError)
         assertTrue(!state.isLoading)
         assertTrue(vm.uiState.value.nameError is NameFieldError.Remote)
-
     }
 }

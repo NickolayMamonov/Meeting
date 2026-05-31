@@ -29,6 +29,7 @@ private val MapPlaceholder = Color(0xFFE1E5E9)
 private val GoogleMarkerRed = Color(0xFFEA4335)
 private val GoogleMarkerBlue = Color(0xFF4285F4)
 private val GoogleMarkerYellow = Color(0xFFFBBC04)
+
 @Composable
 fun UIKitMapView(
     address: String,

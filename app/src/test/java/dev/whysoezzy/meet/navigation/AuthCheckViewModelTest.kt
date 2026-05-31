@@ -16,7 +16,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthCheckViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -49,7 +48,7 @@ class AuthCheckViewModelTest {
         val vm = viewModel()
 
         vm.isLoggedIn.test {
-            assertNull(awaitItem())      // initialValue
+            assertNull(awaitItem()) // initialValue
             advanceUntilIdle()
             assertEquals(false, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -62,7 +61,7 @@ class AuthCheckViewModelTest {
         val vm = viewModel()
 
         vm.isLoggedIn.test {
-            assertNull(awaitItem())      // initialValue
+            assertNull(awaitItem()) // initialValue
             advanceUntilIdle()
             assertEquals(false, awaitItem())
 
@@ -81,7 +80,7 @@ class AuthCheckViewModelTest {
         val vm = viewModel()
 
         vm.isLoggedIn.test {
-            assertNull(awaitItem())      // initialValue
+            assertNull(awaitItem()) // initialValue
             advanceUntilIdle()
             assertEquals(true, awaitItem())
 

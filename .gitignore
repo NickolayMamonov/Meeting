@@ -14,3 +14,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# build-logic (included build)
+/build-logic/build
+/build-logic/convention/build
+/build-logic/.gradle

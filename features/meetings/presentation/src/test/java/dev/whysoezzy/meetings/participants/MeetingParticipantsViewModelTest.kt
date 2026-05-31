@@ -19,7 +19,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MeetingParticipantsViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -46,14 +45,14 @@ class MeetingParticipantsViewModelTest {
         assertTrue(state is MeetingParticipantsUiState.Success)
         state as MeetingParticipantsUiState.Success
         assertEquals(1, state.participants.size)
-        assertEquals("Иван Петров", state.participants.first().name)   // склейка в маппере
+        assertEquals("Иван Петров", state.participants.first().name) // склейка в маппере
         assertEquals("host", state.participants.first().role)
     }
 
     @Test
     fun `load failure produces Error state`() = runTest {
         coEvery { getMeetingParticipantsUseCase(MEETING_ID) } returns
-                Result.failure(RuntimeException("boom"))
+            Result.failure(RuntimeException("boom"))
 
         val vm = viewModel()
         vm.onEvent(MeetingParticipantsEvent.LoadParticipants(MEETING_ID))

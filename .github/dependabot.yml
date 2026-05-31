@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # Gradle-зависимости (читает gradle/libs.versions.toml)
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    groups:
+      androidx:
+        patterns:
+          - "androidx.*"
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+      ktor:
+        patterns:
+          - "io.ktor*"
+      koin:
+        patterns:
+          - "io.insert-koin*"
+      testing:
+        patterns:
+          - "io.mockk*"
+          - "app.cash.turbine*"
+          - "junit*"
+    ignore:
+      # Kotlin-мажоры бампим вручную — связка с AGP и compose-compiler
+      - dependency-name: "org.jetbrains.kotlin*"
+        update-types: ["version-update:semver-major"]
+      # AGP-мажоры — вручную (Gradle/JDK-совместимость)
+      - dependency-name: "com.android.tools.build:gradle"
+        update-types: ["version-update:semver-major"]
+
+  # Версии самих GitHub Actions в workflow
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    groups:
+      actions:
+        patterns:
+          - "*"

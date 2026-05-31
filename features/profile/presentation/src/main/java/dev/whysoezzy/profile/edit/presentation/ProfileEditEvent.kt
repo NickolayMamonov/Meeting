@@ -61,6 +61,7 @@ sealed interface ProfileEditEvent {
 
     // Действия
     data object Save : ProfileEditEvent
+
     data object DeleteProfile : ProfileEditEvent
 
     data object ConfirmDeleteProfile : ProfileEditEvent

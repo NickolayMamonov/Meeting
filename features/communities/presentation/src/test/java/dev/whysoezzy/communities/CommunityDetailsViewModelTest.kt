@@ -1,9 +1,6 @@
 package dev.whysoezzy.communities
 
 import com.whysoezzy.domain.models.Community
-import dev.whysoezzy.communities.details.presentation.CommunityDetailsEvent
-import dev.whysoezzy.communities.details.presentation.CommunityDetailsUiState
-import dev.whysoezzy.communities.details.presentation.CommunityDetailsViewModel
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
 import com.whysoezzy.domain.models.MeetingStatus
@@ -15,6 +12,9 @@ import com.whysoezzy.domain.usecase.SubscribeToCommunityUseCase
 import com.whysoezzy.domain.usecase.UnsubscribeFromCommunityUseCase
 import com.whysoezzy.testing.MainDispatcherRule
 import com.whysoezzy.testing.TestDispatcherProvider
+import dev.whysoezzy.communities.details.presentation.CommunityDetailsEvent
+import dev.whysoezzy.communities.details.presentation.CommunityDetailsUiState
+import dev.whysoezzy.communities.details.presentation.CommunityDetailsViewModel
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,7 +27,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommunityDetailsViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -52,8 +51,8 @@ class CommunityDetailsViewModelTest {
         coEvery { getCommunityByIdUseCase(COMMUNITY_ID) } returns Result.success(sampleCommunity)
         coEvery { getCommunityMeetingsUseCase(COMMUNITY_ID) } returns Result.success(
             listOf(
-                meeting(id = 1L, time = FIXED_NOW + 10_000L),  // future → active
-                meeting(id = 2L, time = FIXED_NOW - 10_000L),  // past
+                meeting(id = 1L, time = FIXED_NOW + 10_000L), // future → active
+                meeting(id = 2L, time = FIXED_NOW - 10_000L), // past
             ),
         )
         coEvery { getCommunitySubscribersUseCase(COMMUNITY_ID) } returns Result.success(emptyList())
@@ -72,7 +71,7 @@ class CommunityDetailsViewModelTest {
     @Test
     fun `community load failure produces Error state`() = runTest {
         coEvery { getCommunityByIdUseCase(COMMUNITY_ID) } returns
-                Result.failure(RuntimeException("boom"))
+            Result.failure(RuntimeException("boom"))
 
         val vm = viewModel()
         vm.onEvent(CommunityDetailsEvent.LoadCommunity(COMMUNITY_ID))

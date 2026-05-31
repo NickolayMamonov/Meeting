@@ -163,7 +163,10 @@ private fun NameInputScreenErrorPreview() {
 }
 
 @Composable
-private fun nameErrorText(error: NameFieldError?, @StringRes blankRes: Int): String? = when (error) {
+private fun nameErrorText(
+    error: NameFieldError?,
+    @StringRes blankRes: Int,
+): String? = when (error) {
     null -> null
     NameFieldError.Blank -> stringResource(blankRes)
     NameFieldError.TooShort -> stringResource(R.string.auth_name_error_too_short)

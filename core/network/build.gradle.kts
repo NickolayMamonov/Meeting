@@ -1,49 +1,27 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.serialization)
+    id("meet.android.library")
+    id("meet.android.serialization")
 }
 
 android {
     namespace = "com.whysoezzy.network"
-    compileSdk = 36
-
-    defaultConfig {
-        minSdk = 30
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
-    }
 
     buildTypes {
         debug {
-            val baseUrl =
-                (project.findProperty("BASE_URL_DEBUG") as? String)
-                    ?: "http://10.0.2.2:8080"
+            val baseUrl = (project.findProperty("BASE_URL_DEBUG") as? String) ?: "http://10.0.2.2:8080"
             buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
         }
         release {
-            val baseUrl =
-                (project.findProperty("BASE_URL_RELEASE") as? String)
-                    ?: "https://api.example.com"
+            val baseUrl = (project.findProperty("BASE_URL_RELEASE") as? String) ?: "https://api.example.com"
             check(baseUrl.startsWith("https://")) {
                 "BASE_URL_RELEASE must use https:// (got: $baseUrl). " +
                     "Set it in ~/.gradle/gradle.properties or via CI environment."
             }
             buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
         }
     }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-    kotlinOptions {
-        jvmTarget = "21"
     }
     buildFeatures {
         buildConfig = true
@@ -61,14 +39,9 @@ dependencies {
     api(libs.kotlinx.serialization.json)
 
     implementation(libs.timber)
-
-    // Desugaring for LocalDateTime
     coreLibraryDesugaring(libs.desugar.jdk.libs)
-
-    // Android
     implementation(libs.androidx.core.ktx)
 
-    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

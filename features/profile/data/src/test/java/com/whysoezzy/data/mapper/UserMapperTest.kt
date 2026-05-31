@@ -11,7 +11,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UserMapperTest {
-
     // ==================== UserProfileDto.toDomain ====================
 
     @Test
@@ -100,7 +99,8 @@ class UserMapperTest {
         val result = dto.toMeetingInfo()
 
         // 2025-06-01T18:00:00 UTC → epoch millis
-        val expected = java.time.LocalDateTime.of(2025, 6, 1, 18, 0, 0)
+        val expected = java.time.LocalDateTime
+            .of(2025, 6, 1, 18, 0, 0)
             .toEpochSecond(java.time.ZoneOffset.UTC) * 1000
         assertEquals(expected, result.time)
     }
@@ -111,7 +111,8 @@ class UserMapperTest {
 
         val result = dto.toMeetingInfo()
 
-        val expected = java.time.LocalDateTime.of(2025, 6, 1, 0, 0, 0)
+        val expected = java.time.LocalDateTime
+            .of(2025, 6, 1, 0, 0, 0)
             .toEpochSecond(java.time.ZoneOffset.UTC) * 1000
         assertEquals(expected, result.time)
     }

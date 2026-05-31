@@ -106,13 +106,15 @@ private fun parseDateToTimestamp(dateString: String?): Long {
     if (dateString.isNullOrBlank()) return 0L
     for (formatter in dateTimeFormatters) {
         try {
-            return LocalDateTime.parse(dateString, formatter)
+            return LocalDateTime
+                .parse(dateString, formatter)
                 .toEpochSecond(ZoneOffset.UTC) * 1000
         } catch (_: Exception) {
         }
     }
     return try {
-        LocalDate.parse(dateString, dateOnlyFormatter)
+        LocalDate
+            .parse(dateString, dateOnlyFormatter)
             .atStartOfDay()
             .toEpochSecond(ZoneOffset.UTC) * 1000
     } catch (_: Exception) {

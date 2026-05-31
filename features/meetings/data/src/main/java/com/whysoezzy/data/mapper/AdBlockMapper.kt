@@ -3,7 +3,6 @@ package com.whysoezzy.data.mapper
 import com.whysoezzy.data.dto.AdBlockResponseDto
 import com.whysoezzy.domain.models.AdBlock
 
-
 internal fun AdBlockResponseDto.toDomain(): AdBlock? {
     return when (type) {
         "COMMUNITIES" -> AdBlock.CommunitiesAd(
