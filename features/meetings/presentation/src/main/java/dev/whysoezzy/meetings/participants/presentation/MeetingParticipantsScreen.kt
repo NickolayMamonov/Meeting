@@ -19,7 +19,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import dev.whysoezzy.features_meetings.R
-import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading

@@ -370,7 +370,6 @@ private sealed interface MeetingOrAd {
  */
 @Composable
 private fun rememberCyclingAdBlocks(adBlocks: List<UIKitAdBlock>): List<UIKitAdBlock> {
-
     return remember(adBlocks) {
         if (adBlocks.isEmpty()) return@remember emptyList()
         // Нам нужно больше блоков, чем есть уникальных — циклически повторяем

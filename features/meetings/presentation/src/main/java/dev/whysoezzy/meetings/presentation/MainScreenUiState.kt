@@ -1,7 +1,6 @@
 package dev.whysoezzy.meetings.presentation
 
 import androidx.compose.runtime.Immutable
-import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo

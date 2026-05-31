@@ -28,7 +28,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MeetingDetailsViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -74,7 +73,7 @@ class MeetingDetailsViewModelTest {
     @Test
     fun `loadMeeting failure emits Error state`() = runTest {
         coEvery { getMeetingByIdUseCase(MEETING_ID) } returns
-                Result.failure(RuntimeException("Network error"))
+            Result.failure(RuntimeException("Network error"))
 
         val vm = viewModel()
         vm.onEvent(MeetingDetailsEvent.LoadMeeting(MEETING_ID))
@@ -147,7 +146,7 @@ class MeetingDetailsViewModelTest {
     fun `joinMeeting failure rolls back isUserJoined to false`() = runTest {
         coEvery { getMeetingByIdUseCase(MEETING_ID) } returns Result.success(sampleMeeting)
         coEvery { joinMeetingUseCase(MEETING_ID) } returns
-                Result.failure(RuntimeException("Server error"))
+            Result.failure(RuntimeException("Server error"))
         isLoggedInFlow.value = true
 
         val vm = viewModel()
@@ -164,7 +163,7 @@ class MeetingDetailsViewModelTest {
     @Test
     fun `joinMeeting when already joined does nothing`() = runTest {
         coEvery { getMeetingByIdUseCase(MEETING_ID) } returns
-                Result.success(sampleMeeting.copy(isUserInParticipants = true))
+            Result.success(sampleMeeting.copy(isUserInParticipants = true))
         isLoggedInFlow.value = true
 
         val vm = viewModel()
@@ -182,7 +181,7 @@ class MeetingDetailsViewModelTest {
     @Test
     fun `leaveMeeting calls use case and sets isUserJoined = false optimistically`() = runTest {
         coEvery { getMeetingByIdUseCase(MEETING_ID) } returns
-                Result.success(sampleMeeting.copy(isUserInParticipants = true))
+            Result.success(sampleMeeting.copy(isUserInParticipants = true))
         coEvery { leaveMeetingUseCase(MEETING_ID) } returns Result.success(Unit)
 
         val vm = viewModel()
@@ -200,9 +199,9 @@ class MeetingDetailsViewModelTest {
     @Test
     fun `leaveMeeting failure rolls back isUserJoined to true`() = runTest {
         coEvery { getMeetingByIdUseCase(MEETING_ID) } returns
-                Result.success(sampleMeeting.copy(isUserInParticipants = true))
+            Result.success(sampleMeeting.copy(isUserInParticipants = true))
         coEvery { leaveMeetingUseCase(MEETING_ID) } returns
-                Result.failure(RuntimeException("Server error"))
+            Result.failure(RuntimeException("Server error"))
 
         val vm = viewModel()
         vm.onEvent(MeetingDetailsEvent.LoadMeeting(MEETING_ID))
@@ -220,7 +219,7 @@ class MeetingDetailsViewModelTest {
     @Test
     fun `OpenMap with valid coordinates emits OpenMap nav event`() = runTest {
         coEvery { getMeetingByIdUseCase(MEETING_ID) } returns
-                Result.success(sampleMeeting.copy(address = addressWithCoords))
+            Result.success(sampleMeeting.copy(address = addressWithCoords))
 
         val vm = viewModel()
         vm.onEvent(MeetingDetailsEvent.LoadMeeting(MEETING_ID))

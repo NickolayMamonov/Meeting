@@ -134,8 +134,6 @@ fun CommunityHost.toUIKitCommunityHost() = UIKitCommunityHost(
 
 // ─── Meeting ──────────────────────────────────────────────────────────────────
 
-
-
 /** Полная доменная Meeting → UIKitMeetingInfo */
 fun Meeting.toUIKitMeetingInfo() = UIKitMeetingInfo(
     id = id,
@@ -228,18 +226,28 @@ internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
 
 fun AdBlock.toUIKit(): UIKitAdBlock = when (this) {
     is AdBlock.CommunitiesAd -> UIKitAdBlock.CommunitiesAd(
-        id = id, title = title, description = description,
-        communities = communities.toUIKitCommunityInfoList(),   // уже существует
+        id = id,
+        title = title,
+        description = description,
+        communities = communities.toUIKitCommunityInfoList(), // уже существует
     )
     is AdBlock.TextAd -> UIKitAdBlock.TextAd(
-        id = id, title = title, description = description,
-        actionText = actionText, actionUrl = actionUrl,
+        id = id,
+        title = title,
+        description = description,
+        actionText = actionText,
+        actionUrl = actionUrl,
     )
     is AdBlock.PeopleAd -> UIKitAdBlock.PeopleAd(
-        id = id, title = title, description = description,
+        id = id,
+        title = title,
+        description = description,
         users = users.map {
             UIKitAdBlock.PeopleAd.Person(
-                id = it.id, name = it.name, avatarUrl = it.avatarUrl, role = it.role,
+                id = it.id,
+                name = it.name,
+                avatarUrl = it.avatarUrl,
+                role = it.role,
             )
         },
     )
