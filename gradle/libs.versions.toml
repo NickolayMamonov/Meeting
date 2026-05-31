@@ -25,6 +25,7 @@ kotlinxSerialization = "1.6.3"
 ktlintGradle = "12.1.2"
 ktlint = "1.4.1"
 detekt = "1.23.7"
+coreSplashscreen = "1.2.0"
 
 # Testing
 mockk = "1.13.13"
@@ -88,6 +89,9 @@ ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 compose-compiler-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+
+
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
