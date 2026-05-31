@@ -14,6 +14,7 @@ import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
+import com.whysoezzy.testing.TestDispatcherProvider
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsEvent
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsNavEvent
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsUiState
@@ -51,6 +52,7 @@ class ProfileDetailsViewModelTest {
         getUserCommunitiesUseCase = getUserCommunitiesUseCase,
         manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
         logoutUseCase = logoutUseCase,
+        dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher),
     )
 
     // ==================== loadProfile — own profile ====================

@@ -2,6 +2,7 @@ package dev.whysoezzy.communities.details.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunityMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface CommunityDetailsNavEvent {
     data class NavigateToMeeting(
@@ -45,6 +47,8 @@ class CommunityDetailsViewModel(
     private val getCommunitySubscribersUseCase: GetCommunitySubscribersUseCase,
     private val subscribeToCommunityUseCase: SubscribeToCommunityUseCase,
     private val unsubscribeFromCommunityUseCase: UnsubscribeFromCommunityUseCase,
+    private val dispatchers: DispatcherProvider,
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow<CommunityDetailsUiState>(CommunityDetailsUiState.Loading)
@@ -84,27 +88,30 @@ class CommunityDetailsViewModel(
                         val meetingsDeferred = async { getCommunityMeetingsUseCase(communityId) }
                         val subscribersDeferred = async { getCommunitySubscribersUseCase(communityId) }
                         (meetingsDeferred.await().getOrNull() ?: emptyList()) to
-                            (subscribersDeferred.await().getOrNull() ?: emptyList())
+                                (subscribersDeferred.await().getOrNull() ?: emptyList())
                     }
 
-                    val currentTime = System.currentTimeMillis()
-                    val activeMeetings = meetings.filter { it.time >= currentTime }.sortedBy { it.time }
-                    val pastMeetings = meetings.filter { it.time < currentTime }.sortedByDescending { it.time }
+                    val success = withContext(dispatchers.default) {
+                        val now = currentTimeMillis()
+                        val activeMeetings = meetings.filter { it.time >= now }.sortedBy { it.time }
+                        val pastMeetings = meetings.filter { it.time < now }.sortedByDescending { it.time }
 
-                    _uiState.value = CommunityDetailsUiState.Success(
-                        communityId = community.id,
-                        imageUrl = community.imageUrl,
-                        title = community.name,
-                        tags = community.tags.map { tag ->
-                            UIKitMeetingTag(id = tag.id, text = tag.name, state = UIKitTagState.ACTIVE)
-                        },
-                        description = community.description,
-                        isSubscribed = community.isSubscribed,
-                        subscribersCount = community.subscribersCount,
-                        subscribers = subscribers.map { it.toUIKitPerson() },
-                        activeMeetings = activeMeetings.map { it.toUIKitMeetingInfo() },
-                        pastMeetings = pastMeetings.map { it.toUIKitMeetingInfo() },
-                    )
+                        CommunityDetailsUiState.Success(
+                            communityId = community.id,
+                            imageUrl = community.imageUrl,
+                            title = community.name,
+                            tags = community.tags.map { tag ->
+                                UIKitMeetingTag(id = tag.id, text = tag.name, state = UIKitTagState.ACTIVE)
+                            },
+                            description = community.description,
+                            isSubscribed = community.isSubscribed,
+                            subscribersCount = community.subscribersCount,
+                            subscribers = subscribers.map { it.toUIKitPerson() },
+                            activeMeetings = activeMeetings.map { it.toUIKitMeetingInfo() },
+                            pastMeetings = pastMeetings.map { it.toUIKitMeetingInfo() },
+                        )
+                    }
+                    _uiState.value = success
                 }
         }
     }
