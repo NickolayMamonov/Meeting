@@ -5,5 +5,4 @@ import androidx.compose.runtime.staticCompositionLocalOf
 
 val LocalWindowSizeClass = staticCompositionLocalOf<WindowSizeClass> {
     error("LocalWindowSizeClass not provided. Wrap content in CompositionLocalProvider in MainActivity.")
-
 }
