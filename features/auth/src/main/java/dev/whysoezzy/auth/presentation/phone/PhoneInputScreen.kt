@@ -31,6 +31,13 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
+private fun phoneErrorText(error: PhoneInputError?): String? = when (error) {
+    null -> null
+    PhoneInputError.Invalid -> stringResource(R.string.auth_phone_error_invalid)
+    is PhoneInputError.Remote -> error.message
+}
+
+@Composable
 fun PhoneInputScreen(
     onPhoneSubmitted: (String) -> Unit,
     onBackPressed: () -> Unit,
@@ -93,12 +100,13 @@ private fun PhoneInputContent(
         Spacer(modifier = Modifier.height(SpacingTokens.L))
 
         // Phone input
+        val phoneErr = phoneErrorText(uiState.error)
         UIKitPhoneInput(
             value = uiState.phoneNumber,
             onValueChange = onPhoneNumberChange,
             placeholder = stringResource(R.string.auth_phone_placeholder),
             state = if (uiState.error != null) UIKitInputState.ERROR else UIKitInputState.FILLED,
-            errorMessage = uiState.error,
+            errorMessage = phoneErr,                          // было: uiState.error
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -140,7 +148,7 @@ private fun PhoneInputScreenErrorPreview() {
             uiState =
                 PhoneInputUiState(
                     phoneNumber = "+7 (999) 123",
-                    error = stringResource(R.string.auth_phone_error_invalid),
+                    error = PhoneInputError.Invalid
                 ),
         )
     }
