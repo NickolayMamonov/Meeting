@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -34,6 +36,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
@@ -60,7 +66,6 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
-
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
@@ -95,10 +100,13 @@ fun MainScreen(
                 }
 
                 is MainScreenUiState.Success -> {
+                    val pagedMeetings = viewModel.pagedMeetings.collectAsLazyPagingItems()
                     MainScreenContent(
                         heroMeetings = state.heroMeetings,
                         popularMeetings = state.popularMeetings,
-                        allMeetings = state.allMeetings,
+                        searchResults = state.allMeetings,
+                        searchQuery = state.searchQuery,
+                        pagedMeetings = pagedMeetings,
                         communities = state.communities,
                         adBlocks = state.adBlocks,
                         onMeetingClick = onMeetingClick,
@@ -156,7 +164,9 @@ private fun LoadingContent() {
 private fun MainScreenContent(
     heroMeetings: List<UIKitMeetingInfo>,
     popularMeetings: List<UIKitMeetingInfo>,
-    allMeetings: List<UIKitMeetingInfo>,
+    searchResults: List<UIKitMeetingInfo>,
+    searchQuery: String,
+    pagedMeetings: LazyPagingItems<UIKitMeetingInfo>,
     communities: List<UIKitCommunityInfo>,
     adBlocks: List<UIKitAdBlock>,
     onMeetingClick: (Long) -> Unit,
@@ -165,11 +175,11 @@ private fun MainScreenContent(
     onCommunitySubscribeClick: (Long, Boolean) -> Unit,
 ) {
     // Генерируем бесконечный циклический список рекламных блоков, чтобы типы чередовались
+    val isSearching = searchQuery.isNotBlank()
     val cyclingAdBlocks = rememberCyclingAdBlocks(adBlocks)
-    val meetingsWithAds = remember(allMeetings, cyclingAdBlocks) {
-        buildMeetingsWithAdsList(allMeetings, cyclingAdBlocks)
+    val searchWithAds = remember(searchResults, cyclingAdBlocks) {
+        buildMeetingsWithAdsList(searchResults, cyclingAdBlocks)
     }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 16.dp),
@@ -275,48 +285,17 @@ private fun MainScreenContent(
             )
         }
 
-        items(
-            items = meetingsWithAds,
-            key = { item ->
-                when (item) {
-                    is MeetingOrAd.Meeting -> "meeting_${item.meeting.id}"
-                    is MeetingOrAd.Ad -> "ad_${item.adBlock.id}"
-                }
-            },
-        ) { item ->
-            when (item) {
-                is MeetingOrAd.Meeting -> {
-                    val eventCardTags = remember(item.meeting.tags) { item.meeting.tags.toEventCardTags() }
-                    UIKitEventCard(
-                        imageUrl = item.meeting.imageUrl,
-                        title = item.meeting.title,
-                        date = item.meeting.date,
-                        address = UIKitAddress(
-                            address = item.meeting.address,
-                            latitude = 0.0,
-                            longitude = 0.0,
-                        ),
-                        tags = eventCardTags,
-                        cardType = UIKitEventCardType.WIDE,
-                        onCardClick = { onMeetingClick(item.meeting.id) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-                is MeetingOrAd.Ad -> {
-                    AdBlockComponent(
-                        adBlock = item.adBlock,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        onUserClick = onUserProfileClick,
-                        onCommunitySubscribe = onCommunitySubscribeClick,
-                        onCommunityClick = onCommunityClick,
-                    )
-                }
-            }
-        }
+        allMeetingsSection(
+            isSearching = isSearching,
+            searchResults = searchResults,
+            searchWithAds = searchWithAds,
+            pagedMeetings = pagedMeetings,
+            cyclingAdBlocks = cyclingAdBlocks,
+            onMeetingClick = onMeetingClick,
+            onCommunityClick = onCommunityClick,
+            onUserProfileClick = onUserProfileClick,
+            onCommunitySubscribeClick = onCommunitySubscribeClick,
+        )
     }
 }
 
@@ -401,4 +380,144 @@ private fun buildMeetingsWithAdsList(
     }
 
     return result
+}
+
+@Composable
+private fun MeetingCardItem(
+    meeting: UIKitMeetingInfo,
+    onMeetingClick: (Long) -> Unit,
+) {
+    val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTags() }
+    UIKitEventCard(
+        imageUrl = meeting.imageUrl,
+        title = meeting.title,
+        date = meeting.date,
+        address = UIKitAddress(address = meeting.address, latitude = 0.0, longitude = 0.0),
+        tags = eventCardTags,
+        cardType = UIKitEventCardType.WIDE,
+        onCardClick = { onMeetingClick(meeting.id) },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+}
+
+private fun LazyListScope.pagedMeetingsLoadState(
+    items: LazyPagingItems<UIKitMeetingInfo>,
+    onRetry: () -> Unit,
+) {
+    when (items.loadState.append) {
+        is LoadState.Loading -> item {
+            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is LoadState.Error -> item {
+            PagingErrorRow(onRetry = onRetry)
+        }
+        else -> Unit
+    }
+    if (items.loadState.refresh is LoadState.Loading && items.itemCount == 0) {
+        item {
+            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+    }
+}
+
+@Composable
+private fun PagingErrorRow(
+    onRetry: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.meetings_main_paging_error),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Button(onClick = onRetry) {
+            Text(stringResource(UIKitR.string.action_retry))
+        }
+    }
+}
+
+@Composable
+private fun EmptySearchHint() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.meetings_main_search_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun LazyListScope.allMeetingsSection(
+    isSearching: Boolean,
+    searchResults: List<UIKitMeetingInfo>,
+    searchWithAds: List<MeetingOrAd>,
+    pagedMeetings: LazyPagingItems<UIKitMeetingInfo>,
+    cyclingAdBlocks: List<UIKitAdBlock>,
+    onMeetingClick: (Long) -> Unit,
+    onCommunityClick: (Long) -> Unit,
+    onUserProfileClick: (Long) -> Unit,
+    onCommunitySubscribeClick: (Long, Boolean) -> Unit,
+) {
+    if (isSearching) {
+        items(
+            items = searchWithAds,
+            key = { item ->
+                when (item) {
+                    is MeetingOrAd.Meeting -> "meeting_${item.meeting.id}"
+                    is MeetingOrAd.Ad -> "ad_${item.adBlock.id}"
+                }
+            },
+        ) { item ->
+            when (item) {
+                is MeetingOrAd.Meeting -> MeetingCardItem(item.meeting, onMeetingClick)
+                is MeetingOrAd.Ad -> AdBlockComponent(
+                    adBlock = item.adBlock,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    onUserClick = onUserProfileClick,
+                    onCommunitySubscribe = onCommunitySubscribeClick,
+                    onCommunityClick = onCommunityClick,
+                )
+            }
+        }
+        if (searchResults.isEmpty()) {
+            item { EmptySearchHint() }
+        }
+    } else {
+        items(
+            count = pagedMeetings.itemCount,
+            key = pagedMeetings.itemKey { "meeting_${it.id}" },
+        ) { index ->
+            val meeting = pagedMeetings[index]
+            if (meeting != null) {
+                MeetingCardItem(meeting, onMeetingClick)
+                if ((index + 1) % AD_BLOCK_INTERVAL == 0 && cyclingAdBlocks.isNotEmpty()) {
+                    val ad = cyclingAdBlocks[(index / AD_BLOCK_INTERVAL) % cyclingAdBlocks.size]
+                    AdBlockComponent(
+                        adBlock = ad,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        onUserClick = onUserProfileClick,
+                        onCommunitySubscribe = onCommunitySubscribeClick,
+                        onCommunityClick = onCommunityClick,
+                    )
+                }
+            }
+        }
+        pagedMeetingsLoadState(pagedMeetings, onRetry = { pagedMeetings.retry() })
+    }
 }

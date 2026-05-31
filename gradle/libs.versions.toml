@@ -29,6 +29,7 @@ coreSplashscreen = "1.2.0"
 googleServices = "4.4.4"
 firebaseCrashlyticsPlugin = "3.0.7"
 firebaseBom = "34.14.0"
+paging = "3.4.2"
 
 # Testing
 mockk = "1.13.13"
@@ -96,8 +97,14 @@ android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref 
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 compose-compiler-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 
-
+#Splahscreen
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
+
+#Paging
+androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
+androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
+androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "paging" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

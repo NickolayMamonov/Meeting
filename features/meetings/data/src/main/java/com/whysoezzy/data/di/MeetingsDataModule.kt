@@ -8,6 +8,7 @@ import com.whysoezzy.domain.usecase.GetAllMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetHeroMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.GetMeetingParticipantsUseCase
+import com.whysoezzy.domain.usecase.GetPagedMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetPopularMeetingsUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
@@ -29,4 +30,5 @@ val meetingsModule = module {
     factory { GetMeetingParticipantsUseCase(get()) }
     factory { JoinMeetingUseCase(get()) }
     factory { LeaveMeetingUseCase(get()) }
+    factory { GetPagedMeetingsUseCase(get()) }
 }

@@ -6,4 +6,5 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.paging.common)
 }

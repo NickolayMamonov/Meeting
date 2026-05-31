@@ -17,4 +17,7 @@
     <!-- MeetingParticipantsScreen -->
     <string name="meeting_participants_default_title">Участники</string>
     <string name="meeting_participants_empty">Пока нет участников</string>
+
+    <string name="meetings_main_paging_error">Не удалось загрузить</string>
+    <string name="meetings_main_search_empty">Ничего не найдено</string>
 </resources>
