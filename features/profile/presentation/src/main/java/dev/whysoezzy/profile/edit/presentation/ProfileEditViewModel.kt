@@ -340,7 +340,6 @@ class ProfileEditViewModel(
         !ValidationUtils.isValidEmail(email) -> "Введите корректный email"
         else -> null
     }
-
     private fun validateDescription(description: String): String? = when {
         description.length > 500 -> "Максимум 500 символов"
         else -> null

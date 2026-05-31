@@ -88,7 +88,7 @@ class CommunityDetailsViewModel(
                         val meetingsDeferred = async { getCommunityMeetingsUseCase(communityId) }
                         val subscribersDeferred = async { getCommunitySubscribersUseCase(communityId) }
                         (meetingsDeferred.await().getOrNull() ?: emptyList()) to
-                            (subscribersDeferred.await().getOrNull() ?: emptyList())
+                                (subscribersDeferred.await().getOrNull() ?: emptyList())
                     }
 
                     val success = withContext(dispatchers.default) {
