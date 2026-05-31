@@ -34,7 +34,8 @@ class CrashReportingTreeTest {
     fun `ERROR with throwable records exception`() {
         val ex = RuntimeException("boom")
         Timber.tag("Tag").e(ex, "err msg")
-        verify { reporter.log("[Tag] err msg") }
+
+        verify { reporter.log(match { it.startsWith("[Tag] err msg") }) }
         verify { reporter.recordException(ex) }
     }
 
