@@ -18,6 +18,7 @@ import dev.whysoezzy.profile.details.presentation.ProfileDetailsEvent
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsNavEvent
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsUiState
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsViewModel
+import dev.whysoezzy.profile.details.presentation.ProfileMode
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -61,7 +62,8 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(emptyList())
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
+
         advanceUntilIdle()
 
         val state = vm.uiState.value
@@ -80,7 +82,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(99L) } returns Result.success(emptyList())
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(99L))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Other(99L)))
         advanceUntilIdle()
 
         val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -98,7 +100,7 @@ class ProfileDetailsViewModelTest {
             coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(sampleCommunities)
 
             val vm = viewModel()
-            vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
             advanceUntilIdle()
 
             val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -120,7 +122,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(sampleCommunities)
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -137,7 +139,7 @@ class ProfileDetailsViewModelTest {
         val vm = viewModel()
 
         vm.navEvent.test {
-            vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
             advanceUntilIdle()
 
             assertEquals(ProfileDetailsNavEvent.NavigateToNameInput, awaitItem())
@@ -151,7 +153,7 @@ class ProfileDetailsViewModelTest {
                 Result.failure(RuntimeException("Network error"))
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value is ProfileDetailsUiState.Error)
@@ -166,7 +168,7 @@ class ProfileDetailsViewModelTest {
         val vm = viewModel()
 
         vm.navEvent.test {
-            vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
             advanceUntilIdle()
 
             assertEquals(ProfileDetailsNavEvent.NavigateToAuth, awaitItem())
@@ -186,7 +188,7 @@ class ProfileDetailsViewModelTest {
         coEvery { manageCommunitySubscriptionUseCase(any(), any()) } returns Result.success(Unit)
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         // community id=1 изначально isSubscribed=false
@@ -206,7 +208,7 @@ class ProfileDetailsViewModelTest {
                 Result.failure(RuntimeException("Server error"))
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         vm.onEvent(ProfileDetailsEvent.ToggleCommunitySubscription(communityId = 1L, isSubscribed = true))
@@ -229,7 +231,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(communities)
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -261,7 +263,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(emptyList())
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         vm.navEvent.test {

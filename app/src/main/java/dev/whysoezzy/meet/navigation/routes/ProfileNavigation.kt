@@ -12,6 +12,7 @@ import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import dev.whysoezzy.auth.presentation.name.NameInputScreen
 import dev.whysoezzy.meet.navigation.MeetRoute
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsScreen
+import dev.whysoezzy.profile.details.presentation.ProfileMode
 import dev.whysoezzy.profile.edit.presentation.ProfileEditScreen
 import org.koin.compose.koinInject
 
@@ -33,7 +34,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
             }
             true -> {
                 ProfileDetailsScreen(
-                    userId = null,
+                    mode = ProfileMode.Self,
                     onBackPressed = { navController.popBackStack() },
                     onEditClick = { navController.navigate(MeetRoute.ProfileEdit.route) },
                     onLogout = {
@@ -62,7 +63,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
     ) { backStackEntry ->
         val userId = backStackEntry.arguments?.getLong("userId") ?: 0L
         ProfileDetailsScreen(
-            userId = userId,
+            mode = ProfileMode.Other(userId),
             onBackPressed = { navController.popBackStack() },
             onMeetingClick = { meetingId ->
                 navController.navigate(MeetRoute.MeetingDetails.createRoute(meetingId))

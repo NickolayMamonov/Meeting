@@ -31,7 +31,7 @@ sealed interface ProfileDetailsUiState {
 
 sealed interface ProfileDetailsEvent {
     data class LoadProfile(
-        val userId: Long?,
+        val mode: ProfileMode,
     ) : ProfileDetailsEvent
 
     data object EditProfile : ProfileDetailsEvent

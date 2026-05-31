@@ -39,7 +39,7 @@ class ProfileDetailsViewModel(
 
     fun onEvent(event: ProfileDetailsEvent) {
         when (event) {
-            is ProfileDetailsEvent.LoadProfile -> loadProfile(event.userId)
+            is ProfileDetailsEvent.LoadProfile -> loadProfile(event.mode)
             is ProfileDetailsEvent.EditProfile -> viewModelScope.launch {
                 _navEvent.emit(ProfileDetailsNavEvent.NavigateToEdit)
             }
@@ -57,12 +57,15 @@ class ProfileDetailsViewModel(
         }
     }
 
-    private fun loadProfile(userId: Long?) {
+    private fun loadProfile(mode: ProfileMode) {
         viewModelScope.launch {
             _uiState.value = ProfileDetailsUiState.Loading
 
-            val isOwnProfile = userId == null
-            val userResult = if (isOwnProfile) getCurrentUserUseCase() else getUserByIdUseCase(userId)
+            val isOwnProfile = mode is ProfileMode.Self
+            val userResult = when (mode) {
+                ProfileMode.Self -> getCurrentUserUseCase()
+                is ProfileMode.Other -> getUserByIdUseCase(mode.userId)
+            }
 
             userResult
                 .onFailure { exception ->

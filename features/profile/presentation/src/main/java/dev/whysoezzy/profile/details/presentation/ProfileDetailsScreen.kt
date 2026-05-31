@@ -55,7 +55,7 @@ private val ErrorButtonMaxWidth = 343.dp
 @Composable
 fun ProfileDetailsScreen(
     modifier: Modifier = Modifier,
-    userId: Long? = null,
+    mode: ProfileMode,
     onBackPressed: () -> Unit,
     onEditClick: () -> Unit = {},
     onLogout: () -> Unit = {},
@@ -71,8 +71,8 @@ fun ProfileDetailsScreen(
 
     SecureScreenEffect()
 
-    LaunchedEffect(userId) {
-        viewModel.onEvent(ProfileDetailsEvent.LoadProfile(userId))
+    LaunchedEffect(mode) {
+        viewModel.onEvent(ProfileDetailsEvent.LoadProfile(mode))
     }
 
     LaunchedEffect(Unit) {
@@ -108,7 +108,7 @@ fun ProfileDetailsScreen(
 
             is ProfileDetailsUiState.Error -> ErrorContent(
                 message = state.message,
-                onRetry = { viewModel.onEvent(ProfileDetailsEvent.LoadProfile(userId)) },
+                onRetry = { viewModel.onEvent(ProfileDetailsEvent.LoadProfile(mode)) },
                 onBackPressed = onBackPressed,
             )
         }
