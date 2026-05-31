@@ -173,7 +173,7 @@ private fun PeopleAdBlock(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(adBlock.users) { user ->
+            items(adBlock.users, key = { it.id }) { user ->
                 UIKitPersonCard(
                     imageUrl = user.avatarUrl,
                     name = user.name,
