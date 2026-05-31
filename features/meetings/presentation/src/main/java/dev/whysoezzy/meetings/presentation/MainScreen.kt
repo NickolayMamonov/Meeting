@@ -34,7 +34,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
@@ -42,6 +41,7 @@ import dev.whysoezzy.uikit.components.cards.UIKitEventCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
 import dev.whysoezzy.uikit.components.search.UIKitSearchBar
 import dev.whysoezzy.uikit.components.text.TextHeading2
+import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
@@ -158,7 +158,7 @@ private fun MainScreenContent(
     popularMeetings: List<UIKitMeetingInfo>,
     allMeetings: List<UIKitMeetingInfo>,
     communities: List<UIKitCommunityInfo>,
-    adBlocks: List<AdBlock>,
+    adBlocks: List<UIKitAdBlock>,
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit,
     onUserProfileClick: (Long) -> Unit,
@@ -359,7 +359,7 @@ private sealed interface MeetingOrAd {
     ) : MeetingOrAd
 
     data class Ad(
-        val adBlock: AdBlock,
+        val adBlock: UIKitAdBlock,
     ) : MeetingOrAd
 }
 
@@ -369,7 +369,8 @@ private sealed interface MeetingOrAd {
  * Если isNotEmpty(), генерируется список из ~3×meetings.size/3 элементов.
  */
 @Composable
-private fun rememberCyclingAdBlocks(adBlocks: List<AdBlock>): List<AdBlock> {
+private fun rememberCyclingAdBlocks(adBlocks: List<UIKitAdBlock>): List<UIKitAdBlock> {
+
     return remember(adBlocks) {
         if (adBlocks.isEmpty()) return@remember emptyList()
         // Нам нужно больше блоков, чем есть уникальных — циклически повторяем
@@ -384,7 +385,7 @@ private fun rememberCyclingAdBlocks(adBlocks: List<AdBlock>): List<AdBlock> {
  */
 private fun buildMeetingsWithAdsList(
     meetings: List<UIKitMeetingInfo>,
-    adBlocks: List<AdBlock>,
+    adBlocks: List<UIKitAdBlock>,
 ): List<MeetingOrAd> {
     if (adBlocks.isEmpty()) return meetings.map { MeetingOrAd.Meeting(it) }
 

@@ -6,10 +6,14 @@ import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.toUserMessage
+import dev.whysoezzy.meetings.mappers.toUIKitAdBlocks
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfos
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingTags
+import dev.whysoezzy.uikit.models.UIKitAdBlock
+import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
+import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitTagState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,7 +45,6 @@ class MainScreenViewModel(
     private val _navEvent = MutableSharedFlow<MainScreenNavEvent>(extraBufferCapacity = 1)
     val navEvent: SharedFlow<MainScreenNavEvent> = _navEvent.asSharedFlow()
 
-    // Кэш всех встреч для локальной фильтрации без повторных запросов к API
     private var cachedAllMeetings: List<UIKitMeetingInfo> = emptyList()
 
     init {
@@ -72,27 +75,25 @@ class MainScreenViewModel(
             getMainScreenDataUseCase()
                 .onSuccess { data ->
                     val mapped = withContext(dispatchers.default) {
-                        val allMeetings = data.allMeetings.toUIKitMeetingInfos()
-                        val heroMeetings = data.heroMeetings.toUIKitMeetingInfos()
-                        val popularMeetings = data.popularMeetings.toUIKitMeetingInfos()
-                        val categories = data.categories.toUIKitMeetingTags()
-                        Triple(allMeetings, heroMeetings to popularMeetings, categories)
+                        MappedHomeData(
+                            allMeetings = data.allMeetings.toUIKitMeetingInfos(),
+                            heroMeetings = data.heroMeetings.toUIKitMeetingInfos(),
+                            popularMeetings = data.popularMeetings.toUIKitMeetingInfos(),
+                            categories = data.categories.toUIKitMeetingTags(),
+                            communities = data.communities.toUIKitCommunityInfoList(),
+                            adBlocks = data.adBlocks.toUIKitAdBlocks(),
+                        )
                     }
 
-                    val (allMeetingsMapped, heroPair, categories) = mapped
-                    val (heroMeetings, popularMeetings) = heroPair
-
-                    cachedAllMeetings = allMeetingsMapped
-
-                    val communities = data.communities.toUIKitCommunityInfoList()
+                    cachedAllMeetings = mapped.allMeetings
 
                     _uiState.value = MainScreenUiState.Success(
-                        heroMeetings = heroMeetings,
-                        popularMeetings = popularMeetings,
-                        allMeetings = allMeetingsMapped,
-                        categories = categories,
-                        communities = communities,
-                        adBlocks = data.adBlocks,
+                        heroMeetings = mapped.heroMeetings,
+                        popularMeetings = mapped.popularMeetings,
+                        allMeetings = mapped.allMeetings,
+                        categories = mapped.categories,
+                        communities = mapped.communities,
+                        adBlocks = mapped.adBlocks,
                     )
                 }.onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
@@ -188,4 +189,13 @@ class MainScreenViewModel(
             },
         )
     }
+
+    private data class MappedHomeData(
+        val allMeetings: List<UIKitMeetingInfo>,
+        val heroMeetings: List<UIKitMeetingInfo>,
+        val popularMeetings: List<UIKitMeetingInfo>,
+        val categories: List<UIKitMeetingTag>,
+        val communities: List<UIKitCommunityInfo>,
+        val adBlocks: List<UIKitAdBlock>,
+    )
 }

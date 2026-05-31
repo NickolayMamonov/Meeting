@@ -16,18 +16,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.whysoezzy.domain.models.AdBlock
 import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
 import dev.whysoezzy.uikit.components.cards.UIKitPersonCard
 import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
+import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 @Composable
 fun AdBlockComponent(
-    adBlock: AdBlock,
+    adBlock: UIKitAdBlock,
     modifier: Modifier = Modifier,
     onCommunitySubscribe: (Long, Boolean) -> Unit = { _, _ -> },
     onCommunityClick: (Long) -> Unit = {},
@@ -35,20 +35,20 @@ fun AdBlockComponent(
     onAdClick: () -> Unit = {},
 ) {
     when (adBlock) {
-        is AdBlock.CommunitiesAd -> CommunitiesAdBlock(
+        is UIKitAdBlock.CommunitiesAd -> CommunitiesAdBlock(
             adBlock = adBlock,
             modifier = modifier,
             onCommunitySubscribe = onCommunitySubscribe,
             onCommunityClick = onCommunityClick,
         )
 
-        is AdBlock.TextAd -> TextAdBlock(
+        is UIKitAdBlock.TextAd -> TextAdBlock(
             adBlock = adBlock,
             modifier = modifier,
             onClick = onAdClick,
         )
 
-        is AdBlock.PeopleAd -> PeopleAdBlock(
+        is UIKitAdBlock.PeopleAd -> PeopleAdBlock(
             adBlock = adBlock,
             modifier = modifier,
             onUserClick = onUserClick,
@@ -58,7 +58,7 @@ fun AdBlockComponent(
 
 @Composable
 private fun CommunitiesAdBlock(
-    adBlock: AdBlock.CommunitiesAd,
+    adBlock: UIKitAdBlock.CommunitiesAd,
     modifier: Modifier = Modifier,
     onCommunitySubscribe: (Long, Boolean) -> Unit,
     onCommunityClick: (Long) -> Unit,
@@ -89,7 +89,7 @@ private fun CommunitiesAdBlock(
             items(adBlock.communities, key = { it.id }) { community ->
                 UIKitCommunityCard(
                     imageUrl = community.imageUrl,
-                    title = community.name,
+                    title = community.title,
                     isSubscribed = community.isSubscribed,
                     onSubscribeClick = { isSubscribed ->
                         onCommunitySubscribe(community.id, isSubscribed)
@@ -103,7 +103,7 @@ private fun CommunitiesAdBlock(
 
 @Composable
 private fun TextAdBlock(
-    adBlock: AdBlock.TextAd,
+    adBlock: UIKitAdBlock.TextAd,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -146,7 +146,7 @@ private fun TextAdBlock(
 
 @Composable
 private fun PeopleAdBlock(
-    adBlock: AdBlock.PeopleAd,
+    adBlock: UIKitAdBlock.PeopleAd,
     modifier: Modifier = Modifier,
     onUserClick: (Long) -> Unit,
 ) {

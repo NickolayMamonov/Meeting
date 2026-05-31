@@ -2,6 +2,7 @@ package dev.whysoezzy.meetings.presentation
 
 import androidx.compose.runtime.Immutable
 import com.whysoezzy.domain.models.AdBlock
+import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
@@ -16,7 +17,7 @@ sealed interface MainScreenUiState {
         val allMeetings: List<UIKitMeetingInfo>,
         val categories: List<UIKitMeetingTag>,
         val communities: List<UIKitCommunityInfo>,
-        val adBlocks: List<AdBlock> = emptyList(),
+        val adBlocks: List<UIKitAdBlock> = emptyList(),
         val searchQuery: String = "",
     ) : MainScreenUiState
 
