@@ -15,6 +15,7 @@ import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.TagState
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
+import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunity
@@ -45,6 +46,13 @@ fun Person.toUIKit() = UIKitPerson(
     surname = surname,
     avatar = avatarUrl,
     description = bio,
+)
+
+fun Person.toPersonItem() = PersonItem(
+    id = id,
+    name = "$name $surname",
+    role = role,
+    imageUrl = avatarUrl,
 )
 
 fun List<Person>.toUIKitPersons() = map { it.toUIKit() }

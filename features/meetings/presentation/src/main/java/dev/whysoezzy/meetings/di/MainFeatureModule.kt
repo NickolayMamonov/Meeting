@@ -26,5 +26,10 @@ val mainFeatureModule = module {
             dispatchers = get(),
         )
     }
-    viewModel { MeetingParticipantsViewModel(get<GetMeetingParticipantsUseCase>()) }
+    viewModel {
+        MeetingParticipantsViewModel(
+            getMeetingParticipantsUseCase = get(),
+            dispatchers = get(),
+        )
+    }
 }
