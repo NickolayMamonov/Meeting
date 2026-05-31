@@ -34,7 +34,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileDetailsViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -120,7 +119,7 @@ class ProfileDetailsViewModelTest {
         // coroutineScope + getOrNull — ошибка в одном async не ломает другой (R-021)
         coEvery { getCurrentUserUseCase() } returns Result.success(sampleUser)
         coEvery { getUserMeetingsUseCase(USER_ID) } returns
-                Result.failure(RuntimeException("timeout"))
+            Result.failure(RuntimeException("timeout"))
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(sampleCommunities)
 
         val vm = viewModel()
@@ -128,8 +127,8 @@ class ProfileDetailsViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value as ProfileDetailsUiState.Success
-        assertEquals(0, state.userMeetings.size)       // emptyList из getOrNull
-        assertEquals(2, state.userCommunities.size)    // communities пришли нормально
+        assertEquals(0, state.userMeetings.size) // emptyList из getOrNull
+        assertEquals(2, state.userCommunities.size) // communities пришли нормально
     }
 
     // ==================== loadProfile — edge cases ====================
@@ -152,7 +151,7 @@ class ProfileDetailsViewModelTest {
     @Test
     fun `loadProfile failure emits Error state`() = runTest {
         coEvery { getCurrentUserUseCase() } returns
-                Result.failure(RuntimeException("Network error"))
+            Result.failure(RuntimeException("Network error"))
 
         val vm = viewModel()
         vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
@@ -164,7 +163,7 @@ class ProfileDetailsViewModelTest {
     @Test
     fun `loadProfile UnauthorizedError triggers logout and NavigateToAuth`() = runTest {
         coEvery { getCurrentUserUseCase() } returns
-                Result.failure(ApiException.UnauthorizedError("401"))
+            Result.failure(ApiException.UnauthorizedError("401"))
         coEvery { logoutUseCase() } returns Unit
 
         val vm = viewModel()
@@ -207,7 +206,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserMeetingsUseCase(USER_ID) } returns Result.success(emptyList())
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(sampleCommunities)
         coEvery { manageCommunitySubscriptionUseCase(any(), any()) } returns
-                Result.failure(RuntimeException("Server error"))
+            Result.failure(RuntimeException("Server error"))
 
         val vm = viewModel()
         vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
@@ -280,12 +279,29 @@ class ProfileDetailsViewModelTest {
     }
 
     // ==================== isValidEmail ====================
-    @Test fun `email valid simple`() { assertTrue(ValidationUtils.isValidEmail("user@example.com")) }
-    @Test fun `email valid with dots and plus`() { assertTrue(ValidationUtils.isValidEmail("a.b+tag@mail.co.uk")) }
-    @Test fun `email without at is invalid`() { assertFalse(ValidationUtils.isValidEmail("userexample.com")) }
-    @Test fun `email without domain is invalid`() { assertFalse(ValidationUtils.isValidEmail("user@")) }
-    @Test fun `email without tld is invalid`() { assertFalse(ValidationUtils.isValidEmail("user@example")) }
-    @Test fun `email blank is invalid`() { assertFalse(ValidationUtils.isValidEmail("")) }
+    @Test fun `email valid simple`() {
+        assertTrue(ValidationUtils.isValidEmail("user@example.com"))
+    }
+
+    @Test fun `email valid with dots and plus`() {
+        assertTrue(ValidationUtils.isValidEmail("a.b+tag@mail.co.uk"))
+    }
+
+    @Test fun `email without at is invalid`() {
+        assertFalse(ValidationUtils.isValidEmail("userexample.com"))
+    }
+
+    @Test fun `email without domain is invalid`() {
+        assertFalse(ValidationUtils.isValidEmail("user@"))
+    }
+
+    @Test fun `email without tld is invalid`() {
+        assertFalse(ValidationUtils.isValidEmail("user@example"))
+    }
+
+    @Test fun `email blank is invalid`() {
+        assertFalse(ValidationUtils.isValidEmail(""))
+    }
     // ==================== Fixtures ====================
 
     private companion object {

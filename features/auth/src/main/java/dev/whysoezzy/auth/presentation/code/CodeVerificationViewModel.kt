@@ -35,9 +35,9 @@ class CodeVerificationViewModel(
     private val sendOtpUseCase: SendOtpUseCase,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
-
     private val phoneNumber: String =
         URLDecoder.decode(savedStateHandle.get<String>(ARG_PHONE).orEmpty(), "UTF-8")
+
     companion object {
         const val ARG_PHONE = "phoneNumber"
         private const val OTP_RESEND_TIMEOUT_SECONDS = 60

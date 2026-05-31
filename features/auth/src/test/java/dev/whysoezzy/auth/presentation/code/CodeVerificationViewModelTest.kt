@@ -26,7 +26,6 @@ import java.net.URLEncoder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CodeVerificationViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -123,7 +122,7 @@ class CodeVerificationViewModelTest {
     @Test
     fun `verify failure sets error in state`() = runTest {
         coEvery { verifyOtpUseCase(any(), any()) } returns
-                Result.failure(RuntimeException("Invalid code"))
+            Result.failure(RuntimeException("Invalid code"))
 
         val vm = viewModel()
         vm.onEvent(CodeVerificationEvent.UpdateCode("0000"))

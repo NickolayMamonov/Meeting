@@ -106,7 +106,7 @@ private fun PhoneInputContent(
             onValueChange = onPhoneNumberChange,
             placeholder = stringResource(R.string.auth_phone_placeholder),
             state = if (uiState.error != null) UIKitInputState.ERROR else UIKitInputState.FILLED,
-            errorMessage = phoneErr,                          // было: uiState.error
+            errorMessage = phoneErr, // было: uiState.error
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -148,7 +148,7 @@ private fun PhoneInputScreenErrorPreview() {
             uiState =
                 PhoneInputUiState(
                     phoneNumber = "+7 (999) 123",
-                    error = PhoneInputError.Invalid
+                    error = PhoneInputError.Invalid,
                 ),
         )
     }

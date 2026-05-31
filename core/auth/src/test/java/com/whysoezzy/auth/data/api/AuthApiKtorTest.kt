@@ -10,6 +10,7 @@ import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,11 +21,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import io.ktor.http.Headers
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthApiKtorTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 

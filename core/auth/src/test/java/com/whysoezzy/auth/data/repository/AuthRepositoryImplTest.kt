@@ -27,7 +27,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthRepositoryImplTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -82,7 +81,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `verifyOtp isNewUser=true propagates to AuthResult`() = runTest {
         coEvery { authApi.verifyOtp(any(), any(), any(), any()) } returns
-                successAuthResponse(isNewUser = true)
+            successAuthResponse(isNewUser = true)
         coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
         val result = repository().verifyOtp("+79991234567", "1234")
@@ -93,7 +92,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `verifyOtp failure returns Result failure without saving tokens`() = runTest {
         coEvery { authApi.verifyOtp(any(), any(), any(), any()) } throws
-                RuntimeException("Invalid code")
+            RuntimeException("Invalid code")
 
         val result = repository().verifyOtp("+79991234567", "0000")
 
@@ -108,7 +107,7 @@ class AuthRepositoryImplTest {
         coEvery { tokenManager.getRefreshToken() } returns "oldRefresh"
         coEvery { tokenManager.getUserId() } returns 1L
         coEvery { authApi.refreshToken("oldRefresh") } returns
-                RefreshTokenResponse(accessToken = "newAccess", refreshToken = "newRefresh")
+            RefreshTokenResponse(accessToken = "newAccess", refreshToken = "newRefresh")
         coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
         val result = repository().refreshToken()
@@ -188,8 +187,6 @@ class AuthRepositoryImplTest {
         // clearTokens должен выполниться несмотря на отмену (NonCancellable в finally)
         coVerify(exactly = 1) { tokenManager.clearTokens() }
     }
-
-
 
     // ==================== Fixtures ====================
 

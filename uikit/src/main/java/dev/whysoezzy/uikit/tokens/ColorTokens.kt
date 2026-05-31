@@ -16,7 +16,6 @@ object ColorTokens {
 
     val SocialButtonBackground = Color(0xFF9A10F0)
 
-
     // Neutral Colors
     val NeutralActive = Color(0xFF29183B)
     val NeutralDark = Color(0xFF190E26)

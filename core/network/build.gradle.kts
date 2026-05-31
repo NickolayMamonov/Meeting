@@ -15,7 +15,7 @@ android {
             val baseUrl = (project.findProperty("BASE_URL_RELEASE") as? String) ?: "https://api.example.com"
             check(baseUrl.startsWith("https://")) {
                 "BASE_URL_RELEASE must use https:// (got: $baseUrl). " +
-                        "Set it in ~/.gradle/gradle.properties or via CI environment."
+                    "Set it in ~/.gradle/gradle.properties or via CI environment."
             }
             buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
         }

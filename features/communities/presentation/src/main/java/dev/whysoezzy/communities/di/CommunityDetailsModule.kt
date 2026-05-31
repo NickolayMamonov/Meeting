@@ -20,7 +20,7 @@ val communityModule = module {
         CommunitySubscribersViewModel(
             getCommunityByIdUseCase = get(),
             getCommunitySubscribersUseCase = get(),
-            dispatchers = get()
+            dispatchers = get(),
         )
     }
 }
