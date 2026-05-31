@@ -1,7 +1,7 @@
 package dev.whysoezzy.communities.subscribers
 
 import androidx.compose.runtime.Immutable
-import com.whysoezzy.domain.models.Person
+import dev.whysoezzy.uikit.components.layouts.PersonItem
 
 @Immutable
 sealed interface CommunitySubscribersUiState {
@@ -9,7 +9,7 @@ sealed interface CommunitySubscribersUiState {
 
     data class Success(
         val communityName: String,
-        val subscribers: List<Person>,
+        val subscribers: List<PersonItem>,
     ) : CommunitySubscribersUiState
 
     data class Error(

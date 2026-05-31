@@ -4,6 +4,7 @@ import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.testing.MainDispatcherRule
+import com.whysoezzy.testing.TestDispatcherProvider
 import dev.whysoezzy.communities.subscribers.CommunitySubscribersEvent
 import dev.whysoezzy.communities.subscribers.CommunitySubscribersUiState
 import dev.whysoezzy.communities.subscribers.CommunitySubscribersViewModel
@@ -29,6 +30,7 @@ class CommunitySubscribersViewModelTest {
     private fun viewModel() = CommunitySubscribersViewModel(
         getCommunityByIdUseCase = getCommunityByIdUseCase,
         getCommunitySubscribersUseCase = getCommunitySubscribersUseCase,
+        dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher),   // NEW
     )
 
     @Test
@@ -40,9 +42,7 @@ class CommunitySubscribersViewModelTest {
         vm.onEvent(CommunitySubscribersEvent.LoadSubscribers(COMMUNITY_ID))
         advanceUntilIdle()
 
-        val state = vm.uiState.value
-        assertTrue(state is CommunitySubscribersUiState.Success)
-        state as CommunitySubscribersUiState.Success
+        val state = vm.uiState.value as CommunitySubscribersUiState.Success
         assertEquals("Книжный клуб", state.communityName)
         assertEquals(2, state.subscribers.size)
     }

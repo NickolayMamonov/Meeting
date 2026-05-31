@@ -2,9 +2,11 @@ package dev.whysoezzy.communities.subscribers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.network.toUserMessage
+import dev.whysoezzy.communities.mappers.toPersonItem
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -24,6 +27,7 @@ sealed interface CommunitySubscribersNavEvent {
 class CommunitySubscribersViewModel(
     private val getCommunityByIdUseCase: GetCommunityByIdUseCase,
     private val getCommunitySubscribersUseCase: GetCommunitySubscribersUseCase,
+    private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow<CommunitySubscribersUiState>(CommunitySubscribersUiState.Loading)
@@ -47,9 +51,13 @@ class CommunitySubscribersViewModel(
             try {
                 val community = getCommunityByIdUseCase(communityId).getOrThrow()
                 val subscribers = getCommunitySubscribersUseCase(communityId).getOrThrow()
+
+                val items = withContext(dispatchers.default) {
+                    subscribers.map { it.toPersonItem() }
+                }
                 _uiState.value = CommunitySubscribersUiState.Success(
                     communityName = community.name,
-                    subscribers = subscribers,
+                    subscribers = items,
                 )
             } catch (e: CancellationException) {
                 throw e
