@@ -42,7 +42,7 @@ fun CodeVerificationScreen(
     onCodeVerifiedExisting: () -> Unit,
     onCodeVerifiedNew: (phone: String, code: String) -> Unit,
     onBackPressed: () -> Unit,
-    viewModel: CodeVerificationViewModel = koinViewModel { parametersOf(phoneNumber) },
+    viewModel: CodeVerificationViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current

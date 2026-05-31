@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.presentation.code
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
@@ -21,6 +22,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.net.URLEncoder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CodeVerificationViewModelTest {
@@ -33,7 +35,9 @@ class CodeVerificationViewModelTest {
     private val testPhone = "+79991234567"
 
     private fun TestScope.viewModel() = CodeVerificationViewModel(
-        phoneNumber = testPhone,
+        savedStateHandle = SavedStateHandle(
+            mapOf(CodeVerificationViewModel.ARG_PHONE to URLEncoder.encode(testPhone, "UTF-8")),
+        ),
         verifyOtpUseCase = verifyOtpUseCase,
         sendOtpUseCase = sendOtpUseCase,
         currentTimeMillis = { testScheduler.currentTime },
