@@ -31,6 +31,7 @@ class CodeVerificationViewModel(
     private val phoneNumber: String,
     private val verifyOtpUseCase: VerifyOtpUseCase,
     private val sendOtpUseCase: SendOtpUseCase,
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     companion object {
         private const val OTP_RESEND_TIMEOUT_SECONDS = 60
@@ -126,11 +127,11 @@ class CodeVerificationViewModel(
         timerJob?.cancel()
         timerJob =
             viewModelScope.launch {
-                val startTime = System.currentTimeMillis()
+                val startTime = currentTimeMillis()
                 val durationMs = TIMER_DURATION_MS
 
                 while (true) {
-                    val elapsed = System.currentTimeMillis() - startTime
+                    val elapsed = currentTimeMillis() - startTime
                     val remaining = ((durationMs - elapsed) / 1000).toInt().coerceAtLeast(0)
                     _uiState.value =
                         _uiState.value.copy(
