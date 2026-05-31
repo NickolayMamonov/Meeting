@@ -25,7 +25,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class ProfileDetailsViewModel(
+class ProfileDetailsViewModel
+    @Suppress("LongParameterList")
+    constructor(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val getUserByIdUseCase: GetUserByIdUseCase,
     private val getUserMeetingsUseCase: GetUserMeetingsUseCase,
