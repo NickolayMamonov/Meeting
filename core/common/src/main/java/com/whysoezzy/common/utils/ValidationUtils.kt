@@ -1,6 +1,8 @@
 package com.whysoezzy.common.utils
 
 object ValidationUtils {
+    private val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+
     /**
      * Номер телефона валиден если содержит 11 цифр, начиная с 7 или 8.
      * Бэкенд сам нормализует формат к +7XXXXXXXXXX.
@@ -23,4 +25,6 @@ object ValidationUtils {
     fun isValidName(name: String): Boolean = name.isNotBlank() && name.length >= 2 && name.all { it.isLetter() || it == '-' || it == ' ' }
 
     fun isValidSurname(surname: String): Boolean = isValidName(surname)
+
+    fun isValidEmail(email: String): Boolean = EMAIL_REGEX.matches(email)
 }

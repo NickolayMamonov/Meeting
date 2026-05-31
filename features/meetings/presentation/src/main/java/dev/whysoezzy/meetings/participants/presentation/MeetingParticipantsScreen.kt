@@ -54,15 +54,7 @@ fun MeetingParticipantsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = when (uiState) {
-                            is MeetingParticipantsUiState.Success ->
-                                (uiState as MeetingParticipantsUiState.Success).meetingTitle
-                            else -> stringResource(R.string.meeting_participants_default_title)
-                        },
-                    )
-                },
+                title = { Text(text = stringResource(R.string.meeting_participants_default_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
                         Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(UIKitR.string.action_back))
@@ -78,14 +70,7 @@ fun MeetingParticipantsScreen(
 
             is MeetingParticipantsUiState.Success -> {
                 PersonsGridContent(
-                    persons = state.participants.map { participant ->
-                        PersonItem(
-                            id = participant.id,
-                            name = "${participant.name} ${participant.surname}",
-                            role = participant.role,
-                            imageUrl = participant.avatarUrl,
-                        )
-                    },
+                    persons = state.participants,
                     onPersonClick = { participantId ->
                         viewModel.onEvent(MeetingParticipantsEvent.NavigateToProfile(participantId))
                     },

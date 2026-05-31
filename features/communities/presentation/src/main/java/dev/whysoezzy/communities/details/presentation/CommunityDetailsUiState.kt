@@ -6,8 +6,8 @@ import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitPerson
 
 @Immutable
-sealed class CommunityDetailsUiState {
-    data object Loading : CommunityDetailsUiState()
+sealed interface CommunityDetailsUiState {
+    data object Loading : CommunityDetailsUiState
 
     data class Success(
         val communityId: Long,
@@ -20,11 +20,11 @@ sealed class CommunityDetailsUiState {
         val subscribers: List<UIKitPerson>,
         val activeMeetings: List<UIKitMeetingInfo>,
         val pastMeetings: List<UIKitMeetingInfo>,
-    ) : CommunityDetailsUiState()
+    ) : CommunityDetailsUiState
 
     data class Error(
         val message: String,
-    ) : CommunityDetailsUiState()
+    ) : CommunityDetailsUiState
 }
 
 sealed class CommunityDetailsEvent {

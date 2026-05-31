@@ -1,7 +1,6 @@
 package dev.whysoezzy.profile.mappers
 
 import com.whysoezzy.common.utils.DateUtils.formatDateTime
-import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.CommunityHost
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
@@ -104,24 +103,8 @@ fun CommunityInfo.toUIKitCommunityInfo(
     )
 }
 
-fun List<CommunityInfo>.toUIKitCommunityInfoList(
-    subscribedIds: Set<Long> = emptySet(),
-): List<UIKitCommunityInfo> {
-    return map { community ->
-        community.toUIKitCommunityInfo(
-            isSubscribed = subscribedIds.contains(community.id),
-        )
-    }
-}
-
-fun List<Community>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> = map { community ->
-    UIKitCommunityInfo(
-        id = community.id,
-        title = community.name,
-        imageUrl = community.imageUrl,
-        isSubscribed = community.isSubscribed,
-    )
-}
+fun List<CommunityInfo>.toUIKitCommunityInfoList(): List<UIKitCommunityInfo> =
+    map { it.toUIKitCommunityInfo(isSubscribed = it.isSubscribed) }
 
 private fun extractUsername(url: String): String {
     return url.substringAfterLast('/').substringBefore('?')

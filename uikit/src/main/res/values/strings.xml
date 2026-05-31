@@ -10,4 +10,14 @@
     <string name="action_back">Назад</string>
     <string name="action_cancel">Отмена</string>
     <string name="action_done">Готово</string>
+
+    <string name="a11y_user_avatar">Аватар пользователя</string>
+    <string name="a11y_default_avatar">Аватар по умолчанию</string>
+    <string name="a11y_profile_photo">Фото профиля</string>
+    <string name="a11y_community_logo">Логотип сообщества</string>
+
+    <string name="uikit_user_meetings_title">Мои встречи</string>
+    <string name="uikit_user_meetings_empty">Вы пока не записаны ни на одну встречу</string>
+    <string name="uikit_user_communities_title">Мои сообщества</string>
+    <string name="uikit_user_communities_empty">Вы пока не состоите ни в одном сообществе</string>
 </resources>

@@ -21,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
 enum class UIKitInputState {
@@ -75,7 +75,7 @@ fun UIKitInput(
                     .clip(RoundedCornerShape(BorderRadiusTokens.L))
                     .background(
                         when (inputState) {
-                            UIKitInputState.ERROR -> Color(0xFFFDE7ED)
+                            UIKitInputState.ERROR -> ColorTokens.AccentDangerBackground
                             else -> colorScheme.neutralSecondaryBackground
                         },
                         shape = RoundedCornerShape(BorderRadiusTokens.L),

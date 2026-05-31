@@ -2,6 +2,7 @@ package dev.whysoezzy.profile.edit.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
@@ -20,8 +21,8 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
-sealed class ProfileEditNavEvent {
-    object NavigateBack : ProfileEditNavEvent()
+sealed interface ProfileEditNavEvent {
+    data object NavigateBack : ProfileEditNavEvent
 }
 
 class ProfileEditViewModel(
@@ -336,10 +337,9 @@ class ProfileEditViewModel(
 
     private fun validateEmail(email: String): String? = when {
         email.isBlank() -> null // email опционален
-        !email.contains("@") -> "Введите корректный email"
+        !ValidationUtils.isValidEmail(email) -> "Введите корректный email"
         else -> null
     }
-
     private fun validateDescription(description: String): String? = when {
         description.length > 500 -> "Максимум 500 символов"
         else -> null

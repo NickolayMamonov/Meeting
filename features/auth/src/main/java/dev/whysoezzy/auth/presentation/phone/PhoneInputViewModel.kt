@@ -3,6 +3,7 @@ package dev.whysoezzy.auth.presentation.phone
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
+import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.network.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,13 +33,12 @@ class PhoneInputViewModel(
             )
     }
 
-    private fun validatePhoneNumber(phoneNumber: String): String? {
+    private fun validatePhoneNumber(phoneNumber: String): PhoneInputError? {
         val digits = phoneNumber.filter { it.isDigit() }
-        // local = 10 цифр после кода страны, итого 11 с кодом 7
         return when {
-            digits.length < 11 -> null // ещё вводит — не показываем ошибку
-            !digits.startsWith("7") -> "Номер должен начинаться с +7"
-            else -> null
+            digits.length < 10 -> null
+            ValidationUtils.isValidPhoneNumber(phoneNumber) -> null
+            else -> PhoneInputError.Invalid
         }
     }
 
@@ -59,7 +59,7 @@ class PhoneInputViewModel(
                     _uiState.value =
                         _uiState.value.copy(
                             isLoading = false,
-                            error = exception.toUserMessage(),
+                            error = PhoneInputError.Remote(exception.toUserMessage()),
                         )
                 }
         }

@@ -11,6 +11,7 @@ import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
 import com.whysoezzy.testing.MainDispatcherRule
+import com.whysoezzy.testing.TestDispatcherProvider
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -47,6 +48,7 @@ class MeetingDetailsViewModelTest {
             joinMeetingUseCase = joinMeetingUseCase,
             leaveMeetingUseCase = leaveMeetingUseCase,
             isLoggedInUseCase = isLoggedInUseCase,
+            dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher),
         )
     }
 

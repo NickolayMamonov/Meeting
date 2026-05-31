@@ -14,6 +14,9 @@ object ColorTokens {
     val BrandLight = Color(0xFFECDAFF)
     val BrandBackground = Color(0xFFF5ECFF)
 
+    val SocialButtonBackground = Color(0xFF9A10F0)
+
+
     // Neutral Colors
     val NeutralActive = Color(0xFF29183B)
     val NeutralDark = Color(0xFF190E26)
@@ -29,6 +32,8 @@ object ColorTokens {
     val AccentWarning = Color(0xFFFDCF41)
     val AccentSuccess = Color(0xFF2CC069)
     val AccentSafe = Color(0xFF7BCBCF)
+
+    val AccentDangerBackground = Color(0xFFFDE7ED)
 
     // Gradient Colors
     val PrimaryGradientColors =

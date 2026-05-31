@@ -22,12 +22,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -60,7 +62,7 @@ fun UIKitAvatar(
         if (imageUrl.isNotEmpty()) {
             AsyncImage(
                 model = imageUrl,
-                contentDescription = "User Avatar",
+                contentDescription = stringResource(R.string.a11y_user_avatar),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(ColorTokens.NeutralLine),
@@ -76,7 +78,7 @@ fun UIKitAvatar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Person,
-                    contentDescription = "Default Avatar",
+                    contentDescription = stringResource(R.string.a11y_default_avatar),
                     tint = colorScheme.neutralWeak,
                     modifier = Modifier.size(size * 0.6f),
                 )

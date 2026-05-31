@@ -6,8 +6,8 @@ import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
 
 @Immutable
-sealed class ProfileDetailsUiState {
-    data object Loading : ProfileDetailsUiState()
+sealed interface ProfileDetailsUiState {
+    data object Loading : ProfileDetailsUiState
 
     data class Success(
         val userId: Long,
@@ -22,64 +22,64 @@ sealed class ProfileDetailsUiState {
         val socialMedias: List<UIKitSocialMediaInfo>,
         val userMeetings: List<UIKitMeetingInfo>,
         val userCommunities: List<UIKitCommunityInfo>,
-    ) : ProfileDetailsUiState()
+    ) : ProfileDetailsUiState
 
     data class Error(
         val message: String,
-    ) : ProfileDetailsUiState()
+    ) : ProfileDetailsUiState
 }
 
-sealed class ProfileDetailsEvent {
+sealed interface ProfileDetailsEvent {
     data class LoadProfile(
-        val userId: Long?,
-    ) : ProfileDetailsEvent()
+        val mode: ProfileMode,
+    ) : ProfileDetailsEvent
 
-    data object EditProfile : ProfileDetailsEvent()
+    data object EditProfile : ProfileDetailsEvent
 
-    data object ShareProfile : ProfileDetailsEvent()
+    data object ShareProfile : ProfileDetailsEvent
 
-    data object Logout : ProfileDetailsEvent()
+    data object Logout : ProfileDetailsEvent
 
     data class NavigateToMeeting(
         val meetingId: Long,
-    ) : ProfileDetailsEvent()
+    ) : ProfileDetailsEvent
 
     data class NavigateToCommunity(
         val communityId: Long,
-    ) : ProfileDetailsEvent()
+    ) : ProfileDetailsEvent
 
     data class OpenSocialMedia(
         val url: String,
-    ) : ProfileDetailsEvent()
+    ) : ProfileDetailsEvent
 
     data class ToggleCommunitySubscription(
         val communityId: Long,
         val isSubscribed: Boolean,
-    ) : ProfileDetailsEvent()
+    ) : ProfileDetailsEvent
 }
 
-sealed class ProfileDetailsNavEvent {
-    data object NavigateToAuth : ProfileDetailsNavEvent()
+sealed interface ProfileDetailsNavEvent {
+    data object NavigateToAuth : ProfileDetailsNavEvent
 
     /** Профиль загружен, но имя пустое — отправляем заполнить */
-    data object NavigateToNameInput : ProfileDetailsNavEvent()
+    data object NavigateToNameInput : ProfileDetailsNavEvent
 
     data class NavigateToMeeting(
         val meetingId: Long,
-    ) : ProfileDetailsNavEvent()
+    ) : ProfileDetailsNavEvent
 
     data class NavigateToCommunity(
         val communityId: Long,
-    ) : ProfileDetailsNavEvent()
+    ) : ProfileDetailsNavEvent
 
-    data object NavigateToEdit : ProfileDetailsNavEvent()
+    data object NavigateToEdit : ProfileDetailsNavEvent
 
     data class OpenSocialMedia(
         val url: String,
-    ) : ProfileDetailsNavEvent()
+    ) : ProfileDetailsNavEvent
 
     data class ShareProfile(
         val name: String,
         val shareText: String,
-    ) : ProfileDetailsNavEvent()
+    ) : ProfileDetailsNavEvent
 }

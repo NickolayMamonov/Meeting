@@ -6,6 +6,7 @@ import com.whysoezzy.domain.models.MeetingTag
 import com.whysoezzy.domain.models.Person
 import com.whysoezzy.domain.models.TagState
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
+import dev.whysoezzy.uikit.components.layouts.PersonItem
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingStatus
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
@@ -30,6 +31,13 @@ fun Person.toUIKitPerson() = UIKitPerson(
     surname = surname,
     avatar = avatarUrl,
     description = bio,
+)
+
+fun Person.toPersonItem() = PersonItem(
+    id = id,
+    name = "$name $surname",
+    role = role,
+    imageUrl = avatarUrl,
 )
 
 private fun TagState.toUIKitTagState(): UIKitTagState = when (this) {

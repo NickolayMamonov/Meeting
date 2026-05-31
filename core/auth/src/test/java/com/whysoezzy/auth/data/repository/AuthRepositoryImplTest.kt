@@ -6,6 +6,7 @@ import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.AuthUserDto
 import com.whysoezzy.auth.data.dto.RefreshTokenResponse
 import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -120,10 +121,9 @@ class AuthRepositoryImplTest {
     @Test
     fun `refreshToken with null stored token returns failure`() = runTest {
         coEvery { tokenManager.getRefreshToken() } returns null
-
         val result = repository().refreshToken()
-
         assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is ApiException.UnauthorizedError)
         coVerify(exactly = 0) { authApi.refreshToken(any()) }
     }
 
@@ -188,6 +188,8 @@ class AuthRepositoryImplTest {
         // clearTokens должен выполниться несмотря на отмену (NonCancellable в finally)
         coVerify(exactly = 1) { tokenManager.clearTokens() }
     }
+
+
 
     // ==================== Fixtures ====================
 

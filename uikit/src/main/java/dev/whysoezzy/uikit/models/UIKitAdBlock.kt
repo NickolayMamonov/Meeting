@@ -1,33 +1,43 @@
-package com.whysoezzy.domain.models
+package dev.whysoezzy.uikit.models
 
-sealed interface AdBlock {
+import androidx.compose.runtime.Immutable
+
+@Immutable
+sealed interface UIKitAdBlock {
     val id: Long
-    val isActive: Boolean
     val title: String
     val description: String
 
+    @Immutable
     data class CommunitiesAd(
         override val id: Long,
         override val title: String,
         override val description: String,
-        val communities: List<CommunityInfo>,
-        override val isActive: Boolean = true,
-    ) : AdBlock
+        val communities: List<UIKitCommunityInfo>,
+    ) : UIKitAdBlock
 
+    @Immutable
     data class TextAd(
         override val id: Long,
         override val title: String,
         override val description: String,
         val actionText: String? = null,
         val actionUrl: String? = null,
-        override val isActive: Boolean = true,
-    ) : AdBlock
+    ) : UIKitAdBlock
 
+    @Immutable
     data class PeopleAd(
         override val id: Long,
         override val title: String,
         override val description: String,
         val users: List<Person>,
-        override val isActive: Boolean = true,
-    ) : AdBlock
+    ) : UIKitAdBlock {
+        @Immutable
+        data class Person(
+            val id: Long,
+            val name: String,
+            val avatarUrl: String,
+            val role: String,
+        )
+    }
 }

@@ -14,6 +14,7 @@ val profileFeatureModule = module {
             getUserCommunitiesUseCase = get(),
             manageCommunitySubscriptionUseCase = get(),
             logoutUseCase = get(),
+            dispatchers = get(),
         )
     }
 

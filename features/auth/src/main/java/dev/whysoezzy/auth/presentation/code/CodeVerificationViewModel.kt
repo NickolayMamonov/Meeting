@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.presentation.code
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.models.AuthResult
@@ -15,24 +16,30 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.URLDecoder
 
-sealed class CodeVerificationNavEvent {
+sealed interface CodeVerificationNavEvent {
     /** Пользователь существующий — сразу в Main */
-    data object NavigateToMain : CodeVerificationNavEvent()
+    data object NavigateToMain : CodeVerificationNavEvent
 
     /** Новый пользователь — нужно ввести имя */
     data class NavigateToNameInput(
         val phone: String,
         val code: String,
-    ) : CodeVerificationNavEvent()
+    ) : CodeVerificationNavEvent
 }
 
 class CodeVerificationViewModel(
-    private val phoneNumber: String,
+    savedStateHandle: SavedStateHandle,
     private val verifyOtpUseCase: VerifyOtpUseCase,
     private val sendOtpUseCase: SendOtpUseCase,
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
+
+    private val phoneNumber: String =
+        URLDecoder.decode(savedStateHandle.get<String>(ARG_PHONE).orEmpty(), "UTF-8")
     companion object {
+        const val ARG_PHONE = "phoneNumber"
         private const val OTP_RESEND_TIMEOUT_SECONDS = 60
         private const val TIMER_POLL_INTERVAL_MS = 1000L
         private const val TIMER_DURATION_MS = OTP_RESEND_TIMEOUT_SECONDS * 1000L
@@ -126,11 +133,11 @@ class CodeVerificationViewModel(
         timerJob?.cancel()
         timerJob =
             viewModelScope.launch {
-                val startTime = System.currentTimeMillis()
+                val startTime = currentTimeMillis()
                 val durationMs = TIMER_DURATION_MS
 
                 while (true) {
-                    val elapsed = System.currentTimeMillis() - startTime
+                    val elapsed = currentTimeMillis() - startTime
                     val remaining = ((durationMs - elapsed) / 1000).toInt().coerceAtLeast(0)
                     _uiState.value =
                         _uiState.value.copy(

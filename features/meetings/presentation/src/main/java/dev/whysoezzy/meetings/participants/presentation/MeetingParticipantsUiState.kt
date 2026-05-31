@@ -1,28 +1,27 @@
 package dev.whysoezzy.meetings.participants.presentation
 
 import androidx.compose.runtime.Immutable
-import com.whysoezzy.domain.models.Person
+import dev.whysoezzy.uikit.components.layouts.PersonItem
 
 @Immutable
-sealed class MeetingParticipantsUiState {
-    data object Loading : MeetingParticipantsUiState()
+sealed interface MeetingParticipantsUiState {
+    data object Loading : MeetingParticipantsUiState
 
     data class Success(
-        val meetingTitle: String,
-        val participants: List<Person>,
-    ) : MeetingParticipantsUiState()
+        val participants: List<PersonItem>,
+    ) : MeetingParticipantsUiState
 
     data class Error(
         val message: String,
-    ) : MeetingParticipantsUiState()
+    ) : MeetingParticipantsUiState
 }
 
-sealed class MeetingParticipantsEvent {
+sealed interface MeetingParticipantsEvent {
     data class LoadParticipants(
         val meetingId: Long,
-    ) : MeetingParticipantsEvent()
+    ) : MeetingParticipantsEvent
 
     data class NavigateToProfile(
         val userId: Long,
-    ) : MeetingParticipantsEvent()
+    ) : MeetingParticipantsEvent
 }

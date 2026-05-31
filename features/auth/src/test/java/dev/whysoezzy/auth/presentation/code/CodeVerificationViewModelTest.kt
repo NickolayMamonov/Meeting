@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.presentation.code
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
@@ -9,8 +10,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,6 +22,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.net.URLEncoder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CodeVerificationViewModelTest {
@@ -30,10 +34,13 @@ class CodeVerificationViewModelTest {
     private val sendOtpUseCase: SendOtpUseCase = mockk()
     private val testPhone = "+79991234567"
 
-    private fun viewModel() = CodeVerificationViewModel(
-        phoneNumber = testPhone,
+    private fun TestScope.viewModel() = CodeVerificationViewModel(
+        savedStateHandle = SavedStateHandle(
+            mapOf(CodeVerificationViewModel.ARG_PHONE to URLEncoder.encode(testPhone, "UTF-8")),
+        ),
         verifyOtpUseCase = verifyOtpUseCase,
         sendOtpUseCase = sendOtpUseCase,
+        currentTimeMillis = { testScheduler.currentTime },
     )
 
     // ==================== initial state ====================
@@ -41,12 +48,11 @@ class CodeVerificationViewModelTest {
     @Test
     fun `initial state has empty code, canResend=false, remainingTime=60`() = runTest {
         val vm = viewModel()
-        advanceUntilIdle() // timer tick
+        runCurrent()
 
         val state = vm.uiState.value
         assertEquals("", state.code)
         assertFalse(state.canResend)
-        // remainingTime может быть чуть меньше 60 после первого тика, проверяем > 0
         assertTrue(state.remainingTime > 0)
     }
 
@@ -164,10 +170,9 @@ class CodeVerificationViewModelTest {
         assertTrue(vm.uiState.value.canResend)
 
         vm.onEvent(CodeVerificationEvent.ResendCode)
-        advanceUntilIdle()
+        runCurrent()
 
         coVerify(exactly = 1) { sendOtpUseCase(testPhone) }
-        // После resend таймер сбрасывается
         assertFalse(vm.uiState.value.canResend)
         assertEquals(60, vm.uiState.value.remainingTime)
     }

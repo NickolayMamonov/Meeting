@@ -3,6 +3,7 @@ package dev.whysoezzy.meetings.details.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
+import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.common.utils.AddressUtils.extractMetroFromAddress
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
@@ -22,32 +23,33 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-sealed class MeetingDetailsNavEvent {
+sealed interface MeetingDetailsNavEvent {
     data class NavigateToProfile(
         val userId: Long,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class NavigateToMeeting(
         val meetingId: Long,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class NavigateToCommunity(
         val communityId: Long,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class OpenMap(
         val latitude: Double,
         val longitude: Double,
         val address: String,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
     data class ShareMeeting(
         val title: String,
         val shareText: String,
-    ) : MeetingDetailsNavEvent()
+    ) : MeetingDetailsNavEvent
 
-    object NavigateToAuth : MeetingDetailsNavEvent()
+    data object NavigateToAuth : MeetingDetailsNavEvent
 }
 
 class MeetingDetailsViewModel(
@@ -55,6 +57,7 @@ class MeetingDetailsViewModel(
     private val joinMeetingUseCase: JoinMeetingUseCase,
     private val leaveMeetingUseCase: LeaveMeetingUseCase,
     private val isLoggedInUseCase: IsLoggedInUseCase,
+    private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MeetingDetailsUiState>(MeetingDetailsUiState.Loading)
     val uiState: StateFlow<MeetingDetailsUiState> = _uiState.asStateFlow()
@@ -97,23 +100,25 @@ class MeetingDetailsViewModel(
 
             getMeetingByIdUseCase(meetingId)
                 .onSuccess { meeting ->
-                    _uiState.value = MeetingDetailsUiState.Success(
-                        meetingId = meeting.id,
-                        imageUrl = meeting.imageUrl,
-                        title = meeting.title,
-                        dateTime = meeting.date,
-                        address = meeting.address.toUIKit(),
-                        tags = meeting.tags.toUIKitMeetingTags(),
-                        description = meeting.description,
-                        host = meeting.personHost?.toUIKitPersonHost(),
-                        nearestMetro = extractMetroFromAddress(meeting.address.address),
-                        participants = meeting.participants.map { it.toUIKit() },
-                        isUserJoined = meeting.isUserInParticipants,
-                        totalPlaces = meeting.capacity,
-                        community = meeting.communityHost?.toUIKitCommunityHost(),
-                        otherMeetings = meeting.communityHost?.meetingsInfo?.toUIKitMeetingInfoList()
-                            ?: emptyList(),
-                    )
+                    val success = withContext(dispatchers.default) {
+                        MeetingDetailsUiState.Success(
+                            meetingId = meeting.id,
+                            imageUrl = meeting.imageUrl,
+                            title = meeting.title,
+                            dateTime = meeting.date,
+                            address = meeting.address.toUIKit(),
+                            tags = meeting.tags.toUIKitMeetingTags(),
+                            description = meeting.description,
+                            host = meeting.personHost?.toUIKitPersonHost(),
+                            nearestMetro = extractMetroFromAddress(meeting.address.address),
+                            participants = meeting.participants.map { it.toUIKit() },
+                            isUserJoined = meeting.isUserInParticipants,
+                            totalPlaces = meeting.capacity,
+                            community = meeting.communityHost?.toUIKitCommunityHost(),
+                            otherMeetings = meeting.communityHost?.meetingsInfo?.toUIKitMeetingInfoList() ?: emptyList(),
+                        )
+                    }
+                    _uiState.value = success
                 }.onFailure { exception ->
                     _uiState.value = MeetingDetailsUiState.Error(
                         message = exception.toUserMessage(),

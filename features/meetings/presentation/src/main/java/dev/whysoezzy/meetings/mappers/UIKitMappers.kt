@@ -1,6 +1,7 @@
 package dev.whysoezzy.meetings.mappers
 
 import com.whysoezzy.common.utils.DateUtils.formatDateTime
+import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.CommunityHost
 import com.whysoezzy.domain.models.CommunityInfo
@@ -14,6 +15,8 @@ import com.whysoezzy.domain.models.PersonHost
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.TagState
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardTag
+import dev.whysoezzy.uikit.components.layouts.PersonItem
+import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunity
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
@@ -43,6 +46,13 @@ fun Person.toUIKit() = UIKitPerson(
     surname = surname,
     avatar = avatarUrl,
     description = bio,
+)
+
+fun Person.toPersonItem() = PersonItem(
+    id = id,
+    name = "$name $surname",
+    role = role,
+    imageUrl = avatarUrl,
 )
 
 fun List<Person>.toUIKitPersons() = map { it.toUIKit() }
@@ -215,3 +225,24 @@ internal fun List<UIKitMeetingTag>.toEventCardTags(): List<UIKitEventCardTag> =
             isEnabled = tag.state != UIKitTagState.DISABLED,
         )
     }
+
+fun AdBlock.toUIKit(): UIKitAdBlock = when (this) {
+    is AdBlock.CommunitiesAd -> UIKitAdBlock.CommunitiesAd(
+        id = id, title = title, description = description,
+        communities = communities.toUIKitCommunityInfoList(),   // уже существует
+    )
+    is AdBlock.TextAd -> UIKitAdBlock.TextAd(
+        id = id, title = title, description = description,
+        actionText = actionText, actionUrl = actionUrl,
+    )
+    is AdBlock.PeopleAd -> UIKitAdBlock.PeopleAd(
+        id = id, title = title, description = description,
+        users = users.map {
+            UIKitAdBlock.PeopleAd.Person(
+                id = it.id, name = it.name, avatarUrl = it.avatarUrl, role = it.role,
+            )
+        },
+    )
+}
+
+fun List<AdBlock>.toUIKitAdBlocks(): List<UIKitAdBlock> = map { it.toUIKit() }

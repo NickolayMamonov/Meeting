@@ -3,6 +3,7 @@ package dev.whysoezzy.profile.details.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
+import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ProfileDetailsViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
@@ -30,6 +32,7 @@ class ProfileDetailsViewModel(
     private val getUserCommunitiesUseCase: GetUserCommunitiesUseCase,
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
     private val logoutUseCase: LogoutUseCase,
+    private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ProfileDetailsUiState>(ProfileDetailsUiState.Loading)
     val uiState: StateFlow<ProfileDetailsUiState> = _uiState.asStateFlow()
@@ -39,7 +42,7 @@ class ProfileDetailsViewModel(
 
     fun onEvent(event: ProfileDetailsEvent) {
         when (event) {
-            is ProfileDetailsEvent.LoadProfile -> loadProfile(event.userId)
+            is ProfileDetailsEvent.LoadProfile -> loadProfile(event.mode)
             is ProfileDetailsEvent.EditProfile -> viewModelScope.launch {
                 _navEvent.emit(ProfileDetailsNavEvent.NavigateToEdit)
             }
@@ -57,12 +60,15 @@ class ProfileDetailsViewModel(
         }
     }
 
-    private fun loadProfile(userId: Long?) {
+    private fun loadProfile(mode: ProfileMode) {
         viewModelScope.launch {
             _uiState.value = ProfileDetailsUiState.Loading
 
-            val isOwnProfile = userId == null
-            val userResult = if (isOwnProfile) getCurrentUserUseCase() else getUserByIdUseCase(userId)
+            val isOwnProfile = mode is ProfileMode.Self
+            val userResult = when (mode) {
+                ProfileMode.Self -> getCurrentUserUseCase()
+                is ProfileMode.Other -> getUserByIdUseCase(mode.userId)
+            }
 
             userResult
                 .onFailure { exception ->
@@ -83,27 +89,26 @@ class ProfileDetailsViewModel(
                         val meetingsDeferred = async { getUserMeetingsUseCase(user.id) }
                         val communitiesDeferred = async { getUserCommunitiesUseCase(user.id) }
                         (meetingsDeferred.await().getOrNull() ?: emptyList()) to
-                            (communitiesDeferred.await().getOrNull() ?: emptyList())
+                                (communitiesDeferred.await().getOrNull() ?: emptyList())
                     }
 
-                    val subscribedIds = communities.filter { it.isSubscribed }.map { it.id }.toSet()
-
-                    _uiState.value = ProfileDetailsUiState.Success(
-                        userId = user.id,
-                        name = user.name,
-                        surname = user.surname,
-                        email = user.email,
-                        city = user.city,
-                        description = user.bio,
-                        avatarUrl = user.avatar.takeIf { it.isNotBlank() },
-                        interests = user.interests.map { it.name },
-                        isOwnProfile = isOwnProfile,
-                        socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
-                        userMeetings = meetings.map { it.toUIKitMeetingInfo() },
-                        userCommunities = communities.toUIKitCommunityInfoList(
-                            subscribedIds = subscribedIds,
-                        ),
-                    )
+                    val success = withContext(dispatchers.default) {
+                        ProfileDetailsUiState.Success(
+                            userId = user.id,
+                            name = user.name,
+                            surname = user.surname,
+                            email = user.email,
+                            city = user.city,
+                            description = user.bio,
+                            avatarUrl = user.avatar.takeIf { it.isNotBlank() },
+                            interests = user.interests.map { it.name },
+                            isOwnProfile = isOwnProfile,
+                            socialMedias = user.socialMedias.map { it.toUIKitSocialMediaInfo() },
+                            userMeetings = meetings.map { it.toUIKitMeetingInfo() },
+                            userCommunities = communities.toUIKitCommunityInfoList(),
+                        )
+                    }
+                    _uiState.value = success
                 }
         }
     }

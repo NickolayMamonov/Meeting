@@ -1,23 +1,28 @@
 package dev.whysoezzy.auth.presentation.phone
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.utils.ValidationUtils
 
 @Immutable
 data class PhoneInputUiState(
     val phoneNumber: String = "",
     val isLoading: Boolean = false,
     val isCodeSent: Boolean = false,
-    val error: String? = null,
+    val error: PhoneInputError? = null,
 ) {
     val isValid: Boolean
-        // +7 (999) 999-99-99 = 18 символов, или 11 цифр (без форматирования)
-        get() = phoneNumber.filter { it.isDigit() }.length == 11 && error == null
+        get() = ValidationUtils.isValidPhoneNumber(phoneNumber) && error == null
 }
 
-sealed class PhoneInputEvent {
+sealed interface PhoneInputEvent {
     data class UpdatePhoneNumber(
         val phoneNumber: String,
-    ) : PhoneInputEvent()
+    ) : PhoneInputEvent
 
-    data object SendCode : PhoneInputEvent()
+    data object SendCode : PhoneInputEvent
+}
+
+sealed interface PhoneInputError {
+    data object Invalid : PhoneInputError
+    data class Remote(val message: String) : PhoneInputError
 }

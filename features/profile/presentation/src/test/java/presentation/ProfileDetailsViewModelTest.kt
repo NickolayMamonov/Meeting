@@ -2,6 +2,7 @@ package presentation
 
 import app.cash.turbine.test
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
+import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.MeetingStatus
@@ -13,10 +14,12 @@ import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
+import com.whysoezzy.testing.TestDispatcherProvider
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsEvent
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsNavEvent
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsUiState
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsViewModel
+import dev.whysoezzy.profile.details.presentation.ProfileMode
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -49,6 +52,7 @@ class ProfileDetailsViewModelTest {
         getUserCommunitiesUseCase = getUserCommunitiesUseCase,
         manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
         logoutUseCase = logoutUseCase,
+        dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher),
     )
 
     // ==================== loadProfile — own profile ====================
@@ -60,7 +64,8 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(emptyList())
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
+
         advanceUntilIdle()
 
         val state = vm.uiState.value
@@ -79,7 +84,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(99L) } returns Result.success(emptyList())
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(99L))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Other(99L)))
         advanceUntilIdle()
 
         val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -97,7 +102,7 @@ class ProfileDetailsViewModelTest {
             coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(sampleCommunities)
 
             val vm = viewModel()
-            vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
             advanceUntilIdle()
 
             val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -119,7 +124,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(sampleCommunities)
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -136,7 +141,7 @@ class ProfileDetailsViewModelTest {
         val vm = viewModel()
 
         vm.navEvent.test {
-            vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
             advanceUntilIdle()
 
             assertEquals(ProfileDetailsNavEvent.NavigateToNameInput, awaitItem())
@@ -150,7 +155,7 @@ class ProfileDetailsViewModelTest {
                 Result.failure(RuntimeException("Network error"))
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value is ProfileDetailsUiState.Error)
@@ -165,7 +170,7 @@ class ProfileDetailsViewModelTest {
         val vm = viewModel()
 
         vm.navEvent.test {
-            vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
             advanceUntilIdle()
 
             assertEquals(ProfileDetailsNavEvent.NavigateToAuth, awaitItem())
@@ -185,7 +190,7 @@ class ProfileDetailsViewModelTest {
         coEvery { manageCommunitySubscriptionUseCase(any(), any()) } returns Result.success(Unit)
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         // community id=1 изначально isSubscribed=false
@@ -205,7 +210,7 @@ class ProfileDetailsViewModelTest {
                 Result.failure(RuntimeException("Server error"))
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         vm.onEvent(ProfileDetailsEvent.ToggleCommunitySubscription(communityId = 1L, isSubscribed = true))
@@ -217,7 +222,7 @@ class ProfileDetailsViewModelTest {
     }
 
     @Test
-    fun `subscribedIds are correctly reflected in userCommunities`() = runTest {
+    fun `community isSubscribed is reflected in userCommunities`() = runTest {
         // communities возвращаются с isSubscribed=true для id=2
         val communities = listOf(
             sampleCommunities[0].copy(isSubscribed = false),
@@ -228,7 +233,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(communities)
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         val state = vm.uiState.value as ProfileDetailsUiState.Success
@@ -260,7 +265,7 @@ class ProfileDetailsViewModelTest {
         coEvery { getUserCommunitiesUseCase(USER_ID) } returns Result.success(emptyList())
 
         val vm = viewModel()
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(null))
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
         advanceUntilIdle()
 
         vm.navEvent.test {
@@ -274,6 +279,13 @@ class ProfileDetailsViewModelTest {
         }
     }
 
+    // ==================== isValidEmail ====================
+    @Test fun `email valid simple`() { assertTrue(ValidationUtils.isValidEmail("user@example.com")) }
+    @Test fun `email valid with dots and plus`() { assertTrue(ValidationUtils.isValidEmail("a.b+tag@mail.co.uk")) }
+    @Test fun `email without at is invalid`() { assertFalse(ValidationUtils.isValidEmail("userexample.com")) }
+    @Test fun `email without domain is invalid`() { assertFalse(ValidationUtils.isValidEmail("user@")) }
+    @Test fun `email without tld is invalid`() { assertFalse(ValidationUtils.isValidEmail("user@example")) }
+    @Test fun `email blank is invalid`() { assertFalse(ValidationUtils.isValidEmail("")) }
     // ==================== Fixtures ====================
 
     private companion object {
