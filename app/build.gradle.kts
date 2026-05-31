@@ -1,5 +1,7 @@
 plugins {
     id("meet.android.application")
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -53,6 +55,10 @@ dependencies {
 
     implementation(project(":features:auth"))
     implementation(project(":uikit"))
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.analytics)
 
     implementation(libs.timber)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
