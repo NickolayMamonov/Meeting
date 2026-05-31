@@ -188,8 +188,6 @@ class AuthRepositoryImplTest {
         coVerify(exactly = 1) { tokenManager.clearTokens() }
     }
 
-
-
     // ==================== Fixtures ====================
 
     private fun successAuthResponse(isNewUser: Boolean = false) = AuthResponse(
