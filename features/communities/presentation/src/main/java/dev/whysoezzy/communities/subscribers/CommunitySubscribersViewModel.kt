@@ -44,36 +44,18 @@ class CommunitySubscribersViewModel(
     private fun loadSubscribers(communityId: Long) {
         viewModelScope.launch {
             _uiState.value = CommunitySubscribersUiState.Loading
-
             try {
-                val communityResult = getCommunityByIdUseCase(communityId)
-                if (communityResult.isFailure) {
-                    _uiState.value = CommunitySubscribersUiState.Error(
-                        message = "Не удалось загрузить информацию о сообществе",
-                    )
-                    return@launch
-                }
-
-                val community = communityResult.getOrThrow()
-                val subscribersResult = getCommunitySubscribersUseCase(communityId)
-                if (subscribersResult.isFailure) {
-                    _uiState.value = CommunitySubscribersUiState.Error(
-                        message = "Не удалось загрузить подписчиков",
-                    )
-                    return@launch
-                }
-
+                val community = getCommunityByIdUseCase(communityId).getOrThrow()
+                val subscribers = getCommunitySubscribersUseCase(communityId).getOrThrow()
                 _uiState.value = CommunitySubscribersUiState.Success(
                     communityName = community.name,
-                    subscribers = subscribersResult.getOrThrow(),
+                    subscribers = subscribers,
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load community subscribers")
-                _uiState.value = CommunitySubscribersUiState.Error(
-                    message = e.toUserMessage(),
-                )
+                _uiState.value = CommunitySubscribersUiState.Error(message = e.toUserMessage())
             }
         }
     }
