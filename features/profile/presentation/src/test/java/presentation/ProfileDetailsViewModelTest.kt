@@ -2,6 +2,7 @@ package presentation
 
 import app.cash.turbine.test
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
+import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.MeetingStatus
@@ -274,6 +275,13 @@ class ProfileDetailsViewModelTest {
         }
     }
 
+    // ==================== isValidEmail ====================
+    @Test fun `email valid simple`() { assertTrue(ValidationUtils.isValidEmail("user@example.com")) }
+    @Test fun `email valid with dots and plus`() { assertTrue(ValidationUtils.isValidEmail("a.b+tag@mail.co.uk")) }
+    @Test fun `email without at is invalid`() { assertFalse(ValidationUtils.isValidEmail("userexample.com")) }
+    @Test fun `email without domain is invalid`() { assertFalse(ValidationUtils.isValidEmail("user@")) }
+    @Test fun `email without tld is invalid`() { assertFalse(ValidationUtils.isValidEmail("user@example")) }
+    @Test fun `email blank is invalid`() { assertFalse(ValidationUtils.isValidEmail("")) }
     // ==================== Fixtures ====================
 
     private companion object {
