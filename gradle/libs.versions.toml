@@ -22,9 +22,8 @@ datastore = "1.2.1"
 tink = "1.19.0"
 desugarJdkLibs = "2.0.4"
 kotlinxSerialization = "1.6.3"
-ktlintGradle = "12.1.2"
-ktlint = "1.4.1"
-detekt = "1.23.7"
+ktlintGradle = "14.2.0"
+ktlint = "1.5.0"
 coreSplashscreen = "1.2.0"
 googleServices = "4.4.4"
 firebaseCrashlyticsPlugin = "3.0.7"
@@ -115,6 +114,5 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrainsKotlinJvm" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
