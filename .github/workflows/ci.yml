@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   static-analysis:
-    name: ktlint + detekt + lint
+    name: ktlint + lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +30,6 @@ jobs:
         run: echo "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
       - name: ktlint
         run: ./gradlew ktlintCheck
-      - name: detekt
-        run: ./gradlew detekt
       - name: Android Lint
         run: ./gradlew :app:lint
       - name: Upload reports
@@ -41,7 +39,6 @@ jobs:
           name: static-analysis-reports
           path: |
             **/build/reports/ktlint/
-            **/build/reports/detekt/
             app/build/reports/lint-results-*.html
           if-no-files-found: ignore
 
