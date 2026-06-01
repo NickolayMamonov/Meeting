@@ -7,7 +7,7 @@ import java.util.TimeZone
 
 object DateUtils {
     private const val DATE_TIME_PATTERN = "dd MMMM yyyy, HH:mm"
-    private val ruLocale = Locale("ru")
+    private val ruLocale = Locale.forLanguageTag("ru")
     private val utc: TimeZone = TimeZone.getTimeZone("UTC")
 
     /**

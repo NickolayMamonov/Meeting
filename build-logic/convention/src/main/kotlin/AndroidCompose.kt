@@ -14,7 +14,8 @@ internal fun Project.configureAndroidCompose(
     commonExtension.buildFeatures.compose = true
 
     extensions.configure<ComposeCompilerGradlePluginExtension> {
-        stabilityConfigurationFile.set(
+
+        stabilityConfigurationFiles.add(
             rootProject.layout.projectDirectory.file("compose-stability.conf"),
         )
     }
@@ -26,7 +27,7 @@ internal fun Project.configureAndroidCompose(
         add("implementation", libs.findLibrary("androidx-ui-graphics").get())
         add("implementation", libs.findLibrary("androidx-ui-tooling-preview").get())
         add("implementation", libs.findLibrary("androidx-material3").get())
-        add("implementation", libs.findLibrary("androidx-material3").get())
+        add("implementation", libs.findLibrary("androidx-material-icons-core").get())
         add("implementation", "androidx.compose.material3:material3-window-size-class")
         add("debugImplementation", libs.findLibrary("androidx-ui-tooling").get())
         add("debugImplementation", libs.findLibrary("androidx-ui-test-manifest").get())

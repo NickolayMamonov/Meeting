@@ -16,9 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.AppIcons
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import dev.whysoezzy.uikit.tokens.TypographyTokens
@@ -89,7 +87,7 @@ fun UIKitSearchField(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Search,
+                        imageVector = AppIcons.SearchOutlined,
                         contentDescription = "Search",
                         tint = colorScheme.neutralWeak,
                         modifier = Modifier.size(22.dp),
@@ -118,7 +116,7 @@ fun UIKitSearchField(
                 if (value.isNotEmpty()) {
                     Spacer(modifier = Modifier.width(SpacingTokens.XS))
                     Icon(
-                        imageVector = Icons.Outlined.Clear,
+                        imageVector = AppIcons.ClearOutlined,
                         contentDescription = "Clear",
                         tint = colorScheme.neutralWeak,
                         modifier =

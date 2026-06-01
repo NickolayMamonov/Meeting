@@ -20,7 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.whysoezzy.uikit.components.tags.UIKitTag
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
 import dev.whysoezzy.uikit.models.UIKitAddress

@@ -1,19 +1,19 @@
 [versions]
-agp = "8.7.3"
-kotlin = "2.0.21"
+agp = "8.13.2"
+kotlin = "2.3.20"
 coreKtx = "1.16.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.9.0"
 activityCompose = "1.10.1"
-composeBom = "2025.05.00"
+composeBom = "2026.05.01"
 navigationCompose = "2.8.5"
 appcompat = "1.7.0"
 material = "1.12.0"
-jetbrainsKotlinJvm = "2.0.21"
+jetbrainsKotlinJvm = "2.3.20"
 kotlinxCoroutines = "1.9.0"
-coil = "2.7.0"
+coil = "3.4.0"
 timber = "5.0.1"
 lottie = "5.2.0"
 koin-bom = "3.5.6"
@@ -22,9 +22,8 @@ datastore = "1.2.1"
 tink = "1.19.0"
 desugarJdkLibs = "2.0.4"
 kotlinxSerialization = "1.6.3"
-ktlintGradle = "12.1.2"
-ktlint = "1.4.1"
-detekt = "1.23.7"
+ktlintGradle = "14.2.0"
+ktlint = "1.5.0"
 coreSplashscreen = "1.2.0"
 googleServices = "4.4.4"
 firebaseCrashlyticsPlugin = "3.0.7"
@@ -54,8 +53,10 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 androidx-lifecycle-runtime-compose-android = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+coil = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
@@ -92,6 +93,7 @@ ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -114,6 +116,5 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrainsKotlinJvm" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }

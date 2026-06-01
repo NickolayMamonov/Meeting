@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.whysoezzy.uikit.R
 import dev.whysoezzy.uikit.components.avatars.UIKitAvatarWithInitials
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup

@@ -37,7 +37,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.meetings.mappers.toEventCardTags
 import dev.whysoezzy.uikit.components.blocks.UIKitAddressMapBlock

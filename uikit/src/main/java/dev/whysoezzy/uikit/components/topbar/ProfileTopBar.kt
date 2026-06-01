@@ -7,10 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.AppIcons
 
 /**
  * Топбар для экрана профиля
@@ -76,7 +73,7 @@ fun ProfileTopBar(
                 modifier = Modifier.size(48.dp),
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    imageVector = AppIcons.ArrowBack,
                     contentDescription = "Назад",
                     tint = contentColor,
                     modifier = Modifier.size(24.dp),
@@ -107,7 +104,7 @@ fun ProfileTopBar(
                 modifier = Modifier.size(48.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Edit,
+                    imageVector = AppIcons.Edit,
                     contentDescription = "Редактировать",
                     tint = contentColor,
                     modifier = Modifier.size(24.dp),
@@ -119,7 +116,7 @@ fun ProfileTopBar(
                 modifier = Modifier.size(48.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Share,
+                    imageVector = AppIcons.Share,
                     contentDescription = "Поделиться",
                     tint = contentColor,
                     modifier = Modifier.size(24.dp),
