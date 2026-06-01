@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -25,6 +23,7 @@ import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.AppIcons
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import dev.whysoezzy.uikit.R as UIKitR
@@ -54,7 +53,7 @@ private fun AuthSuccessContent(
     ) {
         // Success icon
         Icon(
-            imageVector = Icons.Filled.CheckCircle,
+            imageVector = AppIcons.CheckCircle,
             contentDescription = stringResource(R.string.auth_success_content_description),
             tint = ColorTokens.AccentSuccess,
             modifier = Modifier.size(80.dp),

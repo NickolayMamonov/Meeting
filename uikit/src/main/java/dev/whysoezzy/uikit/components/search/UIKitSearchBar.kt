@@ -17,10 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +37,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.AppIcons
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import dev.whysoezzy.uikit.tokens.TypographyTokens
@@ -98,7 +95,7 @@ fun UIKitSearchBar(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Search,
+                        imageVector = AppIcons.Search,
                         contentDescription = "Search",
                         tint = if (query.isEmpty()) contentColor else activeContentColor,
                         modifier = Modifier.padding(end = SpacingTokens.S),
@@ -123,7 +120,7 @@ fun UIKitSearchBar(
                     ) {
                         if (query.isNotEmpty()) {
                             Icon(
-                                imageVector = Icons.Default.Clear,
+                                imageVector = AppIcons.Clear,
                                 contentDescription = "Clear",
                                 tint = contentColor,
                                 modifier =
@@ -162,7 +159,7 @@ fun UIKitSearchBar(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Person,
+                            imageVector = AppIcons.Person,
                             contentDescription = "Profile",
                             tint = Color.Black,
                             modifier = Modifier.size(32.dp),

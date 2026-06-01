@@ -1,8 +1,6 @@
 package dev.whysoezzy.communities.subscribers
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,6 +21,7 @@ import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading
 import dev.whysoezzy.uikit.error.asUserMessage
+import dev.whysoezzy.uikit.tokens.AppIcons
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +64,7 @@ fun CommunitySubscribersScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
                         Icon(
-                            Icons.Default.KeyboardArrowLeft,
+                            AppIcons.Back,
                             contentDescription = stringResource(
                                 dev.whysoezzy.uikit.R.string.action_back,
                             ),

@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.AppIcons
 
 /**
  * TopBar для экранов редактирования с кнопками Отмены и Сохранения
@@ -69,7 +67,7 @@ fun EditTopBar(
             modifier = Modifier.size(48.dp),
         ) {
             Icon(
-                imageVector = Icons.Default.Close,
+                imageVector = AppIcons.Close,
                 contentDescription = "Отмена",
                 tint = contentColor,
                 modifier = Modifier.size(24.dp),
@@ -99,7 +97,7 @@ fun EditTopBar(
             modifier = Modifier.size(48.dp),
         ) {
             Icon(
-                imageVector = Icons.Default.Check,
+                imageVector = AppIcons.Check,
                 contentDescription = "Сохранить",
                 tint =
                     if (isSaveEnabled) {
