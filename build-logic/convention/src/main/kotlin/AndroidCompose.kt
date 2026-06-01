@@ -14,7 +14,8 @@ internal fun Project.configureAndroidCompose(
     commonExtension.buildFeatures.compose = true
 
     extensions.configure<ComposeCompilerGradlePluginExtension> {
-        stabilityConfigurationFile.set(
+
+        stabilityConfigurationFiles.add(
             rootProject.layout.projectDirectory.file("compose-stability.conf"),
         )
     }
