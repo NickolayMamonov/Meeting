@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
 
     implementation(libs.coil)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.lottie)
     implementation(libs.lottie.compose)
 

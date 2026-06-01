@@ -50,7 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
