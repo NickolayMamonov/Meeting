@@ -34,9 +34,7 @@ class CodeVerificationViewModelTest {
     private val testPhone = "+79991234567"
 
     private fun TestScope.viewModel() = CodeVerificationViewModel(
-        savedStateHandle = SavedStateHandle(
-            mapOf(CodeVerificationViewModel.ARG_PHONE to URLEncoder.encode(testPhone, "UTF-8")),
-        ),
+        phoneNumber = testPhone,
         verifyOtpUseCase = verifyOtpUseCase,
         sendOtpUseCase = sendOtpUseCase,
         currentTimeMillis = { testScheduler.currentTime },

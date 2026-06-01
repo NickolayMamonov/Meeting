@@ -36,6 +36,7 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun CodeVerificationScreen(
@@ -43,7 +44,7 @@ fun CodeVerificationScreen(
     onCodeVerifiedExisting: () -> Unit,
     onCodeVerifiedNew: (phone: String, code: String) -> Unit,
     onBackPressed: () -> Unit,
-    viewModel: CodeVerificationViewModel = koinViewModel(),
+    viewModel: CodeVerificationViewModel = koinViewModel { parametersOf(phoneNumber) },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
