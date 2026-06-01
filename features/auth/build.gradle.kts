@@ -22,8 +22,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.coil)
-    implementation(libs.coil.network.okhttp)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.mockk)
