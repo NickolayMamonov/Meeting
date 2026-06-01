@@ -10,6 +10,6 @@ sealed interface NameFieldError {
     data object NonLetter : NameFieldError
 
     data class Remote(
-        val errorType: ErrorType
+        val errorType: ErrorType,
     ) : NameFieldError
 }

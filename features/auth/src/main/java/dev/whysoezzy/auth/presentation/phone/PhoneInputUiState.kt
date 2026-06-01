@@ -27,6 +27,6 @@ sealed interface PhoneInputError {
     data object Invalid : PhoneInputError
 
     data class Remote(
-        val errorType: ErrorType
+        val errorType: ErrorType,
     ) : PhoneInputError
 }

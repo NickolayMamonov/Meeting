@@ -51,8 +51,8 @@ class MainScreenViewModelTest {
         coEvery { searchMeetingsUseCase(any()) } returns Result.success(
             SearchData(
                 meetings = emptyList(),
-                communities = emptyList()
-            )
+                communities = emptyList(),
+            ),
         )
     }
 
@@ -117,7 +117,7 @@ class MainScreenViewModelTest {
     fun `search delegates to searchMeetingsUseCase and puts results in state`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.success(sampleData)
         coEvery { searchMeetingsUseCase("kotlin") } returns
-                Result.success(SearchData(meetings = listOf(meeting1), communities = emptyList()))
+            Result.success(SearchData(meetings = listOf(meeting1), communities = emptyList()))
 
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
@@ -140,7 +140,7 @@ class MainScreenViewModelTest {
     fun `blank query clears search results - paged list shown`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.success(sampleData)
         coEvery { searchMeetingsUseCase("kotlin") } returns
-                Result.success(SearchData(meetings = listOf(meeting1), communities = emptyList()))
+            Result.success(SearchData(meetings = listOf(meeting1), communities = emptyList()))
 
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
@@ -171,7 +171,7 @@ class MainScreenViewModelTest {
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
             getPagedMeetingsUseCase = getPagedMeetingsUseCase,
             searchMeetingsUseCase = searchMeetingsUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
         advanceUntilIdle()
 
@@ -195,7 +195,7 @@ class MainScreenViewModelTest {
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
             getPagedMeetingsUseCase = getPagedMeetingsUseCase,
             searchMeetingsUseCase = searchMeetingsUseCase,
-            dispatchers = testDispatchers
+            dispatchers = testDispatchers,
         )
         advanceUntilIdle()
 
@@ -207,8 +207,6 @@ class MainScreenViewModelTest {
         val state = viewModel.uiState.value as MainScreenUiState.Success
         assertTrue(state.categories.all { it.state == UIKitTagState.ACTIVE })
     }
-
-
 
     // ==================== Fixtures ====================
 

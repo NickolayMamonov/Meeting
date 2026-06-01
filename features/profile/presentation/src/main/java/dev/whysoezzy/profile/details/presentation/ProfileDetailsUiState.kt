@@ -26,7 +26,7 @@ sealed interface ProfileDetailsUiState {
     ) : ProfileDetailsUiState
 
     data class Error(
-        val errorType: ErrorType
+        val errorType: ErrorType,
     ) : ProfileDetailsUiState
 }
 

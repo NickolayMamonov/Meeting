@@ -17,8 +17,18 @@ internal fun Project.configureKotlinAndroid(
             sourceCompatibility = JavaVersion.VERSION_21
             targetCompatibility = JavaVersion.VERSION_21
         }
+
+        lint {
+            // Детектор краши на Kotlin 2.0.21 Analysis API (IncompatibleClassChangeError,
+            // KaSimpleVariableAccessCall). Баг в lint-тулинге, не в нашем коде.
+            // Снять после бампа Kotlin/AGP в Сессии 11.
+            disable += "FrequentlyChangingValue"
+            disable += "RememberInComposition"
+        }
     }
     configureKotlin()
+
+
 }
 
 internal fun Project.configureKotlin() {
@@ -27,4 +37,7 @@ internal fun Project.configureKotlin() {
             jvmTarget.set(JvmTarget.JVM_21)
         }
     }
+
+
 }
+
