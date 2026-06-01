@@ -22,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.whysoezzy.common.error.ErrorType
 import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
@@ -29,6 +30,7 @@ import dev.whysoezzy.uikit.components.forms.UIKitCodeInput
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextMetadata1
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
@@ -118,7 +120,7 @@ private fun CodeVerificationContent(
 
         if (uiState.error != null) {
             TextMetadata1(
-                text = uiState.error,
+                text = uiState.error.asUserMessage(),
                 color = ColorTokens.AccentDanger,
                 textAlign = TextAlign.Center,
             )
@@ -177,7 +179,7 @@ private fun CodeVerificationScreenErrorPreview() {
             uiState =
                 CodeVerificationUiState(
                     code = "1234",
-                    error = stringResource(R.string.auth_code_error_invalid),
+                    error = ErrorType.Unknown,
                     canResend = true,
                 ),
         )

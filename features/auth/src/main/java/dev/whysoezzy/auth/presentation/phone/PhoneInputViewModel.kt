@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
 import com.whysoezzy.common.utils.ValidationUtils
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,7 +59,7 @@ class PhoneInputViewModel(
                     _uiState.value =
                         _uiState.value.copy(
                             isLoading = false,
-                            error = PhoneInputError.Remote(exception.toUserMessage()),
+                            error = PhoneInputError.Remote(exception.toErrorType()),
                         )
                 }
         }

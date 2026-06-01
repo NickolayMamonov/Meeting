@@ -1,6 +1,7 @@
 package dev.whysoezzy.auth.presentation.phone
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.common.utils.ValidationUtils
 
 @Immutable
@@ -26,6 +27,6 @@ sealed interface PhoneInputError {
     data object Invalid : PhoneInputError
 
     data class Remote(
-        val message: String,
+        val errorType: ErrorType
     ) : PhoneInputError
 }

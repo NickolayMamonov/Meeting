@@ -1,13 +1,14 @@
 package dev.whysoezzy.auth.presentation.code
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.error.ErrorType
 
 @Immutable
 data class CodeVerificationUiState(
     val code: String = "",
     val isLoading: Boolean = false,
     val isVerified: Boolean = false,
-    val error: String? = null,
+    val error: ErrorType? = null,
     val remainingTime: Int = 60, // seconds for resend
     val canResend: Boolean = false,
 ) {

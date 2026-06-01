@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
 import com.whysoezzy.auth.domain.usecase.VerifyOtpUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -99,7 +99,7 @@ class CodeVerificationViewModel(
                     _uiState.value =
                         _uiState.value.copy(
                             isLoading = false,
-                            error = exception.toUserMessage(),
+                            error = exception.toErrorType(),
                         )
                 }
         }
@@ -123,7 +123,7 @@ class CodeVerificationViewModel(
                 }.onFailure { exception ->
                     _uiState.value =
                         _uiState.value.copy(
-                            error = exception.toUserMessage(),
+                            error = exception.toErrorType(),
                         )
                 }
         }
