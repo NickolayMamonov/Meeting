@@ -6,6 +6,7 @@ import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
+import com.google.crypto.tink.internal.RegistryConfiguration
 
 /**
  * Пошаговое AEAD-шифрование строк через Tink. Keyset хранится в SharedPreferences,
@@ -25,7 +26,7 @@ internal class TokenCrypto(
                 .withMasterKeyUri(MASTER_KEY_URI)
                 .build()
                 .keysetHandle
-                .getPrimitive(Aead::class.java)
+                .getPrimitive(RegistryConfiguration.get(), Aead::class.java)
         }
 
     fun encrypt(plaintext: String, aad: String): String =
