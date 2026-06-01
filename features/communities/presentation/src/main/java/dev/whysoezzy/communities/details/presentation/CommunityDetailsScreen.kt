@@ -54,6 +54,7 @@ import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.topbar.BackShareTopBar
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -141,7 +142,7 @@ fun CommunityDetailsScreen(
 
             is CommunityDetailsUiState.Error -> {
                 ErrorContent(
-                    message = state.message,
+                    message = state.errorType.asUserMessage(),
                     onRetry = {
                         viewModel.onEvent(CommunityDetailsEvent.LoadCommunity(communityId))
                     },

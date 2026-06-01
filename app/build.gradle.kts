@@ -1,5 +1,7 @@
 plugins {
     id("meet.android.application")
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -13,6 +15,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -50,6 +56,9 @@ dependencies {
     implementation(project(":features:auth"))
     implementation(project(":uikit"))
 
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+
     implementation(libs.timber)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
@@ -59,6 +68,7 @@ dependencies {
     implementation(libs.koin.compose)
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.lottie.compose)

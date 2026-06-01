@@ -34,6 +34,11 @@ updates:
       # AGP-мажоры — вручную (Gradle/JDK-совместимость)
       - dependency-name: "com.android.tools.build:gradle"
         update-types: ["version-update:semver-major"]
+      # Firebase/Crashlytics плагины — мажоры вручную (3.0.6 ломается на AGP 9)
+      - dependency-name: "com.google.firebase.crashlytics*"
+        update-types: [ "version-update:semver-major" ]
+      - dependency-name: "com.google.gms*"
+        update-types: [ "version-update:semver-major" ]
 
   # Версии самих GitHub Actions в workflow
   - package-ecosystem: "github-actions"

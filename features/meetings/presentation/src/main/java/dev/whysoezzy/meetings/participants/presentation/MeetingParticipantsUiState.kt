@@ -1,6 +1,7 @@
 package dev.whysoezzy.meetings.participants.presentation
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.error.ErrorType
 import dev.whysoezzy.uikit.components.layouts.PersonItem
 
 @Immutable
@@ -12,7 +13,7 @@ sealed interface MeetingParticipantsUiState {
     ) : MeetingParticipantsUiState
 
     data class Error(
-        val message: String,
+        val errorType: ErrorType,
     ) : MeetingParticipantsUiState
 }
 

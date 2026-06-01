@@ -1,6 +1,7 @@
 package dev.whysoezzy.profile.details.presentation
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.error.ErrorType
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitSocialMediaInfo
@@ -25,7 +26,7 @@ sealed interface ProfileDetailsUiState {
     ) : ProfileDetailsUiState
 
     data class Error(
-        val message: String,
+        val errorType: ErrorType,
     ) : ProfileDetailsUiState
 }
 

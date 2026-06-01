@@ -1,6 +1,7 @@
 package dev.whysoezzy.communities.subscribers
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.error.ErrorType
 import dev.whysoezzy.uikit.components.layouts.PersonItem
 
 @Immutable
@@ -13,7 +14,7 @@ sealed interface CommunitySubscribersUiState {
     ) : CommunitySubscribersUiState
 
     data class Error(
-        val message: String,
+        val errorType: ErrorType,
     ) : CommunitySubscribersUiState
 }
 

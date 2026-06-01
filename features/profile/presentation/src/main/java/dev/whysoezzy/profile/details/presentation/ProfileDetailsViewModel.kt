@@ -10,7 +10,7 @@ import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
 import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.network.error.ApiException
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
@@ -78,7 +78,7 @@ class ProfileDetailsViewModel
                             handleLogout()
                         } else {
                             _uiState.value = ProfileDetailsUiState.Error(
-                                message = exception.toUserMessage(),
+                                errorType = exception.toErrorType(),
                             )
                         }
                     }.onSuccess { user ->

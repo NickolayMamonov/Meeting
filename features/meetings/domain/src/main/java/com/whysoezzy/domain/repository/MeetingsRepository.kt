@@ -1,8 +1,10 @@
 package com.whysoezzy.domain.repository
 
+import androidx.paging.PagingData
 import com.whysoezzy.domain.models.AdBlock
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.Person
+import kotlinx.coroutines.flow.Flow
 
 interface MeetingsRepository {
     suspend fun getHeroEvents(): Result<List<Meeting>>
@@ -24,4 +26,6 @@ interface MeetingsRepository {
     suspend fun getUserMeetings(): Result<List<Meeting>>
 
     suspend fun getAdBlocks(): Result<List<AdBlock>>
+
+    fun getAllEventsPaged(tagId: Long?): Flow<PagingData<Meeting>>
 }

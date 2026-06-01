@@ -1,5 +1,7 @@
 package dev.whysoezzy.auth.presentation.name
 
+import com.whysoezzy.common.error.ErrorType
+
 sealed interface NameFieldError {
     data object Blank : NameFieldError
 
@@ -8,6 +10,6 @@ sealed interface NameFieldError {
     data object NonLetter : NameFieldError
 
     data class Remote(
-        val message: String,
+        val errorType: ErrorType,
     ) : NameFieldError
 }

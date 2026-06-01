@@ -8,7 +8,7 @@ import com.whysoezzy.domain.usecase.GetCommunityMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.domain.usecase.SubscribeToCommunityUseCase
 import com.whysoezzy.domain.usecase.UnsubscribeFromCommunityUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.communities.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.communities.mappers.toUIKitPerson
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
@@ -81,7 +81,7 @@ class CommunityDetailsViewModel(
             getCommunityByIdUseCase(communityId)
                 .onFailure { e ->
                     _uiState.value = CommunityDetailsUiState.Error(
-                        message = e.toUserMessage(),
+                        errorType = e.toErrorType(),
                     )
                 }.onSuccess { community ->
                     val (meetings, subscribers) = coroutineScope {

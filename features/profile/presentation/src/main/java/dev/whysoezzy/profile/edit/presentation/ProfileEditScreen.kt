@@ -57,6 +57,7 @@ import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
 import dev.whysoezzy.uikit.components.toggles.UIKitToggleRow
 import dev.whysoezzy.uikit.components.topbar.EditTopBar
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.ColorTokens
@@ -91,9 +92,10 @@ fun ProfileEditScreen(
         }
     }
 
+    val errorMessage = uiState.error?.asUserMessage()
     // Показываем ошибку в Snackbar
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let { snackbarHostState.showSnackbar(it) }
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 
     Scaffold(
@@ -156,7 +158,6 @@ fun ProfileEditScreen(
             )
         }
 
-        // Диалог выбора интересов
         if (showInterestDialog) {
             AlertDialog(
                 onDismissRequest = { showInterestDialog = false },
@@ -198,7 +199,6 @@ fun ProfileEditScreen(
             )
         }
 
-        // Диалог подтверждения удаления профиля
         if (uiState.showDeleteConfirmDialog) {
             AlertDialog(
                 onDismissRequest = { viewModel.onEvent(ProfileEditEvent.DismissDeleteProfile) },

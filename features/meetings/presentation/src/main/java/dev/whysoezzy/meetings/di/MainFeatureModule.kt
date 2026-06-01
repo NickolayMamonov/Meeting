@@ -15,6 +15,8 @@ val mainFeatureModule = module {
         MainScreenViewModel(
             getMainScreenDataUseCase = get(),
             manageCommunitySubscriptionUseCase = get(),
+            getPagedMeetingsUseCase = get(),
+            searchMeetingsUseCase = get(),
             dispatchers = get(),
         )
     }

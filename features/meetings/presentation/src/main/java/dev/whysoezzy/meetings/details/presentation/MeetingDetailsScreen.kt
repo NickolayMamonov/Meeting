@@ -55,6 +55,7 @@ import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.topbar.BackShareTopBar
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityHost
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
@@ -155,7 +156,7 @@ fun MeetingDetailsScreen(
 
             is MeetingDetailsUiState.Error -> {
                 ErrorContent(
-                    message = state.message,
+                    message = state.errorType.asUserMessage(),
                     onRetry = { viewModel.onEvent(MeetingDetailsEvent.LoadMeeting(meetingId)) },
                     onBackPressed = onBackPressed,
                     modifier = Modifier.padding(paddingValues),

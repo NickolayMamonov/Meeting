@@ -1,24 +1,33 @@
 package dev.whysoezzy.meetings.presentation
 
+import androidx.paging.PagingData
 import app.cash.turbine.test
+import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.domain.models.MainScreenData
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
 import com.whysoezzy.domain.models.MeetingStatus
 import com.whysoezzy.domain.models.MeetingTag
+import com.whysoezzy.domain.models.SearchData
 import com.whysoezzy.domain.models.TagState
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
+import com.whysoezzy.domain.usecase.GetPagedMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
+import com.whysoezzy.domain.usecase.SearchMeetingsUseCase
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
 import com.whysoezzy.testing.TestDispatcherProvider
+import dev.whysoezzy.uikit.models.UIKitTagState
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -30,7 +39,22 @@ class MainScreenViewModelTest {
     private val getMainScreenDataUseCase: GetMainScreenDataUseCase = mockk()
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase = mockk()
 
+    private val getPagedMeetingsUseCase: GetPagedMeetingsUseCase = mockk()
+    private val searchMeetingsUseCase: SearchMeetingsUseCase = mockk()
     private val testDispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher)
+
+    @Before
+    fun setUp() {
+        // pager по умолчанию пустой — тесты Success/Error не падают на подписке pagedMeetings
+        every { getPagedMeetingsUseCase(any()) } returns flowOf(PagingData.empty())
+        // поиск по умолчанию — пусто; конкретные тесты переопределяют
+        coEvery { searchMeetingsUseCase(any()) } returns Result.success(
+            SearchData(
+                meetings = emptyList(),
+                communities = emptyList(),
+            ),
+        )
+    }
 
     // ==================== loadData ====================
 
@@ -41,6 +65,8 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
+            getPagedMeetingsUseCase = getPagedMeetingsUseCase,
+            searchMeetingsUseCase = searchMeetingsUseCase,
             dispatchers = testDispatchers,
         )
 
@@ -52,7 +78,7 @@ class MainScreenViewModelTest {
             val success = awaitItem()
             assertTrue(success is MainScreenUiState.Success)
             success as MainScreenUiState.Success
-            assertEquals(2, success.allMeetings.size)
+            assertEquals(0, success.allMeetings.size)
             assertEquals(1, success.heroMeetings.size)
             assertEquals(1, success.popularMeetings.size)
             assertEquals(1, success.categories.size)
@@ -69,6 +95,8 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
+            getPagedMeetingsUseCase = getPagedMeetingsUseCase,
+            searchMeetingsUseCase = searchMeetingsUseCase,
             dispatchers = testDispatchers,
         )
 
@@ -78,9 +106,7 @@ class MainScreenViewModelTest {
 
             val error = awaitItem()
             assertTrue(error is MainScreenUiState.Error)
-            // Сообщение от toUserMessage() — конкретный текст специально не проверяем
-            // (R-020 поменяет его на StringRes), главное — что Error-состояние выставлено.
-            assertTrue((error as MainScreenUiState.Error).message.isNotBlank())
+            assertEquals(ErrorType.NoConnection, (error as MainScreenUiState.Error).errorType)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -88,15 +114,19 @@ class MainScreenViewModelTest {
     // ==================== search ====================
 
     @Test
-    fun `search by title filters cached meetings`() = runTest {
+    fun `search delegates to searchMeetingsUseCase and puts results in state`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.success(sampleData)
+        coEvery { searchMeetingsUseCase("kotlin") } returns
+            Result.success(SearchData(meetings = listOf(meeting1), communities = emptyList()))
 
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
+            getPagedMeetingsUseCase = getPagedMeetingsUseCase,
+            searchMeetingsUseCase = searchMeetingsUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
             dispatchers = testDispatchers,
         )
-        advanceUntilIdle() // дождаться loadMainScreenData из init
+        advanceUntilIdle()
 
         viewModel.onEvent(MainScreenEvent.Search("kotlin"))
         advanceUntilIdle()
@@ -107,11 +137,15 @@ class MainScreenViewModelTest {
     }
 
     @Test
-    fun `search with blank query restores full cached list`() = runTest {
+    fun `blank query clears search results - paged list shown`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.success(sampleData)
+        coEvery { searchMeetingsUseCase("kotlin") } returns
+            Result.success(SearchData(meetings = listOf(meeting1), communities = emptyList()))
 
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
+            getPagedMeetingsUseCase = getPagedMeetingsUseCase,
+            searchMeetingsUseCase = searchMeetingsUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
             dispatchers = testDispatchers,
         )
@@ -123,18 +157,20 @@ class MainScreenViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value as MainScreenUiState.Success
-        assertEquals(2, state.allMeetings.size)
+        assertEquals(0, state.allMeetings.size)
+        assertEquals("", state.searchQuery)
     }
 
     // ==================== filterByTag ====================
-
     @Test
-    fun `filterByTag keeps only meetings carrying that tag`() = runTest {
+    fun `filterByTag marks selected category and clears search`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.success(sampleData)
 
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
+            getPagedMeetingsUseCase = getPagedMeetingsUseCase,
+            searchMeetingsUseCase = searchMeetingsUseCase,
             dispatchers = testDispatchers,
         )
         advanceUntilIdle()
@@ -143,22 +179,22 @@ class MainScreenViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value as MainScreenUiState.Success
-        assertEquals(1, state.allMeetings.size)
-        assertTrue(
-            state.allMeetings
-                .first()
-                .tags
-                .any { it.id == KOTLIN_TAG_ID },
+        assertEquals(
+            UIKitTagState.SELECTED,
+            state.categories.first { it.id == KOTLIN_TAG_ID }.state,
         )
+        assertEquals("", state.searchQuery)
     }
 
     @Test
-    fun `filterByTag with null resets the filter`() = runTest {
+    fun `filterByTag null clears selection`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.success(sampleData)
 
         val viewModel = MainScreenViewModel(
             getMainScreenDataUseCase = getMainScreenDataUseCase,
             manageCommunitySubscriptionUseCase = manageCommunitySubscriptionUseCase,
+            getPagedMeetingsUseCase = getPagedMeetingsUseCase,
+            searchMeetingsUseCase = searchMeetingsUseCase,
             dispatchers = testDispatchers,
         )
         advanceUntilIdle()
@@ -169,7 +205,7 @@ class MainScreenViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value as MainScreenUiState.Success
-        assertEquals(2, state.allMeetings.size)
+        assertTrue(state.categories.all { it.state == UIKitTagState.ACTIVE })
     }
 
     // ==================== Fixtures ====================

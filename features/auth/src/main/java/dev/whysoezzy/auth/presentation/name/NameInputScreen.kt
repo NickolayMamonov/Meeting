@@ -28,6 +28,7 @@ import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -171,5 +172,5 @@ private fun nameErrorText(
     NameFieldError.Blank -> stringResource(blankRes)
     NameFieldError.TooShort -> stringResource(R.string.auth_name_error_too_short)
     NameFieldError.NonLetter -> stringResource(R.string.auth_name_error_only_letters)
-    is NameFieldError.Remote -> error.message
+    is NameFieldError.Remote -> error.errorType.asUserMessage()
 }

@@ -1,6 +1,7 @@
 package dev.whysoezzy.meetings.presentation
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.error.ErrorType
 import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
@@ -21,6 +22,6 @@ sealed interface MainScreenUiState {
     ) : MainScreenUiState
 
     data class Error(
-        val message: String,
+        val errorType: ErrorType,
     ) : MainScreenUiState
 }

@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.communities.mappers.toPersonItem
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,7 +63,7 @@ class CommunitySubscribersViewModel(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load community subscribers")
-                _uiState.value = CommunitySubscribersUiState.Error(message = e.toUserMessage())
+                _uiState.value = CommunitySubscribersUiState.Error(errorType = e.toErrorType())
             }
         }
     }

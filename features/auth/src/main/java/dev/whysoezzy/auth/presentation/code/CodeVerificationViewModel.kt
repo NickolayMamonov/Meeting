@@ -1,12 +1,11 @@
 package dev.whysoezzy.auth.presentation.code
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
 import com.whysoezzy.auth.domain.usecase.VerifyOtpUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.net.URLDecoder
 
 sealed interface CodeVerificationNavEvent {
     /** Пользователь существующий — сразу в Main */
@@ -30,16 +28,12 @@ sealed interface CodeVerificationNavEvent {
 }
 
 class CodeVerificationViewModel(
-    savedStateHandle: SavedStateHandle,
+    private val phoneNumber: String,
     private val verifyOtpUseCase: VerifyOtpUseCase,
     private val sendOtpUseCase: SendOtpUseCase,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
-    private val phoneNumber: String =
-        URLDecoder.decode(savedStateHandle.get<String>(ARG_PHONE).orEmpty(), "UTF-8")
-
     companion object {
-        const val ARG_PHONE = "phoneNumber"
         private const val OTP_RESEND_TIMEOUT_SECONDS = 60
         private const val TIMER_POLL_INTERVAL_MS = 1000L
         private const val TIMER_DURATION_MS = OTP_RESEND_TIMEOUT_SECONDS * 1000L
@@ -99,7 +93,7 @@ class CodeVerificationViewModel(
                     _uiState.value =
                         _uiState.value.copy(
                             isLoading = false,
-                            error = exception.toUserMessage(),
+                            error = exception.toErrorType(),
                         )
                 }
         }
@@ -123,7 +117,7 @@ class CodeVerificationViewModel(
                 }.onFailure { exception ->
                     _uiState.value =
                         _uiState.value.copy(
-                            error = exception.toUserMessage(),
+                            error = exception.toErrorType(),
                         )
                 }
         }

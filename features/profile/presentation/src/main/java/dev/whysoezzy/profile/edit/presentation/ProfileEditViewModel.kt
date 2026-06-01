@@ -2,6 +2,7 @@ package dev.whysoezzy.profile.edit.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
@@ -10,7 +11,7 @@ import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -91,7 +92,7 @@ class ProfileEditViewModel(
                 }.onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.toUserMessage(),
+                        error = e.toErrorType(),
                     )
                 }
         }
@@ -237,7 +238,7 @@ class ProfileEditViewModel(
         }
 
         val user = currentUser ?: run {
-            _uiState.value = _uiState.value.copy(error = "Профиль ещё не загружен, попробуйте позже")
+            _uiState.value = _uiState.value.copy(error = ErrorType.Unknown)
             return
         }
 
@@ -278,7 +279,7 @@ class ProfileEditViewModel(
                 Timber.e(e, "Failed to prepare profile data for save")
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    error = "Ошибка при подготовке данных профиля",
+                    error = ErrorType.Unknown,
                 )
                 return@launch
             }
@@ -304,7 +305,7 @@ class ProfileEditViewModel(
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    error = e.toUserMessage(),
+                    error = e.toErrorType(),
                 )
             }
         }

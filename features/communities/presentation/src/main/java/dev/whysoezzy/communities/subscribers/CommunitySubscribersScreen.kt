@@ -22,6 +22,7 @@ import dev.whysoezzy.communities.R
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading
+import dev.whysoezzy.uikit.error.asUserMessage
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,7 +93,7 @@ fun CommunitySubscribersScreen(
 
             is CommunitySubscribersUiState.Error -> {
                 PersonsGridError(
-                    message = state.message,
+                    message = state.errorType.asUserMessage(),
                     onRetry = {
                         viewModel.onEvent(CommunitySubscribersEvent.LoadSubscribers(communityId))
                     },

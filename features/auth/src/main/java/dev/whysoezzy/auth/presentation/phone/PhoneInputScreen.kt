@@ -25,6 +25,7 @@ import dev.whysoezzy.uikit.components.forms.UIKitPhoneInput
 import dev.whysoezzy.uikit.components.inputs.UIKitInputState
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -34,7 +35,7 @@ import org.koin.androidx.compose.koinViewModel
 private fun phoneErrorText(error: PhoneInputError?): String? = when (error) {
     null -> null
     PhoneInputError.Invalid -> stringResource(R.string.auth_phone_error_invalid)
-    is PhoneInputError.Remote -> error.message
+    is PhoneInputError.Remote -> error.errorType.asUserMessage()
 }
 
 @Composable

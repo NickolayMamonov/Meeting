@@ -18,7 +18,7 @@ val authFeatureModule =
 
         viewModel { (phoneNumber: String) ->
             CodeVerificationViewModel(
-                savedStateHandle = get(),
+                phoneNumber = phoneNumber,
                 verifyOtpUseCase = get(),
                 sendOtpUseCase = get(),
             )

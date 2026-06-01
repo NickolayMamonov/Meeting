@@ -2,12 +2,18 @@ package dev.whysoezzy.meetings.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.map
 import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
+import com.whysoezzy.domain.usecase.GetPagedMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.domain.usecase.SearchMeetingsUseCase
+import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.meetings.mappers.toUIKitAdBlocks
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityInfoList
+import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfos
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingTags
 import dev.whysoezzy.uikit.models.UIKitAdBlock
@@ -15,12 +21,16 @@ import dev.whysoezzy.uikit.models.UIKitCommunityInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitTagState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -37,6 +47,8 @@ sealed interface MainScreenNavEvent {
 class MainScreenViewModel(
     private val getMainScreenDataUseCase: GetMainScreenDataUseCase,
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
+    private val getPagedMeetingsUseCase: GetPagedMeetingsUseCase,
+    private val searchMeetingsUseCase: SearchMeetingsUseCase,
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MainScreenUiState>(MainScreenUiState.Loading)
@@ -45,7 +57,14 @@ class MainScreenViewModel(
     private val _navEvent = MutableSharedFlow<MainScreenNavEvent>(extraBufferCapacity = 1)
     val navEvent: SharedFlow<MainScreenNavEvent> = _navEvent.asSharedFlow()
 
-    private var cachedAllMeetings: List<UIKitMeetingInfo> = emptyList()
+    private val activeTagId = MutableStateFlow<Long?>(null)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val pagedMeetings: Flow<PagingData<UIKitMeetingInfo>> =
+        activeTagId
+            .flatMapLatest { tagId -> getPagedMeetingsUseCase(tagId) }
+            .map { pagingData -> pagingData.map { it.toUIKitMeetingInfo() } }
+            .cachedIn(viewModelScope)
 
     init {
         loadMainScreenData()
@@ -76,7 +95,6 @@ class MainScreenViewModel(
                 .onSuccess { data ->
                     val mapped = withContext(dispatchers.default) {
                         MappedHomeData(
-                            allMeetings = data.allMeetings.toUIKitMeetingInfos(),
                             heroMeetings = data.heroMeetings.toUIKitMeetingInfos(),
                             popularMeetings = data.popularMeetings.toUIKitMeetingInfos(),
                             categories = data.categories.toUIKitMeetingTags(),
@@ -85,54 +103,49 @@ class MainScreenViewModel(
                         )
                     }
 
-                    cachedAllMeetings = mapped.allMeetings
-
                     _uiState.value = MainScreenUiState.Success(
                         heroMeetings = mapped.heroMeetings,
                         popularMeetings = mapped.popularMeetings,
-                        allMeetings = mapped.allMeetings,
+                        allMeetings = emptyList(),
                         categories = mapped.categories,
                         communities = mapped.communities,
                         adBlocks = mapped.adBlocks,
                     )
                 }.onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
-                        exception.toUserMessage(),
+                        exception.toErrorType(),
                     )
                 }
         }
     }
 
     private fun performSearch(query: String) {
-        val currentState = _uiState.value
-
-        if (currentState is MainScreenUiState.Success) {
-            _uiState.value = currentState.copy(searchQuery = query)
-        }
+        val currentState = _uiState.value as? MainScreenUiState.Success ?: return
+        // фиксируем строку запроса в state (top bar)
+        _uiState.value = currentState.copy(searchQuery = query)
 
         if (query.isBlank()) {
-            val currentState = _uiState.value as? MainScreenUiState.Success
-            if (currentState != null) {
-                _uiState.value = currentState.copy(allMeetings = cachedAllMeetings)
-            } else {
-                loadMainScreenData()
-            }
+            // пустой запрос → показываем paged-список; результаты поиска очищаем
+            _uiState.value = (_uiState.value as MainScreenUiState.Success).copy(allMeetings = emptyList())
             return
         }
 
         viewModelScope.launch {
-            val lowerQuery = query.lowercase()
-            val filtered = withContext(dispatchers.default) {
-                cachedAllMeetings.filter { meeting ->
-                    meeting.title.lowercase().contains(lowerQuery) ||
-                        meeting.tags.any { it.text.lowercase().contains(lowerQuery) } ||
-                        meeting.address.lowercase().contains(lowerQuery)
+            searchMeetingsUseCase(query)
+                .onSuccess { searchData ->
+                    val mapped = withContext(dispatchers.default) {
+                        searchData.meetings.toUIKitMeetingInfos()
+                    }
+                    val latest = _uiState.value as? MainScreenUiState.Success ?: return@launch
+                    if (latest.searchQuery == query) {
+                        _uiState.value = latest.copy(allMeetings = mapped)
+                    }
+                }.onFailure {
+                    val latest = _uiState.value as? MainScreenUiState.Success ?: return@launch
+                    if (latest.searchQuery == query) {
+                        _uiState.value = latest.copy(allMeetings = emptyList())
+                    }
                 }
-            }
-            val latestState = _uiState.value as? MainScreenUiState.Success ?: return@launch
-            if (latestState.searchQuery == query) {
-                _uiState.value = latestState.copy(allMeetings = filtered)
-            }
         }
     }
 
@@ -142,24 +155,17 @@ class MainScreenViewModel(
      */
     private fun filterByTag(tagId: Long?) {
         val currentState = _uiState.value as? MainScreenUiState.Success ?: return
-        viewModelScope.launch {
-            val (filtered, updatedCategories) = withContext(dispatchers.default) {
-                val filtered = if (tagId == null) {
-                    cachedAllMeetings
-                } else {
-                    cachedAllMeetings.filter { meeting -> meeting.tags.any { it.id == tagId } }
-                }
-                val updatedCategories = currentState.categories.map { tag ->
-                    tag.copy(state = if (tag.id == tagId) UIKitTagState.SELECTED else UIKitTagState.ACTIVE)
-                }
-                filtered to updatedCategories
-            }
 
-            _uiState.value = currentState.copy(
-                allMeetings = filtered,
-                categories = updatedCategories,
-            )
-        }
+        // выбор тега сбрасывает активный поиск (режимы взаимоисключающие)
+        _uiState.value = currentState.copy(
+            searchQuery = "",
+            allMeetings = emptyList(),
+            categories = currentState.categories.map { tag ->
+                tag.copy(state = if (tag.id == tagId) UIKitTagState.SELECTED else UIKitTagState.ACTIVE)
+            },
+        )
+
+        activeTagId.value = tagId
     }
 
     /**
@@ -191,7 +197,6 @@ class MainScreenViewModel(
     }
 
     private data class MappedHomeData(
-        val allMeetings: List<UIKitMeetingInfo>,
         val heroMeetings: List<UIKitMeetingInfo>,
         val popularMeetings: List<UIKitMeetingInfo>,
         val categories: List<UIKitMeetingTag>,
