@@ -1,6 +1,5 @@
 package dev.whysoezzy.auth.presentation.code
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.models.AuthResult
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.net.URLDecoder
 
 sealed interface CodeVerificationNavEvent {
     /** Пользователь существующий — сразу в Main */
@@ -35,7 +33,6 @@ class CodeVerificationViewModel(
     private val sendOtpUseCase: SendOtpUseCase,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
-
     companion object {
         private const val OTP_RESEND_TIMEOUT_SECONDS = 60
         private const val TIMER_POLL_INTERVAL_MS = 1000L
