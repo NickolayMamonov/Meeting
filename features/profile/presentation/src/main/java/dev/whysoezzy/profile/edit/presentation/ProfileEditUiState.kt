@@ -1,6 +1,7 @@
 package dev.whysoezzy.profile.edit.presentation
 
 import androidx.compose.runtime.Immutable
+import com.whysoezzy.common.error.ErrorType
 
 @Immutable
 data class ProfileEditUiState(
@@ -31,7 +32,7 @@ data class ProfileEditUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
-    val error: String? = null,
+    val error: ErrorType? = null,
     // Диалог подтверждения удаления
     val showDeleteConfirmDialog: Boolean = false,
 ) {

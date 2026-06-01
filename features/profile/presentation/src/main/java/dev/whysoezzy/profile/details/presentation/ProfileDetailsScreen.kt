@@ -42,6 +42,7 @@ import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.social.UIKitSocialMediaList
 import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.topbar.ProfileTopBar
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
@@ -107,7 +108,7 @@ fun ProfileDetailsScreen(
             )
 
             is ProfileDetailsUiState.Error -> ErrorContent(
-                message = state.message,
+                message = state.errorType.asUserMessage(),
                 onRetry = { viewModel.onEvent(ProfileDetailsEvent.LoadProfile(mode)) },
                 onBackPressed = onBackPressed,
             )
