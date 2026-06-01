@@ -47,6 +47,7 @@ import dev.whysoezzy.uikit.components.cards.UIKitEventCard
 import dev.whysoezzy.uikit.components.cards.UIKitEventCardType
 import dev.whysoezzy.uikit.components.search.UIKitSearchBar
 import dev.whysoezzy.uikit.components.text.TextHeading2
+import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
@@ -122,7 +123,7 @@ fun MainScreen(
 
                 is MainScreenUiState.Error -> {
                     ErrorContent(
-                        message = state.message,
+                        message = state.errorType.asUserMessage(),
                         onRetry = {
                             viewModel.onEvent(MainScreenEvent.Retry)
                         },

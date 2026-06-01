@@ -22,6 +22,7 @@ import dev.whysoezzy.features_meetings.R
 import dev.whysoezzy.uikit.components.layouts.PersonsGridContent
 import dev.whysoezzy.uikit.components.layouts.PersonsGridError
 import dev.whysoezzy.uikit.components.layouts.PersonsGridLoading
+import dev.whysoezzy.uikit.error.asUserMessage
 import org.koin.androidx.compose.koinViewModel
 import dev.whysoezzy.uikit.R as UIKitR
 
@@ -80,7 +81,7 @@ fun MeetingParticipantsScreen(
 
             is MeetingParticipantsUiState.Error -> {
                 PersonsGridError(
-                    message = state.message,
+                    message = state.errorType.asUserMessage(),
                     onRetry = {
                         viewModel.onEvent(MeetingParticipantsEvent.LoadParticipants(meetingId))
                     },

@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.domain.usecase.GetMeetingParticipantsUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.meetings.mappers.toPersonItem
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,7 +56,7 @@ class MeetingParticipantsViewModel(
                     _uiState.value = MeetingParticipantsUiState.Success(participants = items)
                 }.onFailure { exception ->
                     _uiState.value = MeetingParticipantsUiState.Error(
-                        message = exception.toUserMessage(),
+                        errorType = exception.toErrorType(),
                     )
                 }
         }

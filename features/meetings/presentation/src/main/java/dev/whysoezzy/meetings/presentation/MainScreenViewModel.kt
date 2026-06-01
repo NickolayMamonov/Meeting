@@ -10,7 +10,7 @@ import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.GetPagedMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.domain.usecase.SearchMeetingsUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.meetings.mappers.toUIKitAdBlocks
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfo
@@ -113,7 +113,7 @@ class MainScreenViewModel(
                     )
                 }.onFailure { exception ->
                     _uiState.value = MainScreenUiState.Error(
-                        exception.toUserMessage(),
+                        exception.toErrorType(),
                     )
                 }
         }

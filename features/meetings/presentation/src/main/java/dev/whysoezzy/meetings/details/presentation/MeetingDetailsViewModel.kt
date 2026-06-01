@@ -8,7 +8,7 @@ import com.whysoezzy.common.utils.AddressUtils.extractMetroFromAddress
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
-import com.whysoezzy.network.toUserMessage
+import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.meetings.mappers.toUIKit
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityHost
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfoList
@@ -121,7 +121,7 @@ class MeetingDetailsViewModel(
                     _uiState.value = success
                 }.onFailure { exception ->
                     _uiState.value = MeetingDetailsUiState.Error(
-                        message = exception.toUserMessage(),
+                        errorType = exception.toErrorType(),
                     )
                 }
         }
