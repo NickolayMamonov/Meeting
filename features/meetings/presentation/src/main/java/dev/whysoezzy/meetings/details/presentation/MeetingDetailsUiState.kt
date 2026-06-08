@@ -28,6 +28,8 @@ sealed interface MeetingDetailsUiState {
         val totalPlaces: Int,
         val community: UIKitCommunityHost?,
         val otherMeetings: List<UIKitMeetingInfo>,
+        val externalUrl: String? = null,
+        val isOnline: Boolean = false,
     ) : MeetingDetailsUiState
 
     data class Error(
@@ -59,4 +61,6 @@ sealed interface MeetingDetailsEvent {
     data object OpenMap : MeetingDetailsEvent
 
     data object ShareMeeting : MeetingDetailsEvent
+
+    data object OpenExternalUrl : MeetingDetailsEvent
 }

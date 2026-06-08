@@ -21,3 +21,10 @@ fun shareIntent(context: Context, title: String, text: String) {
     }
     context.startActivity(Intent.createChooser(intent, "Поделиться встречей"))
 }
+
+fun openUrlIntent(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+    if (intent.resolveActivity(context.packageManager) != null) {
+        context.startActivity(intent)
+    }
+}
