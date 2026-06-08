@@ -15,6 +15,9 @@ data class Meeting(
     val meetingStatus: MeetingStatus,
     val isUserInParticipants: Boolean,
     val capacity: Int,
+    val source: String = "MANUAL",
+    val externalUrl: String? = null,
+    val isOnline: Boolean = false,
 )
 
 data class MeetingAddress(
