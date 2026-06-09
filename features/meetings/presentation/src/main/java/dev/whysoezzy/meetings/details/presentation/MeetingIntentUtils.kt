@@ -9,9 +9,11 @@ import androidx.core.net.toUri
 fun openMapIntent(context: Context, latitude: Double, longitude: Double, address: String) {
     try {
         val uri = "geo:$latitude,$longitude?q=${Uri.encode(address)}".toUri()
-        context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
     } catch (e: ActivityNotFoundException) {
         // нет карт — игнорируем
     }
