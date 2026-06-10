@@ -19,4 +19,7 @@ data class MeetingDto(
     @SerialName("meetingStatus") val meetingStatus: String,
     @SerialName("isUserInParticipants") val isUserInParticipants: Boolean,
     @SerialName("capacity") val capacity: Int?,
+    @SerialName("source") val source: String = "MANUAL",
+    @SerialName("externalUrl") val externalUrl: String? = null,
+    @SerialName("isOnline") val isOnline: Boolean = false,
 )

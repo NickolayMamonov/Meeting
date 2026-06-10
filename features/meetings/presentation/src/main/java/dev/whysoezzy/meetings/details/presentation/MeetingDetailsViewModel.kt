@@ -9,6 +9,9 @@ import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
 import com.whysoezzy.network.toErrorType
+import dev.whysoezzy.meetings.details.presentation.MeetingDetailsNavEvent.NavigateToCommunity
+import dev.whysoezzy.meetings.details.presentation.MeetingDetailsNavEvent.NavigateToMeeting
+import dev.whysoezzy.meetings.details.presentation.MeetingDetailsNavEvent.NavigateToProfile
 import dev.whysoezzy.meetings.mappers.toUIKit
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityHost
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfoList
@@ -50,6 +53,10 @@ sealed interface MeetingDetailsNavEvent {
     ) : MeetingDetailsNavEvent
 
     data object NavigateToAuth : MeetingDetailsNavEvent
+
+    data class OpenExternalUrl(
+        val url: String,
+    ) : MeetingDetailsNavEvent
 }
 
 class MeetingDetailsViewModel(
@@ -80,16 +87,17 @@ class MeetingDetailsViewModel(
             MeetingDetailsEvent.JoinMeeting -> joinMeeting()
             MeetingDetailsEvent.LeaveMeeting -> leaveMeeting()
             is MeetingDetailsEvent.NavigateToProfile -> viewModelScope.launch {
-                _navEvent.emit(MeetingDetailsNavEvent.NavigateToProfile(event.userId))
+                _navEvent.emit(NavigateToProfile(event.userId))
             }
             is MeetingDetailsEvent.NavigateToCommunity -> viewModelScope.launch {
-                _navEvent.emit(MeetingDetailsNavEvent.NavigateToCommunity(event.communityId))
+                _navEvent.emit(NavigateToCommunity(event.communityId))
             }
             is MeetingDetailsEvent.NavigateToMeeting -> viewModelScope.launch {
-                _navEvent.emit(MeetingDetailsNavEvent.NavigateToMeeting(event.meetingId))
+                _navEvent.emit(NavigateToMeeting(event.meetingId))
             }
             MeetingDetailsEvent.OpenMap -> openMap()
             MeetingDetailsEvent.ShareMeeting -> shareMeeting()
+            MeetingDetailsEvent.OpenExternalUrl -> openExternalUrl()
         }
     }
 
@@ -116,6 +124,8 @@ class MeetingDetailsViewModel(
                             totalPlaces = meeting.capacity,
                             community = meeting.communityHost?.toUIKitCommunityHost(),
                             otherMeetings = meeting.communityHost?.meetingsInfo?.toUIKitMeetingInfoList() ?: emptyList(),
+                            externalUrl = meeting.externalUrl,
+                            isOnline = meeting.isOnline,
                         )
                     }
                     _uiState.value = success
@@ -169,6 +179,14 @@ class MeetingDetailsViewModel(
                     ),
                 )
             }
+        }
+    }
+
+    private fun openExternalUrl() {
+        val state = _uiState.value as? MeetingDetailsUiState.Success ?: return
+        val url = state.externalUrl ?: return
+        viewModelScope.launch {
+            _navEvent.emit(MeetingDetailsNavEvent.OpenExternalUrl(url))
         }
     }
 

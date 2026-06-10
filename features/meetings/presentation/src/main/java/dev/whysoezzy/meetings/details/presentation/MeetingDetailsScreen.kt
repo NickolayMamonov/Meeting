@@ -100,6 +100,8 @@ fun MeetingDetailsScreen(
                         openMapIntent(context, event.latitude, event.longitude, event.address)
                     is MeetingDetailsNavEvent.ShareMeeting ->
                         shareIntent(context, event.title, event.shareText)
+                    is MeetingDetailsNavEvent.OpenExternalUrl ->
+                        openUrlIntent(context, event.url)
                     MeetingDetailsNavEvent.NavigateToAuth -> onAuthRequired()
                 }
             }
@@ -124,8 +126,10 @@ fun MeetingDetailsScreen(
                 BottomActionSection(
                     totalPlaces = successState.totalPlaces,
                     isUserJoined = successState.isUserJoined,
+                    externalUrl = successState.externalUrl,
                     onJoinClick = { viewModel.onEvent(MeetingDetailsEvent.JoinMeeting) },
                     onLeaveClick = { viewModel.onEvent(MeetingDetailsEvent.LeaveMeeting) },
+                    onOpenExternalClick = { viewModel.onEvent(MeetingDetailsEvent.OpenExternalUrl) },
                 )
             }
         },
@@ -172,6 +176,8 @@ private fun BottomActionSection(
     isUserJoined: Boolean,
     onJoinClick: () -> Unit,
     onLeaveClick: () -> Unit,
+    externalUrl: String? = null,
+    onOpenExternalClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -186,26 +192,35 @@ private fun BottomActionSection(
                 .padding(SpacingTokens.L),
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
-            TextBody2(
-                text = stringResource(R.string.meeting_details_capacity, totalPlaces),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (isUserJoined) {
+            if (externalUrl != null) {
                 UIKitButton(
-                    text = stringResource(R.string.meeting_details_leave),
-                    onClick = onLeaveClick,
-                    state = UIKitButtonState.SECONDARY,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                UIKitButton(
-                    text = stringResource(R.string.meeting_details_join),
-                    onClick = onJoinClick,
+                    text = "Перейти к регистрации",
+                    onClick = onOpenExternalClick,
                     state = UIKitButtonState.PRIMARY,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            } else {
+                TextBody2(
+                    text = stringResource(R.string.meeting_details_capacity, totalPlaces),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (isUserJoined) {
+                    UIKitButton(
+                        text = stringResource(R.string.meeting_details_leave),
+                        onClick = onLeaveClick,
+                        state = UIKitButtonState.SECONDARY,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    UIKitButton(
+                        text = stringResource(R.string.meeting_details_join),
+                        onClick = onJoinClick,
+                        state = UIKitButtonState.PRIMARY,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
