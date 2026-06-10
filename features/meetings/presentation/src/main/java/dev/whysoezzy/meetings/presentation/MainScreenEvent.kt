@@ -25,4 +25,6 @@ sealed interface MainScreenEvent {
     data class NavigateToMeeting(
         val meetingId: Long,
     ) : MainScreenEvent
+
+    data object Refresh : MainScreenEvent
 }
