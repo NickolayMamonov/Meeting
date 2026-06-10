@@ -267,7 +267,13 @@ private fun MeetingContent(
         }
 
         item {
-            TextBody2(text = "${uiState.dateTime} · ${uiState.address.address}")
+            TextBody2(
+                text = if (uiState.isOnline) {
+                    "${uiState.dateTime} · Онлайн"
+                } else {
+                    "${uiState.dateTime} · ${uiState.address.address}"
+                },
+            )
         }
 
         item {
@@ -291,14 +297,16 @@ private fun MeetingContent(
             }
         }
 
-        item {
-            UIKitAddressMapBlock(
-                address = uiState.address.address,
-                latitude = uiState.address.latitude,
-                longitude = uiState.address.longitude,
-                nearestMetro = uiState.nearestMetro,
-                onMapClick = onMapClick,
-            )
+        if (!uiState.isOnline) {
+            item {
+                UIKitAddressMapBlock(
+                    address = uiState.address.address,
+                    latitude = uiState.address.latitude,
+                    longitude = uiState.address.longitude,
+                    nearestMetro = uiState.nearestMetro,
+                    onMapClick = onMapClick,
+                )
+            }
         }
 
         item {
