@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -101,23 +102,33 @@ fun MainScreen(
 
                 is MainScreenUiState.Success -> {
                     val pagedMeetings = viewModel.pagedMeetings.collectAsLazyPagingItems()
-                    MainScreenContent(
-                        heroMeetings = state.heroMeetings,
-                        popularMeetings = state.popularMeetings,
-                        searchResults = state.allMeetings,
-                        searchQuery = state.searchQuery,
-                        pagedMeetings = pagedMeetings,
-                        communities = state.communities,
-                        adBlocks = state.adBlocks,
-                        onMeetingClick = onMeetingClick,
-                        onCommunityClick = onCommunityClick,
-                        onUserProfileClick = onUserProfileClick,
-                        onCommunitySubscribeClick = { communityId, isSubscribed ->
-                            viewModel.onEvent(
-                                MainScreenEvent.CommunitySubscriptionChanged(communityId, isSubscribed),
-                            )
+                    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = {
+                            viewModel.onEvent(MainScreenEvent.Refresh)
+                            pagedMeetings.refresh()
                         },
-                    )
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        MainScreenContent(
+                            heroMeetings = state.heroMeetings,
+                            popularMeetings = state.popularMeetings,
+                            searchResults = state.allMeetings,
+                            searchQuery = state.searchQuery,
+                            pagedMeetings = pagedMeetings,
+                            communities = state.communities,
+                            adBlocks = state.adBlocks,
+                            onMeetingClick = onMeetingClick,
+                            onCommunityClick = onCommunityClick,
+                            onUserProfileClick = onUserProfileClick,
+                            onCommunitySubscribeClick = { communityId, isSubscribed ->
+                                viewModel.onEvent(
+                                    MainScreenEvent.CommunitySubscriptionChanged(communityId, isSubscribed),
+                                )
+                            },
+                        )
+                    }
                 }
 
                 is MainScreenUiState.Error -> {

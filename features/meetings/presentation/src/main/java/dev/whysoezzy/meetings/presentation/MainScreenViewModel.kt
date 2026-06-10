@@ -57,6 +57,9 @@ class MainScreenViewModel(
     private val _navEvent = MutableSharedFlow<MainScreenNavEvent>(extraBufferCapacity = 1)
     val navEvent: SharedFlow<MainScreenNavEvent> = _navEvent.asSharedFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     private val activeTagId = MutableStateFlow<Long?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -84,6 +87,7 @@ class MainScreenViewModel(
             is MainScreenEvent.NavigateToMeeting -> viewModelScope.launch {
                 _navEvent.emit(MainScreenNavEvent.NavigateToMeeting(event.meetingId))
             }
+            is MainScreenEvent.Refresh -> refresh()
         }
     }
 
@@ -116,6 +120,33 @@ class MainScreenViewModel(
                         exception.toErrorType(),
                     )
                 }
+        }
+    }
+
+    private fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            getMainScreenDataUseCase()
+                .onSuccess { data ->
+                    val mapped = withContext(dispatchers.default) {
+                        MappedHomeData(
+                            heroMeetings = data.heroMeetings.toUIKitMeetingInfos(),
+                            popularMeetings = data.popularMeetings.toUIKitMeetingInfos(),
+                            categories = data.categories.toUIKitMeetingTags(),
+                            communities = data.communities.toUIKitCommunityInfoList(),
+                            adBlocks = data.adBlocks.toUIKitAdBlocks(),
+                        )
+                    }
+                    _uiState.value = MainScreenUiState.Success(
+                        heroMeetings = mapped.heroMeetings,
+                        popularMeetings = mapped.popularMeetings,
+                        allMeetings = emptyList(),
+                        categories = mapped.categories,
+                        communities = mapped.communities,
+                        adBlocks = mapped.adBlocks,
+                    )
+                }
+            _isRefreshing.value = false
         }
     }
 
