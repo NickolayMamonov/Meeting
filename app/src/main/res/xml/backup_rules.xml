@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- Исключаем зашифрованные preferences с токенами -->
-    <exclude domain="sharedpref" path="secure_auth_prefs.xml"/>
+    <!-- Exclude auth token storage from backup. -->
+    <exclude domain="file" path="datastore/secure_token_store.preferences_pb"/>
+    <exclude domain="sharedpref" path="meeting_token_keyset_prefs.xml"/>
 </full-backup-content>
