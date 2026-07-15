@@ -1,6 +1,6 @@
 package com.whysoezzy.network
 
-import com.whysoezzy.network.error.ApiException
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.network.error.ErrorResponse
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.bodyAsText
@@ -15,7 +15,7 @@ suspend inline fun <T> safeApiCall(crossinline apiCall: suspend () -> T): Result
         val statusCode = e.response.status.value
         when (statusCode) {
             401, 403 -> {
-                Result.failure(ApiException.UnauthorizedError())
+                Result.failure(AppException.UnauthorizedError())
             }
 
             else -> {
@@ -31,13 +31,13 @@ suspend inline fun <T> safeApiCall(crossinline apiCall: suspend () -> T): Result
                             path = "",
                         )
                     }
-                Result.failure(ApiException.ServerError(errorResponse))
+                Result.failure(AppException.ServerError(errorResponse.message))
             }
         }
     } catch (e: IOException) {
-        Result.failure(ApiException.NetworkError(e.message ?: "Network error"))
+        Result.failure(AppException.NetworkError(e.message ?: "Network error"))
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        Result.failure(ApiException.UnknownError(e.message ?: "Unknown error"))
+        Result.failure(AppException.UnknownError(e.message ?: "Unknown error"))
     }

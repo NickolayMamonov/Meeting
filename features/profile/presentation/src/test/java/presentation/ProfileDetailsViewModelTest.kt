@@ -2,6 +2,7 @@ package presentation
 
 import app.cash.turbine.test
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
@@ -12,7 +13,6 @@ import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
 import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
-import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
 import com.whysoezzy.testing.TestDispatcherProvider
 import dev.whysoezzy.profile.details.presentation.ProfileDetailsEvent
@@ -163,7 +163,7 @@ class ProfileDetailsViewModelTest {
     @Test
     fun `loadProfile UnauthorizedError triggers logout and NavigateToAuth`() = runTest {
         coEvery { getCurrentUserUseCase() } returns
-            Result.failure(ApiException.UnauthorizedError("401"))
+            Result.failure(AppException.UnauthorizedError("401"))
         coEvery { logoutUseCase() } returns Unit
 
         val vm = viewModel()

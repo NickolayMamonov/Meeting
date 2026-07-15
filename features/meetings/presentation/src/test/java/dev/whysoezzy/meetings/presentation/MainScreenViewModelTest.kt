@@ -2,6 +2,7 @@ package dev.whysoezzy.meetings.presentation
 
 import androidx.paging.PagingData
 import app.cash.turbine.test
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.domain.models.MainScreenData
 import com.whysoezzy.domain.models.Meeting
@@ -14,7 +15,6 @@ import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.GetPagedMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.domain.usecase.SearchMeetingsUseCase
-import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
 import com.whysoezzy.testing.TestDispatcherProvider
 import dev.whysoezzy.uikit.models.UIKitTagState
@@ -89,7 +89,7 @@ class MainScreenViewModelTest {
     @Test
     fun `loadData failure emits Error state with user-friendly message`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.failure(
-            ApiException.NetworkError("connection lost"),
+            AppException.NetworkError("connection lost"),
         )
 
         val viewModel = MainScreenViewModel(

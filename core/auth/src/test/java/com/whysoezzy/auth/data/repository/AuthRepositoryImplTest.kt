@@ -6,7 +6,7 @@ import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.AuthUserDto
 import com.whysoezzy.auth.data.dto.RefreshTokenResponse
 import com.whysoezzy.auth.domain.models.AuthResult
-import com.whysoezzy.network.error.ApiException
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -122,7 +122,7 @@ class AuthRepositoryImplTest {
         coEvery { tokenManager.getRefreshToken() } returns null
         val result = repository().refreshToken()
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is ApiException.UnauthorizedError)
+        assertTrue(result.exceptionOrNull() is AppException.UnauthorizedError)
         coVerify(exactly = 0) { authApi.refreshToken(any()) }
     }
 

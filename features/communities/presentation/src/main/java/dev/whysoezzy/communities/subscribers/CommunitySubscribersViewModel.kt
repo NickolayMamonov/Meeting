@@ -3,9 +3,9 @@ package dev.whysoezzy.communities.subscribers
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.common.dispatcher.DispatcherProvider
+import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
-import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.communities.mappers.toPersonItem
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
