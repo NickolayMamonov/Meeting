@@ -11,7 +11,6 @@ dependencies {
     implementation(project(":features:communities:domain"))
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
-    implementation(project(":core:network"))
 
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)

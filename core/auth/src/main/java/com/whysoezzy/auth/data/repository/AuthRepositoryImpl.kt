@@ -4,7 +4,7 @@ import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.data.api.AuthApi
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.repository.AuthRepository
-import com.whysoezzy.network.error.ApiException
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.network.safeApiCall
 import io.ktor.utils.io.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -49,7 +49,7 @@ internal class AuthRepositoryImpl(
     override suspend fun refreshToken(): Result<String> {
         val currentRefreshToken = tokenManager.getRefreshToken()
             ?: return Result.failure(
-                ApiException.UnauthorizedError("No refresh token available"),
+                AppException.UnauthorizedError("No refresh token available"),
             )
         return safeApiCall {
             val response = authApi.refreshToken(currentRefreshToken)

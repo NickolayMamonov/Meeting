@@ -6,11 +6,11 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import com.whysoezzy.common.dispatcher.DispatcherProvider
+import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.GetPagedMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
 import com.whysoezzy.domain.usecase.SearchMeetingsUseCase
-import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.meetings.mappers.toUIKitAdBlocks
 import dev.whysoezzy.meetings.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.meetings.mappers.toUIKitMeetingInfo

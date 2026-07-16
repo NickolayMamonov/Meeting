@@ -3,7 +3,7 @@ package dev.whysoezzy.auth.presentation.name
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.repository.UserProfileUpdater
-import com.whysoezzy.network.toErrorType
+import com.whysoezzy.common.error.toErrorType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow

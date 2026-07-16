@@ -3,8 +3,8 @@ package dev.whysoezzy.meetings.participants.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.common.dispatcher.DispatcherProvider
+import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.domain.usecase.GetMeetingParticipantsUseCase
-import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.meetings.mappers.toPersonItem
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow

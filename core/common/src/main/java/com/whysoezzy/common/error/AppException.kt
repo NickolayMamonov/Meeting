@@ -1,21 +1,21 @@
-package com.whysoezzy.network.error
+package com.whysoezzy.common.error
 
-sealed class ApiException(
+sealed class AppException(
     message: String,
 ) : Exception(message) {
     data class ServerError(
-        val errorResponse: ErrorResponse,
-    ) : ApiException(errorResponse.message)
+        override val message: String,
+    ) : AppException(message)
 
     data class NetworkError(
         override val message: String,
-    ) : ApiException(message)
+    ) : AppException(message)
 
     data class UnauthorizedError(
         override val message: String = "Unauthorized",
-    ) : ApiException(message)
+    ) : AppException(message)
 
     data class UnknownError(
         override val message: String,
-    ) : ApiException(message)
+    ) : AppException(message)
 }

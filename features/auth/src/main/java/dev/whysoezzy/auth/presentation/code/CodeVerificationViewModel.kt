@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.usecase.SendOtpUseCase
 import com.whysoezzy.auth.domain.usecase.VerifyOtpUseCase
-import com.whysoezzy.network.toErrorType
+import com.whysoezzy.common.error.toErrorType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
