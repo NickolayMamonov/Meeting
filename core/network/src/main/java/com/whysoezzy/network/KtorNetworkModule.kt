@@ -1,6 +1,8 @@
 package com.whysoezzy.network
 
 import io.ktor.client.HttpClient
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
@@ -28,84 +30,100 @@ object KtorNetworkModule {
         onRefreshToken: (suspend () -> Pair<String, String>?)? = null,
     ): HttpClient =
         HttpClient(Android) {
-            defaultRequest {
-                url(BuildConfig.BASE_URL)
-            }
+            configure(tokenProvider, onRefreshToken)
+        }
 
-            install(HttpTimeout) {
-                requestTimeoutMillis = 30_000
-                connectTimeoutMillis = 30_000
-                socketTimeoutMillis = 30_000
-            }
+    internal fun provideHttpClient(
+        engine: HttpClientEngine,
+        tokenProvider: TokenProvider? = null,
+        onRefreshToken: (suspend () -> Pair<String, String>?)? = null,
+    ): HttpClient =
+        HttpClient(engine) {
+            configure(tokenProvider, onRefreshToken)
+        }
 
-            install(ContentNegotiation) {
-                json(
-                    Json {
-                        prettyPrint = BuildConfig.DEBUG
-                        isLenient = true
-                        ignoreUnknownKeys = true
-                        coerceInputValues = true
-                        encodeDefaults = false
-                    },
-                )
-            }
-            install(HttpRequestRetry) {
-                retryOnServerErrors(maxRetries = 3)
-                retryOnException(maxRetries = 3, retryOnTimeout = true)
-                exponentialDelay()
-            }
+    private fun HttpClientConfig<*>.configure(
+        tokenProvider: TokenProvider?,
+        onRefreshToken: (suspend () -> Pair<String, String>?)?,
+    ) {
+        defaultRequest {
+            url(BuildConfig.BASE_URL)
+        }
 
-            if (BuildConfig.DEBUG) {
-                install(Logging) {
-                    level = LogLevel.ALL
-                }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 30_000
+            connectTimeoutMillis = 30_000
+            socketTimeoutMillis = 30_000
+        }
+
+        install(ContentNegotiation) {
+            json(
+                Json {
+                    prettyPrint = BuildConfig.DEBUG
+                    isLenient = true
+                    ignoreUnknownKeys = true
+                    coerceInputValues = true
+                    encodeDefaults = false
+                },
+            )
+        }
+        install(HttpRequestRetry) {
+            retryOnServerErrors(maxRetries = 3)
+            retryOnException(maxRetries = 3, retryOnTimeout = true)
+            exponentialDelay()
+        }
+
+        if (BuildConfig.DEBUG) {
+            install(Logging) {
+                level = LogLevel.ALL
             }
+        }
 
-            if (tokenProvider != null && onRefreshToken != null) {
-                install(Auth) {
-                    bearer {
-                        loadTokens {
-                            val accessToken = tokenProvider.getAccessToken()
-                            val refreshToken = tokenProvider.getRefreshToken()
+        if (tokenProvider != null && onRefreshToken != null) {
+            install(Auth) {
+                bearer {
+                    loadTokens {
+                        val accessToken = tokenProvider.getAccessToken()
+                        val refreshToken = tokenProvider.getRefreshToken()
 
-                            if (accessToken != null && refreshToken != null) {
+                        if (accessToken != null && refreshToken != null) {
+                            BearerTokens(
+                                accessToken = accessToken,
+                                refreshToken = refreshToken,
+                            )
+                        } else {
+                            null
+                        }
+                    }
+
+                    sendWithoutRequest { request ->
+                        val baseHost =
+                            BuildConfig.BASE_URL
+                                .removePrefix("https://")
+                                .removePrefix("http://")
+                                .substringBefore("/")
+                                .substringBefore(":")
+                        request.url.host == baseHost
+                    }
+
+                    refreshTokens {
+                        try {
+                            val tokens = onRefreshToken()
+                            tokens?.let {
                                 BearerTokens(
-                                    accessToken = accessToken,
-                                    refreshToken = refreshToken,
+                                    accessToken = it.first,
+                                    refreshToken = it.second,
                                 )
-                            } else {
-                                null
                             }
-                        }
-
-                        sendWithoutRequest { request ->
-                            val baseHost =
-                                BuildConfig.BASE_URL
-                                    .removePrefix("https://")
-                                    .removePrefix("http://")
-                                    .substringBefore("/")
-                                    .substringBefore(":")
-                            request.url.host == baseHost
-                        }
-
-                        refreshTokens {
-                            try {
-                                val tokens = onRefreshToken()
-                                tokens?.let {
-                                    BearerTokens(
-                                        accessToken = it.first,
-                                        refreshToken = it.second,
-                                    )
-                                }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                Timber.e(e, "Bearer refresh callback failed")
-                                null
-                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Timber.e(e, "Bearer refresh callback failed")
+                            null
                         }
                     }
                 }
             }
         }
+    }
 }
