@@ -47,7 +47,8 @@ internal class AuthRepositoryImpl(
         }
 
     override suspend fun refreshToken(): Result<String> {
-        val currentRefreshToken = tokenManager.getRefreshToken()
+        val currentRefreshToken = tokenManager
+            .getRefreshToken()
             ?.takeIf { it.isNotBlank() }
             ?: return Result.failure(
                 AppException.UnauthorizedError("No refresh token available"),

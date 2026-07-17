@@ -1,8 +1,8 @@
 package dev.whysoezzy.meet.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -23,7 +23,6 @@ fun MeetNavHost(
 ) {
     val authViewModel: AuthCheckViewModel = koinViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
-    var hasInitializedAuthState by remember { mutableStateOf(false) }
 
     // Показываем SplashScreen пока проверяем авторизацию
     if (isLoggedIn == null) {
@@ -48,6 +47,19 @@ fun MeetNavHost(
         communitiesNavigation(navController)
         profileNavigation(navController)
     }
+
+    AuthStateNavigationEffect(
+        navController = navController,
+        isLoggedIn = isLoggedIn,
+    )
+}
+
+@Composable
+internal fun AuthStateNavigationEffect(
+    navController: NavHostController,
+    isLoggedIn: Boolean?,
+) {
+    var hasInitializedAuthState by remember { mutableStateOf(false) }
 
     LaunchedEffect(isLoggedIn) {
         if (!hasInitializedAuthState) {
