@@ -6,6 +6,7 @@ import com.whysoezzy.data.dto.UpdateUserDto
 import com.whysoezzy.data.dto.UserProfileDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -29,6 +30,10 @@ internal class UserApiKtor(
                 contentType(ContentType.Application.Json)
                 setBody(updateDto)
             }.body()
+    }
+
+    override suspend fun deleteCurrentUserProfile() {
+        client.delete("profile")
     }
 
     override suspend fun getUserMeetings(userId: Long): List<MeetingInfoDto> {
