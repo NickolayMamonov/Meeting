@@ -11,6 +11,8 @@ interface UserRepository {
 
     suspend fun updateUserProfile(user: User): Result<User>
 
+    suspend fun deleteCurrentUserProfile(): Result<Unit>
+
     suspend fun getUserMeetings(userId: Long): Result<List<MeetingInfo>>
 
     suspend fun getUserCommunities(userId: Long): Result<List<CommunityInfo>>

@@ -27,6 +27,10 @@ internal class UserRepositoryImpl(
         userApi.updateUserProfile(updateDto).toDomain()
     }
 
+    override suspend fun deleteCurrentUserProfile(): Result<Unit> = safeApiCall {
+        userApi.deleteCurrentUserProfile()
+    }
+
     override suspend fun getUserMeetings(userId: Long): Result<List<MeetingInfo>> = safeApiCall {
         userApi.getUserMeetings(userId).map { it.toMeetingInfo() }
     }

@@ -12,6 +12,8 @@ internal interface UserApi {
 
     suspend fun updateUserProfile(updateDto: UpdateUserDto): UserProfileDto
 
+    suspend fun deleteCurrentUserProfile()
+
     suspend fun getUserMeetings(userId: Long): List<MeetingInfoDto>
 
     suspend fun getUserCommunities(userId: Long): List<CommunityInfoDto>

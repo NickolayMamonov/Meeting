@@ -10,6 +10,7 @@ import com.whysoezzy.data.repository.UserProfileUpdaterImpl
 import com.whysoezzy.data.repository.UserRepositoryImpl
 import com.whysoezzy.domain.repository.TagRepository
 import com.whysoezzy.domain.repository.UserRepository
+import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
@@ -30,6 +31,7 @@ val profileDataModule = module {
     single<UserProfileUpdater> { UserProfileUpdaterImpl(get<UserApi>()) }
     // Use Cases
     factory { GetCurrentUserUseCase(get()) }
+    factory { DeleteCurrentUserProfileUseCase(get()) }
     factory { GetUserByIdUseCase(get()) }
     factory { UpdateUserProfileUseCase(get()) }
     factory { GetUserMeetingsUseCase(get()) }
