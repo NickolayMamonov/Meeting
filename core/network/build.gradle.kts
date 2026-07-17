@@ -8,7 +8,7 @@ plugins {
 val releaseBuildRequested = gradle.startParameter.taskNames.any { requestedTask ->
     val taskName = requestedTask.substringAfterLast(':')
     taskName.contains("release", ignoreCase = true) ||
-        taskName in setOf("assemble", "build", "bundle", "package", "publish")
+        taskName in setOf("assemble", "build", "bundle", "check", "package", "publish", "test")
 }
 
 fun requiredReleaseBaseUrl(): String {
