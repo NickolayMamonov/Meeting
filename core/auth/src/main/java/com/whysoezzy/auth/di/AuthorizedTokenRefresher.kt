@@ -1,0 +1,43 @@
+package com.whysoezzy.auth.di
+
+import com.whysoezzy.auth.TokenManager
+import com.whysoezzy.auth.domain.repository.AuthRepository
+import com.whysoezzy.common.error.AppException
+import timber.log.Timber
+import kotlin.coroutines.cancellation.CancellationException
+
+/**
+ * Converts a bearer-token refresh into Ktor tokens without treating transient failures as logout.
+ */
+internal suspend fun refreshAuthorizedTokens(
+    authRepository: AuthRepository,
+    tokenManager: TokenManager,
+): Pair<String, String>? {
+    if (tokenManager.getRefreshToken().isNullOrBlank()) {
+        tokenManager.clearTokens()
+        return null
+    }
+
+    try {
+        val result = authRepository.refreshToken()
+        val accessToken = result.getOrElse { error ->
+            if (error is AppException.UnauthorizedError) {
+                tokenManager.clearTokens()
+            } else {
+                Timber.w(error, "Token refresh failed; preserving local session for retry")
+            }
+            return null
+        }
+        val refreshToken = tokenManager.getRefreshToken()
+        if (refreshToken.isNullOrBlank()) {
+            tokenManager.clearTokens()
+            return null
+        }
+        return accessToken to refreshToken
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Timber.w(e, "Token refresh failed; preserving local session for retry")
+        return null
+    }
+}

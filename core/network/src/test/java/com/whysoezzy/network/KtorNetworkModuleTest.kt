@@ -18,6 +18,42 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class KtorNetworkModuleTest {
     @Test
+    fun `failed token refresh does not retry protected request or recurse`() =
+        runTest {
+            val requestCount = AtomicInteger()
+            val refreshCount = AtomicInteger()
+            val engine = MockEngine { request ->
+                requestCount.incrementAndGet()
+                assertEquals("Bearer old-access-token", request.headers[HttpHeaders.Authorization])
+                respond(content = "", status = HttpStatusCode.Unauthorized)
+            }
+            val client =
+                KtorNetworkModule.provideHttpClient(
+                    engine = engine,
+                    tokenProvider =
+                        object : TokenProvider {
+                            override suspend fun getAccessToken() = "old-access-token"
+
+                            override suspend fun getRefreshToken() = "old-refresh-token"
+                        },
+                    onRefreshToken = {
+                        refreshCount.incrementAndGet()
+                        null
+                    },
+                )
+
+            try {
+                val response = client.get("/protected").bodyAsText()
+
+                assertEquals("", response)
+                assertEquals(1, requestCount.get())
+                assertEquals(1, refreshCount.get())
+            } finally {
+                client.close()
+            }
+        }
+
+    @Test
     fun `concurrent unauthorized requests share one token refresh and retry with new bearer token`() =
         runTest {
             val initialRequestsEntered = CompletableDeferred<Unit>()
