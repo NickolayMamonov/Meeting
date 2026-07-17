@@ -14,8 +14,6 @@ import com.whysoezzy.network.KtorNetworkModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
-import timber.log.Timber
-import kotlin.coroutines.cancellation.CancellationException
 
 val authModule =
     module {
@@ -36,23 +34,10 @@ val authModule =
             KtorNetworkModule.provideHttpClient(
                 tokenProvider = tokenManager,
                 onRefreshToken = {
-                    try {
-                        val authRepo = get<AuthRepository>()
-                        val newAccessToken = authRepo.refreshToken().getOrNull()
-                        if (newAccessToken != null) {
-                            val refresh = tokenManager.getRefreshToken() ?: ""
-                            Pair(newAccessToken, refresh)
-                        } else {
-                            tokenManager.clearTokens()
-                            null
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Timber.e(e, "Token refresh failed, clearing tokens — user will be logged out")
-                        tokenManager.clearTokens()
-                        null
-                    }
+                    refreshAuthorizedTokens(
+                        authRepository = get(),
+                        tokenManager = tokenManager,
+                    )
                 },
             )
         }
