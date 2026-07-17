@@ -5,7 +5,9 @@ import com.whysoezzy.data.dto.SocialMediaDto
 import com.whysoezzy.data.dto.TagDto
 import com.whysoezzy.data.dto.UserProfileDto
 import com.whysoezzy.domain.models.MeetingStatus
+import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
+import com.whysoezzy.domain.models.User
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,11 +40,11 @@ class UserMapperTest {
     }
 
     @Test
-    fun `toDomain maps socialMedias list`() {
+    fun `toDomain maps supported socialMedias list`() {
         val dto = minimalUserDto(
             socialMedias = listOf(
                 SocialMediaDto(type = "TELEGRAM", url = "https://t.me/ivan"),
-                SocialMediaDto(type = "GITHUB", url = "https://github.com/ivan"),
+                SocialMediaDto(type = "habr", url = "https://habr.com/users/ivan"),
             ),
         )
 
@@ -50,7 +52,7 @@ class UserMapperTest {
 
         assertEquals(2, result.socialMedias.size)
         assertEquals(SocialMediaType.TELEGRAM, result.socialMedias[0].type)
-        assertEquals(SocialMediaType.GITHUB, result.socialMedias[1].type)
+        assertEquals(SocialMediaType.HABR, result.socialMedias[1].type)
     }
 
     @Test
@@ -79,14 +81,33 @@ class UserMapperTest {
     }
 
     @Test
-    fun `toDomain unknown socialMedia type falls back to TELEGRAM`() {
+    fun `toDomain drops unsupported socialMedia types`() {
         val dto = minimalUserDto(
-            socialMedias = listOf(SocialMediaDto(type = "UNKNOWN_PLATFORM", url = "https://example.com")),
+            socialMedias = listOf(
+                SocialMediaDto(type = "github", url = "https://github.com/ivan"),
+                SocialMediaDto(type = "linkedin", url = "https://linkedin.com/in/ivan"),
+                SocialMediaDto(type = "UNKNOWN_PLATFORM", url = "https://example.com"),
+            ),
         )
 
         val result = dto.toDomain()
 
-        assertEquals(SocialMediaType.TELEGRAM, result.socialMedias[0].type)
+        assertTrue(result.socialMedias.isEmpty())
+    }
+
+    @Test
+    fun `toUpdateDto serializes supported socialMedia types as lowercase backend values`() {
+        val result = sampleUser(
+            socialMedias = listOf(
+                SocialMediaInfo(SocialMediaType.HABR, "https://habr.com/users/ivan", "ivan"),
+                SocialMediaInfo(SocialMediaType.TELEGRAM, "https://t.me/ivan", "ivan"),
+            ),
+        ).toUpdateDto()
+
+        assertEquals(
+            listOf("habr", "telegram"),
+            result.socialMedias?.map(SocialMediaDto::type),
+        )
     }
 
     // ==================== MeetingInfoDto.toMeetingInfo — parseDateToTimestamp ====================
@@ -167,6 +188,20 @@ class UserMapperTest {
         description = description,
         avatarUrl = avatarUrl,
         interests = interests,
+        socialMedias = socialMedias,
+    )
+
+    private fun sampleUser(
+        socialMedias: List<SocialMediaInfo> = emptyList(),
+    ) = User(
+        id = 1L,
+        name = "Ivan",
+        surname = "Ivanov",
+        email = "ivan@example.com",
+        city = "Moscow",
+        avatar = "",
+        phone = "+79991234567",
+        bio = "",
         socialMedias = socialMedias,
     )
 }

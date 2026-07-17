@@ -1,5 +1,7 @@
 package dev.whysoezzy.profile.edit.presentation
 
+import com.whysoezzy.domain.models.SocialMediaType
+
 sealed interface ProfileEditEvent {
     // Основная информация — единое поле "Имя Фамилия"
     data class UpdateNameSurname(
@@ -48,7 +50,7 @@ sealed interface ProfileEditEvent {
 
     // Социальные сети
     data class UpdateSocialMedia(
-        val type: String,
+        val type: SocialMediaType,
         val username: String,
     ) : ProfileEditEvent
 

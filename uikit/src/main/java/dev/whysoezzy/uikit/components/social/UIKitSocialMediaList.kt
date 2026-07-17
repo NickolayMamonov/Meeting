@@ -81,16 +81,12 @@ private fun getSocialMediaIcon(type: UIKitSocialMedia): Painter =
     when (type) {
         UIKitSocialMedia.TELEGRAM -> painterResource(R.drawable.telegram_logo)
         UIKitSocialMedia.HABR -> painterResource(R.drawable.habr_icon)
-        UIKitSocialMedia.GITHUB -> painterResource(R.drawable.habr_icon) // fallback
-        UIKitSocialMedia.LINKEDIN -> painterResource(R.drawable.telegram_logo) // fallback
     }
 
 private fun getSocialMediaName(type: UIKitSocialMedia): String =
     when (type) {
         UIKitSocialMedia.TELEGRAM -> "Telegram"
         UIKitSocialMedia.HABR -> "Habr"
-        UIKitSocialMedia.GITHUB -> "GitHub"
-        UIKitSocialMedia.LINKEDIN -> "LinkedIn"
     }
 
 @Preview(showBackground = true)

@@ -2,6 +2,7 @@ package dev.whysoezzy.profile.edit.presentation
 
 import androidx.compose.runtime.Immutable
 import com.whysoezzy.common.error.ErrorType
+import com.whysoezzy.domain.models.SocialMediaType
 
 @Immutable
 data class ProfileEditUiState(
@@ -18,7 +19,7 @@ data class ProfileEditUiState(
     // Все доступные теги (id -> name)
     val availableTags: Map<Long, String> = emptyMap(),
     // Социальные сети (Map: тип -> username)
-    val socialMedias: Map<String, String> = emptyMap(),
+    val socialMedias: Map<SocialMediaType, String> = emptyMap(),
     // Настройки приватности
     val showCommunities: Boolean = true,
     val showMeetings: Boolean = true,

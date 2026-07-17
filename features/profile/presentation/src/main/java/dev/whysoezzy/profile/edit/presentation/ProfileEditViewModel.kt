@@ -186,14 +186,14 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(interests = list, isSaved = false)
     }
 
-    private fun updateSocialMedia(type: String, username: String) {
+    private fun updateSocialMedia(type: SocialMediaType, username: String) {
         val map = _uiState.value.socialMedias.toMutableMap()
         if (username.isBlank()) map.remove(type) else map[type] = username
         _uiState.value = _uiState.value.copy(socialMedias = map, isSaved = false)
     }
 
-    private fun extractSocialMedias(list: List<SocialMediaInfo>): Map<String, String> =
-        list.associate { it.type.name.lowercase() to it.username }
+    private fun extractSocialMedias(list: List<SocialMediaInfo>): Map<SocialMediaType, String> =
+        list.associate { it.type to it.username }
 
     private fun toggleShowCommunities() {
         _uiState.value = _uiState.value.copy(
@@ -251,16 +251,11 @@ class ProfileEditViewModel(
             try {
                 socialMediasList = state.socialMedias.mapNotNull { (type, username) ->
                     if (username.isBlank()) return@mapNotNull null
-                    try {
-                        val smType = SocialMediaType.valueOf(type.uppercase())
-                        SocialMediaInfo(
-                            type = smType,
-                            url = generateSocialMediaUrl(smType, username),
-                            username = username,
-                        )
-                    } catch (_: IllegalArgumentException) {
-                        null
-                    }
+                    SocialMediaInfo(
+                        type = type,
+                        url = generateSocialMediaUrl(type, username),
+                        username = username,
+                    )
                 }
 
                 updatedInterests = state.interests.mapNotNull { name ->
@@ -351,7 +346,5 @@ class ProfileEditViewModel(
         when (type) {
             SocialMediaType.TELEGRAM -> "https://t.me/$username"
             SocialMediaType.HABR -> "https://habr.com/users/$username"
-            SocialMediaType.LINKEDIN -> "https://linkedin.com/in/$username"
-            SocialMediaType.GITHUB -> "https://github.com/$username"
         }
 }

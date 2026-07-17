@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
+import com.whysoezzy.domain.models.SocialMediaType
 import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
 import dev.whysoezzy.uikit.components.tags.UIKitTagGroup
@@ -228,7 +229,7 @@ private fun EditContent(
     onDescriptionChange: (String) -> Unit,
     onAddInterest: () -> Unit,
     onRemoveInterest: (String) -> Unit,
-    onSocialMediaChange: (String, String) -> Unit,
+    onSocialMediaChange: (SocialMediaType, String) -> Unit,
     onToggleShowCommunities: () -> Unit,
     onToggleShowMeetings: () -> Unit,
     onToggleNotifications: () -> Unit,
@@ -379,14 +380,14 @@ private fun EditContent(
                 )
                 SocialField(
                     icon = painterResource(UIKitR.drawable.habr_icon),
-                    value = uiState.socialMedias["habr"] ?: "",
-                    onValueChange = { onSocialMediaChange("habr", it) },
+                    value = uiState.socialMedias[SocialMediaType.HABR] ?: "",
+                    onValueChange = { onSocialMediaChange(SocialMediaType.HABR, it) },
                     hint = stringResource(R.string.profile_edit_social_habr),
                 )
                 SocialField(
                     icon = painterResource(UIKitR.drawable.telegram_logo),
-                    value = uiState.socialMedias["telegram"] ?: "",
-                    onValueChange = { onSocialMediaChange("telegram", it) },
+                    value = uiState.socialMedias[SocialMediaType.TELEGRAM] ?: "",
+                    onValueChange = { onSocialMediaChange(SocialMediaType.TELEGRAM, it) },
                     hint = stringResource(R.string.profile_edit_social_telegram),
                 )
             }
