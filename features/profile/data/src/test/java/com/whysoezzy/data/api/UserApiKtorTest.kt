@@ -1,5 +1,6 @@
 package com.whysoezzy.data.api
 
+import com.whysoezzy.data.repository.UserRepositoryImpl
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -8,6 +9,7 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UserApiKtorTest {
@@ -28,5 +30,26 @@ class UserApiKtorTest {
 
         assertEquals(HttpMethod.Delete, method)
         assertEquals("/profile", path)
+    }
+
+    @Test
+    fun `delete current user profile returns failure for a client error response`() = runTest {
+        assertDeleteFailure(HttpStatusCode.BadRequest)
+    }
+
+    @Test
+    fun `delete current user profile returns failure for a server error response`() = runTest {
+        assertDeleteFailure(HttpStatusCode.InternalServerError)
+    }
+
+    private suspend fun assertDeleteFailure(status: HttpStatusCode) {
+        val engine = MockEngine { respond(content = "", status = status) }
+        val client = HttpClient(engine) {
+            defaultRequest { url("http://test.local/") }
+        }
+
+        val result = UserRepositoryImpl(UserApiKtor(client)).deleteCurrentUserProfile()
+
+        assertTrue(result.isFailure)
     }
 }
