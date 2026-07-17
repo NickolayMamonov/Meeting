@@ -5,8 +5,6 @@ import androidx.compose.runtime.Immutable
 enum class UIKitSocialMedia {
     TELEGRAM,
     HABR,
-    GITHUB,
-    LINKEDIN,
 }
 
 @Immutable

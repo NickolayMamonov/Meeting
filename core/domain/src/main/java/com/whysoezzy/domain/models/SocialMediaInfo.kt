@@ -9,6 +9,4 @@ data class SocialMediaInfo(
 enum class SocialMediaType {
     TELEGRAM,
     HABR,
-    LINKEDIN,
-    GITHUB,
 }
