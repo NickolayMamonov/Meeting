@@ -21,5 +21,22 @@ Pet-проект: приложение для поиска и посещения
 
 ## Запуск
 1. Запусти бэкенд-сервер (см. репозиторий бэкенда)
-2. Убедись что `BASE_URL` в `core/network/build.gradle.kts` указывает на твой сервер
+2. При необходимости задай URL debug-сервера через `BASE_URL_DEBUG` в `~/.gradle/gradle.properties` или `-PBASE_URL_DEBUG=http://...`
 3. `./gradlew assembleDebug`
+
+## Release BASE_URL
+
+Release-сборка требует явный HTTPS URL в `BASE_URL_RELEASE`; значение не хранится в репозитории:
+
+```sh
+./gradlew assembleRelease -PBASE_URL_RELEASE=https://release-test.invalid
+```
+
+В CI передавай защищённый секрет без вывода в логи через Gradle project property:
+
+```yaml
+env:
+  ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ secrets.BASE_URL_RELEASE }}
+```
+
+Пустые значения, HTTP и `https://api.example.com` отклоняются. Реальный release URL и настройки TLS/pinning должны быть согласованы с production-конфигурацией сети.
