@@ -1,8 +1,8 @@
 package com.whysoezzy.data.api
 
+import com.whysoezzy.data.dto.AvatarUploadResponseDto
 import com.whysoezzy.data.dto.CommunityInfoDto
 import com.whysoezzy.data.dto.MeetingInfoDto
-import com.whysoezzy.data.dto.AvatarUploadResponseDto
 import com.whysoezzy.data.dto.UpdateUserDto
 import com.whysoezzy.data.dto.UserProfileDto
 import com.whysoezzy.domain.models.AvatarUpload

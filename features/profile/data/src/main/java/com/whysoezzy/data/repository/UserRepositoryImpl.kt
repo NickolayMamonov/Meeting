@@ -4,8 +4,8 @@ import com.whysoezzy.data.api.UserApi
 import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.data.mapper.toMeetingInfo
 import com.whysoezzy.data.mapper.toUpdateDto
-import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.AvatarUpload
+import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.repository.UserRepository
