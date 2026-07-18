@@ -2,6 +2,7 @@ package dev.whysoezzy.profile.edit.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.usecase.LogoutUseCase
 import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.common.utils.ValidationUtils
@@ -9,6 +10,7 @@ import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
+import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
@@ -24,12 +26,16 @@ import kotlin.coroutines.cancellation.CancellationException
 
 sealed interface ProfileEditNavEvent {
     data object NavigateBack : ProfileEditNavEvent
+
+    data object NavigateToAuth : ProfileEditNavEvent
 }
 
 class ProfileEditViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val updateUserProfileUseCase: UpdateUserProfileUseCase,
     private val getAllTagsUseCase: GetAllTagsUseCase,
+    private val deleteCurrentUserProfileUseCase: DeleteCurrentUserProfileUseCase,
+    private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileEditUiState())
     val uiState: StateFlow<ProfileEditUiState> = _uiState.asStateFlow()
@@ -315,8 +321,27 @@ class ProfileEditViewModel(
     }
 
     private fun confirmDeleteProfile() {
-        _uiState.value = _uiState.value.copy(showDeleteConfirmDialog = false)
-        // TODO: вызов deleteAccountUseCase когда будет добавлен
+        if (_uiState.value.isSaving) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isSaving = true,
+                error = null,
+                showDeleteConfirmDialog = false,
+            )
+
+            deleteCurrentUserProfileUseCase()
+                .onSuccess {
+                    logoutUseCase()
+                    _uiState.value = _uiState.value.copy(isSaving = false)
+                    _navEvent.tryEmit(ProfileEditNavEvent.NavigateToAuth)
+                }.onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaving = false,
+                        error = exception.toErrorType(),
+                    )
+                }
+        }
     }
 
     private fun validateName(name: String): String? = when {

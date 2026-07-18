@@ -1,15 +1,20 @@
 package presentation
 
+import app.cash.turbine.test
+import com.whysoezzy.auth.domain.usecase.LogoutUseCase
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.User
+import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
 import com.whysoezzy.testing.MainDispatcherRule
 import dev.whysoezzy.profile.edit.presentation.ProfileEditEvent
+import dev.whysoezzy.profile.edit.presentation.ProfileEditNavEvent
 import dev.whysoezzy.profile.edit.presentation.ProfileEditViewModel
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,6 +33,8 @@ class ProfileEditViewModelTest {
     private val getCurrentUserUseCase: GetCurrentUserUseCase = mockk()
     private val updateUserProfileUseCase: UpdateUserProfileUseCase = mockk()
     private val getAllTagsUseCase: GetAllTagsUseCase = mockk()
+    private val deleteCurrentUserProfileUseCase: DeleteCurrentUserProfileUseCase = mockk()
+    private val logoutUseCase: LogoutUseCase = mockk()
 
     @Test
     fun `save sends Habr and Telegram social media with their supported URLs`() = runTest {
@@ -71,10 +78,63 @@ class ProfileEditViewModelTest {
         assertTrue(updatedUser.captured.socialMedias.isEmpty())
     }
 
+    @Test
+    fun `confirmed profile deletion logs out and navigates to auth`() = runTest {
+        coEvery { getCurrentUserUseCase() } returns Result.success(sampleUser)
+        coEvery { getAllTagsUseCase() } returns Result.success(emptyList())
+        coEvery { deleteCurrentUserProfileUseCase() } returns Result.success(Unit)
+        coEvery { logoutUseCase() } returns Unit
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.navEvent.test {
+            viewModel.onEvent(ProfileEditEvent.DeleteProfile)
+            viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile)
+            advanceUntilIdle()
+
+            assertEquals(ProfileEditNavEvent.NavigateToAuth, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        assertTrue(!viewModel.uiState.value.showDeleteConfirmDialog)
+        assertTrue(!viewModel.uiState.value.isSaving)
+        coVerifyOrder {
+            deleteCurrentUserProfileUseCase()
+            logoutUseCase()
+        }
+    }
+
+    @Test
+    fun `failed profile deletion retains session and exposes an error`() = runTest {
+        coEvery { getCurrentUserUseCase() } returns Result.success(sampleUser)
+        coEvery { getAllTagsUseCase() } returns Result.success(emptyList())
+        coEvery { deleteCurrentUserProfileUseCase() } returns
+            Result.failure(RuntimeException("Network error"))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.navEvent.test {
+            viewModel.onEvent(ProfileEditEvent.DeleteProfile)
+            viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile)
+            advanceUntilIdle()
+
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        assertTrue(!viewModel.uiState.value.showDeleteConfirmDialog)
+        assertTrue(!viewModel.uiState.value.isSaving)
+        assertTrue(viewModel.uiState.value.error != null)
+        coVerify(exactly = 1) { deleteCurrentUserProfileUseCase() }
+        coVerify(exactly = 0) { logoutUseCase() }
+    }
+
     private fun viewModel() = ProfileEditViewModel(
         getCurrentUserUseCase = getCurrentUserUseCase,
         updateUserProfileUseCase = updateUserProfileUseCase,
         getAllTagsUseCase = getAllTagsUseCase,
+        deleteCurrentUserProfileUseCase = deleteCurrentUserProfileUseCase,
+        logoutUseCase = logoutUseCase,
     )
 
     private val sampleUser = User(

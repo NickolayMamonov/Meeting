@@ -88,6 +88,7 @@ fun ProfileEditScreen(
             viewModel.navEvent.collect { event ->
                 when (event) {
                     is ProfileEditNavEvent.NavigateBack -> onSaveSuccess()
+                    is ProfileEditNavEvent.NavigateToAuth -> onSaveSuccess()
                 }
             }
         }
@@ -206,7 +207,10 @@ fun ProfileEditScreen(
                 title = { Text(stringResource(R.string.profile_edit_delete_title)) },
                 text = { Text(stringResource(R.string.profile_edit_delete_message)) },
                 confirmButton = {
-                    TextButton(onClick = { viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile) }) {
+                    TextButton(
+                        onClick = { viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile) },
+                        enabled = !uiState.isSaving,
+                    ) {
                         Text(stringResource(R.string.profile_edit_delete_confirm), color = ColorTokens.AccentDanger)
                     }
                 },
