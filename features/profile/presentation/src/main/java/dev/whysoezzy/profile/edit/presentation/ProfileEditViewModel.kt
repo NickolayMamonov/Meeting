@@ -10,9 +10,9 @@ import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
+import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
-import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +26,7 @@ import kotlin.coroutines.cancellation.CancellationException
 
 sealed interface ProfileEditNavEvent {
     data object NavigateBack : ProfileEditNavEvent
+
     data object NavigateToAuth : ProfileEditNavEvent
 }
 
