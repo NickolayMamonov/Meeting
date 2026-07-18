@@ -1,8 +1,8 @@
 package com.whysoezzy.domain.repository
 
+import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
-import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.User
 
 interface UserRepository {
