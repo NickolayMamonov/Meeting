@@ -1,8 +1,8 @@
 package com.whysoezzy.data.api
 
+import com.whysoezzy.data.dto.AvatarUploadResponseDto
 import com.whysoezzy.data.dto.CommunityInfoDto
 import com.whysoezzy.data.dto.MeetingInfoDto
-import com.whysoezzy.data.dto.AvatarUploadResponseDto
 import com.whysoezzy.data.dto.UpdateUserDto
 import com.whysoezzy.data.dto.UserProfileDto
 import com.whysoezzy.domain.models.AvatarUpload
@@ -11,6 +11,8 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.plugins.onUpload
 import io.ktor.client.request.delete
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
@@ -19,8 +21,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
-import io.ktor.client.request.forms.formData
-import io.ktor.client.request.forms.MultiPartFormDataContent
 import kotlinx.io.asSource
 import kotlinx.io.buffered
 
@@ -47,30 +47,31 @@ internal class UserApiKtor(
         upload: AvatarUpload,
         onProgress: (sentBytes: Long, totalBytes: Long) -> Unit,
     ): AvatarUploadResponseDto {
-        return client.post("media/avatar") {
-            setBody(
-                MultiPartFormDataContent(
-                    formData {
-                        appendInput(
-                            key = "file",
-                            headers = Headers.build {
-                                append(HttpHeaders.ContentType, upload.contentType)
-                                append(
-                                    HttpHeaders.ContentDisposition,
-                                    "filename=\"${upload.fileName}\"",
-                                )
-                            },
-                            size = upload.contentLength,
-                        ) {
-                            upload.openStream().asSource().buffered()
-                        }
-                    },
-                ),
-            )
-            onUpload { sentBytes, totalBytes ->
-                onProgress(sentBytes, totalBytes ?: upload.contentLength)
-            }
-        }.body()
+        return client
+            .post("media/avatar") {
+                setBody(
+                    MultiPartFormDataContent(
+                        formData {
+                            appendInput(
+                                key = "file",
+                                headers = Headers.build {
+                                    append(HttpHeaders.ContentType, upload.contentType)
+                                    append(
+                                        HttpHeaders.ContentDisposition,
+                                        "filename=\"${upload.fileName}\"",
+                                    )
+                                },
+                                size = upload.contentLength,
+                            ) {
+                                upload.openStream().asSource().buffered()
+                            }
+                        },
+                    ),
+                )
+                onUpload { sentBytes, totalBytes ->
+                    onProgress(sentBytes, totalBytes ?: upload.contentLength)
+                }
+            }.body()
     }
 
     override suspend fun deleteCurrentUserProfile() {
