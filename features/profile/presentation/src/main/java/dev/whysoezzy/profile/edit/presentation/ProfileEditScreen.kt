@@ -228,7 +228,7 @@ fun ProfileEditScreen(
                 confirmButton = {
                     TextButton(
                         onClick = { viewModel.onEvent(ProfileEditEvent.ConfirmDeleteProfile) },
-                        enabled = !uiState.isSaving,
+                        enabled = !uiState.isSaving && !uiState.isAvatarUploading,
                     ) {
                         Text(stringResource(R.string.profile_edit_delete_confirm), color = ColorTokens.AccentDanger)
                     }
@@ -457,7 +457,7 @@ private fun EditContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onDeleteProfile() }
+                    .clickable(enabled = !uiState.isAvatarUploading) { onDeleteProfile() }
                     .padding(vertical = SpacingTokens.M),
             )
         }
