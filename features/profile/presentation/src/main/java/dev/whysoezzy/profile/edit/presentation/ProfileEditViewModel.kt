@@ -6,8 +6,8 @@ import com.whysoezzy.auth.domain.usecase.LogoutUseCase
 import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.common.utils.ValidationUtils
-import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.AvatarUpload
+import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User

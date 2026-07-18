@@ -497,20 +497,22 @@ private fun SocialField(
 }
 
 private fun android.net.Uri.toAvatarUpload(context: Context): AvatarUpload? {
-    val contentType = context.contentResolver.getType(this)
-        ?.takeIf { it in supportedAvatarContentTypes }
+    val contentType = context.contentResolver.getType(this)?.takeIf {
+        it in supportedAvatarContentTypes
+    }
         ?: return null
-    val metadata = context.contentResolver.query(
-        this,
-        arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-        null,
-        null,
-        null,
-    )?.use { cursor ->
-        if (!cursor.moveToFirst()) return@use null
-        cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)) to
-            cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
-    } ?: return null
+    val metadata = context.contentResolver
+        .query(
+            this,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)) to
+                cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
+        } ?: return null
     if (metadata.second !in 1..MAX_AVATAR_SIZE_BYTES) return null
 
     return AvatarUpload(
