@@ -1,7 +1,7 @@
 package com.whysoezzy.domain.usecase
 
-import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.AvatarUpload
+import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.repository.UserRepository
