@@ -44,14 +44,16 @@ class PhoneInputViewModel(
 
     private fun sendCode() {
         if (!_uiState.value.isValid) return
+        val normalizedPhoneNumber = normalizePhoneNumber(_uiState.value.phoneNumber)
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            sendOtpUseCase(_uiState.value.phoneNumber)
+            sendOtpUseCase(normalizedPhoneNumber)
                 .onSuccess {
                     _uiState.value =
                         _uiState.value.copy(
+                            phoneNumber = normalizedPhoneNumber,
                             isLoading = false,
                             isCodeSent = true,
                         )
@@ -62,6 +64,16 @@ class PhoneInputViewModel(
                             error = PhoneInputError.Remote(exception.toErrorType()),
                         )
                 }
+        }
+    }
+
+    private fun normalizePhoneNumber(phoneNumber: String): String {
+        val digits = phoneNumber.filter { it.isDigit() }
+        return when {
+            digits.startsWith("8") && digits.length == 11 -> "+7${digits.drop(1)}"
+            digits.startsWith("7") && digits.length == 11 -> "+$digits"
+            digits.length == 10 -> "+7$digits"
+            else -> phoneNumber
         }
     }
 }

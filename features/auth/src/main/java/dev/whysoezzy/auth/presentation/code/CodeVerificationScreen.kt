@@ -116,6 +116,7 @@ private fun CodeVerificationContent(
         UIKitCodeInput(
             value = uiState.code,
             onValueChange = onCodeChange,
+            codeLength = 6,
             isError = uiState.error != null,
         )
 
@@ -179,7 +180,7 @@ private fun CodeVerificationScreenErrorPreview() {
             phoneNumber = "+7 (999) 123-45-67",
             uiState =
                 CodeVerificationUiState(
-                    code = "1234",
+                    code = "123456",
                     error = ErrorType.Unknown,
                     canResend = true,
                 ),
