@@ -8,6 +8,7 @@ import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+import com.whysoezzy.domain.usecase.UploadAvatarUseCase
 import com.whysoezzy.testing.MainDispatcherRule
 import dev.whysoezzy.profile.edit.presentation.ProfileEditEvent
 import dev.whysoezzy.profile.edit.presentation.ProfileEditNavEvent
@@ -34,6 +35,7 @@ class ProfileEditViewModelTest {
     private val updateUserProfileUseCase: UpdateUserProfileUseCase = mockk()
     private val getAllTagsUseCase: GetAllTagsUseCase = mockk()
     private val deleteCurrentUserProfileUseCase: DeleteCurrentUserProfileUseCase = mockk()
+    private val uploadAvatarUseCase: UploadAvatarUseCase = mockk()
     private val logoutUseCase: LogoutUseCase = mockk()
 
     @Test
@@ -129,12 +131,55 @@ class ProfileEditViewModelTest {
         coVerify(exactly = 0) { logoutUseCase() }
     }
 
+    @Test
+    fun `avatar upload updates displayed and saved avatar URL`() = runTest {
+        coEvery { getCurrentUserUseCase() } returns Result.success(sampleUser)
+        coEvery { getAllTagsUseCase() } returns Result.success(emptyList())
+        coEvery { uploadAvatarUseCase(any(), any()) } answers {
+            secondArg<(Long, Long) -> Unit>().invoke(50, 100)
+            Result.success("https://cdn.example/avatar.webp")
+        }
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.onEvent(ProfileEditEvent.UploadAvatar(sampleAvatarUpload()))
+        advanceUntilIdle()
+
+        assertEquals("https://cdn.example/avatar.webp", viewModel.uiState.value.avatarUrl)
+        assertEquals(null, viewModel.uiState.value.avatarUploadProgress)
+        assertTrue(!viewModel.uiState.value.isAvatarUploading)
+    }
+
+    @Test
+    fun `avatar upload failure preserves previous avatar and exposes error`() = runTest {
+        coEvery { getCurrentUserUseCase() } returns Result.success(sampleUser.copy(avatar = "old"))
+        coEvery { getAllTagsUseCase() } returns Result.success(emptyList())
+        coEvery { uploadAvatarUseCase(any(), any()) } returns Result.failure(RuntimeException("offline"))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.onEvent(ProfileEditEvent.UploadAvatar(sampleAvatarUpload()))
+        advanceUntilIdle()
+
+        assertEquals("old", viewModel.uiState.value.avatarUrl)
+        assertTrue(viewModel.uiState.value.error != null)
+        assertTrue(!viewModel.uiState.value.isAvatarUploading)
+    }
+
     private fun viewModel() = ProfileEditViewModel(
         getCurrentUserUseCase = getCurrentUserUseCase,
         updateUserProfileUseCase = updateUserProfileUseCase,
         getAllTagsUseCase = getAllTagsUseCase,
         deleteCurrentUserProfileUseCase = deleteCurrentUserProfileUseCase,
+        uploadAvatarUseCase = uploadAvatarUseCase,
         logoutUseCase = logoutUseCase,
+    )
+
+    private fun sampleAvatarUpload() = com.whysoezzy.domain.models.AvatarUpload(
+        fileName = "avatar.webp",
+        contentType = "image/webp",
+        contentLength = 1,
+        openStream = { java.io.ByteArrayInputStream(byteArrayOf(1)) },
     )
 
     private val sampleUser = User(

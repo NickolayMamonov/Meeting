@@ -7,6 +7,7 @@ import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.SocialMediaInfo
+import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
@@ -14,6 +15,7 @@ import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+import com.whysoezzy.domain.usecase.UploadAvatarUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,6 +30,8 @@ sealed interface ProfileEditNavEvent {
     data object NavigateBack : ProfileEditNavEvent
 
     data object NavigateToAuth : ProfileEditNavEvent
+
+    data object PickAvatar : ProfileEditNavEvent
 }
 
 class ProfileEditViewModel(
@@ -35,6 +39,7 @@ class ProfileEditViewModel(
     private val updateUserProfileUseCase: UpdateUserProfileUseCase,
     private val getAllTagsUseCase: GetAllTagsUseCase,
     private val deleteCurrentUserProfileUseCase: DeleteCurrentUserProfileUseCase,
+    private val uploadAvatarUseCase: UploadAvatarUseCase,
     private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileEditUiState())
@@ -59,6 +64,9 @@ class ProfileEditViewModel(
             is ProfileEditEvent.UpdateCity -> updateCity(event.city)
             is ProfileEditEvent.UpdateDescription -> updateDescription(event.description)
             is ProfileEditEvent.ChangeAvatar -> changeAvatar()
+            is ProfileEditEvent.UploadAvatar -> uploadAvatar(event.upload)
+            is ProfileEditEvent.UploadAvatarFailed ->
+                _uiState.value = _uiState.value.copy(error = ErrorType.Unknown)
             is ProfileEditEvent.AddInterest -> { /* открывается через UI-флаг */ }
             is ProfileEditEvent.AddInterestWithText -> addInterestWithText(event.interest)
             is ProfileEditEvent.RemoveInterest -> removeInterest(event.interest)
@@ -168,7 +176,44 @@ class ProfileEditViewModel(
     }
 
     private fun changeAvatar() {
-        // Обрабатывается в UI через ActivityResultLauncher
+        if (_uiState.value.isAvatarUploading) return
+        _navEvent.tryEmit(ProfileEditNavEvent.PickAvatar)
+    }
+
+    private fun uploadAvatar(upload: AvatarUpload) {
+        if (_uiState.value.isAvatarUploading) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isAvatarUploading = true,
+                avatarUploadProgress = 0,
+                error = null,
+            )
+            uploadAvatarUseCase(upload) { sent, total ->
+                if (total > 0) {
+                    _uiState.value = _uiState.value.copy(
+                        avatarUploadProgress = ((sent * 100) / total).toInt().coerceIn(0, 100),
+                    )
+                }
+            }.onSuccess { avatarUrl ->
+                currentUser = currentUser?.copy(avatar = avatarUrl)
+                _uiState.value = _uiState.value.copy(
+                    avatarUrl = avatarUrl,
+                    isAvatarUploading = false,
+                    avatarUploadProgress = null,
+                    isSaved = false,
+                )
+                getCurrentUserUseCase().onSuccess { refreshedUser ->
+                    currentUser = refreshedUser
+                }
+            }.onFailure { exception ->
+                _uiState.value = _uiState.value.copy(
+                    isAvatarUploading = false,
+                    avatarUploadProgress = null,
+                    error = exception.toErrorType(),
+                )
+            }
+        }
     }
 
     private fun addInterestWithText(interest: String) {
@@ -224,6 +269,7 @@ class ProfileEditViewModel(
 
     private fun saveProfile() {
         val state = _uiState.value
+        if (state.isAvatarUploading) return
         val nameError = validateName(state.name)
         val surnameError = validateSurname(state.surname)
         val emailError = validateEmail(state.email)
@@ -313,6 +359,7 @@ class ProfileEditViewModel(
     }
 
     private fun showDeleteDialog() {
+        if (_uiState.value.isAvatarUploading) return
         _uiState.value = _uiState.value.copy(showDeleteConfirmDialog = true)
     }
 
@@ -321,7 +368,7 @@ class ProfileEditViewModel(
     }
 
     private fun confirmDeleteProfile() {
-        if (_uiState.value.isSaving) return
+        if (_uiState.value.isSaving || _uiState.value.isAvatarUploading) return
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(

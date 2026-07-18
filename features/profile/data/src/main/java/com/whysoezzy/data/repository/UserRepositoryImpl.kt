@@ -5,6 +5,7 @@ import com.whysoezzy.data.mapper.toDomain
 import com.whysoezzy.data.mapper.toMeetingInfo
 import com.whysoezzy.data.mapper.toUpdateDto
 import com.whysoezzy.domain.models.CommunityInfo
+import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.repository.UserRepository
@@ -25,6 +26,13 @@ internal class UserRepositoryImpl(
         val interestIds = user.interests.map { it.id }.takeIf { it.isNotEmpty() }
         val updateDto = user.toUpdateDto(interestIds)
         userApi.updateUserProfile(updateDto).toDomain()
+    }
+
+    override suspend fun uploadAvatar(
+        upload: AvatarUpload,
+        onProgress: (sentBytes: Long, totalBytes: Long) -> Unit,
+    ): Result<String> = safeApiCall {
+        userApi.uploadAvatar(upload, onProgress).url
     }
 
     override suspend fun deleteCurrentUserProfile(): Result<Unit> = safeApiCall {

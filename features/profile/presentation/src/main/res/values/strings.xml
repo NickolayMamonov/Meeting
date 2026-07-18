@@ -12,6 +12,7 @@
     <!-- ProfileEditScreen — photo -->
     <string name="profile_edit_photo_content_description">Фото профиля</string>
     <string name="profile_edit_photo_change">Изменить фото</string>
+    <string name="profile_edit_photo_uploading">Загрузка: %1$d%%</string>
 
     <!-- ProfileEditScreen — fields -->
     <string name="profile_edit_field_fullname">Имя Фамилия</string>

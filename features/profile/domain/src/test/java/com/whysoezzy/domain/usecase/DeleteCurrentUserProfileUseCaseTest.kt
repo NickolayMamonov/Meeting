@@ -1,6 +1,7 @@
 package com.whysoezzy.domain.usecase
 
 import com.whysoezzy.domain.models.CommunityInfo
+import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.MeetingInfo
 import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.repository.UserRepository
@@ -29,6 +30,11 @@ class DeleteCurrentUserProfileUseCaseTest {
         override suspend fun getUserById(id: Long): Result<User> = error("Not used")
 
         override suspend fun updateUserProfile(user: User): Result<User> = error("Not used")
+
+        override suspend fun uploadAvatar(
+            upload: AvatarUpload,
+            onProgress: (sentBytes: Long, totalBytes: Long) -> Unit,
+        ): Result<String> = error("Not used")
 
         override suspend fun deleteCurrentUserProfile(): Result<Unit> {
             deleteRequested = true

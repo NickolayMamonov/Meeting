@@ -40,3 +40,8 @@ internal data class UpdateUserDto(
     @SerialName("showMeetings") val showMeetings: Boolean? = null,
     @SerialName("notificationsEnabled") val notificationsEnabled: Boolean? = null,
 )
+
+@Serializable
+internal data class AvatarUploadResponseDto(
+    @SerialName("url") val url: String,
+)
