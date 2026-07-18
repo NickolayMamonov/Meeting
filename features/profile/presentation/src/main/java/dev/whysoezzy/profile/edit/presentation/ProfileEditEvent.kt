@@ -1,7 +1,7 @@
 package dev.whysoezzy.profile.edit.presentation
 
-import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.AvatarUpload
+import com.whysoezzy.domain.models.SocialMediaType
 
 sealed interface ProfileEditEvent {
     // Основная информация — единое поле "Имя Фамилия"
