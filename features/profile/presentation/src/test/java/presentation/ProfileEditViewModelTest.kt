@@ -18,6 +18,7 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -164,6 +165,33 @@ class ProfileEditViewModelTest {
         assertEquals("old", viewModel.uiState.value.avatarUrl)
         assertTrue(viewModel.uiState.value.error != null)
         assertTrue(!viewModel.uiState.value.isAvatarUploading)
+    }
+
+    @Test
+    fun `delayed profile load after avatar upload retains uploaded avatar for save`() = runTest {
+        val initialLoad = CompletableDeferred<Result<User>>()
+        var profileRequests = 0
+        coEvery { getCurrentUserUseCase() } coAnswers {
+            if (profileRequests++ == 0) initialLoad.await() else Result.success(sampleUser)
+        }
+        coEvery { getAllTagsUseCase() } returns Result.success(emptyList())
+        coEvery { uploadAvatarUseCase(any(), any()) } returns
+            Result.success("https://cdn.example/avatar.webp")
+        coEvery { updateUserProfileUseCase(any()) } answers { Result.success(firstArg()) }
+        val updatedUser = slot<User>()
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.onEvent(ProfileEditEvent.UploadAvatar(sampleAvatarUpload()))
+        advanceUntilIdle()
+        initialLoad.complete(Result.success(sampleUser.copy(avatar = "https://cdn.example/stale.webp")))
+        advanceUntilIdle()
+        viewModel.onEvent(ProfileEditEvent.Save)
+        advanceUntilIdle()
+
+        assertEquals("https://cdn.example/avatar.webp", viewModel.uiState.value.avatarUrl)
+        coVerify(exactly = 1) { updateUserProfileUseCase(capture(updatedUser)) }
+        assertEquals("https://cdn.example/avatar.webp", updatedUser.captured.avatar)
     }
 
     private fun viewModel() = ProfileEditViewModel(

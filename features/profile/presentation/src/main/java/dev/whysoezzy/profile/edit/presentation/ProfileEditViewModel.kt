@@ -49,6 +49,7 @@ class ProfileEditViewModel(
     val navEvent: SharedFlow<ProfileEditNavEvent> = _navEvent.asSharedFlow()
 
     private var currentUser: User? = null
+    private var avatarRevision = 0L
 
     init {
         loadProfile()
@@ -84,10 +85,17 @@ class ProfileEditViewModel(
 
     private fun loadProfile() {
         viewModelScope.launch {
+            val loadAvatarRevision = avatarRevision
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             getCurrentUserUseCase()
                 .onSuccess { user ->
-                    currentUser = user
+                    val keepUploadedAvatar = loadAvatarRevision != avatarRevision
+                    val avatarUrl = if (keepUploadedAvatar) {
+                        _uiState.value.avatarUrl
+                    } else {
+                        user.avatar.takeIf { it.isNotBlank() }
+                    }
+                    currentUser = user.copy(avatar = avatarUrl ?: "")
                     _uiState.value = _uiState.value.copy(
                         name = user.name,
                         surname = user.surname,
@@ -95,7 +103,7 @@ class ProfileEditViewModel(
                         email = user.email,
                         city = user.city,
                         description = user.bio,
-                        avatarUrl = user.avatar.takeIf { it.isNotBlank() },
+                        avatarUrl = avatarUrl,
                         interests = user.interests.map { it.name },
                         socialMedias = extractSocialMedias(user.socialMedias),
                         showCommunities = user.showCommunities,
@@ -196,6 +204,7 @@ class ProfileEditViewModel(
                     )
                 }
             }.onSuccess { avatarUrl ->
+                avatarRevision++
                 currentUser = currentUser?.copy(avatar = avatarUrl)
                 _uiState.value = _uiState.value.copy(
                     avatarUrl = avatarUrl,
@@ -204,7 +213,7 @@ class ProfileEditViewModel(
                     isSaved = false,
                 )
                 getCurrentUserUseCase().onSuccess { refreshedUser ->
-                    currentUser = refreshedUser
+                    currentUser = refreshedUser.copy(avatar = avatarUrl)
                 }
             }.onFailure { exception ->
                 _uiState.value = _uiState.value.copy(
