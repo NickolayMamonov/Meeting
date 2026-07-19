@@ -58,21 +58,21 @@ class CodeVerificationViewModelTest {
         coEvery { verifyOtpUseCase(any(), any()) } returns Result.failure(RuntimeException("bad"))
         val vm = viewModel()
         // Вызовем ошибку
-        vm.onEvent(CodeVerificationEvent.UpdateCode("1234"))
+        vm.onEvent(CodeVerificationEvent.UpdateCode("123456"))
         advanceUntilIdle()
         // Теперь вводим новый код — ошибка должна очиститься
-        vm.onEvent(CodeVerificationEvent.UpdateCode("123"))
+        vm.onEvent(CodeVerificationEvent.UpdateCode("12345"))
 
         val state = vm.uiState.value
-        assertEquals("123", state.code)
+        assertEquals("12345", state.code)
         assertNull(state.error)
     }
 
-    // ==================== auto-verify on 4 digits ====================
+    // ==================== auto-verify on 6 digits ====================
 
     @Test
-    fun `entering 4 digits triggers verifyCode automatically for existing user`() = runTest {
-        coEvery { verifyOtpUseCase(testPhone, "1234") } returns Result.success(
+    fun `entering 6 digits triggers verifyCode automatically for existing user`() = runTest {
+        coEvery { verifyOtpUseCase(testPhone, "123456") } returns Result.success(
             AuthResult(
                 accessToken = "token",
                 refreshToken = "refresh",
@@ -84,7 +84,7 @@ class CodeVerificationViewModelTest {
         val vm = viewModel()
 
         vm.navEvent.test {
-            vm.onEvent(CodeVerificationEvent.UpdateCode("1234"))
+            vm.onEvent(CodeVerificationEvent.UpdateCode("123456"))
             advanceUntilIdle()
 
             assertEquals(CodeVerificationNavEvent.NavigateToMain, awaitItem())
@@ -93,8 +93,8 @@ class CodeVerificationViewModelTest {
     }
 
     @Test
-    fun `entering 4 digits for new user emits NavigateToNameInput`() = runTest {
-        coEvery { verifyOtpUseCase(testPhone, "5678") } returns Result.success(
+    fun `entering 6 digits for new user emits NavigateToNameInput`() = runTest {
+        coEvery { verifyOtpUseCase(testPhone, "567890") } returns Result.success(
             AuthResult(
                 accessToken = "token",
                 refreshToken = "refresh",
@@ -106,7 +106,7 @@ class CodeVerificationViewModelTest {
         val vm = viewModel()
 
         vm.navEvent.test {
-            vm.onEvent(CodeVerificationEvent.UpdateCode("5678"))
+            vm.onEvent(CodeVerificationEvent.UpdateCode("567890"))
             advanceUntilIdle()
 
             val event = awaitItem()
@@ -121,7 +121,7 @@ class CodeVerificationViewModelTest {
             Result.failure(RuntimeException("Invalid code"))
 
         val vm = viewModel()
-        vm.onEvent(CodeVerificationEvent.UpdateCode("0000"))
+        vm.onEvent(CodeVerificationEvent.UpdateCode("000000"))
         advanceUntilIdle()
 
         assertNotNull(vm.uiState.value.error)

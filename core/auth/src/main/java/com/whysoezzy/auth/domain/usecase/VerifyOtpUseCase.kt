@@ -14,7 +14,7 @@ class VerifyOtpUseCase(
         surname: String? = null,
     ): Result<AuthResult> {
         if (!ValidationUtils.isValidOtpCode(code)) {
-            return Result.failure(Exception("Код должен состоять из 4 цифр"))
+            return Result.failure(Exception("Код должен состоять из 6 цифр"))
         }
         return authRepository.verifyOtp(phone, code, name, surname)
     }

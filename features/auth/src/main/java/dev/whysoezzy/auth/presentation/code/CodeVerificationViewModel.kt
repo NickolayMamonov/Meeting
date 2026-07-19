@@ -66,8 +66,8 @@ class CodeVerificationViewModel(
                 error = null,
                 isVerified = false,
             )
-        // Авто-верификация при вводе 4 цифр
-        if (code.length == 4) verifyCode()
+        // Авто-верификация при вводе 6 цифр
+        if (code.length == 6) verifyCode()
     }
 
     private fun verifyCode() {

@@ -32,7 +32,7 @@ fun UIKitCodeInput(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    codeLength: Int = 4,
+    codeLength: Int = 6,
     isError: Boolean = false,
 ) {
     Box(modifier = modifier) {
@@ -126,7 +126,7 @@ private fun UIKitCodeInputPreview() {
 private fun UIKitCodeInputErrorPreview() {
     UIKitTheme {
         UIKitCodeInput(
-            value = "1234",
+            value = "123456",
             onValueChange = {},
             isError = true,
         )

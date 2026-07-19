@@ -29,8 +29,7 @@ fun NavGraphBuilder.authNavigation(navController: NavController) {
 
         // 2. Ввод кода подтверждения
         composable(MeetRoute.CodeVerification.route) { backStackEntry ->
-            val phoneEncoded = backStackEntry.arguments?.getString("phoneNumber") ?: ""
-            val phone = MeetRoute.decode(phoneEncoded)
+            val phone = backStackEntry.arguments?.getString("phoneNumber") ?: ""
 
             CodeVerificationScreen(
                 phoneNumber = phone,
