@@ -17,6 +17,7 @@ import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
 import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+import com.whysoezzy.domain.usecase.UploadAvatarUseCase
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
@@ -34,6 +35,7 @@ val profileDataModule = module {
     factory { DeleteCurrentUserProfileUseCase(get()) }
     factory { GetUserByIdUseCase(get()) }
     factory { UpdateUserProfileUseCase(get()) }
+    factory { UploadAvatarUseCase(get()) }
     factory { GetUserMeetingsUseCase(get()) }
     factory { GetUserCommunitiesUseCase(get()) }
     factory { GetAllTagsUseCase(get()) }

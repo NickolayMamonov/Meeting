@@ -32,6 +32,8 @@ data class ProfileEditUiState(
     // Состояние загрузки
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
+    val isAvatarUploading: Boolean = false,
+    val avatarUploadProgress: Int? = null,
     val isSaved: Boolean = false,
     val error: ErrorType? = null,
     // Диалог подтверждения удаления

@@ -83,7 +83,7 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(expected), headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "1234")
+        val result = AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "123456")
 
         assertEquals("access123", result.accessToken)
         assertEquals("refresh456", result.refreshToken)
@@ -103,7 +103,7 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(response), headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "5678")
+        val result = AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "567890")
 
         assertTrue(result.isNewUser)
     }
@@ -122,10 +122,10 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(response), headers = jsonHeaders)
         }
 
-        AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "1234")
+        AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "123456")
 
         assertTrue(capturedBody.contains("79991234567"))
-        assertTrue(capturedBody.contains("1234"))
+        assertTrue(capturedBody.contains("123456"))
     }
 
     // ==================== refreshToken ====================

@@ -66,7 +66,7 @@ class AuthRepositoryImplTest {
         coEvery { authApi.verifyOtp(any(), any(), any(), any()) } returns successAuthResponse()
         coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
-        val result = repository().verifyOtp("+79991234567", "1234")
+        val result = repository().verifyOtp("+79991234567", "123456")
 
         assertTrue(result.isSuccess)
         val authResult: AuthResult = result.getOrThrow()
@@ -84,7 +84,7 @@ class AuthRepositoryImplTest {
             successAuthResponse(isNewUser = true)
         coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
-        val result = repository().verifyOtp("+79991234567", "1234")
+        val result = repository().verifyOtp("+79991234567", "123456")
 
         assertTrue(result.getOrThrow().isNewUser)
     }
@@ -94,7 +94,7 @@ class AuthRepositoryImplTest {
         coEvery { authApi.verifyOtp(any(), any(), any(), any()) } throws
             RuntimeException("Invalid code")
 
-        val result = repository().verifyOtp("+79991234567", "0000")
+        val result = repository().verifyOtp("+79991234567", "000000")
 
         assertTrue(result.isFailure)
         coVerify(exactly = 0) { tokenManager.saveTokens(any(), any(), any()) }

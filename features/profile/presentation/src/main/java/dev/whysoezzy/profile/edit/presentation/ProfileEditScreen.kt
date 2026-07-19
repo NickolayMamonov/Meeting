@@ -1,5 +1,10 @@
 package dev.whysoezzy.profile.edit.presentation
 
+import android.content.Context
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +57,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
+import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.SocialMediaType
 import dev.whysoezzy.profile.R
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
@@ -79,9 +86,18 @@ fun ProfileEditScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
 
     var showInterestDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val avatarPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        when (val upload = uri?.toAvatarUpload(context)) {
+            null -> if (uri != null) viewModel.onEvent(ProfileEditEvent.UploadAvatarFailed)
+            else -> viewModel.onEvent(ProfileEditEvent.UploadAvatar(upload))
+        }
+    }
 
     LaunchedEffect(Unit) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -89,6 +105,9 @@ fun ProfileEditScreen(
                 when (event) {
                     is ProfileEditNavEvent.NavigateBack -> onSaveSuccess()
                     is ProfileEditNavEvent.NavigateToAuth -> onSaveSuccess()
+                    is ProfileEditNavEvent.PickAvatar -> avatarPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
                 }
             }
         }
@@ -153,7 +172,7 @@ fun ProfileEditScreen(
                 title = "",
                 onCancelClick = onBackPressed,
                 onSaveClick = { viewModel.onEvent(ProfileEditEvent.Save) },
-                isSaveEnabled = uiState.isValid && !uiState.isSaving,
+                isSaveEnabled = uiState.isValid && !uiState.isSaving && !uiState.isAvatarUploading,
                 containerColor = Color.Transparent,
                 contentColor = Color.White,
                 applyStatusBarPadding = true,
@@ -268,11 +287,13 @@ private fun EditContent(
                         .padding(bottom = SpacingTokens.M)
                         .clip(RoundedCornerShape(BorderRadiusTokens.S))
                         .background(Color.Black.copy(alpha = 0.6f))
-                        .clickable { onAvatarClick() }
+                        .clickable(enabled = !uiState.isAvatarUploading) { onAvatarClick() }
                         .padding(horizontal = SpacingTokens.M, vertical = SpacingTokens.S),
                 ) {
                     Text(
-                        text = stringResource(R.string.profile_edit_photo_change),
+                        text = uiState.avatarUploadProgress?.let { progress ->
+                            stringResource(R.string.profile_edit_photo_uploading, progress)
+                        } ?: stringResource(R.string.profile_edit_photo_change),
                         color = Color.White,
                         fontFamily = SFProDisplayFontFamily,
                         fontWeight = FontWeight.Medium,
@@ -474,3 +495,37 @@ private fun SocialField(
         )
     }
 }
+
+private fun android.net.Uri.toAvatarUpload(context: Context): AvatarUpload? {
+    val contentType = context.contentResolver.getType(this)?.takeIf {
+        it in supportedAvatarContentTypes
+    }
+        ?: return null
+    val metadata = context.contentResolver
+        .query(
+            this,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)) to
+                cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
+        } ?: return null
+    if (metadata.second !in 1..MAX_AVATAR_SIZE_BYTES) return null
+
+    return AvatarUpload(
+        fileName = metadata.first,
+        contentType = contentType,
+        contentLength = metadata.second,
+        openStream = {
+            requireNotNull(context.contentResolver.openInputStream(this)) {
+                "Unable to open selected image"
+            }
+        },
+    )
+}
+
+private const val MAX_AVATAR_SIZE_BYTES = 5L * 1024 * 1024
+private val supportedAvatarContentTypes = setOf("image/jpeg", "image/png", "image/webp")

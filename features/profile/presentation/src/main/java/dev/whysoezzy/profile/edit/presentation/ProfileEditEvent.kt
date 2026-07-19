@@ -1,5 +1,6 @@
 package dev.whysoezzy.profile.edit.presentation
 
+import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.SocialMediaType
 
 sealed interface ProfileEditEvent {
@@ -31,6 +32,12 @@ sealed interface ProfileEditEvent {
 
     // Аватар
     data object ChangeAvatar : ProfileEditEvent
+
+    data class UploadAvatar(
+        val upload: AvatarUpload,
+    ) : ProfileEditEvent
+
+    data object UploadAvatarFailed : ProfileEditEvent
 
     // Интересы
     data object AddInterest : ProfileEditEvent
