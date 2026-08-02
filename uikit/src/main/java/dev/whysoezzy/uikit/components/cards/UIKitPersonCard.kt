@@ -125,3 +125,15 @@ fun UIKitPersonCardPreview() {
         }
     }
 }
+
+@Preview(name = "Person card enlarged role", showBackground = true, fontScale = 2f)
+@Composable
+fun UIKitPersonCardEnlargedRolePreview() {
+    UIKitTheme {
+        UIKitPersonCard(
+            name = "Alex",
+            role = "A very long design systems role",
+            imageUrl = "",
+        )
+    }
+}

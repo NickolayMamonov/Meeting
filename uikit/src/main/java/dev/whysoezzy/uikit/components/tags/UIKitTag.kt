@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -61,7 +62,7 @@ fun UIKitTag(
 
     val tagModifier =
         when (size) {
-            UIKitTagSize.SMALL -> Modifier.height(22.dp)
+            UIKitTagSize.SMALL -> Modifier.heightIn(min = 22.dp)
             UIKitTagSize.MEDIUM -> Modifier.height(35.dp)
             UIKitTagSize.LARGE -> Modifier.height(46.dp)
         }
