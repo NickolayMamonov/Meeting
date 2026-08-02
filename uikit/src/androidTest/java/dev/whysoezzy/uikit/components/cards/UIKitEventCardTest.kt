@@ -201,6 +201,30 @@ class UIKitEventCardTest {
     }
 
     @Test
+    fun boundedRowUsesSixDpGapBetweenRuntimeTagSlots() {
+        composeTestRule.setContent {
+            UIKitTheme {
+                BoundedEventTagRow(
+                    tags =
+                        listOf(
+                            UIKitEventCardTag("A", false, true),
+                            UIKitEventCardTag("B", false, true),
+                        ),
+                    modifier = Modifier.width(200.dp).testTag("gap-row"),
+                )
+            }
+        }
+
+        val first = composeTestRule.onNodeWithText("A", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val second = composeTestRule.onNodeWithText("B", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val tagHorizontalPadding = with(composeTestRule.density) { 4.dp.roundToPx() }
+        val actualGap = second.left - first.right - 2f * tagHorizontalPadding
+        val expectedGap = with(composeTestRule.density) { 6.dp.toPx() }
+
+        assertEquals(expectedGap, actualGap, 1f)
+    }
+
+    @Test
     fun constrainedFinalChipAndSelectedDisabledDuplicateBlankTagsStayContained() {
         composeTestRule.setContent {
             UIKitTheme {

@@ -156,6 +156,8 @@ private data class ConstrainedFinalTagSlot(
 
 private object ReadabilityProbeSlot
 
+private val EventTagRowHorizontalGap = 6.dp
+
 private fun constrainDimension(
     preferred: Int,
     min: Int,
@@ -171,6 +173,7 @@ internal fun BoundedEventTagRow(
     modifier: Modifier = Modifier,
 ) {
     SubcomposeLayout(modifier = modifier) { constraints ->
+        val tagGap = EventTagRowHorizontalGap.roundToPx()
         val rowWidth =
             if (constraints.hasBoundedWidth) {
                 constraints.maxWidth
@@ -239,7 +242,7 @@ internal fun BoundedEventTagRow(
         val plan =
             calculateEventTagRowPlan(
                 availableWidth = rowWidth,
-                horizontalGap = SpacingTokens.S.roundToPx(),
+                horizontalGap = tagGap,
                 naturalChipWidths = naturalTagPlaceables.map { it.width },
                 minimumReadableFinalChipWidth = readableFinalChipWidth,
                 indicatorWidths = indicatorPlaceables.mapValues { it.value.width },
@@ -312,7 +315,7 @@ internal fun BoundedEventTagRow(
                 placeable.placeRelative(x, 0)
                 x += placeable.width
                 if (placedIndex != placed.lastIndex) {
-                    x += SpacingTokens.S.roundToPx()
+                    x += tagGap
                 }
             }
         }
