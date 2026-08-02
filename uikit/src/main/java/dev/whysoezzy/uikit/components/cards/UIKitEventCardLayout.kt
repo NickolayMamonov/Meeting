@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -179,7 +180,7 @@ internal fun BoundedEventTagRow(
         if (tags.isEmpty() || rowWidth == 0) {
             return@SubcomposeLayout layout(
                 width = constrainDimension(rowWidth, constraints.minWidth, constraints.maxWidth),
-                height = 0,
+                height = constrainDimension(0, constraints.minHeight, constraints.maxHeight),
             ) {}
         }
 
@@ -295,7 +296,7 @@ internal fun BoundedEventTagRow(
             constraints.hasBoundedHeight && naturalHeight > constraints.maxHeight
         val height =
             if (heightTooTight) {
-                constraints.minHeight
+                constrainDimension(0, constraints.minHeight, constraints.maxHeight)
             } else {
                 constrainDimension(naturalHeight, constraints.minHeight, constraints.maxHeight)
             }
@@ -375,6 +376,7 @@ internal fun MeasuredEventCardLayout(
                     color = colorScheme.neutralBody,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clearAndSetSemantics {},
                 )
             }.single().measure(textConstraints)
         val titleOneLine =
@@ -385,6 +387,7 @@ internal fun MeasuredEventCardLayout(
                     color = colorScheme.neutralBody,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clearAndSetSemantics {},
                 )
             }.single().measure(textConstraints)
         val metadataPlaceable =
@@ -395,12 +398,16 @@ internal fun MeasuredEventCardLayout(
                     color = colorScheme.neutralWeak,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clearAndSetSemantics {},
                 )
             }.single().measure(textConstraints)
         val tagsPlaceable =
             if (tags.isNotEmpty()) {
                 subcompose(TagsSlot) {
-                    BoundedEventTagRow(tags = tags)
+                    BoundedEventTagRow(
+                        tags = tags,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    )
                 }.single().measure(
                     Constraints(
                         minWidth = cardWidth,
