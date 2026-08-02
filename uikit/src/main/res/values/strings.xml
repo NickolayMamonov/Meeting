@@ -20,6 +20,8 @@
     <string name="uikit_user_meetings_empty">Вы пока не записаны ни на одну встречу</string>
     <string name="uikit_user_communities_title">Мои сообщества</string>
     <string name="uikit_user_communities_empty">Вы пока не состоите ни в одном сообществе</string>
+    <string name="uikit_event_card_accessibility">Встреча: %1$s. Дата: %2$s. Адрес: %3$s. Теги: %4$s.</string>
+    <string name="uikit_event_card_accessibility_no_tags">Встреча: %1$s. Дата: %2$s. Адрес: %3$s. Без тегов.</string>
 
     <string name="error_network">Нет соединения с сервером. Проверьте подключение к интернету.</string>
     <string name="error_unauthorized">Сессия истекла. Пожалуйста, войдите снова.</string>
