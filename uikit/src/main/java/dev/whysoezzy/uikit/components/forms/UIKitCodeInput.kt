@@ -14,9 +14,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.autofill.contentType
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,8 +35,9 @@ fun UIKitCodeInput(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    codeLength: Int = 4,
+    codeLength: Int = 6,
     isError: Boolean = false,
+    contentType: ContentType? = ContentType.SmsOtpCode,
 ) {
     Box(modifier = modifier) {
         Row(
@@ -51,22 +55,32 @@ fun UIKitCodeInput(
 
         BasicTextField(
             value = value,
-            onValueChange = { newValue ->
-                val filtered = newValue.filter { it.isDigit() }
-                if (filtered.length <= codeLength) {
-                    onValueChange(filtered)
-                }
-            },
+            onValueChange = { onValueChange(sanitizeCodeInput(it, codeLength)) },
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .alpha(0f),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    .then(
+                        if (contentType != null) {
+                            Modifier.contentType(contentType)
+                        } else {
+                            Modifier
+                        },
+                    ).alpha(0f),
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType = KeyboardType.NumberPassword,
+                    imeAction = ImeAction.Done,
+                ),
             cursorBrush = SolidColor(ColorTokens.BrandDark),
         )
     }
 }
+
+internal fun sanitizeCodeInput(
+    input: String,
+    codeLength: Int,
+): String = input.filter { it in '0'..'9' }.take(codeLength)
 
 @Composable
 private fun CodeDigitBox(
@@ -126,7 +140,7 @@ private fun UIKitCodeInputPreview() {
 private fun UIKitCodeInputErrorPreview() {
     UIKitTheme {
         UIKitCodeInput(
-            value = "1234",
+            value = "123456",
             onValueChange = {},
             isError = true,
         )

@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- PhoneInputScreen -->
-    <string name="auth_phone_title">Добро пожаловать!</string>
-    <string name="auth_phone_subtitle">Для входа в приложение введите номер телефона</string>
-    <string name="auth_phone_placeholder">Номер телефона</string>
-    <string name="auth_phone_send_code">Отправить код</string>
-    <string name="auth_phone_error_invalid">Введите корректный номер телефона</string>
+    <!-- EmailInputScreen -->
+    <string name="auth_email_title">Добро пожаловать!</string>
+    <string name="auth_email_subtitle">Для входа в приложение введите email</string>
+    <string name="auth_email_placeholder">Email</string>
+    <string name="auth_email_send_code">Отправить код</string>
+    <string name="auth_email_error_invalid">Введите корректный email</string>
 
     <!-- CodeVerificationScreen -->
     <string name="auth_code_title">Введите код</string>
-    <string name="auth_code_subtitle">Мы отправили код подтверждения на номер\n%1$s</string>
+    <string name="auth_code_subtitle">Мы отправили код подтверждения на\n%1$s</string>
     <string name="auth_code_resend">Отправить код повторно</string>
     <string name="auth_code_resend_timer">Отправить повторно через %1$d сек</string>
     <string name="auth_code_confirm">Подтвердить</string>
-    <string name="auth_code_error_invalid">Неверный код подтверждения</string>
+    <string name="auth_code_error_invalid">Код неверный или просрочен. Запросите новый код</string>
+    <string name="auth_code_error_rate_limited">Слишком много попыток. Повторите позже</string>
+    <string name="auth_code_error_delivery">Не удалось доставить код. Попробуйте ещё раз</string>
+    <string name="auth_code_error_activation">Сервис отправки временно недоступен</string>
+    <string name="auth_code_error_unknown">Не удалось выполнить запрос. Попробуйте ещё раз</string>
 
     <!-- NameInputScreen -->
     <string name="auth_name_title">Знакомство</string>

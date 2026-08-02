@@ -3,12 +3,12 @@ package dev.whysoezzy.communities.details.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.common.dispatcher.DispatcherProvider
+import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.domain.usecase.GetCommunityByIdUseCase
 import com.whysoezzy.domain.usecase.GetCommunityMeetingsUseCase
 import com.whysoezzy.domain.usecase.GetCommunitySubscribersUseCase
 import com.whysoezzy.domain.usecase.SubscribeToCommunityUseCase
 import com.whysoezzy.domain.usecase.UnsubscribeFromCommunityUseCase
-import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.communities.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.communities.mappers.toUIKitPerson
 import dev.whysoezzy.uikit.models.UIKitMeetingTag

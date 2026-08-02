@@ -5,7 +5,10 @@ import com.whysoezzy.auth.data.api.AuthApi
 import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.AuthUserDto
 import com.whysoezzy.auth.data.dto.RefreshTokenResponse
+import com.whysoezzy.auth.data.dto.SendOtpResponse
+import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.network.TokenSnapshot
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
@@ -39,37 +42,37 @@ class AuthRepositoryImplTest {
         return AuthRepositoryImpl(authApi, tokenManager)
     }
 
-    // ==================== sendOtp ====================
+    // ==================== email OTP request ====================
 
     @Test
-    fun `sendOtp success returns Result success`() = runTest {
-        coEvery { authApi.sendOtp(any()) } returns mapOf("message" to "ok")
+    fun `email request success returns typed success`() = runTest {
+        coEvery { authApi.requestEmailOtp(any()) } returns SendOtpResponse("ok")
 
-        val result = repository().sendOtp("+79991234567")
+        val result = repository().requestEmailOtp("person@example.com")
 
-        assertTrue(result.isSuccess)
+        assertTrue(result is AuthOutcome.Success)
     }
 
     @Test
-    fun `sendOtp failure returns Result failure`() = runTest {
-        coEvery { authApi.sendOtp(any()) } throws RuntimeException("Network error")
+    fun `email request failure returns typed failure`() = runTest {
+        coEvery { authApi.requestEmailOtp(any()) } throws RuntimeException("Network error")
 
-        val result = repository().sendOtp("+79991234567")
+        val result = repository().requestEmailOtp("person@example.com")
 
-        assertTrue(result.isFailure)
+        assertTrue(result is AuthOutcome.Failure)
     }
 
-    // ==================== verifyOtp ====================
+    // ==================== email OTP verification ====================
 
     @Test
-    fun `verifyOtp success saves tokens and returns AuthResult`() = runTest {
-        coEvery { authApi.verifyOtp(any(), any(), any(), any()) } returns successAuthResponse()
+    fun `email verification success saves tokens and returns AuthResult`() = runTest {
+        coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns successAuthResponse()
         coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
-        val result = repository().verifyOtp("+79991234567", "1234")
+        val result = repository().verifyEmailOtp("person@example.com", "123456")
 
-        assertTrue(result.isSuccess)
-        val authResult: AuthResult = result.getOrThrow()
+        assertTrue(result is AuthOutcome.Success)
+        val authResult: AuthResult = (result as AuthOutcome.Success).value
         assertEquals("access123", authResult.accessToken)
         assertEquals(false, authResult.isNewUser)
         assertEquals(1L, authResult.userId)
@@ -79,24 +82,24 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    fun `verifyOtp isNewUser=true propagates to AuthResult`() = runTest {
-        coEvery { authApi.verifyOtp(any(), any(), any(), any()) } returns
+    fun `email verification isNewUser=true propagates to AuthResult`() = runTest {
+        coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns
             successAuthResponse(isNewUser = true)
         coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
 
-        val result = repository().verifyOtp("+79991234567", "1234")
+        val result = repository().verifyEmailOtp("person@example.com", "123456")
 
-        assertTrue(result.getOrThrow().isNewUser)
+        assertTrue((result as AuthOutcome.Success).value.isNewUser)
     }
 
     @Test
-    fun `verifyOtp failure returns Result failure without saving tokens`() = runTest {
-        coEvery { authApi.verifyOtp(any(), any(), any(), any()) } throws
+    fun `email verification failure returns typed failure without saving tokens`() = runTest {
+        coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } throws
             RuntimeException("Invalid code")
 
-        val result = repository().verifyOtp("+79991234567", "0000")
+        val result = repository().verifyEmailOtp("person@example.com", "000000")
 
-        assertTrue(result.isFailure)
+        assertTrue(result is AuthOutcome.Failure)
         coVerify(exactly = 0) { tokenManager.saveTokens(any(), any(), any()) }
     }
 
@@ -104,7 +107,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `refreshToken success saves new tokens and returns access token`() = runTest {
-        coEvery { tokenManager.getRefreshToken() } returns "oldRefresh"
+        coEvery { tokenManager.loadTokens() } returns TokenSnapshot("oldAccess", "oldRefresh")
         coEvery { tokenManager.getUserId() } returns 1L
         coEvery { authApi.refreshToken("oldRefresh") } returns
             RefreshTokenResponse(accessToken = "newAccess", refreshToken = "newRefresh")
@@ -119,7 +122,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `refreshToken with null stored token returns failure`() = runTest {
-        coEvery { tokenManager.getRefreshToken() } returns null
+        coEvery { tokenManager.loadTokens() } returns null
         val result = repository().refreshToken()
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is ApiException.UnauthorizedError)
@@ -128,7 +131,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `refreshToken API failure returns Result failure`() = runTest {
-        coEvery { tokenManager.getRefreshToken() } returns "oldRefresh"
+        coEvery { tokenManager.loadTokens() } returns TokenSnapshot("oldAccess", "oldRefresh")
         coEvery { authApi.refreshToken(any()) } throws RuntimeException("Server error")
 
         val result = repository().refreshToken()

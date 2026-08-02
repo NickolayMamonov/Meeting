@@ -1,21 +1,35 @@
 package com.whysoezzy.network.error
 
-sealed class ApiException(
+import com.whysoezzy.common.error.ErrorType
+import com.whysoezzy.common.error.ErrorTypeCarrier
+
+sealed class ApiException private constructor(
     message: String,
-) : Exception(message) {
-    data class ServerError(
-        val errorResponse: ErrorResponse,
-    ) : ApiException(errorResponse.message)
+) : Exception(message, null, false, false),
+    ErrorTypeCarrier {
+    class ServerError(
+        val metadata: ApiErrorMetadata,
+    ) : ApiException("Server request failed") {
+        override val errorType: ErrorType = ErrorType.Server
 
-    data class NetworkError(
-        override val message: String,
-    ) : ApiException(message)
+        override fun toString(): String = "ServerError(status=${metadata.status}, code=${metadata.code})"
+    }
 
-    data class UnauthorizedError(
-        override val message: String = "Unauthorized",
-    ) : ApiException(message)
+    class NetworkError : ApiException("Network request failed") {
+        override val errorType: ErrorType = ErrorType.NoConnection
 
-    data class UnknownError(
-        override val message: String,
-    ) : ApiException(message)
+        override fun toString(): String = "NetworkError"
+    }
+
+    class UnauthorizedError : ApiException("Unauthorized") {
+        override val errorType: ErrorType = ErrorType.Unauthorized
+
+        override fun toString(): String = "UnauthorizedError"
+    }
+
+    class UnknownError : ApiException("Unexpected request failure") {
+        override val errorType: ErrorType = ErrorType.Unknown
+
+        override fun toString(): String = "UnknownError"
+    }
 }

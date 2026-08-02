@@ -2,12 +2,13 @@ package com.whysoezzy.auth.data.api
 
 import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.RefreshTokenResponse
+import com.whysoezzy.auth.data.dto.SendOtpResponse
 
 internal interface AuthApi {
-    suspend fun sendOtp(phone: String): Map<String, String>
+    suspend fun requestEmailOtp(email: String): SendOtpResponse
 
-    suspend fun verifyOtp(
-        phone: String,
+    suspend fun verifyEmailOtp(
+        email: String,
         code: String,
         name: String? = null,
         surname: String? = null,

@@ -50,13 +50,8 @@ class ValidationUtilsTest {
     // ==================== isValidOtpCode ====================
 
     @Test
-    fun `otp four digits is valid`() {
-        assertTrue(ValidationUtils.isValidOtpCode("1234"))
-    }
-
-    @Test
-    fun `otp three digits is invalid`() {
-        assertFalse(ValidationUtils.isValidOtpCode("123"))
+    fun `otp six ASCII digits is valid`() {
+        assertTrue(ValidationUtils.isValidOtpCode("123456"))
     }
 
     @Test
@@ -65,8 +60,19 @@ class ValidationUtilsTest {
     }
 
     @Test
+    fun `otp seven digits is invalid`() {
+        assertFalse(ValidationUtils.isValidOtpCode("1234567"))
+    }
+
+    @Test
     fun `otp with letters is invalid`() {
-        assertFalse(ValidationUtils.isValidOtpCode("12a4"))
+        assertFalse(ValidationUtils.isValidOtpCode("123a56"))
+    }
+
+    @Test
+    fun `otp Unicode digits are invalid`() {
+        assertFalse(ValidationUtils.isValidOtpCode("１２３４５６"))
+        assertFalse(ValidationUtils.isValidOtpCode("١٢٣٤٥٦"))
     }
 
     @Test

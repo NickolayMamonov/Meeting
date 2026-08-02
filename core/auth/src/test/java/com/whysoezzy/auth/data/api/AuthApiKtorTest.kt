@@ -43,30 +43,30 @@ class AuthApiKtorTest {
             install(ContentNegotiation) { json(json) }
         }
 
-    // ==================== sendOtp ====================
+    // ==================== email OTP request ====================
 
     @Test
-    fun `sendOtp sends POST to auth-send-otp with phone in body`() = runTest {
+    fun `sendOtp sends canonical email in body`() = runTest {
         var capturedBody = ""
         val engine = MockEngine { request ->
             capturedBody = request.body.toByteArray().decodeToString()
             respond(content = """{"message":"ok"}""", headers = jsonHeaders)
         }
 
-        AuthApiKtor(buildClient(engine)).sendOtp("+79991234567")
+        AuthApiKtor(buildClient(engine)).requestEmailOtp("person@example.com")
 
-        assertTrue(capturedBody.contains("79991234567"))
+        assertTrue(capturedBody.contains("\"email\":\"person@example.com\""))
     }
 
     @Test
-    fun `sendOtp returns map on success`() = runTest {
+    fun `sendOtp returns acknowledgement on success`() = runTest {
         val engine = MockEngine {
             respond(content = """{"message":"OTP sent"}""", headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).sendOtp("+79991234567")
+        val result = AuthApiKtor(buildClient(engine)).requestEmailOtp("person@example.com")
 
-        assertEquals("OTP sent", result["message"])
+        assertEquals("OTP sent", result.message)
     }
 
     // ==================== verifyOtp ====================
@@ -83,7 +83,7 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(expected), headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "1234")
+        val result = AuthApiKtor(buildClient(engine)).verifyEmailOtp("person@example.com", "123456")
 
         assertEquals("access123", result.accessToken)
         assertEquals("refresh456", result.refreshToken)
@@ -103,13 +103,13 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(response), headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "5678")
+        val result = AuthApiKtor(buildClient(engine)).verifyEmailOtp("person@example.com", "567890")
 
         assertTrue(result.isNewUser)
     }
 
     @Test
-    fun `verifyOtp sends correct phone and code in body`() = runTest {
+    fun `verifyOtp sends correct email and six digit code in body`() = runTest {
         var capturedBody = ""
         val response = AuthResponse(
             accessToken = "token",
@@ -122,10 +122,10 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(response), headers = jsonHeaders)
         }
 
-        AuthApiKtor(buildClient(engine)).verifyOtp("+79991234567", "1234")
+        AuthApiKtor(buildClient(engine)).verifyEmailOtp("person@example.com", "123456")
 
-        assertTrue(capturedBody.contains("79991234567"))
-        assertTrue(capturedBody.contains("1234"))
+        assertTrue(capturedBody.contains("\"email\":\"person@example.com\""))
+        assertTrue(capturedBody.contains("\"code\":\"123456\""))
     }
 
     // ==================== refreshToken ====================

@@ -3,6 +3,7 @@ package dev.whysoezzy.profile.edit.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.common.error.ErrorType
+import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
@@ -11,7 +12,6 @@ import com.whysoezzy.domain.models.User
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
-import com.whysoezzy.network.toErrorType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow

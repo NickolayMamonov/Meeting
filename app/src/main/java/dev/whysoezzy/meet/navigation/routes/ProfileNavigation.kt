@@ -37,11 +37,6 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
                     mode = ProfileMode.Self,
                     onBackPressed = { navController.popBackStack() },
                     onEditClick = { navController.navigate(MeetRoute.ProfileEdit.route) },
-                    onLogout = {
-                        navController.navigate(MeetRoute.Main.route) {
-                            popUpTo(MeetRoute.Main.route) { inclusive = false }
-                        }
-                    },
                     onNameInput = {
                         navController.navigate(MeetRoute.NameInputFromProfile.route)
                     },

@@ -17,5 +17,6 @@ data class AuthUserDto(
     @SerialName("name") val name: String,
     @SerialName("surname") val surname: String,
     @SerialName("phone") val phone: String? = null,
+    @SerialName("email") val email: String? = null,
     @SerialName("avatarUrl") val avatarUrl: String? = null,
 )

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.whysoezzy.network.TokenSnapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -48,6 +49,24 @@ internal class DataStoreTokenManager(
     override suspend fun getAccessToken(): String? = read(KEY_ACCESS_TOKEN)
 
     override suspend fun getRefreshToken(): String? = read(KEY_REFRESH_TOKEN)
+
+    override suspend fun loadTokens(): TokenSnapshot? {
+        val preferences = dataStore.data
+            .catch { e ->
+                if (e is IOException) emit(emptyPreferences()) else throw e
+            }.first()
+        val accessCiphertext = preferences[KEY_ACCESS_TOKEN] ?: return null
+        val refreshCiphertext = preferences[KEY_REFRESH_TOKEN] ?: return null
+        return try {
+            TokenSnapshot(
+                accessToken = crypto.decrypt(accessCiphertext, KEY_ACCESS_TOKEN.name),
+                refreshToken = crypto.decrypt(refreshCiphertext, KEY_REFRESH_TOKEN.name),
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "Token snapshot decrypt failed; treating session as absent")
+            null
+        }
+    }
 
     override suspend fun getUserId(): Long? = read(KEY_USER_ID)?.toLongOrNull()
 

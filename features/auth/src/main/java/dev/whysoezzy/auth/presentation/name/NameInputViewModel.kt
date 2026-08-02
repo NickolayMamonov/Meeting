@@ -3,7 +3,7 @@ package dev.whysoezzy.auth.presentation.name
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.repository.UserProfileUpdater
-import com.whysoezzy.network.toErrorType
+import com.whysoezzy.common.error.ErrorType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -98,10 +98,10 @@ class NameInputViewModel(
                             isSubmitted = true,
                         )
                     _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
-                }.onFailure { throwable ->
+                }.onFailure {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        nameError = NameFieldError.Remote(throwable.toErrorType()),
+                        nameError = NameFieldError.Remote(ErrorType.Unknown),
                     )
                 }
         }

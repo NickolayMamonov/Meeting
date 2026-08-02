@@ -4,13 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
 import com.whysoezzy.common.dispatcher.DispatcherProvider
+import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
 import com.whysoezzy.domain.usecase.GetUserMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
-import com.whysoezzy.network.error.ApiException
-import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.profile.mappers.toUIKitCommunityInfoList
 import dev.whysoezzy.profile.mappers.toUIKitMeetingInfo
 import dev.whysoezzy.profile.mappers.toUIKitSocialMediaInfo
@@ -74,13 +73,9 @@ class ProfileDetailsViewModel
 
                 userResult
                     .onFailure { exception ->
-                        if (exception is ApiException.UnauthorizedError) {
-                            handleLogout()
-                        } else {
-                            _uiState.value = ProfileDetailsUiState.Error(
-                                errorType = exception.toErrorType(),
-                            )
-                        }
+                        _uiState.value = ProfileDetailsUiState.Error(
+                            errorType = exception.toErrorType(),
+                        )
                     }.onSuccess { user ->
                         if (isOwnProfile && user.name.isBlank()) {
                             _navEvent.emit(ProfileDetailsNavEvent.NavigateToNameInput)
@@ -118,7 +113,6 @@ class ProfileDetailsViewModel
         private fun handleLogout() {
             viewModelScope.launch {
                 logoutUseCase()
-                _navEvent.emit(ProfileDetailsNavEvent.NavigateToAuth)
             }
         }
 

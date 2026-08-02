@@ -1,19 +1,19 @@
 package dev.whysoezzy.auth.presentation.code
 
 import androidx.compose.runtime.Immutable
-import com.whysoezzy.common.error.ErrorType
+import com.whysoezzy.auth.domain.models.AuthFailure
 
 @Immutable
 data class CodeVerificationUiState(
+    val maskedEmail: String = "",
     val code: String = "",
     val isLoading: Boolean = false,
-    val isVerified: Boolean = false,
-    val error: ErrorType? = null,
-    val remainingTime: Int = 60, // seconds for resend
+    val error: AuthFailure? = null,
+    val remainingTime: Int = 60,
     val canResend: Boolean = false,
 ) {
     val isValid: Boolean
-        get() = code.length == 4 && error == null
+        get() = code.length == 6 && error == null && !isLoading
 }
 
 sealed interface CodeVerificationEvent {

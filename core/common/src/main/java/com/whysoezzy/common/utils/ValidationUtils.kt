@@ -13,10 +13,8 @@ object ValidationUtils {
             (digits.length == 10) // без кода страны
     }
 
-    /**
-     * OTP-код — 4 цифры (бэкенд генерирует Random.nextInt(1000, 9999))
-     */
-    fun isValidOtpCode(code: String): Boolean = code.length == 4 && code.all { it.isDigit() }
+    /** OTP-код — ровно 6 ASCII-цифр. */
+    fun isValidOtpCode(code: String): Boolean = code.length == 6 && code.all { it in '0'..'9' }
 
     // Оставляем для обратной совместимости
     @Deprecated("Use isValidOtpCode instead", ReplaceWith("isValidOtpCode(code)"))

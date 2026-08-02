@@ -59,7 +59,6 @@ fun ProfileDetailsScreen(
     mode: ProfileMode,
     onBackPressed: () -> Unit,
     onEditClick: () -> Unit = {},
-    onLogout: () -> Unit = {},
     onNameInput: () -> Unit = {},
     onMeetingClick: (Long) -> Unit = {},
     onCommunityClick: (Long) -> Unit = {},
@@ -80,7 +79,6 @@ fun ProfileDetailsScreen(
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.navEvent.collect { event ->
                 when (event) {
-                    is ProfileDetailsNavEvent.NavigateToAuth -> onLogout()
                     is ProfileDetailsNavEvent.NavigateToNameInput -> onNameInput()
                     is ProfileDetailsNavEvent.NavigateToEdit -> onEditClick()
                     is ProfileDetailsNavEvent.NavigateToMeeting -> onMeetingClick(event.meetingId)

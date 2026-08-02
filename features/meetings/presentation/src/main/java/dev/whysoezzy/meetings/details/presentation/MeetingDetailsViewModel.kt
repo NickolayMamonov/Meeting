@@ -4,11 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import com.whysoezzy.common.dispatcher.DispatcherProvider
+import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.common.utils.AddressUtils.extractMetroFromAddress
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
-import com.whysoezzy.network.toErrorType
 import dev.whysoezzy.meetings.details.presentation.MeetingDetailsNavEvent.NavigateToCommunity
 import dev.whysoezzy.meetings.details.presentation.MeetingDetailsNavEvent.NavigateToMeeting
 import dev.whysoezzy.meetings.details.presentation.MeetingDetailsNavEvent.NavigateToProfile

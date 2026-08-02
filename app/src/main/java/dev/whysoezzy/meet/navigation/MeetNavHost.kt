@@ -1,9 +1,11 @@
 package dev.whysoezzy.meet.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import dev.whysoezzy.meet.navigation.routes.authNavigation
@@ -42,5 +44,12 @@ fun MeetNavHost(
         meetingsNavigation(navController)
         communitiesNavigation(navController)
         profileNavigation(navController)
+    }
+
+    LaunchedEffect(navController) {
+        val authGraph =
+            navController.graph.findNode(MeetRoute.Auth.route.hashCode()) as? NavGraph
+                ?: error("Auth graph missing from the root navigation graph")
+        LegacyAuthCompatibility.assertIds(authGraph)
     }
 }
