@@ -1,5 +1,7 @@
 package dev.whysoezzy.uikit.components.cards
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -7,11 +9,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
@@ -19,6 +24,7 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -34,6 +40,8 @@ import dev.whysoezzy.uikit.components.tags.UIKitTag
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
+import dev.whysoezzy.uikit.tokens.ColorTokens
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -83,6 +91,8 @@ class UIKitEventCardTest {
         title: String = "A long event title that wraps without clipping",
         tags: List<UIKitEventCardTag> = longTags,
         imageUrl: String = "",
+        date: String = "10 August",
+        cardAddress: UIKitAddress = address,
         onClick: (() -> Unit)? = null,
     ) {
         CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
@@ -90,8 +100,8 @@ class UIKitEventCardTest {
                 UIKitEventCard(
                     imageUrl = imageUrl,
                     title = title,
-                    date = "10 August",
-                    address = address,
+                    date = date,
+                    address = cardAddress,
                     tags = tags,
                     cardType = cardType,
                     modifier = modifier,
@@ -222,6 +232,74 @@ class UIKitEventCardTest {
         val expectedGap = with(composeTestRule.density) { 6.dp.toPx() }
 
         assertEquals(expectedGap, actualGap, 1f)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun exactOnlineSingleItFixtureKeepsTagInsideRoundedMaskAtAllCardScales() {
+        val scales = listOf(1f, 1.5f, 2f)
+        val types = listOf(UIKitEventCardType.COMPACT, UIKitEventCardType.WIDE)
+        val onlineAddress = UIKitAddress("Онлайн", 0.0, 0.0)
+        val shapeSafeInset = with(Density(1f)) { BorderRadiusTokens.L.roundToPx() }
+
+        composeTestRule.setContent {
+            Column {
+                types.forEach { cardType ->
+                    scales.forEach { fontScale ->
+                        Box(Modifier.background(Color.Magenta)) {
+                            Card(
+                                modifier =
+                                    Modifier.testTag(
+                                        "rounded-${cardType.name.lowercase()}-$fontScale",
+                                    ),
+                                fontScale = fontScale,
+                                cardType = cardType,
+                                title = "Программирование курс",
+                                date = "14.08.2026",
+                                tags = listOf(UIKitEventCardTag("IT", false, true)),
+                                cardAddress = onlineAddress,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        types.forEach { cardType ->
+            scales.forEach { fontScale ->
+                val node =
+                    composeTestRule.onNodeWithTag(
+                        "rounded-${cardType.name.lowercase()}-$fontScale",
+                        useUnmergedTree = true,
+                    )
+                val bounds = node.fetchSemanticsNode().boundsInRoot
+                assertEquals(
+                    if (cardType == UIKitEventCardType.COMPACT) 212f else 320f,
+                    bounds.width,
+                    0f,
+                )
+                assertEquals(
+                    if (cardType == UIKitEventCardType.COMPACT) 260f else 280f,
+                    bounds.height,
+                    0f,
+                )
+
+                val image = node.captureToImage()
+                val pixels = image.toPixelMap()
+                val lowerTagPixels =
+                    buildList {
+                        for (y in (image.height - 64).coerceAtLeast(0) until image.height) {
+                            for (x in 0 until image.width) {
+                                if (pixels[x, y] == ColorTokens.NeutralLine) {
+                                    add(x to y)
+                                }
+                            }
+                        }
+                    }
+                assertTrue("Expected the IT chip in the lower card region", lowerTagPixels.isNotEmpty())
+                assertTrue(lowerTagPixels.minOf { it.first } >= shapeSafeInset)
+            }
+        }
     }
 
     @Test

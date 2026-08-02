@@ -16,6 +16,7 @@ import coil3.compose.AsyncImage
 import dev.whysoezzy.uikit.components.tags.UIKitTag
 import dev.whysoezzy.uikit.components.tags.UIKitTagSize
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import dev.whysoezzy.uikit.tokens.TypographyTokens
@@ -363,10 +364,15 @@ internal fun MeasuredEventCardLayout(
                 constraints.minHeight,
                 constraints.maxHeight,
             )
+        // A radius-wide strip stays inside the card mask at every vertical position. The image
+        // remains full-bleed so its crop and top-corner treatment are unchanged.
+        val bodyHorizontalInset =
+            BorderRadiusTokens.L.roundToPx().coerceAtMost(cardWidth / 2)
+        val bodyWidth = cardWidth - 2 * bodyHorizontalInset
         val textConstraints =
             Constraints(
                 minWidth = 0,
-                maxWidth = cardWidth,
+                maxWidth = bodyWidth,
                 minHeight = 0,
                 maxHeight = Constraints.Infinity,
             )
@@ -413,8 +419,8 @@ internal fun MeasuredEventCardLayout(
                     )
                 }.single().measure(
                     Constraints(
-                        minWidth = cardWidth,
-                        maxWidth = cardWidth,
+                        minWidth = bodyWidth,
+                        maxWidth = bodyWidth,
                         minHeight = 0,
                         maxHeight = Constraints.Infinity,
                     ),
@@ -499,7 +505,7 @@ internal fun MeasuredEventCardLayout(
                 y += sectionGap
             }
             bodyPlaceables.forEachIndexed { index, placeable ->
-                placeable.placeRelative(0, y)
+                placeable.placeRelative(bodyHorizontalInset, y)
                 y += placeable.height
                 if (index != bodyPlaceables.lastIndex) {
                     y += sectionGap
