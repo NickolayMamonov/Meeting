@@ -3,9 +3,11 @@ package dev.whysoezzy.meet.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import dev.whysoezzy.meet.navigation.routes.authNavigation
@@ -46,10 +48,29 @@ fun MeetNavHost(
         profileNavigation(navController)
     }
 
-    LaunchedEffect(navController) {
-        val authGraph =
-            navController.graph.findNode(MeetRoute.Auth.route.hashCode()) as? NavGraph
-                ?: error("Auth graph missing from the root navigation graph")
-        LegacyAuthCompatibility.assertIds(authGraph)
+    AuthStateNavigationEffect(
+        navController = navController,
+        isLoggedIn = isLoggedIn,
+    )
+}
+
+@Composable
+internal fun AuthStateNavigationEffect(
+    navController: NavHostController,
+    isLoggedIn: Boolean?,
+) {
+    var hasInitializedAuthState by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isLoggedIn) {
+        if (!hasInitializedAuthState) {
+            hasInitializedAuthState = true
+        } else if (isLoggedIn == false) {
+            navController.navigate(MeetRoute.Auth.route) {
+                popUpTo(MeetRoute.Main.route) {
+                    inclusive = true
+                }
+                launchSingleTop = true
+            }
+        }
     }
 }

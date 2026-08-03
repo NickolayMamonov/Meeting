@@ -70,8 +70,6 @@ fun CommunityInfo.toUIKitCommunity(): UIKitCommunity {
 fun SocialMediaType.toUIKitSocialMedia(): UIKitSocialMedia = when (this) {
     SocialMediaType.TELEGRAM -> UIKitSocialMedia.TELEGRAM
     SocialMediaType.HABR -> UIKitSocialMedia.HABR
-    SocialMediaType.LINKEDIN -> UIKitSocialMedia.LINKEDIN
-    SocialMediaType.GITHUB -> UIKitSocialMedia.GITHUB
 }
 
 fun SocialMediaInfo.toUIKitSocialMediaInfo(): UIKitSocialMediaInfo {

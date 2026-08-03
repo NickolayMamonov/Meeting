@@ -33,7 +33,7 @@ internal fun UserProfileDto.toDomain(): User = User(
     avatar = avatarUrl ?: "",
     phone = phone ?: "",
     bio = description ?: "",
-    socialMedias = socialMedias.map { it.toDomain() },
+    socialMedias = socialMedias.mapNotNull { it.toDomain() },
     interests = interests.map { it.toDomain() },
     showCommunities = showCommunities,
     showMeetings = showMeetings,
@@ -76,24 +76,28 @@ private fun TagDto.toDomain(): Tag = Tag(
     name = name,
 )
 
-private fun SocialMediaDto.toDomain(): SocialMediaInfo = SocialMediaInfo(
-    type = mapSocialMediaType(type),
-    url = url,
-    username = extractUsername(url),
-)
+private fun SocialMediaDto.toDomain(): SocialMediaInfo? =
+    mapSocialMediaType(type)?.let { socialMediaType ->
+        SocialMediaInfo(
+            type = socialMediaType,
+            url = url,
+            username = extractUsername(url),
+        )
+    }
 
 private fun SocialMediaInfo.toDto(): SocialMediaDto = SocialMediaDto(
-    type = type.name.lowercase(),
+    type = when (type) {
+        SocialMediaType.TELEGRAM -> "telegram"
+        SocialMediaType.HABR -> "habr"
+    },
     url = url,
 )
 
-private fun mapSocialMediaType(platform: String): SocialMediaType =
+private fun mapSocialMediaType(platform: String): SocialMediaType? =
     when (platform.uppercase()) {
         "TELEGRAM" -> SocialMediaType.TELEGRAM
         "HABR" -> SocialMediaType.HABR
-        "GITHUB" -> SocialMediaType.GITHUB
-        "LINKEDIN" -> SocialMediaType.LINKEDIN
-        else -> SocialMediaType.TELEGRAM
+        else -> null
     }
 
 private fun extractUsername(url: String): String =

@@ -2,8 +2,8 @@ package dev.whysoezzy.meetings.presentation
 
 import androidx.paging.PagingData
 import app.cash.turbine.test
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.common.error.ErrorType
-import com.whysoezzy.common.error.ErrorTypeCarrier
 import com.whysoezzy.domain.models.MainScreenData
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
@@ -89,9 +89,7 @@ class MainScreenViewModelTest {
     @Test
     fun `loadData failure emits Error state with user-friendly message`() = runTest {
         coEvery { getMainScreenDataUseCase() } returns Result.failure(
-            object : Exception("connection lost"), ErrorTypeCarrier {
-                override val errorType: ErrorType = ErrorType.NoConnection
-            },
+            AppException.NetworkError("connection lost"),
         )
 
         val viewModel = MainScreenViewModel(

@@ -2,16 +2,20 @@ package dev.whysoezzy.profile.edit.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.usecase.LogoutUseCase
 import com.whysoezzy.common.error.ErrorType
 import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.common.utils.ValidationUtils
+import com.whysoezzy.domain.models.AvatarUpload
 import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
+import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.UpdateUserProfileUseCase
+import com.whysoezzy.domain.usecase.UploadAvatarUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,12 +28,19 @@ import kotlin.coroutines.cancellation.CancellationException
 
 sealed interface ProfileEditNavEvent {
     data object NavigateBack : ProfileEditNavEvent
+
+    data object NavigateToAuth : ProfileEditNavEvent
+
+    data object PickAvatar : ProfileEditNavEvent
 }
 
 class ProfileEditViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val updateUserProfileUseCase: UpdateUserProfileUseCase,
     private val getAllTagsUseCase: GetAllTagsUseCase,
+    private val deleteCurrentUserProfileUseCase: DeleteCurrentUserProfileUseCase,
+    private val uploadAvatarUseCase: UploadAvatarUseCase,
+    private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileEditUiState())
     val uiState: StateFlow<ProfileEditUiState> = _uiState.asStateFlow()
@@ -38,6 +49,7 @@ class ProfileEditViewModel(
     val navEvent: SharedFlow<ProfileEditNavEvent> = _navEvent.asSharedFlow()
 
     private var currentUser: User? = null
+    private var avatarRevision = 0L
 
     init {
         loadProfile()
@@ -53,6 +65,9 @@ class ProfileEditViewModel(
             is ProfileEditEvent.UpdateCity -> updateCity(event.city)
             is ProfileEditEvent.UpdateDescription -> updateDescription(event.description)
             is ProfileEditEvent.ChangeAvatar -> changeAvatar()
+            is ProfileEditEvent.UploadAvatar -> uploadAvatar(event.upload)
+            is ProfileEditEvent.UploadAvatarFailed ->
+                _uiState.value = _uiState.value.copy(error = ErrorType.Unknown)
             is ProfileEditEvent.AddInterest -> { /* открывается через UI-флаг */ }
             is ProfileEditEvent.AddInterestWithText -> addInterestWithText(event.interest)
             is ProfileEditEvent.RemoveInterest -> removeInterest(event.interest)
@@ -70,10 +85,17 @@ class ProfileEditViewModel(
 
     private fun loadProfile() {
         viewModelScope.launch {
+            val loadAvatarRevision = avatarRevision
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             getCurrentUserUseCase()
                 .onSuccess { user ->
-                    currentUser = user
+                    val keepUploadedAvatar = loadAvatarRevision != avatarRevision
+                    val avatarUrl = if (keepUploadedAvatar) {
+                        _uiState.value.avatarUrl
+                    } else {
+                        user.avatar.takeIf { it.isNotBlank() }
+                    }
+                    currentUser = user.copy(avatar = avatarUrl ?: "")
                     _uiState.value = _uiState.value.copy(
                         name = user.name,
                         surname = user.surname,
@@ -81,7 +103,7 @@ class ProfileEditViewModel(
                         email = user.email,
                         city = user.city,
                         description = user.bio,
-                        avatarUrl = user.avatar.takeIf { it.isNotBlank() },
+                        avatarUrl = avatarUrl,
                         interests = user.interests.map { it.name },
                         socialMedias = extractSocialMedias(user.socialMedias),
                         showCommunities = user.showCommunities,
@@ -162,7 +184,45 @@ class ProfileEditViewModel(
     }
 
     private fun changeAvatar() {
-        // Обрабатывается в UI через ActivityResultLauncher
+        if (_uiState.value.isAvatarUploading) return
+        _navEvent.tryEmit(ProfileEditNavEvent.PickAvatar)
+    }
+
+    private fun uploadAvatar(upload: AvatarUpload) {
+        if (_uiState.value.isAvatarUploading) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isAvatarUploading = true,
+                avatarUploadProgress = 0,
+                error = null,
+            )
+            uploadAvatarUseCase(upload) { sent, total ->
+                if (total > 0) {
+                    _uiState.value = _uiState.value.copy(
+                        avatarUploadProgress = ((sent * 100) / total).toInt().coerceIn(0, 100),
+                    )
+                }
+            }.onSuccess { avatarUrl ->
+                avatarRevision++
+                currentUser = currentUser?.copy(avatar = avatarUrl)
+                _uiState.value = _uiState.value.copy(
+                    avatarUrl = avatarUrl,
+                    isAvatarUploading = false,
+                    avatarUploadProgress = null,
+                    isSaved = false,
+                )
+                getCurrentUserUseCase().onSuccess { refreshedUser ->
+                    currentUser = refreshedUser.copy(avatar = avatarUrl)
+                }
+            }.onFailure { exception ->
+                _uiState.value = _uiState.value.copy(
+                    isAvatarUploading = false,
+                    avatarUploadProgress = null,
+                    error = exception.toErrorType(),
+                )
+            }
+        }
     }
 
     private fun addInterestWithText(interest: String) {
@@ -186,14 +246,14 @@ class ProfileEditViewModel(
         _uiState.value = _uiState.value.copy(interests = list, isSaved = false)
     }
 
-    private fun updateSocialMedia(type: String, username: String) {
+    private fun updateSocialMedia(type: SocialMediaType, username: String) {
         val map = _uiState.value.socialMedias.toMutableMap()
         if (username.isBlank()) map.remove(type) else map[type] = username
         _uiState.value = _uiState.value.copy(socialMedias = map, isSaved = false)
     }
 
-    private fun extractSocialMedias(list: List<SocialMediaInfo>): Map<String, String> =
-        list.associate { it.type.name.lowercase() to it.username }
+    private fun extractSocialMedias(list: List<SocialMediaInfo>): Map<SocialMediaType, String> =
+        list.associate { it.type to it.username }
 
     private fun toggleShowCommunities() {
         _uiState.value = _uiState.value.copy(
@@ -218,6 +278,7 @@ class ProfileEditViewModel(
 
     private fun saveProfile() {
         val state = _uiState.value
+        if (state.isAvatarUploading) return
         val nameError = validateName(state.name)
         val surnameError = validateSurname(state.surname)
         val emailError = validateEmail(state.email)
@@ -251,16 +312,11 @@ class ProfileEditViewModel(
             try {
                 socialMediasList = state.socialMedias.mapNotNull { (type, username) ->
                     if (username.isBlank()) return@mapNotNull null
-                    try {
-                        val smType = SocialMediaType.valueOf(type.uppercase())
-                        SocialMediaInfo(
-                            type = smType,
-                            url = generateSocialMediaUrl(smType, username),
-                            username = username,
-                        )
-                    } catch (_: IllegalArgumentException) {
-                        null
-                    }
+                    SocialMediaInfo(
+                        type = type,
+                        url = generateSocialMediaUrl(type, username),
+                        username = username,
+                    )
                 }
 
                 updatedInterests = state.interests.mapNotNull { name ->
@@ -312,6 +368,7 @@ class ProfileEditViewModel(
     }
 
     private fun showDeleteDialog() {
+        if (_uiState.value.isAvatarUploading) return
         _uiState.value = _uiState.value.copy(showDeleteConfirmDialog = true)
     }
 
@@ -320,8 +377,27 @@ class ProfileEditViewModel(
     }
 
     private fun confirmDeleteProfile() {
-        _uiState.value = _uiState.value.copy(showDeleteConfirmDialog = false)
-        // TODO: вызов deleteAccountUseCase когда будет добавлен
+        if (_uiState.value.isSaving || _uiState.value.isAvatarUploading) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isSaving = true,
+                error = null,
+                showDeleteConfirmDialog = false,
+            )
+
+            deleteCurrentUserProfileUseCase()
+                .onSuccess {
+                    logoutUseCase()
+                    _uiState.value = _uiState.value.copy(isSaving = false)
+                    _navEvent.tryEmit(ProfileEditNavEvent.NavigateToAuth)
+                }.onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaving = false,
+                        error = exception.toErrorType(),
+                    )
+                }
+        }
     }
 
     private fun validateName(name: String): String? = when {
@@ -351,7 +427,5 @@ class ProfileEditViewModel(
         when (type) {
             SocialMediaType.TELEGRAM -> "https://t.me/$username"
             SocialMediaType.HABR -> "https://habr.com/users/$username"
-            SocialMediaType.LINKEDIN -> "https://linkedin.com/in/$username"
-            SocialMediaType.GITHUB -> "https://github.com/$username"
         }
 }

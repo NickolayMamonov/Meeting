@@ -24,6 +24,10 @@ dependencies {
     implementation(libs.androidx.core.ktx)
 
     testImplementation(project(":core:testing"))
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.ktor.client.content.negotiation)
+    testImplementation(libs.ktor.serialization.json)
+    testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

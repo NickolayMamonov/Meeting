@@ -2,8 +2,7 @@ package presentation
 
 import app.cash.turbine.test
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
-import com.whysoezzy.common.error.ErrorType
-import com.whysoezzy.common.error.ErrorTypeCarrier
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.common.utils.ValidationUtils
 import com.whysoezzy.domain.models.CommunityInfo
 import com.whysoezzy.domain.models.MeetingInfo
@@ -162,22 +161,22 @@ class ProfileDetailsViewModelTest {
     }
 
     @Test
-    fun `loadProfile UnauthorizedError emits error without owning auth navigation`() = runTest {
+    fun `loadProfile UnauthorizedError triggers logout and NavigateToAuth`() = runTest {
         coEvery { getCurrentUserUseCase() } returns
-            Result.failure(
-                object : Exception("401"), ErrorTypeCarrier {
-                    override val errorType: ErrorType = ErrorType.Unauthorized
-                },
-            )
+            Result.failure(AppException.UnauthorizedError("401"))
         coEvery { logoutUseCase() } returns Unit
 
         val vm = viewModel()
 
-        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
-        advanceUntilIdle()
+        vm.navEvent.test {
+            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
+            advanceUntilIdle()
 
-        assertTrue(vm.uiState.value is ProfileDetailsUiState.Error)
-        coVerify(exactly = 0) { logoutUseCase() }
+            assertEquals(ProfileDetailsNavEvent.NavigateToAuth, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify(exactly = 1) { logoutUseCase() }
     }
 
     // ==================== subscription toggle ====================
@@ -244,15 +243,18 @@ class ProfileDetailsViewModelTest {
     // ==================== other nav events ====================
 
     @Test
-    fun `Logout delegates to logout use case without navigation`() = runTest {
+    fun `Logout emits NavigateToAuth`() = runTest {
         coEvery { logoutUseCase() } returns Unit
 
         val vm = viewModel()
 
-        vm.onEvent(ProfileDetailsEvent.Logout)
-        advanceUntilIdle()
+        vm.navEvent.test {
+            vm.onEvent(ProfileDetailsEvent.Logout)
+            advanceUntilIdle()
 
-        coVerify(exactly = 1) { logoutUseCase() }
+            assertEquals(ProfileDetailsNavEvent.NavigateToAuth, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

@@ -23,6 +23,9 @@ val profileFeatureModule = module {
             getCurrentUserUseCase = get(),
             updateUserProfileUseCase = get(),
             getAllTagsUseCase = get(),
+            deleteCurrentUserProfileUseCase = get(),
+            uploadAvatarUseCase = get(),
+            logoutUseCase = get(),
         )
     }
 }
