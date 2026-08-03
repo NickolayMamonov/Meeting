@@ -3,6 +3,7 @@ package com.whysoezzy.auth.di
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.common.error.AppException
+import com.whysoezzy.network.error.ApiException
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -21,7 +22,7 @@ internal suspend fun refreshAuthorizedTokens(
     try {
         val result = authRepository.refreshToken()
         val accessToken = result.getOrElse { error ->
-            if (error is AppException.UnauthorizedError) {
+            if (error is AppException.UnauthorizedError || error is ApiException.UnauthorizedError) {
                 tokenManager.clearTokens()
             } else {
                 Timber.w(error, "Token refresh failed; preserving local session for retry")

@@ -9,5 +9,5 @@ import org.koin.dsl.module
 val appModule =
     module {
         single<DispatcherProvider> { DefaultDispatcherProvider() }
-        viewModel { AuthCheckViewModel(get()) }
+        viewModel { AuthCheckViewModel(get(), get(), get()) }
     }

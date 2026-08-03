@@ -103,11 +103,7 @@ class CodeVerificationViewModel(
                         isLoading = false,
                         error = result.failure,
                     )
-                    if (result.failure == AuthFailure.NoConnection ||
-                        result.failure == AuthFailure.Server
-                    ) {
-                        submittedCode = null
-                    }
+                    submittedCode = null
                 }
             }
         }
@@ -129,9 +125,12 @@ class CodeVerificationViewModel(
                     startTimer()
                 }
                 is EmailOtpResendOutcome.Failed -> {
-                    _uiState.value = _uiState.value.copy(error = result.failure)
-                    deadline = currentTimeMillis() + 60_000L
-                    startTimer()
+                    if (result.failure == AuthFailure.MissingOrExpiredAttempt) {
+                        _navEvent.send(CodeVerificationNavEvent.NavigateToEmail)
+                    } else {
+                        _uiState.value = _uiState.value.copy(error = result.failure)
+                        submittedCode = null
+                    }
                 }
             }
         }

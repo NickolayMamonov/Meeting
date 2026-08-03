@@ -13,6 +13,3 @@ sealed interface ErrorType {
 interface ErrorTypeCarrier {
     val errorType: ErrorType
 }
-
-fun Throwable.toErrorType(): ErrorType =
-    (this as? ErrorTypeCarrier)?.errorType ?: ErrorType.Unknown

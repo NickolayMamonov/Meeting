@@ -27,6 +27,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlin.coroutines.cancellation.CancellationException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthRepositoryImplTest {
@@ -79,6 +80,19 @@ class AuthRepositoryImplTest {
 
         // Проверяем что saveTokens вызван с правильными токенами
         coVerify { tokenManager.saveTokens("access123", "refresh456", 1L) }
+    }
+
+    @Test
+    fun `token persistence cancellation is propagated`() = runTest {
+        coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns successAuthResponse()
+        coEvery { tokenManager.saveTokens(any(), any(), any()) } throws CancellationException("cancelled")
+
+        try {
+            repository().verifyEmailOtp("person@example.com", "123456")
+            org.junit.Assert.fail("CancellationException must propagate")
+        } catch (_: CancellationException) {
+            // expected
+        }
     }
 
     @Test

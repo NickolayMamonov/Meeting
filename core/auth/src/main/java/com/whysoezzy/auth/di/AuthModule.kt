@@ -13,7 +13,9 @@ import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.repository.DataStorePendingEmailOtpStore
 import com.whysoezzy.auth.domain.repository.PendingEmailOtpStore
 import com.whysoezzy.auth.domain.usecase.ClearEmailOtpAttemptUseCase
+import com.whysoezzy.auth.domain.usecase.ClearPendingEmailOtpUseCase
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
+import com.whysoezzy.auth.domain.usecase.LoadActiveEmailOtpAttemptUseCase
 import com.whysoezzy.auth.domain.usecase.LoadEmailOtpAttemptUseCase
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
 import com.whysoezzy.auth.domain.usecase.RecoverEmailOtpAttemptUseCase
@@ -24,8 +26,6 @@ import com.whysoezzy.network.KtorNetworkModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
-import timber.log.Timber
-import kotlin.coroutines.cancellation.CancellationException
 
 val authModule =
     module {
@@ -55,28 +55,13 @@ val authModule =
 
         single(qualifier = named("authorizedClient")) {
             val tokenManager: TokenManager = get()
-
             KtorNetworkModule.provideHttpClient(
                 tokenProvider = tokenManager,
                 onRefreshToken = {
-                    try {
-                        val authRepo = get<AuthRepository>()
-                        val newAccessToken = authRepo.refreshToken().getOrNull()
-                        if (newAccessToken != null) {
-                            tokenManager.loadTokens()?.let {
-                                Pair(it.accessToken, it.refreshToken)
-                            }
-                        } else {
-                            tokenManager.clearTokens()
-                            null
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Timber.e(e, "Token refresh failed, clearing tokens — user will be logged out")
-                        tokenManager.clearTokens()
-                        null
-                    }
+                    refreshAuthorizedTokens(
+                        authRepository = get(),
+                        tokenManager = tokenManager,
+                    )
                 },
             )
         }
@@ -87,6 +72,8 @@ val authModule =
         factory { ResendEmailOtpUseCase(get()) }
         factory { VerifyEmailOtpUseCase(get()) }
         factory { ClearEmailOtpAttemptUseCase(get()) }
+        factory { ClearPendingEmailOtpUseCase(get()) }
+        factory { LoadActiveEmailOtpAttemptUseCase(get()) }
         factory { LogoutUseCase(get()) }
         factory { IsLoggedInUseCase(get()) }
     }

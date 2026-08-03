@@ -1,9 +1,11 @@
 package dev.whysoezzy.auth.presentation.code
 
 import app.cash.turbine.test
+import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.DispatchOutcome
 import com.whysoezzy.auth.domain.models.EmailOtpAttempt
 import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
+import com.whysoezzy.auth.domain.models.EmailOtpResendOutcome
 import com.whysoezzy.auth.domain.models.EmailOtpVerifyOutcome
 import com.whysoezzy.auth.domain.usecase.ClearEmailOtpAttemptUseCase
 import com.whysoezzy.auth.domain.usecase.LoadEmailOtpAttemptUseCase
@@ -57,5 +59,43 @@ class CodeVerificationViewModelTest {
             assertEquals(CodeVerificationNavEvent.NavigateToMain, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `missing resend navigates back to email instead of starting another timer`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { resend("attempt-1") } returns
+            EmailOtpResendOutcome.Failed(null, AuthFailure.MissingOrExpiredAttempt)
+        val viewModel = viewModel()
+
+        viewModel.navEvent.test {
+            runCurrent()
+            viewModel.onEvent(CodeVerificationEvent.ResendCode)
+            advanceUntilIdle()
+            assertEquals(CodeVerificationNavEvent.NavigateToEmail, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `recoverable verify failure retains code and allows retry`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { verify("attempt-1", "123456", any(), any()) } returnsMany listOf(
+            EmailOtpVerifyOutcome.Failed(AuthFailure.Server),
+            EmailOtpVerifyOutcome.ExistingUser,
+        )
+        val viewModel = viewModel()
+        runCurrent()
+
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        advanceUntilIdle()
+        assertEquals("123456", viewModel.uiState.value.code)
+        viewModel.onEvent(CodeVerificationEvent.VerifyCode)
+        advanceUntilIdle()
+        assertEquals("123456", viewModel.uiState.value.code)
     }
 }

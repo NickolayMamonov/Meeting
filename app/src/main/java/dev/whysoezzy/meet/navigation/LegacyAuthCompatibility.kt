@@ -1,17 +1,20 @@
 package dev.whysoezzy.meet.navigation
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.core.os.bundleOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * The only source that retains the three phone-build destination route strings.
- *
- * These destinations are deliberately inert. They never receive a back-stack entry,
- * never inspect restored arguments, and immediately converge on the durable email
- * entry state. Keeping the routes here protects Navigation's saved destination IDs
- * during direct upgrades from the phone build.
+ * These destinations are inert and converge from durable authentication state;
+ * restored legacy arguments are never inspected, logged, or forwarded.
  */
 internal object LegacyAuthCompatibility {
     val routes: List<String> = listOf(
@@ -38,24 +41,32 @@ internal fun registerLegacyAuthCompatibilityDestinations(
     builder: NavGraphBuilder,
     navController: NavController,
 ) {
-    builder.composable(LegacyAuthCompatibility.routes[0]) {
-        redirectToEmail(navController)
-    }
-    builder.composable(LegacyAuthCompatibility.routes[1]) {
-        redirectToEmail(navController)
-    }
-    builder.composable(LegacyAuthCompatibility.routes[2]) {
-        redirectToEmail(navController)
-    }
-}
+    LegacyAuthCompatibility.routes.forEach { route ->
+        builder.composable(route) {
+            val authViewModel: AuthCheckViewModel = koinViewModel()
+            val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
+            val pending by authViewModel.pendingAttempt.collectAsStateWithLifecycle()
 
-private fun redirectToEmail(navController: NavController) {
-    navController.navigate(MeetRoute.EmailInput.route) {
-        launchSingleTop = true
-        restoreState = false
-        popUpTo(MeetRoute.Auth.route) {
-            inclusive = false
-            saveState = false
+            LaunchedEffect(isLoggedIn, pending) {
+                val pendingState = pending ?: return@LaunchedEffect
+                when {
+                    isLoggedIn == true -> navController.navigate(MeetRoute.Main.route) {
+                        launchSingleTop = true
+                        popUpTo(MeetRoute.Auth.route) { inclusive = true }
+                    }
+                    pendingState is EmailOtpAttemptResult.Found -> {
+                        navController.popBackStack(MeetRoute.Auth.route, false)
+                        navController.navigate(
+                            MeetRoute.CodeVerification.destinationId,
+                            bundleOf("attemptId" to pendingState.attempt.attemptId),
+                        )
+                    }
+                    else -> navController.navigate(MeetRoute.EmailInput.route) {
+                        launchSingleTop = true
+                        popUpTo(MeetRoute.Auth.route) { inclusive = false }
+                    }
+                }
+            }
         }
     }
 }

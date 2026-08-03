@@ -106,6 +106,18 @@ class ApiCallExtensionsTest {
             assertSanitized(unknownError as ApiException, secret)
         }
 
+    @Test
+    fun `cancellation is never converted to a network failure`() = runTest {
+        val cancellation = kotlinx.coroutines.CancellationException("cancelled")
+
+        try {
+            safeApiCall<String> { throw cancellation }
+            org.junit.Assert.fail("CancellationException must propagate")
+        } catch (actual: kotlinx.coroutines.CancellationException) {
+            assertEquals(cancellation, actual)
+        }
+    }
+
     private fun assertSanitized(
         exception: ApiException,
         secret: String,

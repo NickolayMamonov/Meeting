@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.presentation.code
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -44,6 +45,7 @@ fun CodeVerificationScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SecureScreenEffect()
+    BackHandler { viewModel.clearAndLeave() }
     LaunchedEffect(Unit) {
         viewModel.navEvent.collect { event ->
             when (event) {
@@ -98,6 +100,7 @@ private fun CodeVerificationContent(
         UIKitCodeInput(
             value = uiState.code,
             onValueChange = onCodeChange,
+            codeLength = 6,
             isError = uiState.error != null,
         )
         uiState.error?.let { failure ->

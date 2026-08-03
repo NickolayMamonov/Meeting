@@ -61,6 +61,18 @@ class EmailOtpCoordinator(
         return EmailOtpAttemptResult.Found(pending.public())
     }
 
+    suspend fun loadActive(): EmailOtpAttemptResult {
+        val pending = store.getActive()
+            ?: return EmailOtpAttemptResult.MissingOrExpired
+        if (clock.nowEpochMillis() >= pending.expiresAtEpochMillis) {
+            store.clear(pending.attemptId)
+            return EmailOtpAttemptResult.MissingOrExpired
+        }
+        return EmailOtpAttemptResult.Found(pending.public())
+    }
+
+    suspend fun clearActive() = store.clearActive()
+
     suspend fun resend(attemptId: String): EmailOtpResendOutcome {
         val previous = active(attemptId)
             ?: return EmailOtpResendOutcome.Failed(null, AuthFailure.MissingOrExpiredAttempt)

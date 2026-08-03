@@ -19,6 +19,57 @@ import kotlinx.serialization.json.Json
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
+internal enum class AuthEndpoint {
+    Send,
+    Verify,
+}
+
+internal data class ApiErrorMetadata(
+    val status: Int,
+    val code: String?,
+)
+
+internal fun mapAuthFailure(
+    endpoint: AuthEndpoint,
+    metadata: ApiErrorMetadata,
+): AuthFailure =
+    when (metadata.code?.uppercase()?.replace('-', '_')) {
+        "OTP_DELIVERY_UNAVAILABLE", "OTP_PROVIDER_UNAVAILABLE", "PROVIDER_UNAVAILABLE",
+        "X013_OTP_PROVIDER_UNAVAILABLE", "X_013_OTP_PROVIDER_UNAVAILABLE",
+        "B056_OTP_PROVIDER_UNAVAILABLE", "B_056_OTP_PROVIDER_UNAVAILABLE",
+        ->
+            AuthFailure.DeliveryUnavailable
+        "OTP_ACTIVATION_UNAVAILABLE", "OTP_PROVIDER_ACTIVATION_UNAVAILABLE",
+        "ACTIVATION_UNAVAILABLE", "X013_OTP_ACTIVATION_UNAVAILABLE",
+        "X_013_OTP_ACTIVATION_UNAVAILABLE", "B056_OTP_ACTIVATION_UNAVAILABLE",
+        "B_056_OTP_ACTIVATION_UNAVAILABLE",
+        ->
+            AuthFailure.ActivationUnavailable
+        "OTP_RATE_LIMITED", "OTP_SEND_RATE_LIMITED", "RATE_LIMITED",
+        "X013_OTP_RATE_LIMITED", "X_013_OTP_RATE_LIMITED",
+        "B056_OTP_RATE_LIMITED", "B_056_OTP_RATE_LIMITED",
+        -> AuthFailure.RateLimited
+        "OTP_INVALID", "OTP_INVALID_CODE", "INVALID_OTP", "X013_OTP_INVALID",
+        "X_013_OTP_INVALID", "B056_OTP_INVALID", "B_056_OTP_INVALID",
+        ->
+            AuthFailure.InvalidCode
+        "OTP_EXPIRED", "OTP_INVALID_OR_EXPIRED", "X013_OTP_EXPIRED",
+        "B056_OTP_EXPIRED", "B_056_OTP_EXPIRED", "EXPIRED_OTP",
+        "X013_OTP_EXPIRED", "X_013_OTP_EXPIRED", "OTP_INVALID_OR_EXPIRED_CODE",
+        ->
+            AuthFailure.InvalidOrExpiredCode
+        "BAD_REQUEST", "INVALID_EMAIL", "X013_INVALID_EMAIL", "B056_INVALID_EMAIL" ->
+            if (endpoint == AuthEndpoint.Send) AuthFailure.InvalidEmail else AuthFailure.InvalidCode
+        else -> when {
+            metadata.status == 400 ->
+                if (endpoint == AuthEndpoint.Send) AuthFailure.InvalidEmail else AuthFailure.InvalidCode
+            metadata.status == 429 -> AuthFailure.RateLimited
+            metadata.status == 401 || metadata.status == 403 -> AuthFailure.Unauthorized
+            metadata.status >= 500 -> AuthFailure.Server
+            else -> AuthFailure.Unknown
+        }
+    }
+
 internal class AuthRepositoryImpl(
     private val authApi: AuthApi,
     private val tokenManager: TokenManager,
@@ -44,6 +95,8 @@ internal class AuthRepositoryImpl(
                     refreshToken = response.refreshToken,
                     userId = response.user.id,
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 throw SessionPersistenceException()
             }
@@ -94,7 +147,7 @@ internal class AuthRepositoryImpl(
             AuthOutcome.Success(block())
         } catch (e: ResponseException) {
             val metadata = parseMetadata(e)
-            AuthOutcome.Failure(mapFailure(endpoint, metadata))
+            AuthOutcome.Failure(mapAuthFailure(endpoint, metadata))
         } catch (_: IOException) {
             AuthOutcome.Failure(AuthFailure.NoConnection)
         } catch (_: SessionPersistenceException) {
@@ -107,42 +160,17 @@ internal class AuthRepositoryImpl(
 
     private suspend fun parseMetadata(exception: ResponseException): ApiErrorMetadata {
         val status = exception.response.status.value
-        val code =
-            runCatching {
-                errorJson.decodeFromString<AuthErrorEnvelope>(exception.response.bodyAsText()).code
-            }.getOrNull()
+        val code = try {
+            errorJson.decodeFromString<AuthErrorEnvelope>(exception.response.bodyAsText()).code
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
         return ApiErrorMetadata(status, code)
     }
 
-    private fun mapFailure(
-        endpoint: AuthEndpoint,
-        metadata: ApiErrorMetadata,
-    ): AuthFailure =
-        when {
-            endpoint == AuthEndpoint.Verify &&
-                metadata.status == 401 &&
-                metadata.code == "OTP_INVALID_OR_EXPIRED" -> AuthFailure.InvalidOrExpiredCode
-            metadata.status == 400 || metadata.code == "BAD_REQUEST" ->
-                if (endpoint == AuthEndpoint.Send) AuthFailure.InvalidEmail else AuthFailure.InvalidCode
-            metadata.status == 429 || metadata.code == "OTP_RATE_LIMITED" -> AuthFailure.RateLimited
-            metadata.code == "OTP_DELIVERY_UNAVAILABLE" -> AuthFailure.DeliveryUnavailable
-            metadata.code == "OTP_ACTIVATION_UNAVAILABLE" -> AuthFailure.ActivationUnavailable
-            metadata.status == 401 || metadata.status == 403 -> AuthFailure.Unauthorized
-            metadata.status >= 500 -> AuthFailure.Server
-            else -> AuthFailure.Unknown
-        }
-
-    private enum class AuthEndpoint {
-        Send,
-        Verify,
-    }
-
     private class SessionPersistenceException : Exception()
-
-    private data class ApiErrorMetadata(
-        val status: Int,
-        val code: String?,
-    )
 
     @Serializable
     private data class AuthErrorEnvelope(

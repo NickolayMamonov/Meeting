@@ -105,7 +105,7 @@ private fun EmailInputContent(
             onClick = onSubmit,
             state = if (state.isLoading) {
                 UIKitButtonState.LOADING
-            } else if (state.email.isNotBlank() && state.error == null) {
+            } else if (state.email.isNotBlank()) {
                 UIKitButtonState.PRIMARY
             } else {
                 UIKitButtonState.DISABLED

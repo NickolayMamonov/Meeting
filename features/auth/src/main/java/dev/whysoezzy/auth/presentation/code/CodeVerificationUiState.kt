@@ -13,7 +13,7 @@ data class CodeVerificationUiState(
     val canResend: Boolean = false,
 ) {
     val isValid: Boolean
-        get() = code.length == 6 && error == null && !isLoading
+        get() = code.length == 6 && !isLoading
 }
 
 sealed interface CodeVerificationEvent {

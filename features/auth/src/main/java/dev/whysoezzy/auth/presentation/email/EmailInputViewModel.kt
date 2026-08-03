@@ -2,6 +2,7 @@ package dev.whysoezzy.auth.presentation.email
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import com.whysoezzy.auth.domain.models.EmailOtpRequestOutcome
 import com.whysoezzy.auth.domain.usecase.RecoverEmailOtpAttemptUseCase
 import com.whysoezzy.auth.domain.usecase.RequestEmailOtpUseCase
@@ -27,6 +28,16 @@ class EmailInputViewModel(
 
     private val _navEvent = Channel<EmailInputNavEvent>(capacity = Channel.BUFFERED)
     val navEvent = _navEvent.receiveAsFlow()
+
+    init {
+        viewModelScope.launch {
+            when (val result = recoverActiveAttempt()) {
+                is EmailOtpAttemptResult.Found ->
+                    _navEvent.send(EmailInputNavEvent.NavigateToCode(result.attempt.attemptId))
+                EmailOtpAttemptResult.MissingOrExpired -> Unit
+            }
+        }
+    }
 
     fun onEvent(event: EmailInputEvent) {
         when (event) {
@@ -56,8 +67,5 @@ class EmailInputViewModel(
         }
     }
 
-    @Suppress("UnusedPrivateMember")
-    private suspend fun recover(attemptId: String) {
-        recoverEmailOtp(attemptId)
-    }
+    private suspend fun recoverActiveAttempt(): EmailOtpAttemptResult = recoverEmailOtp.invoke()
 }

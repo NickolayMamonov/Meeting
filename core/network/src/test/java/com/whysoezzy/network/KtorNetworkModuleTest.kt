@@ -63,8 +63,11 @@ class KtorNetworkModuleTest {
         val requestCount = AtomicInteger()
         val engine = MockEngine {
             val attempt = requestCount.incrementAndGet()
-            if (attempt < 4) respond(content = "", status = HttpStatusCode.InternalServerError)
-            else respond(content = "success", status = HttpStatusCode.OK)
+            if (attempt < 4) {
+                respond(content = "", status = HttpStatusCode.InternalServerError)
+            } else {
+                respond(content = "success", status = HttpStatusCode.OK)
+            }
         }
         val client = KtorNetworkModule.provideHttpClient(engine)
         try {
@@ -87,10 +90,14 @@ class KtorNetworkModuleTest {
         val client = KtorNetworkModule.provideHttpClient(
             engine = engine,
             tokenProvider = tokenProvider(),
-            onRefreshToken = { refreshCount.incrementAndGet(); null },
+            onRefreshToken = {
+                refreshCount.incrementAndGet()
+                null
+            },
         )
         try {
-            assertEquals("", client.get("/protected").bodyAsText())
+            val result = safeApiCall { client.get("/protected").bodyAsText() }
+            assertTrue(result.isFailure)
             assertEquals(1, requestCount.get())
             assertEquals(1, refreshCount.get())
         } finally {
@@ -149,7 +156,9 @@ class KtorNetworkModuleTest {
         refreshToken: String = "old-refresh-token",
     ): TokenProvider = object : TokenProvider {
         override suspend fun getAccessToken() = accessToken
+
         override suspend fun getRefreshToken() = refreshToken
+
         override suspend fun loadTokens() = TokenSnapshot(accessToken, refreshToken)
     }
 }

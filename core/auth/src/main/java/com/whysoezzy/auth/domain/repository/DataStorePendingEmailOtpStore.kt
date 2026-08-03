@@ -52,7 +52,18 @@ class DataStorePendingEmailOtpStore(
         }
     }
 
-    override suspend fun get(attemptId: String): PendingEmailOtpAttempt? {
+    override suspend fun get(attemptId: String): PendingEmailOtpAttempt? =
+        readRecord()?.takeIf { it.attemptId == attemptId }?.toAttempt()
+
+    override suspend fun getActive(): PendingEmailOtpAttempt? = readRecord()?.toAttempt()
+
+    override suspend fun clear(attemptId: String) {
+        if (readRecord()?.attemptId == attemptId) clearStored()
+    }
+
+    override suspend fun clearActive() = clearStored()
+
+    private suspend fun readRecord(): PendingEmailOtpRecord? {
         val encrypted = dataStore.data.first()[RECORD_KEY] ?: return null
         val record = runCatching {
             json.decodeFromString(PendingEmailOtpRecord.serializer(), cipher.decrypt(encrypted, AAD))
@@ -60,29 +71,24 @@ class DataStorePendingEmailOtpStore(
             clearStored()
             return null
         }
-        if (record.version != VERSION || record.attemptId != attemptId) return null
-        return runCatching {
-            PendingEmailOtpAttempt(
-                attemptId = record.attemptId,
-                email = EmailAddress.canonical(record.email),
-                resendAvailableAtEpochMillis = record.resendAvailableAtEpochMillis,
-                expiresAtEpochMillis = record.expiresAtEpochMillis,
-                challengeMayBeActive = record.challengeMayBeActive,
-                dispatchOutcome = record.dispatchOutcome,
-            )
-        }.getOrElse {
+        if (record.version != VERSION) {
             clearStored()
-            null
+            return null
         }
+        return record
     }
 
-    override suspend fun clear(attemptId: String) {
-        val current = dataStore.data.first()[RECORD_KEY] ?: return
-        val record = runCatching {
-            json.decodeFromString(PendingEmailOtpRecord.serializer(), cipher.decrypt(current, AAD))
+    private fun PendingEmailOtpRecord.toAttempt(): PendingEmailOtpAttempt? =
+        runCatching {
+            PendingEmailOtpAttempt(
+                attemptId = attemptId,
+                email = EmailAddress.canonical(email),
+                resendAvailableAtEpochMillis = resendAvailableAtEpochMillis,
+                expiresAtEpochMillis = expiresAtEpochMillis,
+                challengeMayBeActive = challengeMayBeActive,
+                dispatchOutcome = dispatchOutcome,
+            )
         }.getOrNull()
-        if (record?.attemptId == attemptId) clearStored()
-    }
 
     private suspend fun clearStored() {
         dataStore.edit { preferences -> preferences.remove(RECORD_KEY) }

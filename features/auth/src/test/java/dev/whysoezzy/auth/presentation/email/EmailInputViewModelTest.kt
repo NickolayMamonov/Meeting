@@ -3,6 +3,7 @@ package dev.whysoezzy.auth.presentation.email
 import app.cash.turbine.test
 import com.whysoezzy.auth.domain.models.DispatchOutcome
 import com.whysoezzy.auth.domain.models.EmailOtpAttempt
+import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import com.whysoezzy.auth.domain.models.EmailOtpRequestOutcome
 import com.whysoezzy.auth.domain.usecase.RecoverEmailOtpAttemptUseCase
 import com.whysoezzy.auth.domain.usecase.RequestEmailOtpUseCase
@@ -25,8 +26,14 @@ class EmailInputViewModelTest {
     private val request: RequestEmailOtpUseCase = mockk()
     private val recovery: RecoverEmailOtpAttemptUseCase = mockk()
 
+    init {
+        coEvery { recovery() } returns
+            com.whysoezzy.auth.domain.models.EmailOtpAttemptResult.MissingOrExpired
+    }
+
     @Test
     fun `successful request emits only opaque attempt id`() = runTest {
+        coEvery { recovery() } returns com.whysoezzy.auth.domain.models.EmailOtpAttemptResult.MissingOrExpired
         coEvery { request("person@example.com") } returns
             EmailOtpRequestOutcome.ProceedToVerification(
                 EmailOtpAttempt(
@@ -51,6 +58,7 @@ class EmailInputViewModelTest {
 
     @Test
     fun `duplicate submit while requesting is ignored`() = runTest {
+        coEvery { recovery() } returns com.whysoezzy.auth.domain.models.EmailOtpAttemptResult.MissingOrExpired
         coEvery { request(any()) } coAnswers {
             kotlinx.coroutines.delay(100)
             EmailOtpRequestOutcome.StayOnEmail(
@@ -65,5 +73,25 @@ class EmailInputViewModelTest {
         advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.error != null)
+    }
+
+    @Test
+    fun `startup recovery emits opaque attempt id`() = runTest {
+        coEvery { recovery() } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt(
+                attemptId = "attempt-1",
+                maskedEmail = "p***@example.com",
+                resendAvailableAtEpochMillis = 60_000,
+                challengeMayBeActive = true,
+                dispatchOutcome = DispatchOutcome.Confirmed,
+            ),
+        )
+        val viewModel = EmailInputViewModel(request, recovery)
+
+        viewModel.navEvent.test {
+            advanceUntilIdle()
+            assertEquals(EmailInputNavEvent.NavigateToCode("attempt-1"), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

@@ -22,10 +22,20 @@ suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> =
         Result.success(apiCall())
     } catch (e: ResponseException) {
         val statusCode = e.response.status.value
-        val responseBody = runCatching { e.response.bodyAsText() }.getOrDefault("")
-        val parsed = runCatching {
+        val responseBody = try {
+            e.response.bodyAsText()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            ""
+        }
+        val parsed = try {
             Json { ignoreUnknownKeys = true }.decodeFromString<ErrorResponse>(responseBody)
-        }.getOrNull()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
         when (statusCode) {
             401, 403 -> {
                 Result.failure(ApiException.UnauthorizedError())

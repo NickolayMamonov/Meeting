@@ -6,5 +6,6 @@ fun Throwable.toErrorType(): ErrorType =
         is AppException.UnauthorizedError -> ErrorType.Unauthorized
         is AppException.ServerError -> ErrorType.Server
         is AppException.UnknownError -> ErrorType.Unknown
+        is ErrorTypeCarrier -> errorType
         else -> ErrorType.Unknown
     }
