@@ -47,6 +47,7 @@ fun MeetNavHost(
         communitiesNavigation(navController)
         profileNavigation(navController)
     }
+    LegacyAuthCompatibility.assertIds(navController.graph)
 
     AuthStateNavigationEffect(
         navController = navController,

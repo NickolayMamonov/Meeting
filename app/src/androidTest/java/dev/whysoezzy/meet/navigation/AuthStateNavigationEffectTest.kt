@@ -25,7 +25,7 @@ class AuthStateNavigationEffectTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun unauthorizedRefresh_routesProtectedDestinationToPhoneAuthAndExcludesProtectedBackStack() {
+    fun unauthorizedRefresh_routesProtectedDestinationToEmailAuthAndExcludesProtectedBackStack() {
         var isLoggedIn by mutableStateOf(true)
         lateinit var navController: NavHostController
 
@@ -43,11 +43,11 @@ class AuthStateNavigationEffectTest {
                     Text("Protected meeting content")
                 }
                 navigation(
-                    startDestination = MeetRoute.PhoneInput.route,
+                    startDestination = MeetRoute.EmailInput.route,
                     route = MeetRoute.Auth.route,
                 ) {
-                    composable(MeetRoute.PhoneInput.route) {
-                        Text("Phone authentication")
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
                     }
                 }
             }
@@ -69,7 +69,7 @@ class AuthStateNavigationEffectTest {
             isLoggedIn = false
         }
 
-        composeTestRule.onNodeWithText("Phone authentication").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Email authentication").assertIsDisplayed()
 
         composeTestRule.runOnIdle {
             val protectedRoutes =

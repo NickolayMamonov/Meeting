@@ -1,19 +1,14 @@
 package dev.whysoezzy.meet.navigation
 
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.core.os.bundleOf
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
-import org.koin.androidx.compose.koinViewModel
 
 /**
  * The only source that retains the three phone-build destination route strings.
- * These destinations are inert and converge from durable authentication state;
+ * These destinations are inert aliases to the current email entry screen;
  * restored legacy arguments are never inspected, logged, or forwarded.
  */
 internal object LegacyAuthCompatibility {
@@ -24,16 +19,34 @@ internal object LegacyAuthCompatibility {
     )
 
     fun assertIds(graph: NavGraph) {
+        val authGraph =
+            graph.findNode(MeetRoute.Auth.route) as? NavGraph
+                ?: error("Missing auth graph")
         routes.forEach { route ->
-            val destination = graph.findNode(route.hashCode())
+            val destination = authGraph.findNode(route)
                 ?: error("Missing legacy compatibility destination: $route")
-            check(destination.id == route.hashCode()) {
+            check(destination.id == navigationDestinationId(route)) {
                 "Legacy destination ID changed for $route"
             }
+            check(destination.route == route) {
+                "Legacy destination route changed for $route: ${destination.route}"
+            }
         }
-        check("auth/code/{attemptId}".hashCode() !in routes.map(String::hashCode)) {
+        val activeCode = authGraph.findNode(MeetRoute.CodeVerification.route)
+            ?: error("Missing active code destination")
+        check(activeCode.id == MeetRoute.CodeVerification.destinationId) {
+            "Active code destination ID changed"
+        }
+        check(activeCode.id !in routes.map(::navigationDestinationId)) {
             "The active code destination collides with a legacy destination ID"
         }
+    }
+}
+
+internal fun redirectLegacyAuth(navController: NavController) {
+    navController.navigate(MeetRoute.EmailInput.route) {
+        launchSingleTop = true
+        popUpTo(MeetRoute.Auth.route) { inclusive = false }
     }
 }
 
@@ -43,29 +56,8 @@ internal fun registerLegacyAuthCompatibilityDestinations(
 ) {
     LegacyAuthCompatibility.routes.forEach { route ->
         builder.composable(route) {
-            val authViewModel: AuthCheckViewModel = koinViewModel()
-            val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
-            val pending by authViewModel.pendingAttempt.collectAsStateWithLifecycle()
-
-            LaunchedEffect(isLoggedIn, pending) {
-                val pendingState = pending ?: return@LaunchedEffect
-                when {
-                    isLoggedIn == true -> navController.navigate(MeetRoute.Main.route) {
-                        launchSingleTop = true
-                        popUpTo(MeetRoute.Auth.route) { inclusive = true }
-                    }
-                    pendingState is EmailOtpAttemptResult.Found -> {
-                        navController.popBackStack(MeetRoute.Auth.route, false)
-                        navController.navigate(
-                            MeetRoute.CodeVerification.destinationId,
-                            bundleOf("attemptId" to pendingState.attempt.attemptId),
-                        )
-                    }
-                    else -> navController.navigate(MeetRoute.EmailInput.route) {
-                        launchSingleTop = true
-                        popUpTo(MeetRoute.Auth.route) { inclusive = false }
-                    }
-                }
+            LaunchedEffect(Unit) {
+                redirectLegacyAuth(navController)
             }
         }
     }

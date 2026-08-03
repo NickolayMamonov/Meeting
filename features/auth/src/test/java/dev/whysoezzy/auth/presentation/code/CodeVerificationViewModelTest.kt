@@ -80,6 +80,26 @@ class CodeVerificationViewModelTest {
     }
 
     @Test
+    fun `failed resend uses persisted cooldown deadline`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { resend("attempt-1") } returns EmailOtpResendOutcome.Failed(
+            null,
+            AuthFailure.ResendNotAvailable(60_000),
+        )
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.ResendCode)
+        runCurrent()
+
+        assertEquals(60, viewModel.uiState.value.remainingTime)
+        assertEquals(false, viewModel.uiState.value.canResend)
+        assertEquals(AuthFailure.ResendNotAvailable(60_000), viewModel.uiState.value.error)
+    }
+
+    @Test
     fun `recoverable verify failure retains code and allows retry`() = runTest {
         coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
             EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),

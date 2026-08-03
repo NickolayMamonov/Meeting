@@ -15,12 +15,13 @@ class LegacyAuthCompatibilityTest {
             ),
             LegacyAuthCompatibility.routes,
         )
-        LegacyAuthCompatibility.routes.forEach { route ->
-            assertEquals(route.hashCode(), route.hashCode())
-        }
+        assertEquals(
+            navigationDestinationId(MeetRoute.CodeVerification.route),
+            MeetRoute.CodeVerification.destinationId,
+        )
         assertNotEquals(
-            "auth/code/{attemptId}".hashCode(),
-            "auth/code/{phoneNumber}".hashCode(),
+            navigationDestinationId("auth/code/{attemptId}"),
+            navigationDestinationId("auth/code/{phoneNumber}"),
         )
     }
 }

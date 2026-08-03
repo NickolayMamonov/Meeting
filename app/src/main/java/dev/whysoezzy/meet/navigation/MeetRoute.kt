@@ -9,7 +9,7 @@ sealed class MeetRoute(
     object EmailInput : MeetRoute("auth/email")
 
     object CodeVerification : MeetRoute("auth/code/{attemptId}") {
-        val destinationId: Int = route.hashCode()
+        val destinationId: Int = navigationDestinationId(route)
     }
 
     object NameInput : MeetRoute("auth/name")
@@ -50,3 +50,7 @@ sealed class MeetRoute(
         fun createRoute(userId: Long) = "profile/$userId"
     }
 }
+
+// Navigation derives string-route IDs from this URI form before hashing the route.
+internal fun navigationDestinationId(route: String): Int =
+    "android-app://androidx.navigation/$route".hashCode()

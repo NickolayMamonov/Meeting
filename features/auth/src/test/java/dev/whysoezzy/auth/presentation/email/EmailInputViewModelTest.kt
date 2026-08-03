@@ -1,6 +1,7 @@
 package dev.whysoezzy.auth.presentation.email
 
 import app.cash.turbine.test
+import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.DispatchOutcome
 import com.whysoezzy.auth.domain.models.EmailOtpAttempt
 import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
@@ -91,6 +92,19 @@ class EmailInputViewModelTest {
         viewModel.navEvent.test {
             advanceUntilIdle()
             assertEquals(EmailInputNavEvent.NavigateToCode("attempt-1"), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `startup no challenge recovery stays on email`() = runTest {
+        coEvery { recovery() } returns EmailOtpAttemptResult.MissingOrExpired
+        val viewModel = EmailInputViewModel(request, recovery)
+
+        viewModel.navEvent.test {
+            advanceUntilIdle()
+            expectNoEvents()
+            assertEquals(null, viewModel.uiState.value.error)
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -116,18 +116,31 @@ class CodeVerificationViewModel(
                 is EmailOtpResendOutcome.Confirmed,
                 is EmailOtpResendOutcome.Unconfirmed,
                 -> {
+                    val attempt =
+                        when (result) {
+                            is EmailOtpResendOutcome.Confirmed -> result.attempt
+                            is EmailOtpResendOutcome.Unconfirmed -> result.attempt
+                        }
                     _uiState.value = _uiState.value.copy(
                         code = if (result is EmailOtpResendOutcome.Confirmed) "" else _uiState.value.code,
                         error = null,
                     )
                     submittedCode = null
-                    deadline = currentTimeMillis() + 60_000L
+                    deadline = attempt.resendAvailableAtEpochMillis
                     startTimer()
                 }
                 is EmailOtpResendOutcome.Failed -> {
                     if (result.failure == AuthFailure.MissingOrExpiredAttempt) {
                         _navEvent.send(CodeVerificationNavEvent.NavigateToEmail)
                     } else {
+                        val persistedDeadline =
+                            (result.failure as? AuthFailure.ResendNotAvailable)
+                                ?.availableAtEpochMillis
+                                ?: result.attempt?.resendAvailableAtEpochMillis
+                        if (persistedDeadline != null) {
+                            deadline = persistedDeadline
+                            startTimer()
+                        }
                         _uiState.value = _uiState.value.copy(error = result.failure)
                         submittedCode = null
                     }
