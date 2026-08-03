@@ -16,6 +16,8 @@ import dev.whysoezzy.meet.navigation.registerLegacyAuthCompatibilityDestinations
 fun NavGraphBuilder.authNavigation(
     navController: NavController,
     startDestination: String = MeetRoute.EmailInput.route,
+    onLegacyDestinationComposed: ((Int) -> Unit)? = null,
+    onLegacyRedirectRequested: (() -> Unit)? = null,
 ) {
     navigation(
         startDestination = startDestination,
@@ -77,6 +79,11 @@ fun NavGraphBuilder.authNavigation(
             )
         }
 
-        registerLegacyAuthCompatibilityDestinations(this, navController)
+        registerLegacyAuthCompatibilityDestinations(
+            builder = this,
+            navController = navController,
+            onLegacyDestinationComposed = onLegacyDestinationComposed,
+            onLegacyRedirectRequested = onLegacyRedirectRequested,
+        )
     }
 }

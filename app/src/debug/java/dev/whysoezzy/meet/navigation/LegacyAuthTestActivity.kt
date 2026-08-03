@@ -4,76 +4,76 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
+import androidx.navigation.compose.ComposeNavigator
+import androidx.navigation.compose.DialogNavigator
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.createGraph
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
+import dev.whysoezzy.meet.navigation.routes.authNavigation
 
 class LegacyAuthTestActivity : ComponentActivity() {
     lateinit var navController: NavHostController
         private set
     var restoredLegacyDestinationId: Int? = null
         private set
+    var legacyRedirectRequestedAfterRestoration: Boolean = false
+        private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val useUpgradedGraph = useUpgradedGraphForNextCreate
         val legacyStacks = readLegacyStackSpecs()
-        setContent {
-            val controller = rememberNavController()
-            navController = controller
-            LegacyAuthTestContent(controller, useUpgradedGraph, legacyStacks)
+        val restoredLegacyRoute = savedLegacyRouteForNextCreate
+        savedLegacyRouteForNextCreate = null
+        navController = NavHostController(this).also { controller ->
+            controller.navigatorProvider.addNavigator(ComposeNavigator())
+            controller.navigatorProvider.addNavigator(DialogNavigator())
         }
+        navController.setLifecycleOwner(this)
+        navController.setViewModelStore(viewModelStore)
+        navController.setOnBackPressedDispatcher(onBackPressedDispatcher)
+        val graph = buildGraph(navController, useUpgradedGraph, legacyStacks, restoredLegacyRoute)
+        navController.graph = graph
+        setContent { NavHost(navController = navController, graph = graph) }
     }
 
-    @Composable
-    private fun LegacyAuthTestContent(
+    private fun buildGraph(
         controller: NavHostController,
         useUpgradedGraph: Boolean,
         legacyStacks: List<LegacyStackSpec>,
-    ) {
-        NavHost(
-            navController = controller,
-            startDestination = MeetRoute.Auth.route,
-        ) {
+        restoredLegacyRoute: String?,
+    ): NavGraph = controller.createGraph(startDestination = MeetRoute.Auth.route) {
+        if (useUpgradedGraph) {
+            authNavigation(
+                navController = controller,
+                startDestination = restoredLegacyRoute ?: MeetRoute.EmailInput.route,
+                onLegacyDestinationComposed = { restoredLegacyDestinationId = it },
+                onLegacyRedirectRequested = {
+                    check(restoredLegacyDestinationId != null) {
+                        "Legacy redirect started before restored destination was composed"
+                    }
+                    legacyRedirectRequestedAfterRestoration = true
+                    redirectLegacyAuth(controller)
+                },
+            )
+        } else {
             navigation(
-                startDestination =
-                    if (useUpgradedGraph) {
-                        MeetRoute.EmailInput.route
-                    } else {
-                        legacyStacks.first().route
-                    },
+                startDestination = legacyStacks.first().route,
                 route = MeetRoute.Auth.route,
             ) {
-                if (useUpgradedGraph) {
-                    composable(MeetRoute.EmailInput.route) {
-                        Text("email")
-                    }
+                legacyStacks.forEach { fixture ->
                     composable(
-                        route = MeetRoute.CodeVerification.route,
-                        arguments = listOf(
-                            navArgument("attemptId") { type = NavType.StringType },
-                        ),
+                        route = fixture.route,
+                        arguments = fixture.argumentNames.map { argumentName ->
+                            navArgument(argumentName) { type = NavType.StringType }
+                        },
                     ) {
-                        Text("code")
-                    }
-                    registerLegacyAuthCompatibilityDestinations(this, controller) {
-                        restoredLegacyDestinationId = it
-                    }
-                } else {
-                    legacyStacks.forEach { fixture ->
-                        composable(
-                            route = fixture.route,
-                            arguments = fixture.argumentNames.map { argumentName ->
-                                navArgument(argumentName) { type = NavType.StringType }
-                            },
-                        ) {
-                            Text("legacy")
-                        }
+                        Text("legacy")
                     }
                 }
             }
@@ -94,7 +94,14 @@ class LegacyAuthTestActivity : ComponentActivity() {
         val argumentNames: List<String>,
     )
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBundle(NAV_STATE, navController.saveState())
+        super.onSaveInstanceState(outState)
+    }
+
     companion object {
+        private const val NAV_STATE = "legacy-auth-nav-state"
+        var savedLegacyRouteForNextCreate: String? = null
         const val EXTRA_LEGACY_STACKS = "legacyStacks"
 
         @Volatile

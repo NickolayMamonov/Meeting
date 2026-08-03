@@ -3,6 +3,6 @@
     <application>
         <activity
             android:name="dev.whysoezzy.meet.navigation.LegacyAuthTestActivity"
-            android:exported="true" />
+            android:exported="false" />
     </application>
 </manifest>

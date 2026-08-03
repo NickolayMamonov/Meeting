@@ -23,15 +23,18 @@ fun MeetNavHost(
 ) {
     val authViewModel: AuthCheckViewModel = koinViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
+    val pendingAttempt by authViewModel.pendingAttempt.collectAsStateWithLifecycle()
 
     // Показываем SplashScreen пока проверяем авторизацию
-    if (isLoggedIn == null) {
+    if (isLoggedIn == null || pendingAttempt == null) {
 //        SplashScreen()
         return
     }
 
+    val loggedIn = requireNotNull(isLoggedIn)
+    val recoveredPendingAttempt = requireNotNull(pendingAttempt)
     val startDestination =
-        if (isLoggedIn == true) {
+        if (loggedIn == true) {
             MeetRoute.Main.route
         } else {
             MeetRoute.Auth.route
@@ -42,7 +45,16 @@ fun MeetNavHost(
         startDestination = startDestination,
         modifier = modifier,
     ) {
-        authNavigation(navController)
+        authNavigation(
+            navController = navController,
+            onLegacyRedirectRequested = {
+                redirectLegacyAuth(
+                    navController = navController,
+                    isLoggedIn = loggedIn,
+                    pendingAttempt = recoveredPendingAttempt,
+                )
+            },
+        )
         meetingsNavigation(navController)
         communitiesNavigation(navController)
         profileNavigation(navController)
