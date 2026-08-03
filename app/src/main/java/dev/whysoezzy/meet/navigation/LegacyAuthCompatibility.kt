@@ -20,10 +20,10 @@ internal object LegacyAuthCompatibility {
 
     fun assertIds(graph: NavGraph) {
         val authGraph =
-            graph.findNode(MeetRoute.Auth.route) as? NavGraph
+            graph.findNode(navigationDestinationId(MeetRoute.Auth.route)) as? NavGraph
                 ?: error("Missing auth graph")
         routes.forEach { route ->
-            val destination = authGraph.findNode(route)
+            val destination = authGraph.findNode(navigationDestinationId(route))
                 ?: error("Missing legacy compatibility destination: $route")
             check(destination.id == navigationDestinationId(route)) {
                 "Legacy destination ID changed for $route"
@@ -32,7 +32,7 @@ internal object LegacyAuthCompatibility {
                 "Legacy destination route changed for $route: ${destination.route}"
             }
         }
-        val activeCode = authGraph.findNode(MeetRoute.CodeVerification.route)
+        val activeCode = authGraph.findNode(MeetRoute.CodeVerification.destinationId)
             ?: error("Missing active code destination")
         check(activeCode.id == MeetRoute.CodeVerification.destinationId) {
             "Active code destination ID changed"
@@ -53,9 +53,11 @@ internal fun redirectLegacyAuth(navController: NavController) {
 internal fun registerLegacyAuthCompatibilityDestinations(
     builder: NavGraphBuilder,
     navController: NavController,
+    onLegacyDestinationComposed: ((Int) -> Unit)? = null,
 ) {
     LegacyAuthCompatibility.routes.forEach { route ->
         builder.composable(route) {
+            onLegacyDestinationComposed?.invoke(navigationDestinationId(route))
             LaunchedEffect(Unit) {
                 redirectLegacyAuth(navController)
             }
