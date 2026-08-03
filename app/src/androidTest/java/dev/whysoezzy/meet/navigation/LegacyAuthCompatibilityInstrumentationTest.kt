@@ -127,6 +127,18 @@ class LegacyAuthCompatibilityInstrumentationTest {
                 scenario.onActivity { activity ->
                     assertEquals(expectedRoute, activity.navController.currentDestination?.route)
                     assertNoLegacyData(activity.navController)
+                    if (redirectMode == LegacyAuthTestActivity.REDIRECT_PENDING_ATTEMPT) {
+                        assertEquals(
+                            setOf("attemptId"),
+                            currentArgumentNames(activity.navController) - DEEP_LINK_INTENT_KEY,
+                        )
+                        assertEquals(
+                            LegacyAuthTestActivity.RESTORED_ATTEMPT_ID,
+                            activity.navController.currentBackStackEntry
+                                ?.arguments
+                                ?.getString("attemptId"),
+                        )
+                    }
                 }
             } finally {
                 scenario.close()
