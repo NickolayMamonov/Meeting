@@ -14,7 +14,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.createGraph
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
-import dev.whysoezzy.meet.navigation.routes.authNavigation
+import com.whysoezzy.auth.domain.models.DispatchOutcome
+import com.whysoezzy.auth.domain.models.EmailOtpAttempt
+import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 
 class LegacyAuthTestActivity : ComponentActivity() {
     lateinit var navController: NavHostController
@@ -28,8 +30,6 @@ class LegacyAuthTestActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val useUpgradedGraph = useUpgradedGraphForNextCreate
         val legacyStacks = readLegacyStackSpecs()
-        val restoredLegacyRoute = savedLegacyRouteForNextCreate
-        savedLegacyRouteForNextCreate = null
         navController = NavHostController(this).also { controller ->
             controller.navigatorProvider.addNavigator(ComposeNavigator())
             controller.navigatorProvider.addNavigator(DialogNavigator())
@@ -37,7 +37,10 @@ class LegacyAuthTestActivity : ComponentActivity() {
         navController.setLifecycleOwner(this)
         navController.setViewModelStore(viewModelStore)
         navController.setOnBackPressedDispatcher(onBackPressedDispatcher)
-        val graph = buildGraph(navController, useUpgradedGraph, legacyStacks, restoredLegacyRoute)
+        val graph = buildGraph(navController, useUpgradedGraph, legacyStacks)
+        savedInstanceState
+            ?.getBundle(NAV_STATE)
+            ?.let(navController::restoreState)
         navController.graph = graph
         setContent { NavHost(navController = navController, graph = graph) }
     }
@@ -46,21 +49,48 @@ class LegacyAuthTestActivity : ComponentActivity() {
         controller: NavHostController,
         useUpgradedGraph: Boolean,
         legacyStacks: List<LegacyStackSpec>,
-        restoredLegacyRoute: String?,
     ): NavGraph = controller.createGraph(startDestination = MeetRoute.Auth.route) {
         if (useUpgradedGraph) {
-            authNavigation(
-                navController = controller,
-                startDestination = restoredLegacyRoute ?: MeetRoute.EmailInput.route,
-                onLegacyDestinationComposed = { restoredLegacyDestinationId = it },
-                onLegacyRedirectRequested = {
-                    check(restoredLegacyDestinationId != null) {
-                        "Legacy redirect started before restored destination was composed"
-                    }
-                    legacyRedirectRequestedAfterRestoration = true
-                    redirectLegacyAuth(controller)
-                },
-            )
+            navigation(
+                startDestination = MeetRoute.EmailInput.route,
+                route = MeetRoute.Auth.route,
+            ) {
+                composable(MeetRoute.EmailInput.route) {
+                    Text("email")
+                }
+                composable(
+                    route = MeetRoute.CodeVerification.route,
+                    arguments = listOf(
+                        navArgument("attemptId") { type = NavType.StringType },
+                    ),
+                ) {
+                    Text("code")
+                }
+                registerLegacyAuthCompatibilityDestinations(
+                    builder = this,
+                    navController = controller,
+                    onLegacyDestinationComposed = { restoredLegacyDestinationId = it },
+                    onLegacyRedirectRequested = {
+                        check(restoredLegacyDestinationId != null) {
+                            "Legacy redirect started before restored destination was composed"
+                        }
+                        legacyRedirectRequestedAfterRestoration = true
+                        redirectLegacyAuth(
+                            navController = controller,
+                            isLoggedIn = redirectModeForNextCreate == REDIRECT_AUTHENTICATED,
+                            pendingAttempt =
+                                if (redirectModeForNextCreate == REDIRECT_PENDING_ATTEMPT) {
+                                    pendingAttempt()
+                                } else {
+                                    EmailOtpAttemptResult.MissingOrExpired
+                                },
+                        )
+                    },
+                )
+            }
+            composable(MeetRoute.Main.route) {
+                Text("main")
+            }
         } else {
             navigation(
                 startDestination = legacyStacks.first().route,
@@ -79,6 +109,17 @@ class LegacyAuthTestActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun pendingAttempt(): EmailOtpAttemptResult =
+        EmailOtpAttemptResult.Found(
+            EmailOtpAttempt(
+                attemptId = RESTORED_ATTEMPT_ID,
+                maskedEmail = "p***@example.com",
+                resendAvailableAtEpochMillis = 60_000,
+                challengeMayBeActive = true,
+                dispatchOutcome = DispatchOutcome.Confirmed,
+            ),
+        )
 
     private fun readLegacyStackSpecs(): List<LegacyStackSpec> =
         intent
@@ -101,10 +142,16 @@ class LegacyAuthTestActivity : ComponentActivity() {
 
     companion object {
         private const val NAV_STATE = "legacy-auth-nav-state"
-        var savedLegacyRouteForNextCreate: String? = null
+        const val REDIRECT_EMAIL = "email"
+        const val REDIRECT_AUTHENTICATED = "authenticated"
+        const val REDIRECT_PENDING_ATTEMPT = "pending-attempt"
+        const val RESTORED_ATTEMPT_ID = "restored-attempt"
         const val EXTRA_LEGACY_STACKS = "legacyStacks"
 
         @Volatile
         var useUpgradedGraphForNextCreate: Boolean = false
+
+        @Volatile
+        var redirectModeForNextCreate: String = REDIRECT_EMAIL
     }
 }

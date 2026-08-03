@@ -56,34 +56,12 @@ class LegacyAuthCompatibilityInstrumentationTest {
     @Test
     fun eachLegacyStack_survivesActivityRecreationAndRedirectsWithoutLegacyArguments() {
         LegacyAuthTestFixture.stacks.forEach { fixture ->
+            LegacyAuthTestActivity.redirectModeForNextCreate = LegacyAuthTestActivity.REDIRECT_EMAIL
             LegacyAuthTestActivity.useUpgradedGraphForNextCreate = false
-            val scenario = ActivityScenario.launch<LegacyAuthTestActivity>(
-                Intent(
-                    InstrumentationRegistry.getInstrumentation().targetContext,
-                    LegacyAuthTestActivity::class.java,
-                ).apply {
-                    putStringArrayListExtra(
-                        LegacyAuthTestActivity.EXTRA_LEGACY_STACKS,
-                        ArrayList(
-                            LegacyAuthTestFixture.stacks.map { stack ->
-                                listOf(stack.route, *stack.argumentNames.toTypedArray())
-                                    .joinToString("|")
-                            },
-                        ),
-                    )
-                },
-            )
+            val scenario = launchLegacyScenario()
             try {
-                waitForIdle()
-                scenario.onActivity { activity ->
-                    fixture.navigationPath.forEach(activity.navController::navigate)
-                    assertEquals(fixture.route, activity.navController.currentDestination?.route)
-                    assertEquals(fixture.destinationId, activity.navController.currentDestination?.id)
-                    assertEquals(
-                        fixture.argumentNames,
-                        currentArgumentNames(activity.navController) - DEEP_LINK_INTENT_KEY,
-                    )
-                    LegacyAuthTestActivity.savedLegacyRouteForNextCreate = fixture.route
+                prepareLegacyStack(scenario, fixture)
+                scenario.onActivity {
                     LegacyAuthTestActivity.useUpgradedGraphForNextCreate = true
                 }
 
@@ -101,7 +79,60 @@ class LegacyAuthCompatibilityInstrumentationTest {
             } finally {
                 scenario.close()
                 LegacyAuthTestActivity.useUpgradedGraphForNextCreate = false
-                LegacyAuthTestActivity.savedLegacyRouteForNextCreate = null
+                LegacyAuthTestActivity.redirectModeForNextCreate =
+                    LegacyAuthTestActivity.REDIRECT_EMAIL
+            }
+        }
+    }
+
+    @Test
+    fun restoredLegacyStack_usesAuthenticatedAndPendingAttemptTargets() {
+        val fixture = LegacyAuthTestFixture.stacks.last()
+        listOf(
+            LegacyAuthTestActivity.REDIRECT_AUTHENTICATED to MeetRoute.Main.route,
+            LegacyAuthTestActivity.REDIRECT_PENDING_ATTEMPT to MeetRoute.CodeVerification.route,
+        ).forEach { (redirectMode, expectedRoute) ->
+            LegacyAuthTestActivity.redirectModeForNextCreate = redirectMode
+            LegacyAuthTestActivity.useUpgradedGraphForNextCreate = false
+            val scenario = launchLegacyScenario()
+            try {
+                prepareLegacyStack(scenario, fixture)
+                scenario.onActivity {
+                    LegacyAuthTestActivity.useUpgradedGraphForNextCreate = true
+                }
+
+                scenario.recreate()
+                waitForIdle()
+                scenario.onActivity { activity ->
+                    assertEquals(fixture.destinationId, activity.restoredLegacyDestinationId)
+                    assertTrue(activity.legacyRedirectRequestedAfterRestoration)
+                    assertEquals(expectedRoute, activity.navController.currentDestination?.route)
+                    assertNoLegacyData(activity.navController)
+                    if (redirectMode == LegacyAuthTestActivity.REDIRECT_PENDING_ATTEMPT) {
+                        assertEquals(
+                            setOf("attemptId"),
+                            currentArgumentNames(activity.navController) - DEEP_LINK_INTENT_KEY,
+                        )
+                        assertEquals(
+                            LegacyAuthTestActivity.RESTORED_ATTEMPT_ID,
+                            activity.navController.currentBackStackEntry
+                                ?.arguments
+                                ?.getString("attemptId"),
+                        )
+                    }
+                }
+
+                scenario.recreate()
+                waitForIdle()
+                scenario.onActivity { activity ->
+                    assertEquals(expectedRoute, activity.navController.currentDestination?.route)
+                    assertNoLegacyData(activity.navController)
+                }
+            } finally {
+                scenario.close()
+                LegacyAuthTestActivity.useUpgradedGraphForNextCreate = false
+                LegacyAuthTestActivity.redirectModeForNextCreate =
+                    LegacyAuthTestActivity.REDIRECT_EMAIL
             }
         }
     }
@@ -110,13 +141,60 @@ class LegacyAuthCompatibilityInstrumentationTest {
     private fun assertArgumentFreeEmailTarget(activity: LegacyAuthTestActivity) {
         val controller = activity.navController
         assertEquals(MeetRoute.EmailInput.route, controller.currentDestination?.route)
-        val rawArgumentNames = currentArgumentNames(controller)
-        assertTrue(rawArgumentNames.none { it == "phone" })
-        assertTrue(rawArgumentNames.none { it == "phoneNumber" })
-        assertTrue(rawArgumentNames.none { it == "code" })
+        assertNoLegacyData(controller)
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun assertNoLegacyData(controller: NavHostController) {
+        val rawArgumentNames =
+            controller.currentBackStack.value
+                .flatMap { it.arguments?.keySet().orEmpty() }
+                .toSet()
+        val legacyArgumentNames = setOf("phone", "phoneNumber", "code")
+        assertTrue(
+            "Legacy arguments leaked through restored back stack: $rawArgumentNames",
+            rawArgumentNames.none { it in legacyArgumentNames },
+        )
         val legacyIds =
             LegacyAuthTestFixture.stacks.map(LegacyStackFixture::destinationId).toSet()
-        assertTrue(controller.currentBackStack.value.none { it.destination.id in legacyIds })
+        assertTrue(
+            "Legacy destinations leaked through restored back stack",
+            controller.currentBackStack.value.none { it.destination.id in legacyIds },
+        )
+    }
+
+    private fun launchLegacyScenario(): ActivityScenario<LegacyAuthTestActivity> =
+        ActivityScenario.launch<LegacyAuthTestActivity>(
+            Intent(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+                LegacyAuthTestActivity::class.java,
+            ).apply {
+                putStringArrayListExtra(
+                    LegacyAuthTestActivity.EXTRA_LEGACY_STACKS,
+                    ArrayList(
+                        LegacyAuthTestFixture.stacks.map { stack ->
+                            listOf(stack.route, *stack.argumentNames.toTypedArray())
+                                .joinToString("|")
+                        },
+                    ),
+                )
+            },
+        )
+
+    private fun prepareLegacyStack(
+        scenario: ActivityScenario<LegacyAuthTestActivity>,
+        fixture: LegacyStackFixture,
+    ) {
+        waitForIdle()
+        scenario.onActivity { activity ->
+            fixture.navigationPath.forEach(activity.navController::navigate)
+            assertEquals(fixture.route, activity.navController.currentDestination?.route)
+            assertEquals(fixture.destinationId, activity.navController.currentDestination?.id)
+            assertEquals(
+                fixture.argumentNames,
+                currentArgumentNames(activity.navController) - DEEP_LINK_INTENT_KEY,
+            )
+        }
     }
 
     private fun onMain(block: () -> Unit) {
