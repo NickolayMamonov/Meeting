@@ -3,12 +3,16 @@ package dev.whysoezzy.meet.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import dev.whysoezzy.meet.navigation.routes.authNavigation
 import dev.whysoezzy.meet.navigation.routes.communitiesNavigation
 import dev.whysoezzy.meet.navigation.routes.meetingsNavigation
@@ -30,7 +34,43 @@ fun MeetNavHost(
         return
     }
 
-    val recoveredPendingAttempt = requireNotNull(pendingAttempt)
+    MeetNavHostContent(
+        navController = navController,
+        isLoggedIn = requireNotNull(isLoggedIn),
+        pendingAttempt = requireNotNull(pendingAttempt),
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun MeetNavHostContent(
+    navController: NavHostController,
+    isLoggedIn: Boolean,
+    pendingAttempt: EmailOtpAttemptResult,
+    modifier: Modifier = Modifier,
+) {
+    // NavHost remembers its graph by the builder lambda. Keep mutable recovery values behind
+    // stable state holders so clearing a recovered attempt cannot replace the graph and its
+    // onboarding back stack.
+    val latestIsLoggedIn = rememberUpdatedState(isLoggedIn)
+    val latestPendingAttempt = rememberUpdatedState(pendingAttempt)
+    val graphBuilder: NavGraphBuilder.() -> Unit = remember(navController) {
+        {
+            authNavigation(
+                navController = navController,
+                onLegacyRedirectRequested = {
+                    redirectLegacyAuth(
+                        navController = navController,
+                        isLoggedIn = latestIsLoggedIn.value,
+                        pendingAttempt = latestPendingAttempt.value,
+                    )
+                },
+            )
+            meetingsNavigation(navController)
+            communitiesNavigation(navController)
+            profileNavigation(navController)
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -38,21 +78,8 @@ fun MeetNavHost(
         // navigation events; rebuilding this graph would discard auth onboarding.
         startDestination = MeetRoute.Auth.route,
         modifier = modifier,
-    ) {
-        authNavigation(
-            navController = navController,
-            onLegacyRedirectRequested = {
-                redirectLegacyAuth(
-                    navController = navController,
-                    isLoggedIn = requireNotNull(isLoggedIn),
-                    pendingAttempt = recoveredPendingAttempt,
-                )
-            },
-        )
-        meetingsNavigation(navController)
-        communitiesNavigation(navController)
-        profileNavigation(navController)
-    }
+        builder = graphBuilder,
+    )
     LegacyAuthCompatibility.assertIds(navController.graph)
 
     AuthStateNavigationEffect(

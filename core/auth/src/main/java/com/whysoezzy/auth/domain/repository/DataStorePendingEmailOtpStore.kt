@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 
 private val Context.pendingEmailOtpDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "pending_email_otp_store",
@@ -75,11 +76,11 @@ class DataStorePendingEmailOtpStore(
         val record = runCatching {
             json.decodeFromString(PendingEmailOtpRecord.serializer(), cipher.decrypt(encrypted, AAD))
         }.getOrElse {
-            runCatching { clearStored() }
+            clearStored()
             return null
         }
         if (record.version != VERSION) {
-            runCatching { clearStored() }
+            clearStored()
             return null
         }
         return record
@@ -98,8 +99,13 @@ class DataStorePendingEmailOtpStore(
         }.getOrNull()
 
     private suspend fun clearStored() {
-        runCatching {
+        try {
             dataStore.edit { preferences -> preferences.remove(RECORD_KEY) }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Cleanup is best effort for corrupt or obsolete records, but cancellation must
+            // still abort the caller instead of being reported as a successful clear.
         }
     }
 

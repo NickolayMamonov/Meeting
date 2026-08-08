@@ -13,6 +13,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.whysoezzy.auth.domain.models.DispatchOutcome
+import com.whysoezzy.auth.domain.models.EmailOtpAttempt
+import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -187,6 +190,46 @@ class AuthStateNavigationEffectTest {
             assertFalse(
                 navController.previousBackStackEntry?.destination?.route in
                     setOf(MeetRoute.Main.route, MeetRoute.MeetingDetails.route),
+            )
+        }
+    }
+
+    @Test
+    fun meetNavHostRecomposition_afterPendingCleanup_preservesOnboardingBackStack() {
+        var pendingAttempt: EmailOtpAttemptResult by mutableStateOf(
+            EmailOtpAttemptResult.Found(
+                EmailOtpAttempt(
+                    attemptId = "restored-attempt",
+                    maskedEmail = "p***@example.com",
+                    resendAvailableAtEpochMillis = 60_000L,
+                    challengeMayBeActive = true,
+                    dispatchOutcome = DispatchOutcome.Confirmed,
+                ),
+            ),
+        )
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+            MeetNavHostContent(
+                navController = navController,
+                isLoggedIn = false,
+                pendingAttempt = pendingAttempt,
+            )
+        }
+
+        composeTestRule.runOnIdle {
+            navController.navigate(MeetRoute.NameInput.route)
+            assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
+            pendingAttempt = EmailOtpAttemptResult.MissingOrExpired
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.runOnIdle {
+            assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
+            assertEquals(
+                MeetRoute.Auth.route,
+                navController.previousBackStackEntry?.destination?.route,
             )
         }
     }
