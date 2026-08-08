@@ -12,6 +12,7 @@ import com.whysoezzy.auth.domain.models.EmailAddress
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.IOException
 
 private val Context.pendingEmailOtpDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "pending_email_otp_store",
@@ -64,15 +65,21 @@ class DataStorePendingEmailOtpStore(
     override suspend fun clearActive() = clearStored()
 
     private suspend fun readRecord(): PendingEmailOtpRecord? {
-        val encrypted = dataStore.data.first()[RECORD_KEY] ?: return null
+        val encrypted =
+            try {
+                dataStore.data.first()[RECORD_KEY]
+            } catch (_: IOException) {
+                return null
+            }
+                ?: return null
         val record = runCatching {
             json.decodeFromString(PendingEmailOtpRecord.serializer(), cipher.decrypt(encrypted, AAD))
         }.getOrElse {
-            clearStored()
+            runCatching { clearStored() }
             return null
         }
         if (record.version != VERSION) {
-            clearStored()
+            runCatching { clearStored() }
             return null
         }
         return record
@@ -91,7 +98,9 @@ class DataStorePendingEmailOtpStore(
         }.getOrNull()
 
     private suspend fun clearStored() {
-        dataStore.edit { preferences -> preferences.remove(RECORD_KEY) }
+        runCatching {
+            dataStore.edit { preferences -> preferences.remove(RECORD_KEY) }
+        }
     }
 
     @Serializable

@@ -13,6 +13,8 @@ import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.repository.PendingEmailOtpAttempt
 import com.whysoezzy.auth.domain.repository.PendingEmailOtpStore
 import com.whysoezzy.common.utils.ValidationUtils
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 fun interface AuthClock {
@@ -30,6 +32,8 @@ class EmailOtpCoordinator(
     private val clock: AuthClock,
     private val idGenerator: AttemptIdGenerator,
 ) {
+    private val operationMutex = Mutex()
+
     suspend fun request(rawEmail: String): EmailOtpRequestOutcome {
         val email =
             when (val parsed = parser.parse(rawEmail)) {
@@ -40,81 +44,94 @@ class EmailOtpCoordinator(
                         failure = parsed.reason,
                     )
             }
-        val now = clock.nowEpochMillis()
-        val pending =
-            PendingEmailOtpAttempt(
-                attemptId = idGenerator.generate(),
-                email = email,
-                resendAvailableAtEpochMillis = now + RESEND_DELAY_MILLIS,
-                expiresAtEpochMillis = now + ATTEMPT_LIFETIME_MILLIS,
-                challengeMayBeActive = true,
-                dispatchOutcome = DispatchOutcome.Unconfirmed,
-            )
-        store.replace(pending)
-        val completed = pending.complete(repository.requestEmailOtp(email.canonical))
-        store.replace(completed)
-        return completed.toRequestOutcome()
-    }
-
-    suspend fun load(attemptId: String): EmailOtpAttemptResult {
-        val pending = active(attemptId) ?: return EmailOtpAttemptResult.MissingOrExpired
-        return EmailOtpAttemptResult.Found(pending.public())
-    }
-
-    suspend fun loadActive(): EmailOtpAttemptResult {
-        val stored = store.getActive()
-            ?: return EmailOtpAttemptResult.MissingOrExpired
-        val pending = active(stored.attemptId)
-            ?: return EmailOtpAttemptResult.MissingOrExpired
-        return EmailOtpAttemptResult.Found(pending.public())
-    }
-
-    suspend fun clearActive() = store.clearActive()
-
-    suspend fun resend(attemptId: String): EmailOtpResendOutcome {
-        val previous = active(attemptId)
-            ?: return EmailOtpResendOutcome.Failed(null, AuthFailure.MissingOrExpiredAttempt)
-        val now = clock.nowEpochMillis()
-        if (now < previous.resendAvailableAtEpochMillis) {
-            return EmailOtpResendOutcome.Failed(
-                previous.public(),
-                AuthFailure.ResendNotAvailable(previous.resendAvailableAtEpochMillis),
-            )
+        return operationMutex.withLock {
+            val now = clock.nowEpochMillis()
+            val pending =
+                PendingEmailOtpAttempt(
+                    attemptId = idGenerator.generate(),
+                    email = email,
+                    resendAvailableAtEpochMillis = now + RESEND_DELAY_MILLIS,
+                    expiresAtEpochMillis = now + ATTEMPT_LIFETIME_MILLIS,
+                    challengeMayBeActive = true,
+                    dispatchOutcome = DispatchOutcome.Unconfirmed,
+                )
+            store.replace(pending)
+            val completed = pending.complete(repository.requestEmailOtp(email.canonical))
+            store.replace(completed)
+            completed.toRequestOutcome()
         }
-        val dispatching =
-            previous.copy(
-                resendAvailableAtEpochMillis = now + RESEND_DELAY_MILLIS,
-                dispatchOutcome = DispatchOutcome.Unconfirmed,
-            )
-        store.replace(dispatching)
-        val result = repository.requestEmailOtp(previous.email.canonical)
-        val completed = dispatching.completeResend(previous, result, now)
-        store.replace(completed)
-        return completed.toResendOutcome(result)
     }
+
+    suspend fun load(attemptId: String): EmailOtpAttemptResult =
+        operationMutex.withLock {
+            val pending = active(attemptId) ?: return@withLock EmailOtpAttemptResult.MissingOrExpired
+            EmailOtpAttemptResult.Found(pending.public())
+        }
+
+    suspend fun loadActive(): EmailOtpAttemptResult =
+        operationMutex.withLock {
+            val stored = store.getActive()
+                ?: return@withLock EmailOtpAttemptResult.MissingOrExpired
+            val pending = active(stored.attemptId)
+                ?: return@withLock EmailOtpAttemptResult.MissingOrExpired
+            EmailOtpAttemptResult.Found(pending.public())
+        }
+
+    suspend fun clearActive() = operationMutex.withLock { store.clearActive() }
+
+    suspend fun resend(attemptId: String): EmailOtpResendOutcome =
+        operationMutex.withLock {
+            val previous = active(attemptId)
+                ?: return@withLock EmailOtpResendOutcome.Failed(
+                    null,
+                    AuthFailure.MissingOrExpiredAttempt,
+                )
+            val now = clock.nowEpochMillis()
+            if (now < previous.resendAvailableAtEpochMillis) {
+                return@withLock EmailOtpResendOutcome.Failed(
+                    previous.public(),
+                    AuthFailure.ResendNotAvailable(previous.resendAvailableAtEpochMillis),
+                )
+            }
+            val dispatching =
+                previous.copy(
+                    resendAvailableAtEpochMillis = now + RESEND_DELAY_MILLIS,
+                    dispatchOutcome = DispatchOutcome.Unconfirmed,
+                )
+            store.replace(dispatching)
+            val result = repository.requestEmailOtp(previous.email.canonical)
+            val completed = dispatching.completeResend(previous, result, now)
+            store.replace(completed)
+            completed.toResendOutcome(result)
+        }
 
     suspend fun verify(
         attemptId: String,
         code: String,
         name: String? = null,
         surname: String? = null,
-    ): EmailOtpVerifyOutcome {
-        if (!ValidationUtils.isValidOtpCode(code)) {
-            return EmailOtpVerifyOutcome.Failed(AuthFailure.InvalidCode)
-        }
-        val pending = active(attemptId)
-            ?: return EmailOtpVerifyOutcome.Failed(AuthFailure.MissingOrExpiredAttempt)
-        return when (val result = repository.verifyEmailOtp(pending.email.canonical, code, name, surname)) {
-            is AuthOutcome.Success -> {
-                store.clear(attemptId)
-                if (result.value.isNewUser) EmailOtpVerifyOutcome.NewUser else EmailOtpVerifyOutcome.ExistingUser
+    ): EmailOtpVerifyOutcome =
+        operationMutex.withLock {
+            if (!ValidationUtils.isValidOtpCode(code)) {
+                return@withLock EmailOtpVerifyOutcome.Failed(AuthFailure.InvalidCode)
             }
+            val pending = active(attemptId)
+                ?: return@withLock EmailOtpVerifyOutcome.Failed(AuthFailure.MissingOrExpiredAttempt)
+            when (val result = repository.verifyEmailOtp(pending.email.canonical, code, name, surname)) {
+                is AuthOutcome.Success -> {
+                    store.clear(attemptId)
+                    if (result.value.isNewUser) {
+                        EmailOtpVerifyOutcome.NewUser
+                    } else {
+                        EmailOtpVerifyOutcome.ExistingUser
+                    }
+                }
 
-            is AuthOutcome.Failure -> EmailOtpVerifyOutcome.Failed(result.reason)
+                is AuthOutcome.Failure -> EmailOtpVerifyOutcome.Failed(result.reason)
+            }
         }
-    }
 
-    suspend fun clear(attemptId: String) = store.clear(attemptId)
+    suspend fun clear(attemptId: String) = operationMutex.withLock { store.clear(attemptId) }
 
     private suspend fun active(attemptId: String): PendingEmailOtpAttempt? {
         val pending = store.get(attemptId) ?: return null

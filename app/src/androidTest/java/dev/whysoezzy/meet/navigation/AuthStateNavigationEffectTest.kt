@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -84,6 +85,109 @@ class AuthStateNavigationEffectTest {
             navController.popBackStack()
 
             assertFalse(navController.currentDestination?.route in protectedRoutes)
+        }
+    }
+
+    @Test
+    fun newUserOnboarding_isPreservedWhenAuthStateBecomesLoggedIn() {
+        var isLoggedIn by mutableStateOf(false)
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = MeetRoute.Auth.route,
+            ) {
+                navigation(
+                    startDestination = MeetRoute.EmailInput.route,
+                    route = MeetRoute.Auth.route,
+                ) {
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
+                    }
+                    composable(MeetRoute.NameInput.route) {
+                        Text("New user onboarding")
+                    }
+                }
+                composable(MeetRoute.Main.route) {
+                    Text("Protected main content")
+                }
+            }
+
+            AuthStateNavigationEffect(
+                navController = navController,
+                isLoggedIn = isLoggedIn,
+            )
+        }
+
+        composeTestRule.runOnIdle {
+            navController.navigate(MeetRoute.NameInput.route)
+        }
+        composeTestRule.onNodeWithText("New user onboarding").assertIsDisplayed()
+
+        composeTestRule.runOnIdle {
+            isLoggedIn = true
+        }
+
+        composeTestRule.onNodeWithText("New user onboarding").assertIsDisplayed()
+        composeTestRule.runOnIdle {
+            assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
+            assertFalse(navController.previousBackStackEntry?.destination?.route == MeetRoute.Main.route)
+        }
+    }
+
+    @Test
+    fun firstResolvedLoggedOutState_clearsRestoredProtectedStack() {
+        var isLoggedIn by mutableStateOf<Boolean?>(null)
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = MeetRoute.Auth.route,
+            ) {
+                navigation(
+                    startDestination = MeetRoute.EmailInput.route,
+                    route = MeetRoute.Auth.route,
+                ) {
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
+                    }
+                }
+                composable(MeetRoute.Main.route) {
+                    Text("Protected main content")
+                }
+                composable(MeetRoute.MeetingDetails.route) {
+                    Text("Protected meeting content")
+                }
+            }
+
+            AuthStateNavigationEffect(
+                navController = navController,
+                isLoggedIn = isLoggedIn,
+            )
+        }
+
+        composeTestRule.runOnIdle {
+            navController.navigate(MeetRoute.Main.route)
+            navController.navigate(MeetRoute.MeetingDetails.createRoute(1L))
+            isLoggedIn = false
+        }
+
+        composeTestRule.onNodeWithText("Email authentication").assertIsDisplayed()
+        composeTestRule.runOnIdle {
+            assertFalse(
+                navController.currentDestination?.route in
+                    setOf(MeetRoute.Main.route, MeetRoute.MeetingDetails.route),
+            )
+            assertFalse(
+                navController.previousBackStackEntry?.destination?.route in
+                    setOf(MeetRoute.Main.route, MeetRoute.MeetingDetails.route),
+            )
         }
     }
 }

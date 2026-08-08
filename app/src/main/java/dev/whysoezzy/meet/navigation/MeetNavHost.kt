@@ -3,11 +3,10 @@ package dev.whysoezzy.meet.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import dev.whysoezzy.meet.navigation.routes.authNavigation
@@ -31,18 +30,13 @@ fun MeetNavHost(
         return
     }
 
-    val loggedIn = requireNotNull(isLoggedIn)
     val recoveredPendingAttempt = requireNotNull(pendingAttempt)
-    val startDestination =
-        if (loggedIn == true) {
-            MeetRoute.Main.route
-        } else {
-            MeetRoute.Auth.route
-        }
 
     NavHost(
         navController = navController,
-        startDestination = startDestination,
+        // Keep the root graph identity stable. Authentication changes are explicit
+        // navigation events; rebuilding this graph would discard auth onboarding.
+        startDestination = MeetRoute.Auth.route,
         modifier = modifier,
     ) {
         authNavigation(
@@ -50,7 +44,7 @@ fun MeetNavHost(
             onLegacyRedirectRequested = {
                 redirectLegacyAuth(
                     navController = navController,
-                    isLoggedIn = loggedIn,
+                    isLoggedIn = requireNotNull(isLoggedIn),
                     pendingAttempt = recoveredPendingAttempt,
                 )
             },
@@ -72,18 +66,29 @@ internal fun AuthStateNavigationEffect(
     navController: NavHostController,
     isLoggedIn: Boolean?,
 ) {
-    var hasInitializedAuthState by remember { mutableStateOf(false) }
-
     LaunchedEffect(isLoggedIn) {
-        if (!hasInitializedAuthState) {
-            hasInitializedAuthState = true
-        } else if (isLoggedIn == false) {
-            navController.navigate(MeetRoute.Auth.route) {
-                popUpTo(MeetRoute.Main.route) {
-                    inclusive = true
+        when {
+            isLoggedIn == false -> {
+                if (!navController.currentDestination.isInAuthGraph()) {
+                    navController.navigate(MeetRoute.Auth.route) {
+                        // A recreated controller can restore Main/meeting/profile entries
+                        // even though the graph's start destination is Auth.
+                        popUpTo(navController.graph.id)
+                        launchSingleTop = true
+                    }
                 }
-                launchSingleTop = true
+            }
+
+            isLoggedIn == true &&
+                navController.currentDestination?.route == MeetRoute.EmailInput.route -> {
+                navController.navigate(MeetRoute.Main.route) {
+                    popUpTo(MeetRoute.Auth.route) { inclusive = true }
+                    launchSingleTop = true
+                }
             }
         }
     }
 }
+
+private fun NavDestination?.isInAuthGraph(): Boolean =
+    this?.hierarchy?.any { it.route == MeetRoute.Auth.route } == true

@@ -20,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthCheckViewModelTest {
@@ -142,6 +143,20 @@ class AuthCheckViewModelTest {
             assertNull(awaitItem())
             advanceUntilIdle()
             assertEquals(EmailOtpAttemptResult.Found(pending), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `pending storage read failure resolves to missing instead of blocking startup`() = runTest {
+        every { authRepository.isLoggedInFlow } returns isLoggedInFlow
+        coEvery { loadPending() } throws IOException("pending store unavailable")
+        val vm = AuthCheckViewModel(authRepository, loadPending, clearPending)
+
+        vm.pendingAttempt.test {
+            assertNull(awaitItem())
+            advanceUntilIdle()
+            assertEquals(EmailOtpAttemptResult.MissingOrExpired, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }

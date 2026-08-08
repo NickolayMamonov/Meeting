@@ -11,6 +11,8 @@ import com.whysoezzy.auth.domain.repository.InMemoryPendingEmailOtpStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -20,12 +22,13 @@ class EmailOtpCoordinatorTest {
     private val repository: AuthRepository = mockk()
     private val store = InMemoryPendingEmailOtpStore()
     private var now = 1_000L
+    private var nextAttemptId = 0
     private val coordinator = EmailOtpCoordinator(
         repository = repository,
         store = store,
         parser = EmailAddressParser(),
         clock = AuthClock { now },
-        idGenerator = AttemptIdGenerator { "attempt-1" },
+        idGenerator = AttemptIdGenerator { "attempt-${++nextAttemptId}" },
     )
 
     @Test
@@ -116,5 +119,52 @@ class EmailOtpCoordinatorTest {
             second,
         )
         coVerify(exactly = 2) { repository.requestEmailOtp("person@example.com") }
+    }
+
+    @Test
+    fun `concurrent requests are serialized and newest generation remains active`() = runTest {
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        coEvery { repository.requestEmailOtp("first@example.com") } coAnswers {
+            firstStarted.complete(Unit)
+            releaseFirst.await()
+            AuthOutcome.Success(Unit)
+        }
+        coEvery { repository.requestEmailOtp("second@example.com") } returns AuthOutcome.Success(Unit)
+
+        val first = async { coordinator.request("first@example.com") }
+        firstStarted.await()
+        val second = async { coordinator.request("second@example.com") }
+
+        assertTrue(!second.isCompleted)
+        releaseFirst.complete(Unit)
+        first.await()
+        second.await()
+
+        val active = coordinator.loadActive() as EmailOtpAttemptResult.Found
+        assertEquals("attempt-2", active.attempt.attemptId)
+        assertEquals("s***@example.com", active.attempt.maskedEmail)
+    }
+
+    @Test
+    fun `clear waits for an in-flight request and cannot be overwritten by its completion`() = runTest {
+        val requestStarted = CompletableDeferred<Unit>()
+        val releaseRequest = CompletableDeferred<Unit>()
+        coEvery { repository.requestEmailOtp(any()) } coAnswers {
+            requestStarted.complete(Unit)
+            releaseRequest.await()
+            AuthOutcome.Success(Unit)
+        }
+
+        val request = async { coordinator.request("person@example.com") }
+        requestStarted.await()
+        val clear = async { coordinator.clearActive() }
+
+        assertTrue(!clear.isCompleted)
+        releaseRequest.complete(Unit)
+        request.await()
+        clear.await()
+
+        assertEquals(EmailOtpAttemptResult.MissingOrExpired, coordinator.loadActive())
     }
 }

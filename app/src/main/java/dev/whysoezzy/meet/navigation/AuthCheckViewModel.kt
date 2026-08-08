@@ -6,6 +6,7 @@ import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.usecase.ClearPendingEmailOtpUseCase
 import com.whysoezzy.auth.domain.usecase.LoadActiveEmailOtpAttemptUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,12 +33,27 @@ class AuthCheckViewModel(
 
     init {
         viewModelScope.launch {
-            _pendingAttempt.value = loadActiveAttempt()
+            _pendingAttempt.value =
+                try {
+                    loadActiveAttempt()
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    // Pending OTP is optional recovery state. A corrupted or unavailable
+                    // store must not prevent the normal auth graph from starting.
+                    EmailOtpAttemptResult.MissingOrExpired
+                }
         }
         viewModelScope.launch {
             authRepository.isLoggedInFlow.collect { loggedIn ->
                 if (loggedIn) {
-                    clearPendingAttempt()
+                    try {
+                        clearPendingAttempt()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        // The terminal auth state is still resolved even if cleanup fails.
+                    }
                     _pendingAttempt.value = EmailOtpAttemptResult.MissingOrExpired
                 }
             }
