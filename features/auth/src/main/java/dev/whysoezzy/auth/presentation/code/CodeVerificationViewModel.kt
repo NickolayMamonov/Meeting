@@ -28,13 +28,14 @@ sealed interface CodeVerificationNavEvent {
 }
 
 class CodeVerificationViewModel(
-    private val attemptId: String,
+    attemptId: String,
     private val loadAttempt: LoadEmailOtpAttemptUseCase,
     private val resendOtp: ResendEmailOtpUseCase,
     private val verifyOtpUseCase: VerifyEmailOtpUseCase,
     private val clearAttempt: ClearEmailOtpAttemptUseCase,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
+    private var activeAttemptId = attemptId
     private val _uiState = MutableStateFlow(CodeVerificationUiState())
     val uiState: StateFlow<CodeVerificationUiState> = _uiState.asStateFlow()
     private val _navEvent = Channel<CodeVerificationNavEvent>(Channel.BUFFERED)
@@ -45,7 +46,7 @@ class CodeVerificationViewModel(
 
     init {
         viewModelScope.launch {
-            when (val result = loadAttempt(attemptId)) {
+            when (val result = loadAttempt(activeAttemptId)) {
                 is EmailOtpAttemptResult.Found -> {
                     deadline = result.attempt.resendAvailableAtEpochMillis
                     _uiState.value = _uiState.value.copy(
@@ -74,7 +75,7 @@ class CodeVerificationViewModel(
     fun clearAndLeave() {
         operation?.cancel()
         viewModelScope.launch {
-            clearAttempt(attemptId)
+            clearAttempt(activeAttemptId)
             _navEvent.send(CodeVerificationNavEvent.NavigateToEmail)
         }
     }
@@ -92,7 +93,7 @@ class CodeVerificationViewModel(
         submittedCode = code
         operation = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            when (val result = verifyOtpUseCase(attemptId, code)) {
+            when (val result = verifyOtpUseCase(activeAttemptId, code)) {
                 EmailOtpVerifyOutcome.ExistingUser -> {
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     _navEvent.send(CodeVerificationNavEvent.NavigateToMain)
@@ -115,7 +116,7 @@ class CodeVerificationViewModel(
     private fun resendCode() {
         if (!_uiState.value.canResend || operation?.isActive == true) return
         operation = viewModelScope.launch {
-            when (val result = resendOtp(attemptId)) {
+            when (val result = resendOtp(activeAttemptId)) {
                 is EmailOtpResendOutcome.Confirmed,
                 is EmailOtpResendOutcome.Unconfirmed,
                 -> {
@@ -124,6 +125,7 @@ class CodeVerificationViewModel(
                             is EmailOtpResendOutcome.Confirmed -> result.attempt
                             is EmailOtpResendOutcome.Unconfirmed -> result.attempt
                         }
+                    activeAttemptId = attempt.attemptId
                     _uiState.value = _uiState.value.copy(
                         code = if (result is EmailOtpResendOutcome.Confirmed) "" else _uiState.value.code,
                         error = null,
@@ -133,6 +135,7 @@ class CodeVerificationViewModel(
                     startTimer()
                 }
                 is EmailOtpResendOutcome.Failed -> {
+                    result.attempt?.let { activeAttemptId = it.attemptId }
                     if (result.failure == AuthFailure.MissingOrExpiredAttempt) {
                         _navEvent.send(CodeVerificationNavEvent.NavigateToEmail)
                     } else {

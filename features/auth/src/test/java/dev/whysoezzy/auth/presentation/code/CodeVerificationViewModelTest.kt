@@ -13,6 +13,7 @@ import com.whysoezzy.auth.domain.usecase.ResendEmailOtpUseCase
 import com.whysoezzy.auth.domain.usecase.VerifyEmailOtpUseCase
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -97,6 +98,28 @@ class CodeVerificationViewModelTest {
         assertEquals(60, viewModel.uiState.value.remainingTime)
         assertEquals(false, viewModel.uiState.value.canResend)
         assertEquals(AuthFailure.ResendNotAvailable(60_000), viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `resend rebinds verification to the durable replacement attempt`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { resend("attempt-1") } returns EmailOtpResendOutcome.Confirmed(
+            EmailOtpAttempt("attempt-2", "p***@example.com", 60_000, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { verify("attempt-2", "123456", any(), any()) } returns
+            EmailOtpVerifyOutcome.ExistingUser
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.ResendCode)
+        advanceUntilIdle()
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { verify("attempt-2", "123456", any(), any()) }
+        coVerify(exactly = 0) { verify("attempt-1", "123456", any(), any()) }
     }
 
     @Test
