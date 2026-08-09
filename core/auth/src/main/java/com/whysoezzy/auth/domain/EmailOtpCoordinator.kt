@@ -59,8 +59,13 @@ class EmailOtpCoordinator(
 
         val result = repository.requestEmailOtp(email.canonical)
         val completed = pending.complete(result)
-        store.replaceIfCurrent(pending.attemptId, pending.dispatchGeneration, completed)
-        return completed.toRequestOutcome()
+        return if (
+            store.replaceIfCurrent(pending.attemptId, pending.dispatchGeneration, completed)
+        ) {
+            completed.toRequestOutcome()
+        } else {
+            resolveCurrentRequestOutcome()
+        }
     }
 
     suspend fun load(attemptId: String): EmailOtpAttemptResult =
@@ -106,8 +111,17 @@ class EmailOtpCoordinator(
 
         val result = repository.requestEmailOtp(previous.email.canonical)
         val completed = dispatching.completeResend(previous, result, now)
-        store.replaceIfCurrent(dispatching.attemptId, dispatching.dispatchGeneration, completed)
-        return completed.toResendOutcome(result)
+        return if (
+            store.replaceIfCurrent(
+                dispatching.attemptId,
+                dispatching.dispatchGeneration,
+                completed,
+            )
+        ) {
+            completed.toResendOutcome(result)
+        } else {
+            resolveCurrentResendOutcome(dispatching.attemptId)
+        }
     }
 
     suspend fun verify(
@@ -121,6 +135,9 @@ class EmailOtpCoordinator(
         }
         val pending = active(attemptId)
             ?: return EmailOtpVerifyOutcome.Failed(AuthFailure.MissingOrExpiredAttempt)
+        if (!pending.challengeMayBeActive) {
+            return EmailOtpVerifyOutcome.Failed(AuthFailure.MissingOrExpiredAttempt)
+        }
         return when (
             val result = repository.verifyEmailOtp(
                 pending.email.canonical,
@@ -163,6 +180,22 @@ class EmailOtpCoordinator(
                 failure = pending.dispatchOutcome.failure(),
             )
         }
+
+    private suspend fun resolveCurrentRequestOutcome(): EmailOtpRequestOutcome =
+        store.getActive()?.let { it.toRequestOutcome() }
+            ?: EmailOtpRequestOutcome.StayOnEmail(
+                attempt = emptyAttempt(),
+                failure = AuthFailure.MissingOrExpiredAttempt,
+            )
+
+    private suspend fun resolveCurrentResendOutcome(
+        attemptId: String,
+    ): EmailOtpResendOutcome =
+        active(attemptId)?.let { it.toCurrentResendOutcome() }
+            ?: EmailOtpResendOutcome.Failed(
+                attempt = null,
+                failure = AuthFailure.MissingOrExpiredAttempt,
+            )
 
     private fun PendingEmailOtpAttempt.complete(result: AuthOutcome<Unit>): PendingEmailOtpAttempt =
         when (result) {
@@ -216,6 +249,13 @@ class EmailOtpCoordinator(
                 } else {
                     EmailOtpResendOutcome.Failed(public(), result.reason)
                 }
+        }
+
+    private fun PendingEmailOtpAttempt.toCurrentResendOutcome(): EmailOtpResendOutcome =
+        when (dispatchOutcome) {
+            DispatchOutcome.Confirmed -> EmailOtpResendOutcome.Confirmed(public())
+            DispatchOutcome.Unconfirmed -> EmailOtpResendOutcome.Unconfirmed(public())
+            else -> EmailOtpResendOutcome.Failed(public(), dispatchOutcome.failure())
         }
 
     private fun PendingEmailOtpAttempt.public() =

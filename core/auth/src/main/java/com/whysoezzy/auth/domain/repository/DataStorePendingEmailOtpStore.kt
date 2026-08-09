@@ -78,8 +78,8 @@ class DataStorePendingEmailOtpStore(
     override suspend fun clearActive(dispatchGeneration: Long?) {
         dataStore.edit { preferences ->
             val current = decodeRecord(preferences)
-            if (current != null &&
-                (dispatchGeneration == null || current.dispatchGeneration == dispatchGeneration)
+            if (dispatchGeneration == null ||
+                (current != null && current.dispatchGeneration == dispatchGeneration)
             ) {
                 preferences.remove(RECORD_KEY)
             }

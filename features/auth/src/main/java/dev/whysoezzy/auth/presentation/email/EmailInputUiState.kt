@@ -8,6 +8,7 @@ data class EmailInputUiState(
     val email: String = "",
     val isLoading: Boolean = false,
     val error: AuthFailure? = null,
+    val resendAvailableAtEpochMillis: Long = 0L,
 )
 
 sealed interface EmailInputEvent {

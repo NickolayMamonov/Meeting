@@ -10,6 +10,7 @@ import com.whysoezzy.auth.domain.usecase.RecoverEmailOtpAttemptUseCase
 import com.whysoezzy.auth.domain.usecase.RequestEmailOtpUseCase
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -118,5 +119,34 @@ class EmailInputViewModelTest {
             assertEquals(AuthFailure.RateLimited, viewModel.uiState.value.error)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `restored no challenge rejects submit before persisted resend deadline`() = runTest {
+        val now = 1_000L
+        val deadline = 60_000L
+        coEvery { recovery() } returns EmailOtpAttemptResult.RecoverOnEmail(
+            email = "person@example.com",
+            attempt = EmailOtpAttempt(
+                attemptId = "attempt-1",
+                maskedEmail = "p***@example.com",
+                resendAvailableAtEpochMillis = deadline,
+                challengeMayBeActive = false,
+                dispatchOutcome = DispatchOutcome.RateLimited,
+            ),
+            failure = AuthFailure.RateLimited,
+        )
+        val viewModel = EmailInputViewModel(request, recovery) { now }
+
+        advanceUntilIdle()
+        viewModel.onEvent(EmailInputEvent.Submit)
+        advanceUntilIdle()
+
+        assertEquals(
+            AuthFailure.ResendNotAvailable(deadline),
+            viewModel.uiState.value.error,
+        )
+        assertEquals(deadline, viewModel.uiState.value.resendAvailableAtEpochMillis)
+        coVerify(exactly = 0) { request(any()) }
     }
 }

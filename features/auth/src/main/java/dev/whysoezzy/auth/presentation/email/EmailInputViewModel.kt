@@ -2,6 +2,7 @@ package dev.whysoezzy.auth.presentation.email
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import com.whysoezzy.auth.domain.models.EmailOtpRequestOutcome
 import com.whysoezzy.auth.domain.usecase.RecoverEmailOtpAttemptUseCase
@@ -22,6 +23,7 @@ sealed interface EmailInputNavEvent {
 class EmailInputViewModel(
     private val requestEmailOtp: RequestEmailOtpUseCase,
     private val recoverEmailOtp: RecoverEmailOtpAttemptUseCase,
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(EmailInputUiState())
     val uiState: StateFlow<EmailInputUiState> = _uiState.asStateFlow()
@@ -38,6 +40,8 @@ class EmailInputViewModel(
                     _uiState.value = _uiState.value.copy(
                         email = result.email,
                         error = result.failure,
+                        resendAvailableAtEpochMillis =
+                            result.attempt.resendAvailableAtEpochMillis,
                     )
                 }
                 EmailOtpAttemptResult.MissingOrExpired -> Unit
@@ -55,7 +59,14 @@ class EmailInputViewModel(
     }
 
     private fun submit() {
-        if (_uiState.value.isLoading) return
+        val state = _uiState.value
+        if (state.isLoading) return
+        if (currentTimeMillis() < state.resendAvailableAtEpochMillis) {
+            _uiState.value = state.copy(
+                error = AuthFailure.ResendNotAvailable(state.resendAvailableAtEpochMillis),
+            )
+            return
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             when (val result = requestEmailOtp(_uiState.value.email)) {
@@ -67,6 +78,8 @@ class EmailInputViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = result.failure,
+                        resendAvailableAtEpochMillis =
+                            result.attempt.resendAvailableAtEpochMillis,
                     )
                 }
             }

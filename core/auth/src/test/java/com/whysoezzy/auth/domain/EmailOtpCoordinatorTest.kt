@@ -2,10 +2,12 @@ package com.whysoezzy.auth.domain
 
 import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.AuthOutcome
+import com.whysoezzy.auth.domain.models.DispatchOutcome
 import com.whysoezzy.auth.domain.models.EmailAddressParser
 import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import com.whysoezzy.auth.domain.models.EmailOtpRequestOutcome
 import com.whysoezzy.auth.domain.models.EmailOtpResendOutcome
+import com.whysoezzy.auth.domain.models.EmailOtpVerifyOutcome
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.repository.InMemoryPendingEmailOtpStore
 import io.mockk.coEvery
@@ -101,6 +103,23 @@ class EmailOtpCoordinatorTest {
     }
 
     @Test
+    fun `verification does not call transport for a known no challenge attempt`() = runTest {
+        coEvery { repository.requestEmailOtp(any()) } returns
+            AuthOutcome.Failure(AuthFailure.RateLimited)
+        coordinator.request("person@example.com")
+
+        val result = coordinator.verify("attempt-1", "123456")
+
+        assertEquals(
+            EmailOtpVerifyOutcome.Failed(AuthFailure.MissingOrExpiredAttempt),
+            result,
+        )
+        coVerify(exactly = 0) {
+            repository.verifyEmailOtp(any(), any(), any(), any())
+        }
+    }
+
+    @Test
     fun `failed resend persists cooldown and rejects another resend before deadline`() = runTest {
         coEvery { repository.requestEmailOtp(any()) } returnsMany listOf(
             AuthOutcome.Success(Unit),
@@ -150,6 +169,89 @@ class EmailOtpCoordinatorTest {
         val active = coordinator.loadActive() as EmailOtpAttemptResult.Found
         assertEquals("attempt-2", active.attempt.attemptId)
         assertEquals("s***@example.com", active.attempt.maskedEmail)
+    }
+
+    @Test
+    fun `stale request completion resolves to the newer active generation`() = runTest {
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val secondStarted = CompletableDeferred<Unit>()
+        val releaseSecond = CompletableDeferred<Unit>()
+        coEvery { repository.requestEmailOtp("first@example.com") } coAnswers {
+            firstStarted.complete(Unit)
+            releaseFirst.await()
+            AuthOutcome.Success(Unit)
+        }
+        coEvery { repository.requestEmailOtp("second@example.com") } coAnswers {
+            secondStarted.complete(Unit)
+            releaseSecond.await()
+            AuthOutcome.Success(Unit)
+        }
+
+        val first = async { coordinator.request("first@example.com") }
+        firstStarted.await()
+        val second = async { coordinator.request("second@example.com") }
+        secondStarted.await()
+        releaseFirst.complete(Unit)
+
+        val firstResult = first.await()
+        releaseSecond.complete(Unit)
+        second.await()
+
+        assertTrue(firstResult is EmailOtpRequestOutcome.ProceedToVerification)
+        assertEquals(
+            "attempt-2",
+            (firstResult as EmailOtpRequestOutcome.ProceedToVerification).attempt.attemptId,
+        )
+        assertEquals(
+            DispatchOutcome.Unconfirmed,
+            firstResult.attempt.dispatchOutcome,
+        )
+    }
+
+    @Test
+    fun `stale resend completion resolves to the newer generation`() = runTest {
+        coEvery { repository.requestEmailOtp(any()) } returns AuthOutcome.Success(Unit)
+        coordinator.request("person@example.com")
+        now += 60_000L
+
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val secondStarted = CompletableDeferred<Unit>()
+        val releaseSecond = CompletableDeferred<Unit>()
+        var dispatchCount = 0
+        coEvery { repository.requestEmailOtp("person@example.com") } coAnswers {
+            dispatchCount += 1
+            if (dispatchCount == 1) {
+                firstStarted.complete(Unit)
+                releaseFirst.await()
+            } else {
+                secondStarted.complete(Unit)
+                releaseSecond.await()
+            }
+            AuthOutcome.Success(Unit)
+        }
+
+        val first = async { coordinator.resend("attempt-1") }
+        firstStarted.await()
+        now += 60_000L
+        val second = async { coordinator.resend("attempt-1") }
+        secondStarted.await()
+        releaseFirst.complete(Unit)
+
+        val firstResult = first.await()
+        releaseSecond.complete(Unit)
+        second.await()
+
+        assertTrue(firstResult is EmailOtpResendOutcome.Unconfirmed)
+        assertEquals(
+            "attempt-1",
+            (firstResult as EmailOtpResendOutcome.Unconfirmed).attempt.attemptId,
+        )
+        assertEquals(
+            DispatchOutcome.Unconfirmed,
+            firstResult.attempt.dispatchOutcome,
+        )
     }
 
     @Test

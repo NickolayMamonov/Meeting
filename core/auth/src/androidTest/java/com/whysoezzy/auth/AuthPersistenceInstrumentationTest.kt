@@ -61,7 +61,8 @@ class AuthPersistenceInstrumentationTest {
 
     @Test
     fun realStores_verifyPersistenceContractWithoutTouchingInstalledAppData() = runBlocking {
-        corruptEncryptedState_failsClosed_andPendingRecordIsRemoved()
+        corruptEncryptedState_failsClosed()
+        clearActive_unconditionallyRemovesCorruptPendingRecord()
         stageLessTokenOnlyState_failsClosed_andIsRemoved()
         allStores_encryptSensitiveValues_recreateAndCleanUp()
         legacyTokenOnlyState_canBeMigratedToReadyAndSurvivesRecreation()
@@ -189,7 +190,7 @@ class AuthPersistenceInstrumentationTest {
         assertEquals("replacement-access", tokenManager.getAccessToken())
     }
 
-    private suspend fun corruptEncryptedState_failsClosed_andPendingRecordIsRemoved() {
+    private suspend fun corruptEncryptedState_failsClosed() {
         val marker = "not-valid-tink-ciphertext"
         writeRawPreferences(TOKEN_STORE) {
             it[stringPreferencesKey("access_token")] = marker
@@ -197,10 +198,6 @@ class AuthPersistenceInstrumentationTest {
             it[stringPreferencesKey("user_id")] = marker
             it[stringPreferencesKey("stage")] = marker
         }
-        writeRawPreferences(PENDING_STORE) {
-            it[stringPreferencesKey("pending_email_otp_record")] = marker
-        }
-
         val tokens = tokenManager
         assertFalse(tokens.isLoggedInFlow.first())
         assertEquals(AuthSession.LoggedOut, DataStoreAuthSessionRepository(tokens).read())
@@ -214,15 +211,6 @@ class AuthPersistenceInstrumentationTest {
             "Corrupt token/session record was not cleaned up",
             tokenStoreBytes.containsSequence(marker.encodeToByteArray()),
         )
-
-        val pending = pendingStore
-        assertNull(pending.getActive())
-        val pendingStoreBytes =
-            context.dataStoreFile(PENDING_STORE).takeIf(File::exists)?.readBytes() ?: ByteArray(0)
-        assertFalse(
-            "Corrupt pending record was not cleaned up",
-            pendingStoreBytes.containsSequence(marker.encodeToByteArray()),
-        )
     }
 
     private suspend fun stageLessTokenOnlyState_failsClosed_andIsRemoved() {
@@ -234,6 +222,23 @@ class AuthPersistenceInstrumentationTest {
         val tokenStoreBytes =
             context.dataStoreFile(TOKEN_STORE).takeIf(File::exists)?.readBytes() ?: ByteArray(0)
         assertFalse(tokenStoreBytes.containsSequence("orphan-access".encodeToByteArray()))
+    }
+
+    private suspend fun clearActive_unconditionallyRemovesCorruptPendingRecord() {
+        val marker = "corrupt-pending-record-for-clear-active"
+        writeRawPreferences(PENDING_STORE) {
+            it[stringPreferencesKey("pending_email_otp_record")] = marker
+        }
+
+        pendingStore.clearActive()
+
+        val pendingStoreBytes =
+            context.dataStoreFile(PENDING_STORE).takeIf(File::exists)?.readBytes() ?: ByteArray(0)
+        assertFalse(
+            "Unqualified clearActive left a corrupt pending record behind",
+            pendingStoreBytes.containsSequence(marker.encodeToByteArray()),
+        )
+        assertNull(pendingStore.getActive())
     }
 
     private suspend fun pendingStore_replacesIdentityAndGenerationCheckedCleanupDoesNotDeleteNewAttempt() {
