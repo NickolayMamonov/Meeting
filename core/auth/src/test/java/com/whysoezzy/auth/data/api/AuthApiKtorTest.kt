@@ -2,17 +2,17 @@ package com.whysoezzy.auth.data.api
 
 import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.AuthUserDto
+import com.whysoezzy.auth.data.dto.SendOtpRequest
+import com.whysoezzy.auth.data.dto.VerifyOtpRequest
+import com.whysoezzy.network.KtorNetworkModule
 import com.whysoezzy.testing.MainDispatcherRule
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -38,10 +38,7 @@ class AuthApiKtorTest {
     }
 
     private fun buildClient(mockEngine: MockEngine): HttpClient =
-        HttpClient(mockEngine) {
-            defaultRequest { url("http://test.local/") }
-            install(ContentNegotiation) { json(json) }
-        }
+        KtorNetworkModule.provideHttpClient(mockEngine)
 
     // ==================== email OTP request ====================
 
@@ -55,7 +52,10 @@ class AuthApiKtorTest {
 
         AuthApiKtor(buildClient(engine)).requestEmailOtp("person@example.com")
 
-        assertTrue(capturedBody.contains("\"email\":\"person@example.com\""))
+        assertEquals(
+            SendOtpRequest("person@example.com"),
+            json.decodeFromString<SendOtpRequest>(capturedBody),
+        )
     }
 
     @Test
@@ -124,8 +124,15 @@ class AuthApiKtorTest {
 
         AuthApiKtor(buildClient(engine)).verifyEmailOtp("person@example.com", "123456")
 
-        assertTrue(capturedBody.contains("\"email\":\"person@example.com\""))
-        assertTrue(capturedBody.contains("\"code\":\"123456\""))
+        assertEquals(
+            VerifyOtpRequest(
+                email = "person@example.com",
+                code = "123456",
+                name = null,
+                surname = null,
+            ),
+            json.decodeFromString<VerifyOtpRequest>(capturedBody),
+        )
     }
 
     // ==================== refreshToken ====================

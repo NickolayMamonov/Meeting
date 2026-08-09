@@ -45,6 +45,15 @@ class AuthCheckViewModel(
 
     init {
         viewModelScope.launch {
+            try {
+                sessionRepository?.read()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // A corrupt session is resolved as logged out by the store.
+            }
+        }
+        viewModelScope.launch {
             _pendingAttempt.value =
                 try {
                     loadActiveAttempt()

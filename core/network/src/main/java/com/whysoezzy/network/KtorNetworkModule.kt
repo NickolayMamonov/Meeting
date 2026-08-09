@@ -44,7 +44,7 @@ object KtorNetworkModule {
             configure(tokenProvider, onRefreshToken)
         }
 
-    internal fun provideHttpClient(
+    fun provideHttpClient(
         engine: HttpClientEngine,
         tokenProvider: TokenProvider? = null,
         onRefreshToken: (suspend () -> Pair<String, String>?)? = null,

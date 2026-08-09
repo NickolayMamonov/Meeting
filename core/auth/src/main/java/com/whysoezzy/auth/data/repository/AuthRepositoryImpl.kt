@@ -10,14 +10,10 @@ import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.network.safeApiCall
-import io.ktor.client.plugins.ResponseException
-import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -89,42 +85,43 @@ internal class AuthRepositoryImpl(
         name: String?,
         surname: String?,
     ): AuthOutcome<AuthResult> =
-        emailApiCall(AuthEndpoint.Verify) {
-            val response = authApi.verifyEmailOtp(email, code, name, surname)
-
-            try {
-                tokenManager.saveTokens(
-                    accessToken = response.accessToken,
-                    refreshToken = response.refreshToken,
-                    userId = response.user.id,
-                )
-                sessionRepository?.saveAuthenticated(
-                    userId = response.user.id,
-                    stage = if (response.isNewUser) {
-                        AuthSession.Stage.NeedsName
-                    } else {
-                        AuthSession.Stage.Ready
-                    },
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                withContext(NonCancellable) {
-                    try {
-                        sessionRepository?.clear()
-                    } finally {
-                        tokenManager.clearTokens()
-                    }
-                }
-                throw SessionPersistenceException()
+        when (
+            val responseOutcome = emailApiCall(AuthEndpoint.Verify) {
+                authApi.verifyEmailOtp(email, code, name, surname)
             }
-
-            AuthResult(
-                accessToken = response.accessToken,
-                refreshToken = response.refreshToken,
-                userId = response.user.id,
-                isNewUser = response.isNewUser,
-            )
+        ) {
+            is AuthOutcome.Failure -> responseOutcome
+            is AuthOutcome.Success -> {
+                val response = responseOutcome.value
+                try {
+                    tokenManager.saveAuthenticated(
+                        accessToken = response.accessToken,
+                        refreshToken = response.refreshToken,
+                        userId = response.user.id,
+                        stage = if (response.isNewUser) {
+                            AuthSession.Stage.NeedsName
+                        } else {
+                            AuthSession.Stage.Ready
+                        },
+                    )
+                    AuthOutcome.Success(
+                        AuthResult(
+                            accessToken = response.accessToken,
+                            refreshToken = response.refreshToken,
+                            userId = response.user.id,
+                            isNewUser = response.isNewUser,
+                        ),
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    withContext(NonCancellable) {
+                        runCatching { sessionRepository?.clear() }
+                        runCatching { tokenManager.clearTokens() }
+                    }
+                    AuthOutcome.Failure(AuthFailure.SessionPersistenceFailure)
+                }
+            }
         }
 
     override suspend fun refreshToken(): Result<String> {
@@ -166,40 +163,36 @@ internal class AuthRepositoryImpl(
         block: suspend () -> T,
     ): AuthOutcome<T> =
         try {
-            AuthOutcome.Success(block())
-        } catch (e: ResponseException) {
-            val metadata = parseMetadata(e)
-            AuthOutcome.Failure(mapAuthFailure(endpoint, metadata))
+            safeApiCall { block() }.fold(
+                onSuccess = { AuthOutcome.Success(it) },
+                onFailure = { error ->
+                    val failure: AuthFailure = when (error) {
+                        is ApiException.ServerError ->
+                            mapAuthFailure(
+                                endpoint,
+                                ApiErrorMetadata(
+                                    status = error.metadata.status,
+                                    code = error.metadata.code,
+                                ),
+                            )
+                        is ApiException.UnauthorizedError ->
+                            error.metadata?.let {
+                                mapAuthFailure(
+                                    endpoint,
+                                    ApiErrorMetadata(it.status, it.code),
+                                )
+                            } ?: AuthFailure.Unauthorized
+                        is ApiException.NetworkError -> AuthFailure.NoConnection
+                        else -> AuthFailure.Unknown
+                    }
+                    AuthOutcome.Failure(failure)
+                },
+            )
         } catch (_: IOException) {
             AuthOutcome.Failure(AuthFailure.NoConnection)
-        } catch (_: SessionPersistenceException) {
-            AuthOutcome.Failure(AuthFailure.SessionPersistenceFailure)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             AuthOutcome.Failure(AuthFailure.Unknown)
         }
-
-    private suspend fun parseMetadata(exception: ResponseException): ApiErrorMetadata {
-        val status = exception.response.status.value
-        val code = try {
-            errorJson.decodeFromString<AuthErrorEnvelope>(exception.response.bodyAsText()).code
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            null
-        }
-        return ApiErrorMetadata(status, code)
-    }
-
-    private class SessionPersistenceException : Exception()
-
-    @Serializable
-    private data class AuthErrorEnvelope(
-        val code: String? = null,
-    )
-
-    private companion object {
-        val errorJson = Json { ignoreUnknownKeys = true }
-    }
 }

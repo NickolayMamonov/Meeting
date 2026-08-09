@@ -99,29 +99,21 @@ internal fun AuthStateNavigationEffect(
     isLoggedIn: Boolean?,
     durableSession: AuthSession? = null,
 ) {
-    LaunchedEffect(isLoggedIn, durableSession) {
-        if (durableSession != null) {
-            navController.resolveFromDurableSession(durableSession)
-            return@LaunchedEffect
-        }
+    LaunchedEffect(isLoggedIn) {
         when {
             isLoggedIn == false -> {
                 if (!navController.currentDestination.isInAuthGraph()) {
                     navController.navigate(MeetRoute.Auth.route) {
-                        // A recreated controller can restore Main/meeting/profile entries
-                        // even though the graph's start destination is Auth.
                         popUpTo(navController.graph.id)
                         launchSingleTop = true
                     }
                 }
             }
 
-            isLoggedIn == true &&
-                navController.currentDestination?.route == MeetRoute.EmailInput.route -> {
-                navController.navigate(MeetRoute.Main.route) {
-                    popUpTo(MeetRoute.Auth.route) { inclusive = true }
-                    launchSingleTop = true
-                }
+            isLoggedIn == true && durableSession != null -> {
+                // Durable stage owns cold-start routing. Once a live flow has started,
+                // feature events own ordinary onboarding transitions.
+                navController.resolveFromDurableSession(durableSession)
             }
         }
     }

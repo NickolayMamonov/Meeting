@@ -47,7 +47,7 @@ val authModule =
                 sessionRepository = get(),
             )
         }
-        single<AuthSessionRepository> { DataStoreAuthSessionRepository(androidContext()) }
+        single<AuthSessionRepository> { DataStoreAuthSessionRepository(get()) }
         single<PendingEmailOtpStore> { DataStorePendingEmailOtpStore(androidContext()) }
         single { EmailAddressParser() }
         single<AuthClock> { AuthClock { System.currentTimeMillis() } }

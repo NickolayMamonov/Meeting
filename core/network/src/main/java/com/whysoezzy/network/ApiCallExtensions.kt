@@ -38,7 +38,11 @@ suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> =
         }
         when (statusCode) {
             401, 403 -> {
-                Result.failure(ApiException.UnauthorizedError())
+                Result.failure(
+                    ApiException.UnauthorizedError(
+                        metadata = ApiErrorMetadata(status = statusCode, code = parsed?.code),
+                    ),
+                )
             }
 
             else -> {

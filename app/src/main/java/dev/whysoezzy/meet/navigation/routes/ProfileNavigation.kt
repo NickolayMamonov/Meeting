@@ -38,7 +38,7 @@ fun NavGraphBuilder.profileNavigation(navController: NavController) {
                 ProfileDetailsScreen(
                     mode = ProfileMode.Self,
                     onBackPressed = { navController.popBackStack() },
-                    onNavigateToAuth = {
+                    onLogout = {
                         navController.navigate(MeetRoute.Auth.route) {
                             popUpTo(MeetRoute.Profile.route) { inclusive = true }
                         }

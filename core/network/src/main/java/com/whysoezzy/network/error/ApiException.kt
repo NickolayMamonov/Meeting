@@ -21,7 +21,9 @@ sealed class ApiException private constructor(
         override fun toString(): String = "NetworkError"
     }
 
-    class UnauthorizedError : ApiException("Unauthorized") {
+    class UnauthorizedError(
+        val metadata: ApiErrorMetadata? = null,
+    ) : ApiException("Unauthorized") {
         override val errorType: ErrorType = ErrorType.Unauthorized
 
         override fun toString(): String = "UnauthorizedError"

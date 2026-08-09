@@ -8,6 +8,7 @@ import com.whysoezzy.auth.data.dto.RefreshTokenResponse
 import com.whysoezzy.auth.data.dto.SendOtpResponse
 import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.network.TokenSnapshot
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
@@ -68,7 +69,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `email verification success saves tokens and returns AuthResult`() = runTest {
         coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns successAuthResponse()
-        coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
+        coEvery { tokenManager.saveAuthenticated(any(), any(), any(), any()) } just runs
 
         val result = repository().verifyEmailOtp("person@example.com", "123456")
 
@@ -79,13 +80,20 @@ class AuthRepositoryImplTest {
         assertEquals(1L, authResult.userId)
 
         // Проверяем что saveTokens вызван с правильными токенами
-        coVerify { tokenManager.saveTokens("access123", "refresh456", 1L) }
+        coVerify {
+            tokenManager.saveAuthenticated(
+                "access123",
+                "refresh456",
+                1L,
+                AuthSession.Stage.Ready,
+            )
+        }
     }
 
     @Test
     fun `token persistence cancellation is propagated`() = runTest {
         coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns successAuthResponse()
-        coEvery { tokenManager.saveTokens(any(), any(), any()) } throws CancellationException("cancelled")
+        coEvery { tokenManager.saveAuthenticated(any(), any(), any(), any()) } throws CancellationException("cancelled")
 
         try {
             repository().verifyEmailOtp("person@example.com", "123456")
@@ -99,7 +107,7 @@ class AuthRepositoryImplTest {
     fun `email verification isNewUser=true propagates to AuthResult`() = runTest {
         coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns
             successAuthResponse(isNewUser = true)
-        coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
+        coEvery { tokenManager.saveAuthenticated(any(), any(), any(), any()) } just runs
 
         val result = repository().verifyEmailOtp("person@example.com", "123456")
 
@@ -114,7 +122,7 @@ class AuthRepositoryImplTest {
         val result = repository().verifyEmailOtp("person@example.com", "000000")
 
         assertTrue(result is AuthOutcome.Failure)
-        coVerify(exactly = 0) { tokenManager.saveTokens(any(), any(), any()) }
+        coVerify(exactly = 0) { tokenManager.saveAuthenticated(any(), any(), any(), any()) }
     }
 
     // ==================== refreshToken ====================

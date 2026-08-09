@@ -6,6 +6,10 @@ plugins {
 android {
     namespace = "com.whysoezzy.auth"
 
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
+
     testOptions {
         unitTests.all {
             it.jvmArgs("-XX:+EnableDynamicAgentLoading")
@@ -17,6 +21,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:common"))
 
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.google.tink.android)
     implementation(libs.timber)
