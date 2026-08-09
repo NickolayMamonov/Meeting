@@ -2,6 +2,7 @@ package dev.whysoezzy.auth.presentation.name
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.auth.domain.repository.UserProfileUpdater
@@ -106,7 +107,7 @@ class NameInputViewModel(
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                showFailure()
+                showFailure(com.whysoezzy.auth.domain.models.AuthFailure.Unknown)
             }
         }
     }
@@ -122,8 +123,8 @@ class NameInputViewModel(
         }
 
         val result = userProfileUpdater.updateName(name, surname)
-        if (result.isFailure) {
-            showFailure()
+        if (result is AuthOutcome.Failure) {
+            showFailure(result.reason)
             return
         }
 
@@ -150,8 +151,8 @@ class NameInputViewModel(
         }
 
         val result = userProfileUpdater.updateName(name, surname)
-        if (result.isFailure) {
-            showFailure()
+        if (result is AuthOutcome.Failure) {
+            showFailure(result.reason)
             return
         }
 
@@ -168,13 +169,21 @@ class NameInputViewModel(
         _navEvent.emit(NameInputNavEvent.ResolveFromDurableSession(sessionRepository.read()))
     }
 
-    private fun showFailure() {
+    private fun showFailure(failure: com.whysoezzy.auth.domain.models.AuthFailure) {
         _uiState.value =
             _uiState.value.copy(
                 isLoading = false,
-                nameError = NameFieldError.Remote(ErrorType.Unknown),
+                nameError = NameFieldError.Remote(failure.toErrorType()),
             )
     }
+
+    private fun com.whysoezzy.auth.domain.models.AuthFailure.toErrorType(): ErrorType =
+        when (this) {
+            com.whysoezzy.auth.domain.models.AuthFailure.NoConnection -> ErrorType.NoConnection
+            com.whysoezzy.auth.domain.models.AuthFailure.Unauthorized -> ErrorType.Unauthorized
+            com.whysoezzy.auth.domain.models.AuthFailure.Server -> ErrorType.Server
+            else -> ErrorType.Unknown
+        }
 
     private suspend fun markSubmitted() {
         _uiState.value =

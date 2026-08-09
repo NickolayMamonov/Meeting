@@ -12,18 +12,25 @@ data class PendingEmailOtpAttempt(
     val expiresAtEpochMillis: Long,
     val challengeMayBeActive: Boolean,
     val dispatchOutcome: DispatchOutcome,
+    val dispatchGeneration: Long = 0L,
 )
 
 interface PendingEmailOtpStore {
     suspend fun replace(attempt: PendingEmailOtpAttempt)
 
+    suspend fun replaceIfCurrent(
+        attemptId: String,
+        dispatchGeneration: Long,
+        replacement: PendingEmailOtpAttempt,
+    ): Boolean
+
     suspend fun get(attemptId: String): PendingEmailOtpAttempt?
 
     suspend fun getActive(): PendingEmailOtpAttempt?
 
-    suspend fun clear(attemptId: String)
+    suspend fun clear(attemptId: String, dispatchGeneration: Long? = null)
 
-    suspend fun clearActive()
+    suspend fun clearActive(dispatchGeneration: Long? = null)
 }
 
 class InMemoryPendingEmailOtpStore : PendingEmailOtpStore {
@@ -34,18 +41,39 @@ class InMemoryPendingEmailOtpStore : PendingEmailOtpStore {
         mutex.withLock { active = attempt }
     }
 
+    override suspend fun replaceIfCurrent(
+        attemptId: String,
+        dispatchGeneration: Long,
+        replacement: PendingEmailOtpAttempt,
+    ): Boolean = mutex.withLock {
+        if (active?.attemptId != attemptId || active?.dispatchGeneration != dispatchGeneration) {
+            false
+        } else {
+            active = replacement
+            true
+        }
+    }
+
     override suspend fun get(attemptId: String): PendingEmailOtpAttempt? =
         mutex.withLock { active?.takeIf { it.attemptId == attemptId } }
 
     override suspend fun getActive(): PendingEmailOtpAttempt? = mutex.withLock { active }
 
-    override suspend fun clear(attemptId: String) {
+    override suspend fun clear(attemptId: String, dispatchGeneration: Long?) {
         mutex.withLock {
-            if (active?.attemptId == attemptId) active = null
+            if (active?.attemptId == attemptId &&
+                (dispatchGeneration == null || active?.dispatchGeneration == dispatchGeneration)
+            ) {
+                active = null
+            }
         }
     }
 
-    override suspend fun clearActive() {
-        mutex.withLock { active = null }
+    override suspend fun clearActive(dispatchGeneration: Long?) {
+        mutex.withLock {
+            if (dispatchGeneration == null || active?.dispatchGeneration == dispatchGeneration) {
+                active = null
+            }
+        }
     }
 }

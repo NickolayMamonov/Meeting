@@ -39,25 +39,30 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class AuthPersistenceInstrumentationTest {
     private lateinit var context: IsolatedStorageContext
+    private lateinit var tokenManager: DataStoreTokenManager
+    private lateinit var pendingStore: DataStorePendingEmailOtpStore
 
     @Before
     fun setUp() {
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
         context = IsolatedStorageContext(targetContext, "real_store_contract")
         context.reset()
+        tokenManager = DataStoreTokenManager(context)
+        pendingStore = DataStorePendingEmailOtpStore(context)
     }
 
     @After
     fun tearDown() = runBlocking {
         // Clear through the real APIs so no authentication material survives this test run.
-        runCatching { DataStoreTokenManager(context).clearTokens() }
-        runCatching { DataStorePendingEmailOtpStore(context).clearActive() }
+        runCatching { tokenManager.clearTokens() }
+        runCatching { pendingStore.clearActive() }
         context.clearIsolatedSharedPreferences()
     }
 
     @Test
     fun realStores_verifyPersistenceContractWithoutTouchingInstalledAppData() = runBlocking {
         corruptEncryptedState_failsClosed_andPendingRecordIsRemoved()
+        stageLessTokenOnlyState_failsClosed_andIsRemoved()
         allStores_encryptSensitiveValues_recreateAndCleanUp()
         legacyTokenOnlyState_canBeMigratedToReadyAndSurvivesRecreation()
         authSession_allowsForwardCasAndIdentityReplacement_butRejectsStaleTransitions()
@@ -73,13 +78,13 @@ class AuthPersistenceInstrumentationTest {
             email = email("sensitive.persistence@example.com"),
         )
 
-        DataStoreTokenManager(context).saveAuthenticated(
+        tokenManager.saveAuthenticated(
             accessToken = accessToken,
             refreshToken = refreshToken,
             userId = userId,
             stage = AuthSession.Stage.NeedsName,
         )
-        DataStorePendingEmailOtpStore(context).replace(attempt)
+        pendingStore.replace(attempt)
 
         val persistedBytes = context.persistedBytes()
         listOf(
@@ -96,9 +101,9 @@ class AuthPersistenceInstrumentationTest {
             )
         }
 
-        val recreatedTokens = DataStoreTokenManager(context)
+        val recreatedTokens = tokenManager
         val recreatedSession = DataStoreAuthSessionRepository(recreatedTokens)
-        val recreatedPending = DataStorePendingEmailOtpStore(context)
+        val recreatedPending = pendingStore
         assertEquals(accessToken, recreatedTokens.getAccessToken())
         assertEquals(refreshToken, recreatedTokens.getRefreshToken())
         assertEquals(userId, recreatedTokens.getUserId())
@@ -112,14 +117,14 @@ class AuthPersistenceInstrumentationTest {
         recreatedSession.clear()
         recreatedPending.clearActive()
 
-        assertNull(DataStoreTokenManager(context).loadTokens())
-        val clearedTokens = DataStoreTokenManager(context)
+        assertNull(tokenManager.loadTokens())
+        val clearedTokens = tokenManager
         assertEquals(AuthSession.LoggedOut, DataStoreAuthSessionRepository(clearedTokens).read())
-        assertNull(DataStorePendingEmailOtpStore(context).getActive())
+        assertNull(pendingStore.getActive())
     }
 
     private suspend fun legacyTokenOnlyState_canBeMigratedToReadyAndSurvivesRecreation() {
-        val legacyTokens = DataStoreTokenManager(context)
+        val legacyTokens = tokenManager
         legacyTokens.saveTokens("legacy-access", "legacy-refresh", 42L)
 
         // Reading a valid install that predates the stage key promotes it to Ready and
@@ -129,7 +134,7 @@ class AuthPersistenceInstrumentationTest {
             DataStoreAuthSessionRepository(legacyTokens).read(),
         )
 
-        val recreatedTokens = DataStoreTokenManager(context)
+        val recreatedTokens = tokenManager
         assertEquals(
             AuthSession(42L, AuthSession.Stage.Ready),
             DataStoreAuthSessionRepository(recreatedTokens).read(),
@@ -144,7 +149,6 @@ class AuthPersistenceInstrumentationTest {
     }
 
     private suspend fun authSession_allowsForwardCasAndIdentityReplacement_butRejectsStaleTransitions() {
-        val tokenManager = DataStoreTokenManager(context)
         val repository = DataStoreAuthSessionRepository(tokenManager)
         tokenManager.saveAuthenticated(
             accessToken = "first-access",
@@ -180,9 +184,9 @@ class AuthPersistenceInstrumentationTest {
         )
         assertEquals(
             AuthSession(200L, AuthSession.Stage.Ready),
-            DataStoreAuthSessionRepository(DataStoreTokenManager(context)).read(),
+            DataStoreAuthSessionRepository(tokenManager).read(),
         )
-        assertEquals("replacement-access", DataStoreTokenManager(context).getAccessToken())
+        assertEquals("replacement-access", tokenManager.getAccessToken())
     }
 
     private suspend fun corruptEncryptedState_failsClosed_andPendingRecordIsRemoved() {
@@ -197,46 +201,62 @@ class AuthPersistenceInstrumentationTest {
             it[stringPreferencesKey("pending_email_otp_record")] = marker
         }
 
-        val tokens = DataStoreTokenManager(context)
+        val tokens = tokenManager
         assertFalse(tokens.isLoggedInFlow.first())
         assertEquals(AuthSession.LoggedOut, DataStoreAuthSessionRepository(tokens).read())
         assertNull(tokens.loadTokens())
         assertNull(tokens.getAccessToken())
         assertNull(tokens.getRefreshToken())
         assertNull(tokens.getUserId())
+        val tokenStoreBytes =
+            context.dataStoreFile(TOKEN_STORE).takeIf(File::exists)?.readBytes() ?: ByteArray(0)
         assertFalse(
             "Corrupt token/session record was not cleaned up",
-            context
-                .dataStoreFile(TOKEN_STORE)
-                .readBytes()
-                .containsSequence(marker.encodeToByteArray()),
+            tokenStoreBytes.containsSequence(marker.encodeToByteArray()),
         )
 
-        val pending = DataStorePendingEmailOtpStore(context)
+        val pending = pendingStore
         assertNull(pending.getActive())
+        val pendingStoreBytes =
+            context.dataStoreFile(PENDING_STORE).takeIf(File::exists)?.readBytes() ?: ByteArray(0)
         assertFalse(
             "Corrupt pending record was not cleaned up",
-            context
-                .dataStoreFile(PENDING_STORE)
-                .readBytes()
-                .containsSequence(marker.encodeToByteArray()),
+            pendingStoreBytes.containsSequence(marker.encodeToByteArray()),
         )
     }
 
+    private suspend fun stageLessTokenOnlyState_failsClosed_andIsRemoved() {
+        val tokens = tokenManager
+        tokens.saveTokens("orphan-access", "orphan-refresh", userId = null)
+        assertFalse(tokens.isLoggedInFlow.first())
+        assertEquals(AuthSession.LoggedOut, tokens.readSession())
+        assertNull(tokens.loadTokens())
+        val tokenStoreBytes =
+            context.dataStoreFile(TOKEN_STORE).takeIf(File::exists)?.readBytes() ?: ByteArray(0)
+        assertFalse(tokenStoreBytes.containsSequence("orphan-access".encodeToByteArray()))
+    }
+
     private suspend fun pendingStore_replacesIdentityAndGenerationCheckedCleanupDoesNotDeleteNewAttempt() {
-        val store = DataStorePendingEmailOtpStore(context)
-        val oldAttempt = pendingAttempt("old-attempt", email("old@example.com"))
-        val newAttempt = pendingAttempt("new-attempt", email("new@example.com"))
+        val store = pendingStore
+        val oldAttempt = pendingAttempt(
+            attemptId = "same-attempt",
+            email = email("old@example.com"),
+            dispatchGeneration = 1L,
+        )
+        val newAttempt = pendingAttempt(
+            attemptId = "same-attempt",
+            email = email("new@example.com"),
+            dispatchGeneration = 2L,
+        )
 
         store.replace(oldAttempt)
         store.replace(newAttempt)
-        store.clear(oldAttempt.attemptId)
+        store.clear(oldAttempt.attemptId, oldAttempt.dispatchGeneration)
 
-        assertNull(store.get(oldAttempt.attemptId))
-        assertEquals(newAttempt, DataStorePendingEmailOtpStore(context).getActive())
+        assertEquals(newAttempt, pendingStore.getActive())
 
-        store.clear(newAttempt.attemptId)
-        assertNull(DataStorePendingEmailOtpStore(context).getActive())
+        store.clear(newAttempt.attemptId, newAttempt.dispatchGeneration)
+        assertNull(pendingStore.getActive())
     }
 
     private suspend fun writeRawPreferences(
@@ -259,6 +279,7 @@ class AuthPersistenceInstrumentationTest {
     private fun pendingAttempt(
         attemptId: String,
         email: EmailAddress,
+        dispatchGeneration: Long = 0L,
     ) = PendingEmailOtpAttempt(
         attemptId = attemptId,
         email = email,
@@ -266,6 +287,7 @@ class AuthPersistenceInstrumentationTest {
         expiresAtEpochMillis = 60_000L,
         challengeMayBeActive = true,
         dispatchOutcome = DispatchOutcome.Confirmed,
+        dispatchGeneration = dispatchGeneration,
     )
 
     private fun email(value: String): EmailAddress =

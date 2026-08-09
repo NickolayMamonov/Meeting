@@ -53,6 +53,9 @@ class CodeVerificationViewModel(
                     )
                     startTimer()
                 }
+                is EmailOtpAttemptResult.RecoverOnEmail -> _navEvent.send(
+                    CodeVerificationNavEvent.NavigateToEmail,
+                )
                 EmailOtpAttemptResult.MissingOrExpired -> _navEvent.send(
                     CodeVerificationNavEvent.NavigateToEmail,
                 )

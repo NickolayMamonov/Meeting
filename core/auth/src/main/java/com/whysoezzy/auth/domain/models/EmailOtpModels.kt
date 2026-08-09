@@ -59,5 +59,11 @@ sealed interface EmailOtpAttemptResult {
         val attempt: EmailOtpAttempt,
     ) : EmailOtpAttemptResult
 
+    data class RecoverOnEmail(
+        val email: String,
+        val attempt: EmailOtpAttempt,
+        val failure: AuthFailure,
+    ) : EmailOtpAttemptResult
+
     data object MissingOrExpired : EmailOtpAttemptResult
 }

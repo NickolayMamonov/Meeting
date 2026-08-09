@@ -60,8 +60,6 @@ sealed interface ProfileDetailsEvent {
 }
 
 sealed interface ProfileDetailsNavEvent {
-    data object NavigateToAuth : ProfileDetailsNavEvent
-
     /** Профиль загружен, но имя пустое — отправляем заполнить */
     data object NavigateToNameInput : ProfileDetailsNavEvent
 

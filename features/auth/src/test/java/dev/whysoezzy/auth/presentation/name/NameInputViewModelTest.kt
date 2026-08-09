@@ -1,6 +1,8 @@
 package dev.whysoezzy.auth.presentation.name
 
 import app.cash.turbine.test
+import com.whysoezzy.auth.domain.models.AuthFailure
+import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.auth.domain.repository.UserProfileUpdater
@@ -121,7 +123,7 @@ class NameInputViewModelTest {
     @Test
     fun `Continue with valid name and surname calls updater and emits NavigateToSuccess`() =
         runTest {
-            coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+            coEvery { userProfileUpdater.updateName(any(), any()) } returns AuthOutcome.Success(Unit)
             val vm = viewModel()
             vm.onEvent(NameInputEvent.UpdateName("Иван"))
             vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -139,7 +141,7 @@ class NameInputViewModelTest {
 
     @Test
     fun `Continue success sets isSubmitted = true and isLoading = false`() = runTest {
-        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns AuthOutcome.Success(Unit)
         val vm = viewModel()
         vm.onEvent(NameInputEvent.UpdateName("Иван"))
         vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -157,7 +159,7 @@ class NameInputViewModelTest {
     @Test
     fun `Continue failure sets nameError from server message`() = runTest {
         coEvery { userProfileUpdater.updateName(any(), any()) } returns
-            Result.failure(RuntimeException("Server error"))
+            AuthOutcome.Failure(AuthFailure.Server)
         val vm = viewModel()
         vm.onEvent(NameInputEvent.UpdateName("Иван"))
         vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -174,7 +176,7 @@ class NameInputViewModelTest {
     @Test
     fun `profile failure emits no navigation and remains retryable`() = runTest {
         coEvery { userProfileUpdater.updateName(any(), any()) } returns
-            Result.failure(RuntimeException("Server error"))
+            AuthOutcome.Failure(AuthFailure.Server)
         val vm = viewModel(NameInputMode.ProfileCompletion, AuthSession.Stage.Ready)
         vm.onEvent(NameInputEvent.UpdateName("Иван"))
         vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -192,7 +194,7 @@ class NameInputViewModelTest {
 
     @Test
     fun `onboarding orders profile update before durable CAS`() = runTest {
-        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns AuthOutcome.Success(Unit)
         val vm = viewModel()
         vm.onEvent(NameInputEvent.UpdateName("Иван"))
         vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -215,7 +217,7 @@ class NameInputViewModelTest {
 
     @Test
     fun `profile completion updates Ready without stage mutation`() = runTest {
-        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns AuthOutcome.Success(Unit)
         val vm = viewModel(NameInputMode.ProfileCompletion, AuthSession.Stage.Ready)
         vm.onEvent(NameInputEvent.UpdateName("Иван"))
         vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
@@ -251,7 +253,7 @@ class NameInputViewModelTest {
 
     @Test
     fun `concurrent Welcome is accepted through durable resolution`() = runTest {
-        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns AuthOutcome.Success(Unit)
         val vm = viewModel()
         coEvery {
             sessionRepository.read()
@@ -283,7 +285,7 @@ class NameInputViewModelTest {
 
     @Test
     fun `CAS failure with unchanged NeedsName does not enter auth success`() = runTest {
-        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns AuthOutcome.Success(Unit)
         val vm = viewModel()
         coEvery {
             sessionRepository.compareAndSetStage(
@@ -309,7 +311,7 @@ class NameInputViewModelTest {
 
     @Test
     fun `profile recheck resolves a concurrent stage change without stage write`() = runTest {
-        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns AuthOutcome.Success(Unit)
         val vm = viewModel(NameInputMode.ProfileCompletion, AuthSession.Stage.Ready)
         coEvery { sessionRepository.read() } returnsMany listOf(
             AuthSession(1L, AuthSession.Stage.Ready),

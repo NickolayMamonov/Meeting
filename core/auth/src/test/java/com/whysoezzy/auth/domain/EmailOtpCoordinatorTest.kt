@@ -83,15 +83,21 @@ class EmailOtpCoordinatorTest {
     }
 
     @Test
-    fun `persisted no challenge attempt is cleared during recovery`() = runTest {
+    fun `persisted no challenge attempt is restored during recovery`() = runTest {
         coEvery { repository.requestEmailOtp(any()) } returns
             AuthOutcome.Failure(AuthFailure.RateLimited)
 
         val result = coordinator.request("person@example.com")
 
         assertTrue(result is EmailOtpRequestOutcome.StayOnEmail)
-        assertEquals(EmailOtpAttemptResult.MissingOrExpired, coordinator.loadActive())
-        assertEquals(EmailOtpAttemptResult.MissingOrExpired, coordinator.load("attempt-1"))
+        assertEquals(
+            EmailOtpAttemptResult.RecoverOnEmail(
+                email = "person@example.com",
+                attempt = (result as EmailOtpRequestOutcome.StayOnEmail).attempt,
+                failure = AuthFailure.RateLimited,
+            ),
+            coordinator.loadActive(),
+        )
     }
 
     @Test

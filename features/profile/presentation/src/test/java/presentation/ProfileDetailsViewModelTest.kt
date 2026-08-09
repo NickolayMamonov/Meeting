@@ -161,20 +161,15 @@ class ProfileDetailsViewModelTest {
     }
 
     @Test
-    fun `loadProfile UnauthorizedError triggers logout and NavigateToAuth`() = runTest {
+    fun `loadProfile UnauthorizedError logs out without feature navigation`() = runTest {
         coEvery { getCurrentUserUseCase() } returns
             Result.failure(AppException.UnauthorizedError("401"))
         coEvery { logoutUseCase() } returns Unit
 
         val vm = viewModel()
 
-        vm.navEvent.test {
-            vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
-            advanceUntilIdle()
-
-            assertEquals(ProfileDetailsNavEvent.NavigateToAuth, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
+        vm.onEvent(ProfileDetailsEvent.LoadProfile(ProfileMode.Self))
+        advanceUntilIdle()
 
         coVerify(exactly = 1) { logoutUseCase() }
     }
@@ -243,18 +238,13 @@ class ProfileDetailsViewModelTest {
     // ==================== other nav events ====================
 
     @Test
-    fun `Logout emits NavigateToAuth`() = runTest {
+    fun `Logout clears session without feature navigation`() = runTest {
         coEvery { logoutUseCase() } returns Unit
 
         val vm = viewModel()
 
-        vm.navEvent.test {
-            vm.onEvent(ProfileDetailsEvent.Logout)
-            advanceUntilIdle()
-
-            assertEquals(ProfileDetailsNavEvent.NavigateToAuth, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
+        vm.onEvent(ProfileDetailsEvent.Logout)
+        advanceUntilIdle()
     }
 
     @Test

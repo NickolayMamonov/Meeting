@@ -36,21 +36,8 @@ class DataStorePendingEmailOtpStore(
     }
 
     override suspend fun replace(attempt: PendingEmailOtpAttempt) {
-        val record = PendingEmailOtpRecord(
-            version = VERSION,
-            attemptId = attempt.attemptId,
-            email = attempt.email.canonical,
-            resendAvailableAtEpochMillis = attempt.resendAvailableAtEpochMillis,
-            expiresAtEpochMillis = attempt.expiresAtEpochMillis,
-            challengeMayBeActive = attempt.challengeMayBeActive,
-            dispatchOutcome = attempt.dispatchOutcome,
-        )
-        val encrypted = cipher.encrypt(
-            json.encodeToString(PendingEmailOtpRecord.serializer(), record),
-            AAD,
-        )
         dataStore.edit { preferences ->
-            preferences[RECORD_KEY] = encrypted
+            preferences[RECORD_KEY] = attempt.toEncryptedRecord()
         }
     }
 
@@ -59,11 +46,45 @@ class DataStorePendingEmailOtpStore(
 
     override suspend fun getActive(): PendingEmailOtpAttempt? = readRecord()?.toAttempt()
 
-    override suspend fun clear(attemptId: String) {
-        if (readRecord()?.attemptId == attemptId) clearStored()
+    override suspend fun replaceIfCurrent(
+        attemptId: String,
+        dispatchGeneration: Long,
+        replacement: PendingEmailOtpAttempt,
+    ): Boolean {
+        var replaced = false
+        dataStore.edit { preferences ->
+            val current = decodeRecord(preferences)
+            if (current?.attemptId == attemptId &&
+                current.dispatchGeneration == dispatchGeneration
+            ) {
+                preferences[RECORD_KEY] = replacement.toEncryptedRecord()
+                replaced = true
+            }
+        }
+        return replaced
     }
 
-    override suspend fun clearActive() = clearStored()
+    override suspend fun clear(attemptId: String, dispatchGeneration: Long?) {
+        dataStore.edit { preferences ->
+            val current = decodeRecord(preferences)
+            if (current?.attemptId == attemptId &&
+                (dispatchGeneration == null || current.dispatchGeneration == dispatchGeneration)
+            ) {
+                preferences.remove(RECORD_KEY)
+            }
+        }
+    }
+
+    override suspend fun clearActive(dispatchGeneration: Long?) {
+        dataStore.edit { preferences ->
+            val current = decodeRecord(preferences)
+            if (current != null &&
+                (dispatchGeneration == null || current.dispatchGeneration == dispatchGeneration)
+            ) {
+                preferences.remove(RECORD_KEY)
+            }
+        }
+    }
 
     private suspend fun readRecord(): PendingEmailOtpRecord? {
         val encrypted =
@@ -86,6 +107,31 @@ class DataStorePendingEmailOtpStore(
         return record
     }
 
+    private fun decodeRecord(preferences: Preferences): PendingEmailOtpRecord? {
+        val encrypted = preferences[RECORD_KEY] ?: return null
+        return runCatching {
+            json.decodeFromString(PendingEmailOtpRecord.serializer(), cipher.decrypt(encrypted, AAD))
+        }.getOrNull()?.takeIf { it.version == VERSION }
+    }
+
+    private fun PendingEmailOtpAttempt.toEncryptedRecord(): String =
+        cipher.encrypt(
+            json.encodeToString(
+                PendingEmailOtpRecord.serializer(),
+                PendingEmailOtpRecord(
+                    version = VERSION,
+                    attemptId = attemptId,
+                    email = email.canonical,
+                    resendAvailableAtEpochMillis = resendAvailableAtEpochMillis,
+                    expiresAtEpochMillis = expiresAtEpochMillis,
+                    challengeMayBeActive = challengeMayBeActive,
+                    dispatchOutcome = dispatchOutcome,
+                    dispatchGeneration = dispatchGeneration,
+                ),
+            ),
+            AAD,
+        )
+
     private fun PendingEmailOtpRecord.toAttempt(): PendingEmailOtpAttempt? =
         runCatching {
             PendingEmailOtpAttempt(
@@ -95,6 +141,7 @@ class DataStorePendingEmailOtpStore(
                 expiresAtEpochMillis = expiresAtEpochMillis,
                 challengeMayBeActive = challengeMayBeActive,
                 dispatchOutcome = dispatchOutcome,
+                dispatchGeneration = dispatchGeneration,
             )
         }.getOrNull()
 
@@ -118,6 +165,7 @@ class DataStorePendingEmailOtpStore(
         val expiresAtEpochMillis: Long,
         val challengeMayBeActive: Boolean,
         val dispatchOutcome: DispatchOutcome,
+        val dispatchGeneration: Long = 0L,
     )
 
     private companion object {

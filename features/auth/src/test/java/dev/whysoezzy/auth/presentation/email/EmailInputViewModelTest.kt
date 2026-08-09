@@ -98,13 +98,24 @@ class EmailInputViewModelTest {
 
     @Test
     fun `startup no challenge recovery stays on email`() = runTest {
-        coEvery { recovery() } returns EmailOtpAttemptResult.MissingOrExpired
+        coEvery { recovery() } returns EmailOtpAttemptResult.RecoverOnEmail(
+            email = "person@example.com",
+            attempt = EmailOtpAttempt(
+                attemptId = "attempt-1",
+                maskedEmail = "p***@example.com",
+                resendAvailableAtEpochMillis = 60_000,
+                challengeMayBeActive = false,
+                dispatchOutcome = DispatchOutcome.RateLimited,
+            ),
+            failure = AuthFailure.RateLimited,
+        )
         val viewModel = EmailInputViewModel(request, recovery)
 
         viewModel.navEvent.test {
             advanceUntilIdle()
             expectNoEvents()
-            assertEquals(null, viewModel.uiState.value.error)
+            assertEquals("person@example.com", viewModel.uiState.value.email)
+            assertEquals(AuthFailure.RateLimited, viewModel.uiState.value.error)
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -34,6 +34,12 @@ class EmailInputViewModel(
             when (val result = recoverActiveAttempt()) {
                 is EmailOtpAttemptResult.Found ->
                     _navEvent.send(EmailInputNavEvent.NavigateToCode(result.attempt.attemptId))
+                is EmailOtpAttemptResult.RecoverOnEmail -> {
+                    _uiState.value = _uiState.value.copy(
+                        email = result.email,
+                        error = result.failure,
+                    )
+                }
                 EmailOtpAttemptResult.MissingOrExpired -> Unit
             }
         }
