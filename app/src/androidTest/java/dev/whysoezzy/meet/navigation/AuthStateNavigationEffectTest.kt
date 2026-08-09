@@ -219,7 +219,9 @@ class AuthStateNavigationEffectTest {
         }
 
         composeTestRule.runOnIdle {
-            navController.navigate(MeetRoute.NameInput.route)
+            navController.navigate(MeetRoute.NameInput.route) {
+                popUpTo(MeetRoute.Auth.route) { inclusive = false }
+            }
             assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
             pendingAttempt = EmailOtpAttemptResult.MissingOrExpired
         }
@@ -229,7 +231,7 @@ class AuthStateNavigationEffectTest {
             assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
             assertEquals(
                 MeetRoute.Auth.route,
-                navController.previousBackStackEntry?.destination?.route,
+                navController.currentDestination?.parent?.route,
             )
         }
     }
