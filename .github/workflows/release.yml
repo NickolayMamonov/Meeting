@@ -69,11 +69,12 @@ jobs:
           test "$RELEASE_TAG" = "v$(python -c 'import json; print(json.load(open("version.json"))["version"])')"
           test "$(git rev-list -n1 "$RELEASE_TAG")" = "$RELEASE_SHA"
           git merge-base --is-ancestor "$RELEASE_SHA" origin/dev
-          count="$(gh release list --limit 100 --json tagName,isDraft,isPublished \
+          count="$(gh release list --limit 100 --json tagName,isDraft,publishedAt \
             --jq "[.[] | select(.tagName == \"$RELEASE_TAG\")] | length")"
           test "$count" = 1
-          gh release view "$RELEASE_TAG" --json isDraft,isPublished --jq \
-            'select(.isDraft == true and .isPublished == false)' >/dev/null
+          authority="$(gh release view "$RELEASE_TAG" --json isDraft,publishedAt)"
+          test "$(jq -r '.isDraft' <<<"$authority")" = true
+          test "$(jq -r '.publishedAt // empty' <<<"$authority")" = ""
       - name: Decode protected release inputs
         id: inputs
         env:
@@ -110,9 +111,12 @@ jobs:
           set -euo pipefail
           apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
           aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
-          apksigner verify --verbose --print-certs "$apk"
-          jarsigner -verify -strict "$aab"
-      - name: Package deterministic release evidence
+          bundletool_jar="$(find "$HOME/.gradle/caches/modules-2/files-2.1/com.android.tools.build/bundletool" -name '*.jar' -print | sort -V | tail -n 1)"
+          test -n "$bundletool_jar"
+          python scripts/release/verify_android_artifacts.py \
+            --metadata app/build/release-metadata/release-build.json \
+            --apk "$apk" --aab "$aab" --bundletool-jar "$bundletool_jar"
+      - name: Prepare deterministic release evidence
         env:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
           RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
@@ -120,22 +124,60 @@ jobs:
           set -euo pipefail
           apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
           aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
+          mapping="$(find app/build/outputs/mapping/release -type f -name '*.txt' -print -quit || true)"
+          symbols="$(find app/build/outputs/native-debug-symbols/release -type f -print -quit || true)"
           mkdir -p release-output
-          python scripts/release/package_artifacts.py \
-            --metadata app/build/release-metadata/release-build.json \
-            --output release-output --apk "$apk" --aab "$aab" \
-            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA" \
+          package_args=(
+            --metadata app/build/release-metadata/release-build.json
+            --output release-output --apk "$apk" --aab "$aab"
+            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA"
             --source-branch dev --workflow "${GITHUB_WORKFLOW}"
-          python scripts/release/verify_chain.py release-output
+            --prepare-only
+          )
+          if test -n "$mapping"; then package_args+=(--mapping "$mapping"); fi
+          if test -n "$symbols"; then package_args+=(--symbols "$symbols"); fi
+          python scripts/release/package_artifacts.py "${package_args[@]}"
       - name: Attest final subjects
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
-          subject-path: |
-            release-output/*.apk
-            release-output/*.aab
-            release-output/release-manifest.json
-            release-output/SHA256SUMS
-            release-output/release-candidate.json
+          subject-path: release-output/*
+      - name: Collect canonical attestation evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          python scripts/release/collect_attestation_evidence.py \
+            --directory release-output \
+            --output "$RUNNER_TEMP/release-attestation-evidence.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-ref refs/heads/dev \
+            --source-sha "$RELEASE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+      - name: Finalize deterministic release evidence
+        env:
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
+          aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
+          mapping="$(find app/build/outputs/mapping/release -type f -name '*.txt' -print -quit || true)"
+          symbols="$(find app/build/outputs/native-debug-symbols/release -type f -print -quit || true)"
+          package_args=(
+            --metadata app/build/release-metadata/release-build.json
+            --output release-output --apk "$apk" --aab "$aab"
+            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA"
+            --source-branch dev --workflow "${GITHUB_WORKFLOW}"
+            --attestation-evidence "$RUNNER_TEMP/release-attestation-evidence.json"
+          )
+          if test -n "$mapping"; then package_args+=(--mapping "$mapping"); fi
+          if test -n "$symbols"; then package_args+=(--symbols "$symbols"); fi
+          python scripts/release/package_artifacts.py "${package_args[@]}"
+          python scripts/release/verify_chain.py release-output
       - name: Upload verified assets to draft
         env:
           GH_TOKEN: ${{ github.token }}
@@ -143,8 +185,16 @@ jobs:
         run: |
           set -euo pipefail
           gh release upload "$RELEASE_TAG" release-output/* --clobber
-          gh release view "$RELEASE_TAG" --json isDraft,isPublished --jq \
-            'select(.isDraft == true and .isPublished == false)' >/dev/null
+          authority="$(gh release view "$RELEASE_TAG" --json isDraft,publishedAt)"
+          test "$(jq -r '.isDraft' <<<"$authority")" = true
+          test "$(jq -r '.publishedAt // empty' <<<"$authority")" = ""
+          remote="$RUNNER_TEMP/android-release-assets"
+          rm -rf "$remote"
+          mkdir -p "$remote"
+          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/android-release-assets.json"
+          gh release download "$RELEASE_TAG" --dir "$remote" --clobber
+          python scripts/release/verify_remote_assets.py \
+            release-output "$RUNNER_TEMP/android-release-assets.json" "$remote"
       - name: Publish only after remote verification
         env:
           GH_TOKEN: ${{ github.token }}
@@ -152,7 +202,17 @@ jobs:
         run: |
           set -euo pipefail
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
-          test "$(gh release view "$RELEASE_TAG" --json isPublished --jq .isPublished)" = false
+          test -z "$(gh release view "$RELEASE_TAG" --json publishedAt --jq '.publishedAt // empty')"
+          remote="$RUNNER_TEMP/android-release-assets-final"
+          rm -rf "$remote"
+          mkdir -p "$remote"
+          gh release view "$RELEASE_TAG" --json isDraft,publishedAt > "$RUNNER_TEMP/android-release-authority-final.json"
+          test "$(jq -r '.isDraft' "$RUNNER_TEMP/android-release-authority-final.json")" = true
+          test "$(jq -r '.publishedAt // empty' "$RUNNER_TEMP/android-release-authority-final.json")" = ""
+          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/android-release-assets-final.json"
+          gh release download "$RELEASE_TAG" --dir "$remote" --clobber
+          python scripts/release/verify_remote_assets.py \
+            release-output "$RUNNER_TEMP/android-release-assets-final.json" "$remote"
           gh release edit "$RELEASE_TAG" --draft=false
       - name: Remove protected inputs
         if: ${{ always() }}

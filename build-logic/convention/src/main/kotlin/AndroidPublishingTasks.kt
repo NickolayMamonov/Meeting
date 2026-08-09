@@ -44,6 +44,9 @@ abstract class ValidateSnapshotPublishingInputsTask : DefaultTask() {
     @get:Optional
     abstract val expectedCertificateSha256: Property<String>
 
+    @get:Input
+    abstract val signingPropertyPrefix: Property<String>
+
     @get:Internal
     abstract val storeFilePath: Property<String>
 
@@ -67,12 +70,13 @@ abstract class ValidateSnapshotPublishingInputsTask : DefaultTask() {
         val signingInputs =
             AndroidSigningInputs.parse(
                 mapOf(
-                    "ANDROID_RELEASE_KEYSTORE_FILE" to storeFilePath.orNull,
-                    "ANDROID_RELEASE_STORE_PASSWORD" to storePassword.orNull,
-                    "ANDROID_RELEASE_KEY_ALIAS" to keyAlias.orNull,
-                    "ANDROID_RELEASE_KEY_PASSWORD" to keyPassword.orNull,
-                    "ANDROID_RELEASE_CERT_SHA256" to expectedCertificateSha256.orNull,
+                    "${signingPropertyPrefix.get()}_KEYSTORE_FILE" to storeFilePath.orNull,
+                    "${signingPropertyPrefix.get()}_STORE_PASSWORD" to storePassword.orNull,
+                    "${signingPropertyPrefix.get()}_KEY_ALIAS" to keyAlias.orNull,
+                    "${signingPropertyPrefix.get()}_KEY_PASSWORD" to keyPassword.orNull,
+                    "${signingPropertyPrefix.get()}_CERT_SHA256" to expectedCertificateSha256.orNull,
                 ),
+                signingPropertyPrefix.get(),
             )
         validateSigningIdentity(signingInputs)
     }

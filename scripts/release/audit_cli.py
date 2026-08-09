@@ -20,13 +20,15 @@ from typing import Any
 
 from release_evidence import (
     EvidenceError,
-    attest_identity,
     classify_pull_request,
     effective_singleton_queue,
     map_merge_group_to_pr,
+    pull_request_tuple,
     required_check_decision,
     select_latest_producer_evidence,
     stable_read,
+    verify_merge_group_event,
+    verify_pull_request_snapshot,
     verify_producer_snapshot,
     verify_two_parent_merge_commit,
 )
@@ -53,7 +55,13 @@ class GitHubApi:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.load(response)
 
-    def all_pages(self, path: str, query: dict[str, Any] | None = None) -> list[Any]:
+    def all_pages(
+        self,
+        path: str,
+        query: dict[str, Any] | None = None,
+        *,
+        max_entries: int = 10_000,
+    ) -> list[Any]:
         page = 1
         result: list[Any] = []
         while True:
@@ -61,6 +69,8 @@ class GitHubApi:
             values = payload if isinstance(payload, list) else payload.get("workflow_runs", payload.get("artifacts", []))
             if not isinstance(values, list):
                 raise EvidenceError(f"unexpected paginated response for {path}")
+            if len(result) + len(values) > max_entries:
+                raise EvidenceError(f"paginated response for {path} exceeds max_entries")
             result.extend(values)
             if len(values) < 100:
                 return result
@@ -83,24 +93,40 @@ def _event() -> dict[str, Any]:
 
 def _producer_evidence(api: GitHubApi, fixture: dict[str, Any] | None) -> dict[str, Any]:
     if fixture is not None:
-        runs = fixture["producer_runs"]
-        artifacts = {
+        runs_first = fixture["producer_runs_first"]
+        artifacts_first = {
             int(run_id): values
-            for run_id, values in fixture["producer_artifacts"].items()
+            for run_id, values in fixture["producer_artifacts_first"].items()
         }
+        runs_second = fixture["producer_runs_second"]
+        artifacts_second = {
+            int(run_id): values
+            for run_id, values in fixture["producer_artifacts_second"].items()
+        }
+        first_snapshot = {"runs": runs_first, "artifacts": artifacts_first}
+        second_snapshot = {"runs": runs_second, "artifacts": artifacts_second}
+        if (
+            runs_first is runs_second
+            or fixture["producer_artifacts_first"] is fixture["producer_artifacts_second"]
+        ):
+            raise EvidenceError("producer snapshots are not independent")
+        verify_producer_snapshot(first_snapshot, second_snapshot)
         selected = select_latest_producer_evidence(
-            runs,
-            artifacts,
+            runs_first,
+            artifacts_first,
             workflow_id=int(fixture["producer_workflow_id"]),
+            workflow_path=fixture["producer_workflow_path"],
             protected_ref="refs/heads/master",
             artifact_name=fixture.get("producer_artifact_name", "credential-audit-evidence.json"),
         )
-        verify_producer_snapshot(fixture["producer_snapshot"], fixture["producer_snapshot"])
         return selected.__dict__
 
     workflow_id = os.environ.get("PRODUCER_WORKFLOW_ID")
     if not workflow_id:
         raise EvidenceError("PRODUCER_WORKFLOW_ID repository variable is required")
+    workflow_path = os.environ.get("PRODUCER_WORKFLOW_PATH")
+    if not workflow_path:
+        raise EvidenceError("PRODUCER_WORKFLOW_PATH repository variable is required")
     runs_first = api.all_pages(
         f"/actions/workflows/{workflow_id}/runs",
         {"branch": "master"},
@@ -114,6 +140,7 @@ def _producer_evidence(api: GitHubApi, fixture: dict[str, Any] | None) -> dict[s
         runs_first,
         artifact_map_first,
         workflow_id=int(workflow_id),
+        workflow_path=workflow_path,
         protected_ref="refs/heads/master",
         artifact_name=os.environ.get(
             "PRODUCER_ARTIFACT_NAME", "credential-audit-evidence.json"
@@ -138,23 +165,53 @@ def _producer_evidence(api: GitHubApi, fixture: dict[str, Any] | None) -> dict[s
 def _queue_evidence(api: GitHubApi | None, fixture: dict[str, Any] | None) -> dict[str, Any]:
     if fixture is not None and "queue" in fixture:
         return fixture["queue"]
-    path = os.environ.get("MERGE_QUEUE_EVIDENCE_PATH")
-    if path:
-        value = _fixture(path)
-        return value["queue"]
-    encoded = os.environ.get("MERGE_QUEUE_EVIDENCE_JSON")
-    if encoded:
-        value = json.loads(encoded)
-        return value["queue"] if "queue" in value else value
-    # There is no stable public API adapter for merge queue entries in every
-    # GitHub Enterprise version. A trusted adapter must provide the complete
-    # evidence object; silently deriving a batch from a commit's associated
-    # PRs would violate the singleton mapping contract.
-    raise EvidenceError("exhaustive merge queue evidence is unavailable")
+    raise EvidenceError(
+        "live exhaustive merge queue adapter is unavailable; refusing environment evidence"
+    )
+
+
+def _queue_entries(
+    queue: dict[str, Any],
+    snapshot: str,
+    *,
+    max_entries: int = 10_000,
+) -> list[dict[str, Any]]:
+    pages_key = f"entries_pages_{snapshot}"
+    entries_key = f"entries_{snapshot}"
+    if pages_key not in queue:
+        entries = queue[entries_key]
+        if not isinstance(entries, list):
+            raise EvidenceError(f"merge queue {snapshot} entries are not a list")
+        if len(entries) > max_entries:
+            raise EvidenceError("merge queue entries exceed max_entries")
+        return entries
+    pages = queue[pages_key]
+    if not isinstance(pages, list) or not pages:
+        raise EvidenceError(f"merge queue {snapshot} pages are missing")
+    entries: list[dict[str, Any]] = []
+    for page in pages:
+        if not isinstance(page, list):
+            raise EvidenceError(f"merge queue {snapshot} page is not a list")
+        if len(entries) + len(page) > max_entries:
+            raise EvidenceError("merge queue entries exceed max_entries")
+        entries.extend(page)
+    return entries
 
 
 def _live_pr(api: GitHubApi, number: int) -> dict[str, Any]:
     return api.get(f"/pulls/{number}")
+
+
+def _fixture_pr_reads(
+    fixture: dict[str, Any],
+    *,
+    prefix: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    first = fixture[f"{prefix}_first"]
+    second = fixture[f"{prefix}_second"]
+    if first is second:
+        raise EvidenceError(f"{prefix} snapshots are not independent")
+    return first, second
 
 
 def run(fixture_path: str | None) -> str:
@@ -165,29 +222,68 @@ def run(fixture_path: str | None) -> str:
     token = os.environ.get("GITHUB_TOKEN", "")
     api = GitHubApi(repository, token) if not fixture else None
     pr = event.get("pull_request") if event_name == "pull_request" else None
-
-    if event_name == "pull_request" and pr is not None:
-        if classify_pull_request(pr) == "non-release":
-            return "N/A: explicit non-release classification"
-
-    evidence = _producer_evidence(api, fixture)
+    live_pr_first: dict[str, Any] | None = None
+    live_pr_second: dict[str, Any] | None = None
+    if event_name == "pull_request":
+        if not isinstance(pr, dict):
+            raise EvidenceError("pull_request event is missing PR data")
+        number = int(pr["number"])
+        if fixture:
+            live_pr_first, live_pr_second = _fixture_pr_reads(
+                fixture, prefix="live_pr"
+            )
+        else:
+            live_pr_first = _live_pr(api, number)
+        classification = classify_pull_request(live_pr_first)
+        if classification != "non-release":
+            evidence = _producer_evidence(api, fixture)
+        else:
+            evidence = {}
+        if fixture is None:
+            live_pr_second = _live_pr(api, number)
+        verified_pr = verify_pull_request_snapshot(
+            pr,
+            live_pr_first,
+            live_pr_second,
+            repository=repository or pull_request_tuple(live_pr_first)[3],
+            target_branch="dev",
+        )
+        if classification == "non-release":
+            return required_check_decision(event_name, verified_pr, evidence)
+        pr = verified_pr
+    else:
+        evidence = _producer_evidence(api, fixture)
     if event_name == "merge_group":
         queue = _queue_evidence(api, fixture)
+        entries_first = _queue_entries(queue, "first")
+        entries_second = _queue_entries(queue, "second")
         rule = effective_singleton_queue(
-            queue["rules_first"], queue["entries_first"], "dev"
+            queue["rules_first"], entries_first, "dev"
         )
+        group_first = queue["group_first"]
+        group_second = queue["group_second"]
         mapped = map_merge_group_to_pr(
-            queue["group"],
-            queue["entries_first"],
+            group_first,
+            entries_first,
             {int(number): value for number, value in queue["live_prs_first"].items()},
+            required_checks=rule["required_checks"],
         )
+        event_group = verify_merge_group_event(
+            event,
+            group_first,
+            queue["commit_first"],
+            repository=repository,
+        )
+        if mapped["pr"]["base_sha"] != event_group["base_sha"]:
+            raise EvidenceError("live PR base SHA disagrees with merge_group event")
         verify_two_parent_merge_commit(
             queue["commit_first"],
+            event_group["base_sha"],
             mapped["pr"]["head_sha"],
-            mapped["pr"]["base_sha"],
         )
         stable_read(queue["rules_first"], queue["rules_second"], "effective queue rules")
-        stable_read(queue["entries_first"], queue["entries_second"], "merge queue entries")
+        stable_read(entries_first, entries_second, "merge queue entries")
+        stable_read(group_first, group_second, "merge group")
         stable_read(queue["live_prs_first"], queue["live_prs_second"], "live PR tuple")
         stable_read(queue["commit_first"], queue["commit_second"], "synthetic merge commit")
     return required_check_decision(event_name, pr, {"verified": bool(evidence)})

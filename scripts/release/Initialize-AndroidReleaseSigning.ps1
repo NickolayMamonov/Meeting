@@ -5,9 +5,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $OfflineBackupDirectory,
     [Parameter(Mandatory = $true)]
-    [string] $CredentialHandoffDirectory,
-    [string] $EnvironmentName = "android-release",
-    [switch] $ProvisionEnvironment
+    [string] $CredentialHandoffDirectory
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,12 +90,12 @@ $keyPassword = New-Secret
 Set-OwnerOnlyAcl $storePasswordFile
 Set-OwnerOnlyAcl $keyPasswordFile
 
-& keytool -genkeypair -v -keystore $keystore -storetype PKCS12 `
+& keytool -genkeypair -v -keystore $keystore -storetype JKS `
     -storepass:file $storePasswordFile -keypass:file $keyPasswordFile -alias meet-release `
     -keyalg RSA -keysize 4096 -validity 3650 `
     -dname "CN=Meet Android Release, OU=Release, O=Meet"
 if ($LASTEXITCODE -ne 0) { throw "keytool key generation failed" }
-& keytool -exportcert -rfc -keystore $keystore -storepass:file $storePasswordFile `
+& keytool -exportcert -keystore $keystore -storepass:file $storePasswordFile `
     -alias meet-release -file $certificate
 if ($LASTEXITCODE -ne 0) { throw "certificate export failed" }
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $certificate).Hash.ToLowerInvariant()

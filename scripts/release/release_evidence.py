@@ -9,6 +9,8 @@ pagination case locally.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 from dataclasses import dataclass
@@ -34,9 +36,93 @@ def sha256_json(value: Any) -> str:
     return sha256_bytes(canonical_json(value))
 
 
+def jcs_bytes(value: Any) -> bytes:
+    """Return RFC 8785 canonical bytes for the integer-only evidence schema."""
+
+    def encode(item: Any) -> str:
+        if item is None or isinstance(item, (bool, int, str)):
+            return json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+        if isinstance(item, float):
+            raise EvidenceError("floating-point values are not allowed in canonical evidence")
+        if isinstance(item, list):
+            return "[" + ",".join(encode(element) for element in item) + "]"
+        if isinstance(item, Mapping):
+            if not all(isinstance(key, str) for key in item):
+                raise EvidenceError("canonical evidence object keys must be strings")
+            keys = sorted(
+                item,
+                key=lambda key: key.encode("utf-16-be", errors="strict"),
+            )
+            return "{" + ",".join(
+                f"{encode(key)}:{encode(item[key])}" for key in keys
+            ) + "}"
+        raise EvidenceError(f"unsupported canonical evidence type: {type(item).__name__}")
+
+    return encode(value).encode("utf-8")
+
+
+def sha256_jcs(value: Any) -> str:
+    return sha256_bytes(jcs_bytes(value))
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise EvidenceError(message)
+
+
+def _sha256(value: Any, what: str) -> str:
+    digest = str(value).lower()
+    _require(
+        len(digest) == 64 and all(character in "0123456789abcdef" for character in digest),
+        f"invalid {what} SHA-256",
+    )
+    return digest
+
+
+def pull_request_tuple(pr: Mapping[str, Any]) -> tuple[Any, ...]:
+    """Return the complete mutable PR identity used by race checks."""
+
+    head = pr.get("head", {})
+    base = pr.get("base", {})
+    head_repository = head.get("repo") or {}
+    base_repository = base.get("repo") or {}
+    return (
+        int(pr["number"]),
+        str(head.get("sha", pr.get("head_sha", ""))),
+        str(head.get("ref", pr.get("head_ref", ""))),
+        str(head_repository.get("full_name", pr.get("head_repository", ""))),
+        str(base.get("ref", pr.get("base_ref", ""))),
+        str(base.get("sha", pr.get("base_sha", ""))),
+        str(base_repository.get("full_name", pr.get("base_repository", ""))),
+        str(pr.get("state", "")),
+        bool(pr.get("draft", False)),
+    )
+
+
+def verify_pull_request_snapshot(
+    event_pr: Mapping[str, Any],
+    first: Mapping[str, Any],
+    second: Mapping[str, Any],
+    *,
+    repository: str,
+    target_branch: str = "dev",
+) -> Mapping[str, Any]:
+    """Bind a pull_request event to two independent live API reads."""
+
+    event_tuple = pull_request_tuple(event_pr)
+    first_tuple = pull_request_tuple(first)
+    second_tuple = pull_request_tuple(second)
+    _require(first is not second, "live PR snapshots are not independent")
+    _require(first_tuple == second_tuple, "live PR tuple changed between verification reads")
+    _require(event_tuple == first_tuple, "event PR tuple disagrees with live PR")
+    _, head_sha, head_ref, head_repository, base_ref, base_sha, base_repository, state, draft = first_tuple
+    _require(bool(head_sha and head_ref and base_sha), "live PR tuple is incomplete")
+    _require(bool(head_repository), "PR head repository is missing")
+    _require(base_repository == repository, "PR base repository mismatch")
+    _require(base_ref == target_branch, "PR base ref mismatch")
+    _require(state == "open", "PR is not open")
+    _require(not draft, "PR is draft")
+    return first
 
 
 def classify_pull_request(pr: Mapping[str, Any]) -> str:
@@ -113,12 +199,19 @@ def effective_singleton_queue(
     _require(rule.get("min_entries") == 1, "dev merge queue min_entries must be one")
     _require(rule.get("batch_size") == 1, "dev merge queue batch_size must be one")
     _require(rule.get("grouping") in {"NONE", "none"}, "dev queue batching is enabled")
-    _require(
-        rule.get("entries_exhaustive") is True,
-        "merge queue entries were not exhaustively enumerated",
-    )
     _require(rule.get("entries_exhaustive") is True, "merge queue entries were not exhaustively enumerated")
-    _require(bool(rule.get("required_checks")), "effective queue has no required checks")
+    required_checks = [str(value) for value in rule.get("required_checks", [])]
+    _require(required_checks, "effective queue has no required checks")
+    _require(
+        len(required_checks) == len(set(required_checks)),
+        "effective queue has duplicate required checks",
+    )
+    _require(
+        "release-please-credential-audit" in required_checks,
+        "effective queue does not require release-please-credential-audit",
+    )
+    _require(len(queue_entries) <= int(rule["max_entries"]), "effective queue exceeds max_entries")
+    _require(len(queue_entries) == 1, "effective queue does not contain exactly one active entry")
     _require(
         all(entry.get("target_branch") == target_branch for entry in queue_entries),
         "queue entries contain another target branch",
@@ -134,6 +227,8 @@ def map_merge_group_to_pr(
     group: Mapping[str, Any],
     queue_entries: Sequence[Mapping[str, Any]],
     live_prs: Mapping[int, Mapping[str, Any]],
+    *,
+    required_checks: Sequence[str] = ("release-please-credential-audit",),
 ) -> Mapping[str, Any]:
     """Map a synthetic merge group to exactly one live PR."""
 
@@ -145,6 +240,9 @@ def map_merge_group_to_pr(
         entry.get("exhaustive") is True,
         "merge queue entry is not from an exhaustive enumeration",
     )
+    target_branch = str(group.get("target_branch", ""))
+    _require(target_branch == "dev", "merge group target branch mismatch")
+    _require(entry.get("target_branch") == target_branch, "queue entry target branch mismatch")
     pr_numbers = [int(number) for number in entry.get("pull_request_numbers", [])]
     _require(len(pr_numbers) == 1, "merge group does not contain exactly one PR")
     number = pr_numbers[0]
@@ -152,6 +250,7 @@ def map_merge_group_to_pr(
     pr = live_prs[number]
     _require(pr.get("state") == "open", "merge group PR is not open")
     _require(not pr.get("draft", False), "merge group PR is draft")
+    _require(pr.get("base_ref") == target_branch, "merge group PR base ref mismatch")
     expected_tuple = (
         int(pr["number"]),
         str(pr["head_sha"]),
@@ -162,21 +261,71 @@ def map_merge_group_to_pr(
         tuple(group.get("pr_tuple", ())) == expected_tuple,
         "merge group PR tuple disagrees with live PR",
     )
+    _require(entry.get("head_sha") == expected_tuple[1], "queue entry head SHA mismatch")
+    _require(entry.get("base_ref") == expected_tuple[2], "queue entry base ref mismatch")
+    _require(entry.get("base_sha") == expected_tuple[3], "queue entry base SHA mismatch")
+    conclusions = entry.get("required_check_conclusions")
+    _require(isinstance(conclusions, Mapping), "queue entry required-check conclusions are missing")
+    expected_checks = {str(value) for value in required_checks}
+    _require(
+        set(conclusions) == expected_checks,
+        "queue entry required-check conclusions are not exact",
+    )
+    _require(
+        conclusions["release-please-credential-audit"] == "success",
+        "release-please-credential-audit conclusion is not success",
+    )
+    _require(
+        all(value == "success" for value in conclusions.values()),
+        "queue entry has a required check that is not successful",
+    )
     return {"entry": entry, "pr": pr, "tuple": expected_tuple}
+
+
+def verify_merge_group_event(
+    event: Mapping[str, Any],
+    group: Mapping[str, Any],
+    commit: Mapping[str, Any],
+    *,
+    repository: str,
+    target_branch: str = "dev",
+) -> Mapping[str, str]:
+    """Bind adapter evidence and the synthetic commit to the triggering event."""
+
+    _require(event.get("action") == "checks_requested", "unexpected merge_group action")
+    event_repository = str(event.get("repository", {}).get("full_name", ""))
+    _require(event_repository == repository, "merge_group repository mismatch")
+    event_group = event.get("merge_group")
+    _require(isinstance(event_group, Mapping), "merge_group event payload is missing")
+    expected = {
+        "head_sha": str(event_group.get("head_sha", "")),
+        "head_ref": str(event_group.get("head_ref", "")),
+        "base_sha": str(event_group.get("base_sha", "")),
+        "base_ref": str(event_group.get("base_ref", "")),
+    }
+    _require(all(expected.values()), "merge_group event identity is incomplete")
+    _require(
+        expected["base_ref"] == f"refs/heads/{target_branch}",
+        "merge_group event base ref mismatch",
+    )
+    for field, value in expected.items():
+        _require(group.get(field) == value, f"queue group {field} disagrees with event")
+    _require(commit.get("sha") == expected["head_sha"], "synthetic commit SHA disagrees with event")
+    return expected
 
 
 def verify_two_parent_merge_commit(
     commit: Mapping[str, Any],
-    expected_head_sha: str,
     expected_base_sha: str,
+    expected_head_sha: str,
 ) -> None:
     parents = commit.get("parents", [])
     _require(len(parents) == 2, "synthetic merge commit must have exactly two parents")
     _require(expected_head_sha != expected_base_sha, "merge commit parents must be distinct")
     actual = [str(parent.get("sha")) for parent in parents]
     _require(
-        actual == [expected_head_sha, expected_base_sha],
-        "synthetic merge commit parents do not match head and base",
+        actual == [expected_base_sha, expected_head_sha],
+        "synthetic merge commit parents do not match base and head",
     )
 
 
@@ -191,26 +340,98 @@ def attest_identity(
     certificate: Mapping[str, Any],
     rekor: Mapping[str, Any],
 ) -> Mapping[str, str]:
-    """Link an attestation using executable canonical identities only."""
+    """Compute identities from canonical evidence bytes, never declared hashes."""
 
-    bundle_digest = str(bundle.get("digest", ""))
-    statement_bundle = str(statement.get("bundle_digest", ""))
-    certificate_identity = str(certificate.get("identity", ""))
-    statement_certificate = str(statement.get("certificate_identity", ""))
-    rekor_identity = str(rekor.get("entry_uuid") or rekor.get("log_index") or "")
-    statement_rekor = str(statement.get("rekor_entry_uuid") or statement.get("rekor_log_index") or "")
-    _require(bundle_digest and bundle_digest == statement_bundle, "bundle/statement identity mismatch")
+    _require("list_id" not in bundle and "list_id" not in statement, "list IDs are not attestation identities")
     _require(
-        certificate_identity and certificate_identity == statement_certificate,
+        bundle.get("media_type") == "application/vnd.dev.sigstore.bundle.v0.3+json",
+        "unsupported or synthetic attestation bundle",
+    )
+    _require(bundle.get("statement") == statement, "bundle/statement content mismatch")
+    _require(bundle.get("certificate") == certificate, "bundle/certificate content mismatch")
+    _require(bundle.get("rekor") == rekor, "bundle/Rekor content mismatch")
+    statement_identity = sha256_jcs(statement)
+    bundle_identity = sha256_jcs(bundle)
+    encoded_certificate = certificate.get("der_base64")
+    _require(isinstance(encoded_certificate, str) and encoded_certificate, "certificate DER is missing")
+    try:
+        certificate_bytes = base64.b64decode(encoded_certificate, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise EvidenceError("certificate DER is not valid base64") from error
+    _require(bool(certificate_bytes), "certificate DER is empty")
+    certificate_identity = sha256_bytes(certificate_bytes)
+    _require(
+        str(statement.get("certificate_sha256", "")).lower() == certificate_identity,
         "certificate identity mismatch",
     )
-    _require(rekor_identity and rekor_identity == statement_rekor, "Rekor identity mismatch")
-    _require("list_id" not in bundle and "list_id" not in statement, "list IDs are not attestation identities")
-    return {
-        "bundle_digest": bundle_digest,
-        "certificate_identity": certificate_identity,
-        "rekor_identity": rekor_identity,
+    log_id = _sha256(rekor.get("log_id", ""), "Rekor log ID")
+    log_index = rekor.get("log_index")
+    integrated_time = rekor.get("integrated_time")
+    _require(isinstance(log_index, int) and log_index >= 0, "invalid Rekor log index")
+    _require(isinstance(integrated_time, int) and integrated_time > 0, "invalid Rekor integrated time")
+    statement_rekor = statement.get("rekor")
+    _require(
+        statement_rekor == {
+            "log_id": log_id,
+            "log_index": log_index,
+            "integrated_time": integrated_time,
+        },
+        "Rekor identity mismatch",
+    )
+    subject = statement.get("subject")
+    _require(isinstance(subject, Mapping), "attestation statement subject is missing")
+    _sha256(subject.get("sha256", ""), "attestation subject")
+    for field in ("predicate", "signer", "source_ref", "source_sha", "run_id", "run_attempt"):
+        _require(statement.get(field) not in (None, ""), f"attestation statement {field} is missing")
+    identity_document = {
+        "canonical_bundle_sha256": bundle_identity,
+        "statement_sha256": statement_identity,
+        "certificate_sha256": certificate_identity,
+        "rekor": statement_rekor,
+        "subject": subject,
+        "predicate": statement["predicate"],
+        "signer": statement["signer"],
+        "source_ref": statement["source_ref"],
+        "source_sha": statement["source_sha"],
+        "run_id": statement["run_id"],
+        "run_attempt": statement["run_attempt"],
     }
+    return {
+        "canonical_bundle_sha256": bundle_identity,
+        "statement_sha256": statement_identity,
+        "certificate_identity": certificate_identity,
+        "rekor_identity": sha256_jcs(statement_rekor),
+        "attestation_identity": sha256_jcs(identity_document),
+    }
+
+
+def verify_attestation_link(
+    producer: Mapping[str, Any],
+    authoritative: Mapping[str, Any],
+) -> Mapping[str, str]:
+    """Require producer-local and exhaustively listed evidence to be identical."""
+
+    producer_identity = attest_identity(
+        producer["bundle"],
+        producer["statement"],
+        producer["certificate"],
+        producer["rekor"],
+    )
+    authoritative_identity = attest_identity(
+        authoritative["bundle"],
+        authoritative["statement"],
+        authoritative["certificate"],
+        authoritative["rekor"],
+    )
+    _require(
+        producer_identity == authoritative_identity,
+        "producer/list attestation identity mismatch",
+    )
+    _require(
+        jcs_bytes(producer["bundle"]) == jcs_bytes(authoritative["bundle"]),
+        "producer/list canonical bundle mismatch",
+    )
+    return producer_identity
 
 
 @dataclass(frozen=True)
@@ -236,6 +457,7 @@ def select_latest_producer_evidence(
     artifacts_by_run: Mapping[int, Sequence[Mapping[str, Any]]],
     *,
     workflow_id: int,
+    workflow_path: str,
     protected_ref: str = "refs/heads/master",
     head_sha: str | None = None,
     artifact_name: str = "credential-audit-evidence.json",
@@ -251,10 +473,13 @@ def select_latest_producer_evidence(
         run
         for run in runs
         if int(run.get("workflow_id", -1)) == workflow_id
+        and run.get("path") == workflow_path
         and run.get("ref") == protected_ref
         and (head_sha is None or run.get("head_sha") == head_sha)
     ]
     _require(matching, "no exact protected-master producer runs found")
+    run_keys = [_producer_key(run) for run in matching]
+    _require(len(run_keys) == len(set(run_keys)), "duplicate producer execution identity")
     latest = max(matching, key=_producer_key)
     _require(latest.get("status") == "completed", "newest producer run is incomplete")
     _require(latest.get("conclusion") == "success", "newest producer run did not succeed")
@@ -269,7 +494,7 @@ def select_latest_producer_evidence(
     digest = str(artifact.get("digest", ""))
     if digest.startswith("sha256:"):
         digest = digest.removeprefix("sha256:")
-    _require(len(digest) == 64 and all(c in "0123456789abcdef" for c in digest), "invalid evidence digest")
+    digest = _sha256(digest, "evidence")
     return ProducerEvidence(
         run_number=int(latest["run_number"]),
         run_id=int(latest["id"]),

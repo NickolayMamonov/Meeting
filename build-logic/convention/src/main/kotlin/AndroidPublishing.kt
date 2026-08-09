@@ -11,12 +11,17 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
     val snapshotRunNumber = publishingInput("snapshotRunNumber")
     val snapshotRunAttempt = publishingInput("snapshotRunAttempt")
     val snapshotCommitSha = publishingInput("snapshotCommitSha")
+    val snapshotSigningValues =
+        AndroidSigningInputs.snapshotPropertyNames.associateWith { name ->
+            publishingInput(name).orNull
+        }
     val releaseCommitSha =
         publishingInput("releaseCommitSha", "GITHUB_SHA")
             .orElse(publishingInput("RELEASE_COMMIT_SHA"))
     val baseUrl = publishingInput("BASE_URL_RELEASE")
     val pins = publishingInput("RELEASE_SPKI_PINS")
     val expectedCertificate = publishingInput("ANDROID_RELEASE_CERT_SHA256")
+    val snapshotExpectedCertificate = publishingInput("ANDROID_SNAPSHOT_CERT_SHA256")
     val signingValues =
         AndroidSigningInputs.propertyNames.associateWith { name ->
             publishingInput(name).orNull
@@ -48,6 +53,15 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             releaseSigningConfig.keyPassword = signingValues["ANDROID_RELEASE_KEY_PASSWORD"]
             buildTypes.getByName("release").signingConfig = releaseSigningConfig
         }
+        if (AndroidSigningInputs.snapshotPropertyNames.all { !snapshotSigningValues[it].isNullOrEmpty() }) {
+            val snapshotSigningConfig = signingConfigs.maybeCreate("meetSnapshot")
+            snapshotSigningConfig.storeFile =
+                file(requireNotNull(snapshotSigningValues["ANDROID_SNAPSHOT_KEYSTORE_FILE"]))
+            snapshotSigningConfig.storePassword = snapshotSigningValues["ANDROID_SNAPSHOT_STORE_PASSWORD"]
+            snapshotSigningConfig.keyAlias = snapshotSigningValues["ANDROID_SNAPSHOT_KEY_ALIAS"]
+            snapshotSigningConfig.keyPassword = snapshotSigningValues["ANDROID_SNAPSHOT_KEY_PASSWORD"]
+            buildTypes.getByName("snapshot").signingConfig = snapshotSigningConfig
+        }
     }
 
     val validateVersion =
@@ -65,7 +79,12 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             runNumber.convention(snapshotRunNumber)
             runAttempt.convention(snapshotRunAttempt)
             commitSha.convention(snapshotCommitSha)
-            expectedCertificateSha256.convention(expectedCertificate)
+            expectedCertificateSha256.convention(snapshotExpectedCertificate)
+            signingPropertyPrefix.convention("ANDROID_SNAPSHOT")
+            storeFilePath.convention(publishingInput("ANDROID_SNAPSHOT_KEYSTORE_FILE"))
+            storePassword.convention(publishingInput("ANDROID_SNAPSHOT_STORE_PASSWORD"))
+            keyAlias.convention(publishingInput("ANDROID_SNAPSHOT_KEY_ALIAS"))
+            keyPassword.convention(publishingInput("ANDROID_SNAPSHOT_KEY_PASSWORD"))
             dependsOn(validateVersion)
         }
 
@@ -100,7 +119,7 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
         runNumber.convention(snapshotRunNumber)
         runAttempt.convention(snapshotRunAttempt)
         commitSha.convention(snapshotCommitSha)
-        expectedCertificateSha256.convention(expectedCertificate)
+        expectedCertificateSha256.convention(snapshotExpectedCertificate)
         workflowName.convention(publishingInput("snapshotWorkflowName", "GITHUB_WORKFLOW").orElse("local"))
         outputFile.set(layout.buildDirectory.file("release-metadata/snapshot-build.json"))
         dependsOn(validateSnapshot)

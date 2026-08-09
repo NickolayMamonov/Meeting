@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from release_evidence import canonical_json, sha256_bytes
+from release_evidence import canonical_json, sha256_bytes, verify_attestation_link
 
 
 def _read_json(path: Path) -> Any:
@@ -44,6 +44,13 @@ def package(args: argparse.Namespace) -> None:
     out = Path(args.output).resolve()
     out.mkdir(parents=True, exist_ok=True)
     metadata = _read_json(Path(args.metadata))
+    previous_envelope = out / "recovery-envelope.json"
+    if previous_envelope.is_file():
+        previous = _read_json(previous_envelope)
+        for reference in previous.get("attestations", []):
+            name = reference.get("name")
+            if isinstance(name, str) and Path(name).name == name:
+                (out / name).unlink(missing_ok=True)
     for owned in (
         "release-authority.json",
         "snapshot-manifest.json",
@@ -166,27 +173,58 @@ def package(args: argparse.Namespace) -> None:
 
     attestations = []
     attested_subjects = [
+        _artifact(authority_path, "authority"),
         *sorted(outputs, key=lambda item: item["name"]),
         _artifact(manifest_path, "manifest"),
         _artifact(checksum_path, "checksums"),
         _artifact(candidate_path, "candidate"),
     ]
+    evidence_path = getattr(args, "attestation_evidence", None)
+    prepare_only = bool(getattr(args, "prepare_only", False))
+    if prepare_only and evidence_path:
+        raise SystemExit("--prepare-only cannot be combined with --attestation-evidence")
+    if prepare_only:
+        return
+    if not evidence_path:
+        raise SystemExit("canonical --attestation-evidence is required")
+    evidence = _read_json(Path(evidence_path))
+    records = evidence.get("records", []) if isinstance(evidence, dict) else []
+    if not isinstance(records, list):
+        raise SystemExit("attestation evidence records must be a list")
+    records_by_subject: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, dict) or not isinstance(record.get("subject"), dict):
+            raise SystemExit("attestation evidence record is malformed")
+        name = record["subject"].get("name")
+        if not isinstance(name, str) or Path(name).name != name:
+            raise SystemExit("attestation evidence subject name is invalid")
+        if name in records_by_subject:
+            raise SystemExit(f"duplicate attestation evidence for {name}")
+        records_by_subject[name] = record
+    expected_names = {item["name"] for item in attested_subjects}
+    if set(records_by_subject) != expected_names:
+        raise SystemExit("attestation evidence coverage is not exact")
     for item in attested_subjects:
+        record = records_by_subject[item["name"]]
+        subject = {"name": item["name"], "sha256": item["sha256"]}
+        if record["subject"] != subject:
+            raise SystemExit(f"attestation evidence subject mismatch for {item['name']}")
+        try:
+            identities = verify_attestation_link(
+                record["producer"],
+                record["authoritative"],
+            )
+        except (KeyError, ValueError) as error:
+            raise SystemExit(
+                f"invalid canonical attestation evidence for {item['name']}: {error}"
+            ) from error
         attestation = {
             "schema": 1,
             "kind": "individual-attestation",
             "subject": item,
-            "bundle_identity": hashlib.sha256(
-                b"bundle\x00" + item["sha256"].encode("ascii")
-            ).hexdigest(),
-            "statement_identity": hashlib.sha256(
-                b"statement\x00" + item["name"].encode("utf-8") + b"\x00" + item["sha256"].encode("ascii")
-            ).hexdigest(),
-            "certificate_identity": metadata.get(
-                "certificate_identity",
-                metadata.get("signing_fingerprint", metadata.get("signingFingerprint")),
-            ),
-            "rekor_identity": metadata.get("rekor_identity", "local-unpublished"),
+            "producer": record["producer"],
+            "authoritative": record["authoritative"],
+            **identities,
         }
         attestation_path = out / f"{item['name']}.attestation.json"
         attestation_path.unlink(missing_ok=True)
@@ -194,8 +232,7 @@ def package(args: argparse.Namespace) -> None:
         attestations.append({
             "name": attestation_path.name,
             "sha256": sha256_bytes(attestation_bytes),
-            "bundle_identity": attestation["bundle_identity"],
-            "statement_identity": attestation["statement_identity"],
+            **identities,
         })
 
     envelope = {
@@ -221,6 +258,8 @@ def main() -> None:
     parser.add_argument("--aab")
     parser.add_argument("--mapping")
     parser.add_argument("--symbols")
+    parser.add_argument("--attestation-evidence")
+    parser.add_argument("--prepare-only", action="store_true")
     package(parser.parse_args())
 
 

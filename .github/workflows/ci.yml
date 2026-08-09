@@ -59,9 +59,7 @@ jobs:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: echo "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
       - name: Run unit tests
-        env:
-          ORG_GRADLE_PROJECT_BASE_URL_RELEASE: https://release-test.invalid
-        run: ./gradlew test
+        run: ./gradlew testDebugUnitTest
       - name: Upload test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -150,22 +148,41 @@ jobs:
             echo "Android debug certificate is not accepted" >&2
             exit 1
           fi
-      - name: Package snapshot evidence
+      - name: Prepare snapshot evidence
         run: |
           set -euo pipefail
           apk="$(find app/build/outputs/apk/snapshot -name '*.apk' -print -quit)"
           mkdir -p snapshot-output
           python scripts/release/package_artifacts.py \
             --metadata app/build/release-metadata/snapshot-build.json \
-            --output snapshot-output --apk "$apk"
-          python scripts/release/verify_chain.py snapshot-output
+            --output snapshot-output --apk "$apk" --prepare-only
       - name: Attest snapshot subjects
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
-          subject-path: |
-            snapshot-output/*.apk
-            snapshot-output/snapshot-manifest.json
-            snapshot-output/SHA256SUMS
+          subject-path: snapshot-output/*
+      - name: Collect canonical snapshot attestation evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python scripts/release/collect_attestation_evidence.py \
+            --directory snapshot-output \
+            --output "$RUNNER_TEMP/snapshot-attestation-evidence.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/ci.yml" \
+            --source-ref refs/heads/dev \
+            --source-sha "$GITHUB_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+      - name: Finalize snapshot evidence
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/snapshot -name '*.apk' -print -quit)"
+          python scripts/release/package_artifacts.py \
+            --metadata app/build/release-metadata/snapshot-build.json \
+            --output snapshot-output --apk "$apk" \
+            --attestation-evidence "$RUNNER_TEMP/snapshot-attestation-evidence.json"
+          python scripts/release/verify_chain.py snapshot-output
       - name: Upload snapshot artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
