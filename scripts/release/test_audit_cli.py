@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+import hashlib
+import io
 import json
 import os
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -203,6 +206,41 @@ class AuditCliTest(unittest.TestCase):
                 "first",
                 max_entries=150,
             )
+
+    def test_downloaded_producer_zip_digest_is_checked_before_parsing(self):
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as value:
+            value.writestr("credential-audit-evidence.json", '{"verified": true}')
+        archive_bytes = archive.getvalue()
+        digest = hashlib.sha256(archive_bytes).hexdigest()
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self):
+                return archive_bytes
+
+        api = GitHubApi("owner/repo", "token")
+        with patch("audit_cli.urllib.request.urlopen", return_value=Response()):
+            self.assertEqual(
+                api.download_artifact_json(
+                    1,
+                    "credential-audit-evidence.json",
+                    digest,
+                ),
+                {"verified": True},
+            )
+        with patch("audit_cli.urllib.request.urlopen", return_value=Response()):
+            with self.assertRaisesRegex(EvidenceError, "ZIP digest"):
+                api.download_artifact_json(
+                    1,
+                    "credential-audit-evidence.json",
+                    "0" * 64,
+                )
 
 
 if __name__ == "__main__":

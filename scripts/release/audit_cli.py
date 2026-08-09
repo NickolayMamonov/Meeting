@@ -9,6 +9,7 @@ stable evidence. Local JSON fixtures use the same verifier as live API data.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -371,7 +372,12 @@ class GitHubApi:
             "commit": self.get(f"/commits/{event_expected['head_sha']}"),
         }
 
-    def download_artifact_json(self, artifact_id: int, expected_name: str) -> dict[str, Any]:
+    def download_artifact_json(
+        self,
+        artifact_id: int,
+        expected_name: str,
+        expected_digest: str,
+    ) -> dict[str, Any]:
         url = f"https://api.github.com/repos/{self.repository}/actions/artifacts/{artifact_id}/zip"
         request = urllib.request.Request(
             url,
@@ -383,7 +389,11 @@ class GitHubApi:
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
-                archive = io.BytesIO(response.read())
+                archive_bytes = response.read()
+            actual_digest = hashlib.sha256(archive_bytes).hexdigest()
+            if actual_digest != expected_digest.removeprefix("sha256:").lower():
+                raise EvidenceError("protected producer artifact ZIP digest mismatch")
+            archive = io.BytesIO(archive_bytes)
             with zipfile.ZipFile(archive) as value:
                 names = value.namelist()
                 if names != [expected_name]:
@@ -516,6 +526,7 @@ def _producer_evidence(api: GitHubApi, fixture: dict[str, Any] | None) -> dict[s
     payload = api.download_artifact_json(
         selected.artifact_id,
         selected.artifact_name,
+        selected.artifact_digest,
     )
     verify_producer_artifact(
         payload,

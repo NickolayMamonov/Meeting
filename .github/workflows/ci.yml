@@ -151,6 +151,8 @@ jobs:
           apksigner sign --ks "$RUNNER_TEMP/snapshot-release.jks" --ks-key-alias meet-release \
             --ks-pass "pass:$STORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" "$apk"
           apksigner verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/snapshot-signer.txt"
+          grep -Eiq 'key algorithm: RSA' "$RUNNER_TEMP/snapshot-signer.txt"
+          grep -Eiq 'key size( \(bits\))?: 4096' "$RUNNER_TEMP/snapshot-signer.txt"
           actual="$(sed -n 's/.*SHA-256 digest: //p' "$RUNNER_TEMP/snapshot-signer.txt" | head -n1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
           expected="$(printf '%s' "$EXPECTED_CERT" | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
           test -n "$actual" && test "$actual" = "$expected"

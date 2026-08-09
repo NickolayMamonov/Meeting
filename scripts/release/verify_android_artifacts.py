@@ -48,8 +48,32 @@ def normalized_digest(value: str) -> str:
     return digest
 
 
+def verify_rsa4096_signer(output: str) -> None:
+    """Require the release signer invariant, not only its certificate hash."""
+
+    normalized = output.lower()
+    keytool_format = re.search(
+        r"public key algorithm:\s*(\d+)-bit\s+([a-z0-9]+)\s+key",
+        normalized,
+    )
+    if keytool_format is not None:
+        if keytool_format.group(1) != "4096" or keytool_format.group(2) != "rsa":
+            raise ArtifactError("release signer RSA-4096 identity is missing")
+        return
+    algorithm = re.search(r"key algorithm:\s*([a-z0-9]+)", normalized)
+    key_size = re.search(r"key size(?:\s*\(bits\))?:\s*(\d+)", normalized)
+    if algorithm is not None or key_size is not None:
+        if algorithm is None or algorithm.group(1) != "rsa":
+            raise ArtifactError("release signer key algorithm is not RSA")
+        if key_size is None or key_size.group(1) != "4096":
+            raise ArtifactError("release signer key size is not RSA-4096")
+        return
+    raise ArtifactError("release signer RSA-4096 identity is missing")
+
+
 def verify_apk(apk: Path, metadata: dict) -> None:
     output = run(["apksigner", "verify", "--verbose", "--print-certs", str(apk)])
+    verify_rsa4096_signer(output)
     digests = re.findall(r"SHA-256 digest:\s*([0-9a-f: ]+)", output, flags=re.IGNORECASE)
     if not digests:
         raise ArtifactError("APK signer output did not contain a SHA-256 certificate digest")
@@ -74,6 +98,7 @@ def verify_apk(apk: Path, metadata: dict) -> None:
 def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
     run(["jarsigner", "-verify", "-strict", str(aab)])
     signer_output = run(["keytool", "-printcert", "-jarfile", str(aab)])
+    verify_rsa4096_signer(signer_output)
     signer_digests = re.findall(
         r"SHA256:\s*([0-9a-f: ]+)", signer_output, flags=re.IGNORECASE
     )

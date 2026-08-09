@@ -22,7 +22,8 @@
 - The same workflow has a protected-`master` producer job. It uploads exactly
   `credential-audit-evidence.json`; the consumer enumerates all producer runs
   and artifacts, selects the newest execution, downloads the artifact, and
-  binds its run/ref/workflow claims to the selected API record.
+  hashes the downloaded ZIP against the selected GitHub artifact digest before
+  parsing it, then binds its run/ref/workflow claims to the selected API record.
 - `MERGE_QUEUE_EVIDENCE_JSON` is a non-secret repository variable containing
   `{"source":"github-api","branch":"dev","required_checks":[...]}`. It enables
   the live GraphQL queue adapter, which paginates the complete queue, reads
@@ -84,6 +85,15 @@ recovered by rerunning the same stable job and re-verifying the same
 Release-Please tag/draft. It cannot create a competing tag or release.
 Manual recovery is accepted only for an existing Release Please draft, exact
 release ID/tag/source commit, and a previously verified evidence artifact.
+The release ID is resolved from the tag through the GitHub Releases API rather
+than a non-existent Release Please action output. Recovery first resolves the
+selected stable-evidence run, successful stable-evidence job attempt, exact
+release artifact, and API-reported ZIP digest. It hashes the downloaded ZIP
+before extracting it, then binds the candidate, tag commit, workflow/ref/SHA,
+run attempt/conclusion, and every producer/authoritative attestation statement
+to that same producer execution. The final recovery mutation job consumes only
+the verified declarative artifact and does not check out or execute release
+source code while `RELEASE_UPLOAD_TOKEN` is present.
 Runtime publication also requires externally recorded Firebase package,
 certificate, TLS/SPKI, backend revision, authenticated-device, install, and
 authenticated-API gates; it must explicitly state that emulator/device state

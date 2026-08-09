@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
+import hashlib
+import json
+import tempfile
 import unittest
+import zipfile
+from pathlib import Path
 
-from recovery_gate import verify as verify_recovery
+from recovery_gate import verify as verify_recovery, verify_producer
 from release_mutation_gate import MutationError, verify_release_state, verify_uploaded_assets
 from runtime_gate import verify as verify_runtime
 
@@ -133,6 +138,87 @@ class PublicationGateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_runtime(evidence)
 
-
+    def test_recovery_binds_successful_stable_producer_and_zip_digest(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence = root / "evidence"
+            evidence.mkdir()
+            (evidence / "release-candidate.json").write_text(
+                '{"tag":"v1.0.0","commit":"' + "a" * 40 + '","source_branch":"dev"}',
+                encoding="utf-8",
+            )
+            (evidence / "release-authority.json").write_text(
+                '{"tag":"v1.0.0","commit":"' + "a" * 40 + '","source_branch":"dev"}',
+                encoding="utf-8",
+            )
+            statement = {
+                "signer": "owner/repo/.github/workflows/release.yml",
+                "source_ref": "refs/heads/dev",
+                "source_sha": "a" * 40,
+                "run_id": 77,
+                "run_attempt": 2,
+            }
+            (evidence / "recovery-envelope.json").write_text(
+                '{"attestations":[{"name":"artifact.attestation.json"}]}',
+                encoding="utf-8",
+            )
+            (evidence / "artifact.attestation.json").write_text(
+                '{"producer":{"statement":' + json.dumps(statement)
+                + '},"authoritative":{"statement":' + json.dumps(statement) + '}}',
+                encoding="utf-8",
+            )
+            archive = root / "evidence.zip"
+            with zipfile.ZipFile(archive, "w") as output:
+                output.write(evidence / "release-candidate.json", "release-candidate.json")
+            digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+            verify_producer(
+                run={
+                    "id": 77,
+                    "path": ".github/workflows/release.yml",
+                    "event": "push",
+                    "head_branch": "dev",
+                    "head_sha": "a" * 40,
+                    "status": "completed",
+                    "conclusion": "success",
+                    "run_attempt": 2,
+                },
+                jobs={
+                    "jobs": [{
+                        "name": "Verify and attest stable artifacts",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "run_id": 77,
+                        "run_attempt": 2,
+                    }]
+                },
+                artifact={
+                    "id": 9,
+                    "name": "android-release-evidence-v1.0.0",
+                    "digest": "sha256:" + digest,
+                    "expired": False,
+                    "workflow_run": {"id": 77},
+                },
+                archive=archive,
+                evidence_directory=evidence,
+                repository="owner/repo",
+                source_run_id=77,
+                source_sha="a" * 40,
+                tag="v1.0.0",
+                artifact_name="android-release-evidence-v1.0.0",
+            )
+            archive.write_bytes(archive.read_bytes() + b"tamper")
+            with self.assertRaisesRegex(ValueError, "ZIP digest"):
+                verify_producer(
+                    run={"id": 77},
+                    jobs=[],
+                    artifact={"digest": "sha256:" + digest, "name": "x", "id": 9},
+                    archive=archive,
+                    evidence_directory=evidence,
+                    repository="owner/repo",
+                    source_run_id=77,
+                    source_sha="a" * 40,
+                    tag="v1.0.0",
+                    artifact_name="android-release-evidence-v1.0.0",
+                )
 if __name__ == "__main__":
     unittest.main()

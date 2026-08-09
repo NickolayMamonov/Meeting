@@ -103,24 +103,37 @@ def _certificate_from_bundle(
 
 def _payload_from_bundle(bundle: Mapping[str, Any]) -> tuple[dict[str, Any], bytes]:
     statement = bundle.get("statement")
-    if isinstance(statement, Mapping):
-        return dict(statement), json.dumps(
-            statement, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
-    envelope = bundle.get("dsseEnvelope", bundle.get("dsse_envelope", {}))
-    if not isinstance(envelope, Mapping):
-        raise CollectionError("attestation DSSE envelope is missing")
-    encoded = envelope.get("payload")
-    if not isinstance(encoded, str) or not encoded:
-        raise CollectionError("attestation DSSE payload is missing")
-    try:
-        payload = base64.b64decode(encoded, validate=True)
-        statement = json.loads(payload)
-    except (binascii.Error, ValueError, json.JSONDecodeError) as error:
-        raise CollectionError("attestation DSSE payload is invalid") from error
-    if not isinstance(statement, dict):
-        raise CollectionError("attestation DSSE payload is not an object")
-    return statement, payload
+    envelope = bundle.get("dsseEnvelope", bundle.get("dsse_envelope"))
+
+    # The DSSE payload is signed evidence and therefore takes precedence
+    # whenever an envelope is present.  A separately materialized statement
+    # is only an equivalent representation, never an alternate source of
+    # truth.  This prevents a caller from hiding a payload conflict behind a
+    # convenient top-level field.
+    if envelope is not None:
+        if not isinstance(envelope, Mapping):
+            raise CollectionError("attestation DSSE envelope is malformed")
+        encoded = envelope.get("payload")
+        if not isinstance(encoded, str) or not encoded:
+            raise CollectionError("attestation DSSE payload is missing")
+        try:
+            payload = base64.b64decode(encoded, validate=True)
+            decoded = json.loads(payload)
+        except (binascii.Error, ValueError, json.JSONDecodeError) as error:
+            raise CollectionError("attestation DSSE payload is invalid") from error
+        if not isinstance(decoded, dict):
+            raise CollectionError("attestation DSSE payload is not an object")
+        if statement is not None:
+            if not isinstance(statement, Mapping) or dict(statement) != decoded:
+                raise CollectionError("top-level statement conflicts with DSSE payload")
+        return decoded, payload
+
+    if not isinstance(statement, Mapping):
+        raise CollectionError("attestation statement is missing")
+    payload = json.dumps(
+        statement, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return dict(statement), payload
 
 
 def _log_id(value: Any) -> str:
