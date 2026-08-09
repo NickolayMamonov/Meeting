@@ -7,8 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -102,8 +100,8 @@ internal fun AuthStateNavigationEffect(
     LaunchedEffect(isLoggedIn) {
         when {
             isLoggedIn == false -> {
-                if (!navController.currentDestination.isInAuthGraph()) {
-                    navController.navigate(MeetRoute.Auth.route) {
+                if (navController.currentDestination?.route != MeetRoute.EmailInput.route) {
+                    navController.navigate(MeetRoute.EmailInput.route) {
                         popUpTo(navController.graph.id)
                         launchSingleTop = true
                     }
@@ -118,6 +116,3 @@ internal fun AuthStateNavigationEffect(
         }
     }
 }
-
-private fun NavDestination?.isInAuthGraph(): Boolean =
-    this?.hierarchy?.any { it.route == MeetRoute.Auth.route } == true

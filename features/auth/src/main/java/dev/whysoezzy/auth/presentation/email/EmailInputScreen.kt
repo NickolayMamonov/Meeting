@@ -115,11 +115,12 @@ private fun EmailInputContent(
     }
 }
 
-private fun emailFailureMessage(failure: AuthFailure): String = when (failure) {
+internal fun emailFailureMessage(failure: AuthFailure): String = when (failure) {
     AuthFailure.InvalidEmail -> "Введите корректный email"
     AuthFailure.RateLimited -> "Слишком много попыток. Повторите позже"
     AuthFailure.DeliveryUnavailable -> "Не удалось доставить код. Попробуйте ещё раз"
     AuthFailure.ActivationUnavailable -> "Сервис отправки временно недоступен"
+    is AuthFailure.ResendNotAvailable -> "Повторить можно после окончания таймера"
     AuthFailure.NoConnection, AuthFailure.Server, AuthFailure.Unknown ->
         "Не удалось выполнить запрос. Попробуйте ещё раз"
     else -> "Не удалось выполнить запрос. Попробуйте ещё раз"

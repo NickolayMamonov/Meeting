@@ -4,6 +4,7 @@ import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.DispatchOutcome
 import com.whysoezzy.auth.domain.models.EmailAddressParser
+import com.whysoezzy.auth.domain.models.EmailOtpAttempt
 import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import com.whysoezzy.auth.domain.models.EmailOtpRequestOutcome
 import com.whysoezzy.auth.domain.models.EmailOtpResendOutcome
@@ -251,6 +252,99 @@ class EmailOtpCoordinatorTest {
         assertEquals(
             DispatchOutcome.Unconfirmed,
             firstResult.attempt.dispatchOutcome,
+        )
+    }
+
+    @Test
+    fun `stale resend completion resolves to a newer active attempt`() = runTest {
+        val resendStarted = CompletableDeferred<Unit>()
+        val releaseResend = CompletableDeferred<Unit>()
+        var callCount = 0
+        coEvery { repository.requestEmailOtp(any()) } coAnswers {
+            when (++callCount) {
+                1 -> AuthOutcome.Success(Unit)
+                2 -> {
+                    resendStarted.complete(Unit)
+                    releaseResend.await()
+                    AuthOutcome.Success(Unit)
+                }
+                else -> AuthOutcome.Success(Unit)
+            }
+        }
+
+        coordinator.request("person@example.com")
+        now += 60_000L
+        val resend = async { coordinator.resend("attempt-1") }
+        resendStarted.await()
+
+        val replacement = async { coordinator.request("new@example.com") }
+        replacement.await()
+        releaseResend.complete(Unit)
+
+        val result = resend.await()
+        assertEquals(
+            EmailOtpResendOutcome.Confirmed(
+                (coordinator.loadActive() as EmailOtpAttemptResult.Found).attempt,
+            ),
+            result,
+        )
+        assertEquals(
+            "attempt-2",
+            (result as EmailOtpResendOutcome.Confirmed).attempt.attemptId,
+        )
+    }
+
+    @Test
+    fun `stale request completion treats expired winning attempt as missing`() = runTest {
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val secondStarted = CompletableDeferred<Unit>()
+        val releaseSecond = CompletableDeferred<Unit>()
+        coEvery { repository.requestEmailOtp("first@example.com") } coAnswers {
+            firstStarted.complete(Unit)
+            releaseFirst.await()
+            AuthOutcome.Success(Unit)
+        }
+        coEvery { repository.requestEmailOtp("second@example.com") } coAnswers {
+            secondStarted.complete(Unit)
+            releaseSecond.await()
+            AuthOutcome.Success(Unit)
+        }
+
+        val first = async { coordinator.request("first@example.com") }
+        firstStarted.await()
+        val second = async { coordinator.request("second@example.com") }
+        secondStarted.await()
+        now += 15 * 60_000L + 1L
+
+        releaseFirst.complete(Unit)
+        assertEquals(
+            EmailOtpRequestOutcome.StayOnEmail(
+                attempt = EmailOtpAttempt(
+                    attemptId = "",
+                    maskedEmail = "",
+                    resendAvailableAtEpochMillis = 0L,
+                    challengeMayBeActive = false,
+                    dispatchOutcome = DispatchOutcome.RejectedValidation,
+                ),
+                failure = AuthFailure.MissingOrExpiredAttempt,
+            ),
+            first.await(),
+        )
+
+        releaseSecond.complete(Unit)
+        assertEquals(
+            EmailOtpRequestOutcome.StayOnEmail(
+                attempt = EmailOtpAttempt(
+                    attemptId = "",
+                    maskedEmail = "",
+                    resendAvailableAtEpochMillis = 0L,
+                    challengeMayBeActive = false,
+                    dispatchOutcome = DispatchOutcome.RejectedValidation,
+                ),
+                failure = AuthFailure.MissingOrExpiredAttempt,
+            ),
+            second.await(),
         )
     }
 

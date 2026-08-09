@@ -103,10 +103,7 @@ class EmailOtpCoordinator(
             )
         }
         if (!began) {
-            return EmailOtpResendOutcome.Failed(
-                null,
-                AuthFailure.MissingOrExpiredAttempt,
-            )
+            return resolveCurrentResendOutcome()
         }
 
         val result = repository.requestEmailOtp(previous.email.canonical)
@@ -120,7 +117,7 @@ class EmailOtpCoordinator(
         ) {
             completed.toResendOutcome(result)
         } else {
-            resolveCurrentResendOutcome(dispatching.attemptId)
+            resolveCurrentResendOutcome()
         }
     }
 
@@ -182,20 +179,35 @@ class EmailOtpCoordinator(
         }
 
     private suspend fun resolveCurrentRequestOutcome(): EmailOtpRequestOutcome =
-        store.getActive()?.let { it.toRequestOutcome() }
+        currentActive()?.toRequestOutcome()
             ?: EmailOtpRequestOutcome.StayOnEmail(
                 attempt = emptyAttempt(),
                 failure = AuthFailure.MissingOrExpiredAttempt,
             )
 
-    private suspend fun resolveCurrentResendOutcome(
-        attemptId: String,
-    ): EmailOtpResendOutcome =
-        active(attemptId)?.let { it.toCurrentResendOutcome() }
+    private suspend fun resolveCurrentResendOutcome(): EmailOtpResendOutcome =
+        currentActive()?.toCurrentResendOutcome()
             ?: EmailOtpResendOutcome.Failed(
                 attempt = null,
                 failure = AuthFailure.MissingOrExpiredAttempt,
             )
+
+    private suspend fun currentActive(): PendingEmailOtpAttempt? {
+        while (true) {
+            val candidate = store.getActive() ?: return null
+            if (clock.nowEpochMillis() >= candidate.expiresAtEpochMillis) {
+                store.clear(candidate.attemptId, candidate.dispatchGeneration)
+                continue
+            }
+
+            val confirmed = store.getActive() ?: return null
+            if (confirmed.attemptId == candidate.attemptId &&
+                confirmed.dispatchGeneration == candidate.dispatchGeneration
+            ) {
+                return confirmed
+            }
+        }
+    }
 
     private fun PendingEmailOtpAttempt.complete(result: AuthOutcome<Unit>): PendingEmailOtpAttempt =
         when (result) {

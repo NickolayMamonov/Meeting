@@ -149,4 +149,12 @@ class EmailInputViewModelTest {
         assertEquals(deadline, viewModel.uiState.value.resendAvailableAtEpochMillis)
         coVerify(exactly = 0) { request(any()) }
     }
+
+    @Test
+    fun `resend cooldown has dedicated user-facing message`() {
+        assertEquals(
+            "Повторить можно после окончания таймера",
+            emailFailureMessage(AuthFailure.ResendNotAvailable(60_000L)),
+        )
+    }
 }
