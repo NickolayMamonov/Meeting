@@ -13,6 +13,8 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.http.HttpMethod
+import io.ktor.http.encodedPath
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -22,6 +24,15 @@ interface TokenProvider {
     suspend fun getAccessToken(): String?
 
     suspend fun getRefreshToken(): String?
+
+    suspend fun loadTokens(): TokenSnapshot?
+}
+
+class TokenSnapshot(
+    val accessToken: String,
+    val refreshToken: String,
+) {
+    override fun toString(): String = "TokenSnapshot(redacted)"
 }
 
 object KtorNetworkModule {
@@ -33,7 +44,7 @@ object KtorNetworkModule {
             configure(tokenProvider, onRefreshToken)
         }
 
-    internal fun provideHttpClient(
+    fun provideHttpClient(
         engine: HttpClientEngine,
         tokenProvider: TokenProvider? = null,
         onRefreshToken: (suspend () -> Pair<String, String>?)? = null,
@@ -46,6 +57,8 @@ object KtorNetworkModule {
         tokenProvider: TokenProvider?,
         onRefreshToken: (suspend () -> Pair<String, String>?)?,
     ) {
+        expectSuccess = true
+
         defaultRequest {
             url(BuildConfig.BASE_URL)
         }
@@ -68,14 +81,23 @@ object KtorNetworkModule {
             )
         }
         install(HttpRequestRetry) {
-            retryOnServerErrors(maxRetries = 3)
-            retryOnException(maxRetries = 3, retryOnTimeout = true)
+            retryIf(maxRetries = MAX_RETRIES) { request, response ->
+                request.method.isRetryable() &&
+                    !request.url.encodedPath.isAuthPath() &&
+                    response.status.value in SERVER_ERROR_STATUS_RANGE
+            }
+            retryOnExceptionIf(maxRetries = MAX_RETRIES) { request, cause ->
+                request.method.isRetryable() &&
+                    !request.url.encodedPath.isAuthPath() &&
+                    cause !is CancellationException
+            }
             exponentialDelay()
         }
 
         if (BuildConfig.DEBUG) {
             install(Logging) {
-                level = LogLevel.ALL
+                level = LogLevel.INFO
+                filter { request -> !request.url.encodedPath.isAuthPath() }
             }
         }
 
@@ -83,27 +105,17 @@ object KtorNetworkModule {
             install(Auth) {
                 bearer {
                     loadTokens {
-                        val accessToken = tokenProvider.getAccessToken()
-                        val refreshToken = tokenProvider.getRefreshToken()
-
-                        if (accessToken != null && refreshToken != null) {
+                        tokenProvider.loadTokens()?.let {
                             BearerTokens(
-                                accessToken = accessToken,
-                                refreshToken = refreshToken,
+                                accessToken = it.accessToken,
+                                refreshToken = it.refreshToken,
                             )
-                        } else {
-                            null
                         }
                     }
 
                     sendWithoutRequest { request ->
-                        val baseHost =
-                            BuildConfig.BASE_URL
-                                .removePrefix("https://")
-                                .removePrefix("http://")
-                                .substringBefore("/")
-                                .substringBefore(":")
-                        request.url.host == baseHost
+                        request.url.host == baseHost() &&
+                            !request.url.encodedPath.isAuthPath()
                     }
 
                     refreshTokens {
@@ -118,7 +130,7 @@ object KtorNetworkModule {
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            Timber.e(e, "Bearer refresh callback failed")
+                            Timber.e("Bearer refresh callback failed")
                             null
                         }
                     }
@@ -126,4 +138,26 @@ object KtorNetworkModule {
             }
         }
     }
+
+    private fun HttpMethod.isRetryable(): Boolean =
+        this == HttpMethod.Get ||
+            this == HttpMethod.Head ||
+            this == HttpMethod.Options ||
+            this == HttpMethod.Put ||
+            this == HttpMethod.Delete
+
+    private fun String.isAuthPath(): Boolean =
+        split('/')
+            .any { segment -> segment.equals(AUTH_PATH_SEGMENT, ignoreCase = true) }
+
+    private fun baseHost(): String =
+        BuildConfig.BASE_URL
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .substringBefore("/")
+            .substringBefore(":")
+
+    private const val AUTH_PATH_SEGMENT = "auth"
+    private const val MAX_RETRIES = 3
+    private val SERVER_ERROR_STATUS_RANGE = 500..599
 }

@@ -4,6 +4,10 @@ plugins {
 
 android {
     namespace = "dev.whysoezzy.auth"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
@@ -11,6 +15,7 @@ dependencies {
     implementation(project(":core:auth"))
     implementation(project(":core:common"))
 
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.android)

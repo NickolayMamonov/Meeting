@@ -4,9 +4,11 @@ import com.whysoezzy.auth.data.dto.AuthResponse
 import com.whysoezzy.auth.data.dto.RefreshTokenRequest
 import com.whysoezzy.auth.data.dto.RefreshTokenResponse
 import com.whysoezzy.auth.data.dto.SendOtpRequest
+import com.whysoezzy.auth.data.dto.SendOtpResponse
 import com.whysoezzy.auth.data.dto.VerifyOtpRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.retry
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -15,23 +17,25 @@ import io.ktor.http.contentType
 internal class AuthApiKtor(
     private val client: HttpClient,
 ) : AuthApi {
-    override suspend fun sendOtp(phone: String): Map<String, String> =
+    override suspend fun requestEmailOtp(email: String): SendOtpResponse =
         client
-            .post("auth/send-otp") {
+            .post("auth/email/send-otp") {
                 contentType(ContentType.Application.Json)
-                setBody(SendOtpRequest(phone))
+                retry { noRetry() }
+                setBody(SendOtpRequest(email))
             }.body()
 
-    override suspend fun verifyOtp(
-        phone: String,
+    override suspend fun verifyEmailOtp(
+        email: String,
         code: String,
         name: String?,
         surname: String?,
     ): AuthResponse =
         client
-            .post("auth/verify-otp") {
+            .post("auth/email/verify-otp") {
                 contentType(ContentType.Application.Json)
-                setBody(VerifyOtpRequest(phone, code, name, surname))
+                retry { noRetry() }
+                setBody(VerifyOtpRequest(email, code, name, surname))
             }.body()
 
     override suspend fun refreshToken(refreshToken: String): RefreshTokenResponse =

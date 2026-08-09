@@ -118,7 +118,6 @@ class ProfileDetailsViewModel
         private fun handleLogout() {
             viewModelScope.launch {
                 logoutUseCase()
-                _navEvent.emit(ProfileDetailsNavEvent.NavigateToAuth)
             }
         }
 

@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.presentation.code
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -18,11 +19,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import com.whysoezzy.common.error.ErrorType
+import com.whysoezzy.auth.domain.models.AuthFailure
 import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
@@ -30,7 +28,6 @@ import dev.whysoezzy.uikit.components.forms.UIKitCodeInput
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextMetadata1
-import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
@@ -40,38 +37,29 @@ import org.koin.core.parameter.parametersOf
 
 @Composable
 fun CodeVerificationScreen(
-    phoneNumber: String,
+    attemptId: String,
     onCodeVerifiedExisting: () -> Unit,
-    onCodeVerifiedNew: (phone: String, code: String) -> Unit,
+    onCodeVerifiedNew: () -> Unit,
     onBackPressed: () -> Unit,
-    viewModel: CodeVerificationViewModel = koinViewModel { parametersOf(phoneNumber) },
+    viewModel: CodeVerificationViewModel = koinViewModel { parametersOf(attemptId) },
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     SecureScreenEffect()
-
-    // Подписываемся на навигационные события из ViewModel
+    BackHandler { viewModel.clearAndLeave() }
     LaunchedEffect(Unit) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.navEvent.collect { event ->
-                when (event) {
-                    is CodeVerificationNavEvent.NavigateToMain ->
-                        onCodeVerifiedExisting()
-                    is CodeVerificationNavEvent.NavigateToNameInput ->
-                        onCodeVerifiedNew(event.phone, event.code)
-                }
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                CodeVerificationNavEvent.NavigateToMain -> onCodeVerifiedExisting()
+                CodeVerificationNavEvent.NavigateToNameInput -> onCodeVerifiedNew()
+                CodeVerificationNavEvent.NavigateToEmail -> onBackPressed()
             }
         }
     }
-
-    Scaffold { paddingValues ->
+    Scaffold { padding ->
         CodeVerificationContent(
-            phoneNumber = phoneNumber,
-            uiState = uiState,
-            modifier =
-                Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize(),
+            maskedEmail = state.maskedEmail,
+            uiState = state,
+            modifier = Modifier.padding(padding).fillMaxSize(),
             onCodeChange = { viewModel.onEvent(CodeVerificationEvent.UpdateCode(it)) },
             onVerifyClick = { viewModel.onEvent(CodeVerificationEvent.VerifyCode) },
             onResendClick = { viewModel.onEvent(CodeVerificationEvent.ResendCode) },
@@ -81,7 +69,7 @@ fun CodeVerificationScreen(
 
 @Composable
 private fun CodeVerificationContent(
-    phoneNumber: String,
+    maskedEmail: String,
     uiState: CodeVerificationUiState,
     modifier: Modifier = Modifier,
     onCodeChange: (String) -> Unit = {},
@@ -93,8 +81,7 @@ private fun CodeVerificationContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
     ) {
-        Spacer(modifier = Modifier.height(60.dp))
-
+        Spacer(Modifier.height(60.dp))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
@@ -105,31 +92,24 @@ private fun CodeVerificationContent(
                 textAlign = TextAlign.Center,
             )
             TextBody2(
-                text = stringResource(R.string.auth_code_subtitle, phoneNumber),
+                text = stringResource(R.string.auth_code_subtitle, maskedEmail),
                 color = ColorTokens.NeutralWeak,
                 textAlign = TextAlign.Center,
             )
         }
-
-        Spacer(modifier = Modifier.height(SpacingTokens.L))
-
         UIKitCodeInput(
             value = uiState.code,
             onValueChange = onCodeChange,
             codeLength = 6,
             isError = uiState.error != null,
         )
-
-        if (uiState.error != null) {
+        uiState.error?.let { failure ->
             TextMetadata1(
-                text = uiState.error.asUserMessage(),
+                text = failureMessage(failure),
                 color = ColorTokens.AccentDanger,
                 textAlign = TextAlign.Center,
             )
         }
-
-        Spacer(modifier = Modifier.height(SpacingTokens.M))
-
         if (uiState.canResend) {
             TextButton(onClick = onResendClick) {
                 TextMetadata1(
@@ -144,46 +124,41 @@ private fun CodeVerificationContent(
                 textAlign = TextAlign.Center,
             )
         }
-
-        Spacer(modifier = Modifier.weight(1f))
-
+        Spacer(Modifier.weight(1f))
         UIKitButton(
             text = stringResource(R.string.auth_code_confirm),
             onClick = onVerifyClick,
-            state =
-                when {
-                    uiState.isLoading -> UIKitButtonState.LOADING
-                    uiState.isValid -> UIKitButtonState.PRIMARY
-                    else -> UIKitButtonState.DISABLED
-                },
+            state = if (uiState.isLoading) {
+                UIKitButtonState.LOADING
+            } else if (uiState.isValid) {
+                UIKitButtonState.PRIMARY
+            } else {
+                UIKitButtonState.DISABLED
+            },
             modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-@Preview
-@Composable
-private fun CodeVerificationScreenPreview() {
-    UIKitTheme {
-        CodeVerificationContent(
-            phoneNumber = stringResource(R.string.auth_code_error_invalid),
-            uiState = CodeVerificationUiState(code = "12", remainingTime = 45),
-        )
-    }
+private fun failureMessage(failure: AuthFailure): String = when (failure) {
+    AuthFailure.InvalidOrExpiredCode,
+    AuthFailure.InvalidCode,
+    -> "The code is incorrect or expired. Request a new code"
+    AuthFailure.RateLimited -> "Too many attempts. Try again later"
+    AuthFailure.DeliveryUnavailable -> "Code delivery is temporarily unavailable"
+    AuthFailure.ActivationUnavailable -> "The email service is temporarily unavailable"
+    AuthFailure.NoConnection, AuthFailure.Server, AuthFailure.Unknown ->
+        "The request could not be completed. Try again"
+    else -> "The request could not be completed. Try again"
 }
 
 @Preview
 @Composable
-private fun CodeVerificationScreenErrorPreview() {
+private fun CodeVerificationPreview() {
     UIKitTheme {
         CodeVerificationContent(
-            phoneNumber = "+7 (999) 123-45-67",
-            uiState =
-                CodeVerificationUiState(
-                    code = "123456",
-                    error = ErrorType.Unknown,
-                    canResend = true,
-                ),
+            maskedEmail = "p***@example.com",
+            uiState = CodeVerificationUiState(code = "123456", remainingTime = 45),
         )
     }
 }

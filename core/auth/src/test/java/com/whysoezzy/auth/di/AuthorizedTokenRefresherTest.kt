@@ -3,6 +3,7 @@ package com.whysoezzy.auth.di
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.common.error.AppException
+import com.whysoezzy.network.error.ApiException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -26,6 +27,18 @@ class AuthorizedTokenRefresherTest {
         coEvery { tokenManager.getRefreshToken() } returns "refresh-token"
         coEvery { authRepository.refreshToken() } returns
             Result.failure(AppException.UnauthorizedError())
+
+        val tokens = refreshAuthorizedTokens(authRepository, tokenManager)
+
+        assertNull(tokens)
+        coVerify(exactly = 1) { tokenManager.clearTokens() }
+    }
+
+    @Test
+    fun `network unauthorized refresh clears local tokens`() = runTest {
+        coEvery { tokenManager.getRefreshToken() } returns "refresh-token"
+        coEvery { authRepository.refreshToken() } returns
+            Result.failure(ApiException.UnauthorizedError())
 
         val tokens = refreshAuthorizedTokens(authRepository, tokenManager)
 

@@ -6,18 +6,13 @@ sealed class MeetRoute(
     // Auth routes
     object Auth : MeetRoute("auth")
 
-    object PhoneInput : MeetRoute("auth/phone")
+    object EmailInput : MeetRoute("auth/email")
 
-    object CodeVerification : MeetRoute("auth/code/{phoneNumber}") {
-        fun createRoute(phoneNumber: String) = "auth/code/${encode(phoneNumber)}"
+    object CodeVerification : MeetRoute("auth/code/{attemptId}") {
+        val destinationId: Int = navigationDestinationId(route)
     }
 
-    object NameInput : MeetRoute("auth/name/{phone}/{code}") {
-        fun createRoute(
-            phone: String,
-            code: String,
-        ) = "auth/name/${encode(phone)}/$code"
-    }
+    object NameInput : MeetRoute("auth/name")
 
     /** Ввод имени без авторизационного контекста — для пользователей с пустым именем */
     object NameInputFromProfile : MeetRoute("profile/setup-name")
@@ -54,11 +49,8 @@ sealed class MeetRoute(
     object UserProfile : MeetRoute("profile/{userId}") {
         fun createRoute(userId: Long) = "profile/$userId"
     }
-
-    companion object {
-        // URL-кодирование для телефонного номера (+7 → %2B7 и т.д.)
-        fun encode(value: String): String = java.net.URLEncoder.encode(value, "UTF-8")
-
-        fun decode(value: String): String = java.net.URLDecoder.decode(value, "UTF-8")
-    }
 }
+
+// Navigation derives string-route IDs from this URI form before hashing the route.
+internal fun navigationDestinationId(route: String): Int =
+    "android-app://androidx.navigation/$route".hashCode()

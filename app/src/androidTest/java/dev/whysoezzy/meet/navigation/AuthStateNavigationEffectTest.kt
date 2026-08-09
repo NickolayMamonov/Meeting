@@ -13,6 +13,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.whysoezzy.auth.domain.models.DispatchOutcome
+import com.whysoezzy.auth.domain.models.EmailOtpAttempt
+import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -25,7 +29,7 @@ class AuthStateNavigationEffectTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun unauthorizedRefresh_routesProtectedDestinationToPhoneAuthAndExcludesProtectedBackStack() {
+    fun unauthorizedRefresh_routesProtectedDestinationToEmailAuthAndExcludesProtectedBackStack() {
         var isLoggedIn by mutableStateOf(true)
         lateinit var navController: NavHostController
 
@@ -43,11 +47,11 @@ class AuthStateNavigationEffectTest {
                     Text("Protected meeting content")
                 }
                 navigation(
-                    startDestination = MeetRoute.PhoneInput.route,
+                    startDestination = MeetRoute.EmailInput.route,
                     route = MeetRoute.Auth.route,
                 ) {
-                    composable(MeetRoute.PhoneInput.route) {
-                        Text("Phone authentication")
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
                     }
                 }
             }
@@ -69,7 +73,7 @@ class AuthStateNavigationEffectTest {
             isLoggedIn = false
         }
 
-        composeTestRule.onNodeWithText("Phone authentication").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Email authentication").assertIsDisplayed()
 
         composeTestRule.runOnIdle {
             val protectedRoutes =
@@ -84,6 +88,243 @@ class AuthStateNavigationEffectTest {
             navController.popBackStack()
 
             assertFalse(navController.currentDestination?.route in protectedRoutes)
+        }
+    }
+
+    @Test
+    fun logoutFromAuthChild_routesToEmailAndClearsAuthChildBackStack() {
+        var isLoggedIn by mutableStateOf(true)
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+            NavHost(
+                navController = navController,
+                startDestination = MeetRoute.Auth.route,
+            ) {
+                navigation(
+                    startDestination = MeetRoute.EmailInput.route,
+                    route = MeetRoute.Auth.route,
+                ) {
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
+                    }
+                    composable(MeetRoute.NameInput.route) {
+                        Text("New user onboarding")
+                    }
+                }
+            }
+            AuthStateNavigationEffect(
+                navController = navController,
+                isLoggedIn = isLoggedIn,
+            )
+        }
+
+        composeTestRule.runOnIdle {
+            navController.navigate(MeetRoute.NameInput.route)
+        }
+        composeTestRule.onNodeWithText("New user onboarding").assertIsDisplayed()
+
+        composeTestRule.runOnIdle {
+            isLoggedIn = false
+        }
+
+        composeTestRule.onNodeWithText("Email authentication").assertIsDisplayed()
+        composeTestRule.runOnIdle {
+            assertEquals(MeetRoute.EmailInput.route, navController.currentDestination?.route)
+            assertFalse(
+                navController.previousBackStackEntry?.destination?.route ==
+                    MeetRoute.NameInput.route,
+            )
+        }
+    }
+
+    @Test
+    fun profileLogout_isRoutedByRootAuthOwner() {
+        var isLoggedIn by mutableStateOf(true)
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+            NavHost(
+                navController = navController,
+                startDestination = MeetRoute.Profile.route,
+            ) {
+                composable(MeetRoute.Profile.route) {
+                    Text("Profile content")
+                }
+                navigation(
+                    startDestination = MeetRoute.EmailInput.route,
+                    route = MeetRoute.Auth.route,
+                ) {
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
+                    }
+                }
+            }
+            AuthStateNavigationEffect(
+                navController = navController,
+                isLoggedIn = isLoggedIn,
+            )
+        }
+
+        composeTestRule.onNodeWithText("Profile content").assertIsDisplayed()
+        composeTestRule.runOnIdle {
+            isLoggedIn = false
+        }
+
+        composeTestRule.onNodeWithText("Email authentication").assertIsDisplayed()
+        composeTestRule.runOnIdle {
+            assertEquals(MeetRoute.EmailInput.route, navController.currentDestination?.route)
+            assertFalse(
+                navController.previousBackStackEntry?.destination?.route ==
+                    MeetRoute.Profile.route,
+            )
+        }
+    }
+
+    @Test
+    fun newUserOnboarding_isPreservedWhenAuthStateBecomesLoggedIn() {
+        var isLoggedIn by mutableStateOf(false)
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = MeetRoute.Auth.route,
+            ) {
+                navigation(
+                    startDestination = MeetRoute.EmailInput.route,
+                    route = MeetRoute.Auth.route,
+                ) {
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
+                    }
+                    composable(MeetRoute.NameInput.route) {
+                        Text("New user onboarding")
+                    }
+                }
+                composable(MeetRoute.Main.route) {
+                    Text("Protected main content")
+                }
+            }
+
+            AuthStateNavigationEffect(
+                navController = navController,
+                isLoggedIn = isLoggedIn,
+            )
+        }
+
+        composeTestRule.runOnIdle {
+            navController.navigate(MeetRoute.NameInput.route)
+        }
+        composeTestRule.onNodeWithText("New user onboarding").assertIsDisplayed()
+
+        composeTestRule.runOnIdle {
+            isLoggedIn = true
+        }
+
+        composeTestRule.onNodeWithText("New user onboarding").assertIsDisplayed()
+        composeTestRule.runOnIdle {
+            assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
+            assertFalse(navController.previousBackStackEntry?.destination?.route == MeetRoute.Main.route)
+        }
+    }
+
+    @Test
+    fun firstResolvedLoggedOutState_clearsRestoredProtectedStack() {
+        var isLoggedIn by mutableStateOf<Boolean?>(null)
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = MeetRoute.Auth.route,
+            ) {
+                navigation(
+                    startDestination = MeetRoute.EmailInput.route,
+                    route = MeetRoute.Auth.route,
+                ) {
+                    composable(MeetRoute.EmailInput.route) {
+                        Text("Email authentication")
+                    }
+                }
+                composable(MeetRoute.Main.route) {
+                    Text("Protected main content")
+                }
+                composable(MeetRoute.MeetingDetails.route) {
+                    Text("Protected meeting content")
+                }
+            }
+
+            AuthStateNavigationEffect(
+                navController = navController,
+                isLoggedIn = isLoggedIn,
+            )
+        }
+
+        composeTestRule.runOnIdle {
+            navController.navigate(MeetRoute.Main.route)
+            navController.navigate(MeetRoute.MeetingDetails.createRoute(1L))
+            isLoggedIn = false
+        }
+
+        composeTestRule.onNodeWithText("Email authentication").assertIsDisplayed()
+        composeTestRule.runOnIdle {
+            assertFalse(
+                navController.currentDestination?.route in
+                    setOf(MeetRoute.Main.route, MeetRoute.MeetingDetails.route),
+            )
+            assertFalse(
+                navController.previousBackStackEntry?.destination?.route in
+                    setOf(MeetRoute.Main.route, MeetRoute.MeetingDetails.route),
+            )
+        }
+    }
+
+    @Test
+    fun meetNavHostRecomposition_afterPendingCleanup_preservesOnboardingBackStack() {
+        var pendingAttempt: EmailOtpAttemptResult by mutableStateOf(
+            EmailOtpAttemptResult.Found(
+                EmailOtpAttempt(
+                    attemptId = "restored-attempt",
+                    maskedEmail = "p***@example.com",
+                    resendAvailableAtEpochMillis = 60_000L,
+                    challengeMayBeActive = true,
+                    dispatchOutcome = DispatchOutcome.Confirmed,
+                ),
+            ),
+        )
+        lateinit var navController: NavHostController
+
+        composeTestRule.setContent {
+            navController = rememberNavController()
+            MeetNavHostContent(
+                navController = navController,
+                isLoggedIn = false,
+                pendingAttempt = pendingAttempt,
+            )
+        }
+
+        composeTestRule.runOnIdle {
+            navController.navigate(MeetRoute.NameInput.route) {
+                popUpTo(MeetRoute.Auth.route) { inclusive = false }
+            }
+            assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
+            pendingAttempt = EmailOtpAttemptResult.MissingOrExpired
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.runOnIdle {
+            assertEquals(MeetRoute.NameInput.route, navController.currentDestination?.route)
+            assertEquals(
+                MeetRoute.Auth.route,
+                navController.currentDestination?.parent?.route,
+            )
         }
     }
 }

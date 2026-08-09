@@ -9,3 +9,7 @@ sealed interface ErrorType {
 
     data object Unknown : ErrorType
 }
+
+interface ErrorTypeCarrier {
+    val errorType: ErrorType
+}

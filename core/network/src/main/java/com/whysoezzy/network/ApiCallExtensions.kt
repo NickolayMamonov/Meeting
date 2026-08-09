@@ -1,6 +1,7 @@
 package com.whysoezzy.network
 
-import com.whysoezzy.common.error.AppException
+import com.whysoezzy.network.error.ApiErrorMetadata
+import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.network.error.ErrorResponse
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.bodyAsText
@@ -8,36 +9,61 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
 
-suspend inline fun <T> safeApiCall(crossinline apiCall: suspend () -> T): Result<T> =
+internal const val SERVER_ERROR_MESSAGE = "Server request failed"
+
+internal const val NETWORK_ERROR_MESSAGE = "Network request failed"
+
+internal const val UNKNOWN_ERROR_MESSAGE = "Unexpected request failure"
+
+internal const val REDACTED_METADATA = "[redacted]"
+
+suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> =
     try {
         Result.success(apiCall())
     } catch (e: ResponseException) {
         val statusCode = e.response.status.value
+        val responseBody = try {
+            e.response.bodyAsText()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            ""
+        }
+        val parsed = try {
+            Json { ignoreUnknownKeys = true }.decodeFromString<ErrorResponse>(responseBody)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
         when (statusCode) {
             401, 403 -> {
-                Result.failure(AppException.UnauthorizedError())
+                Result.failure(
+                    ApiException.UnauthorizedError(
+                        metadata = ApiErrorMetadata(status = statusCode, code = parsed?.code),
+                    ),
+                )
             }
 
             else -> {
-                val errorBody = e.response.bodyAsText()
-                val errorResponse =
-                    try {
-                        Json.decodeFromString<ErrorResponse>(errorBody)
-                    } catch (parseException: Exception) {
-                        ErrorResponse(
-                            status = statusCode,
-                            message = e.message ?: "Unknown error",
-                            timestamp = "",
-                            path = "",
-                        )
-                    }
-                Result.failure(AppException.ServerError(errorResponse.message))
+                val errorResponse = ErrorResponse(
+                    status = statusCode,
+                    message = SERVER_ERROR_MESSAGE,
+                    timestamp = REDACTED_METADATA,
+                    path = REDACTED_METADATA,
+                    code = parsed?.code,
+                )
+                Result.failure(
+                    ApiException.ServerError(
+                        ApiErrorMetadata(status = errorResponse.status, code = errorResponse.code),
+                    ),
+                )
             }
         }
     } catch (e: IOException) {
-        Result.failure(AppException.NetworkError(e.message ?: "Network error"))
+        Result.failure(ApiException.NetworkError())
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        Result.failure(AppException.UnknownError(e.message ?: "Unknown error"))
+        Result.failure(ApiException.UnknownError())
     }

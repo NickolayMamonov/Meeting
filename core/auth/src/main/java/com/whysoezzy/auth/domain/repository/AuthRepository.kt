@@ -1,17 +1,18 @@
 package com.whysoezzy.auth.domain.repository
 
+import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthResult
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
-    suspend fun sendOtp(phone: String): Result<Unit>
+    suspend fun requestEmailOtp(email: String): AuthOutcome<Unit>
 
-    suspend fun verifyOtp(
-        phone: String,
+    suspend fun verifyEmailOtp(
+        email: String,
         code: String,
         name: String? = null,
         surname: String? = null,
-    ): Result<AuthResult>
+    ): AuthOutcome<AuthResult>
 
     suspend fun refreshToken(): Result<String>
 

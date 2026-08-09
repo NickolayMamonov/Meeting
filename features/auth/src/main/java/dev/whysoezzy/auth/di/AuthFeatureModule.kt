@@ -1,9 +1,11 @@
 package dev.whysoezzy.auth.di
 
 import com.whysoezzy.auth.domain.repository.UserProfileUpdater
+import com.whysoezzy.auth.domain.usecase.RecoverEmailOtpAttemptUseCase
+import com.whysoezzy.auth.domain.usecase.RequestEmailOtpUseCase
 import dev.whysoezzy.auth.presentation.code.CodeVerificationViewModel
+import dev.whysoezzy.auth.presentation.email.EmailInputViewModel
 import dev.whysoezzy.auth.presentation.name.NameInputViewModel
-import dev.whysoezzy.auth.presentation.phone.PhoneInputViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
@@ -11,18 +13,27 @@ val authFeatureModule =
     module {
 
         viewModel {
-            PhoneInputViewModel(
-                sendOtpUseCase = get(),
+            EmailInputViewModel(
+                requestEmailOtp = get<RequestEmailOtpUseCase>(),
+                recoverEmailOtp = get<RecoverEmailOtpAttemptUseCase>(),
             )
         }
 
-        viewModel { (phoneNumber: String) ->
+        viewModel { (attemptId: String) ->
             CodeVerificationViewModel(
-                phoneNumber = phoneNumber,
+                attemptId = attemptId,
+                loadAttempt = get(),
+                resendOtp = get(),
                 verifyOtpUseCase = get(),
-                sendOtpUseCase = get(),
+                clearAttempt = get(),
             )
         }
 
-        viewModel { NameInputViewModel(get<UserProfileUpdater>()) }
+        viewModel { (mode: dev.whysoezzy.auth.presentation.name.NameInputMode) ->
+            NameInputViewModel(
+                mode = mode,
+                userProfileUpdater = get<UserProfileUpdater>(),
+                sessionRepository = get(),
+            )
+        }
     }

@@ -1,71 +1,111 @@
 package dev.whysoezzy.meet.navigation.routes
 
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.os.bundleOf
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import dev.whysoezzy.auth.presentation.code.CodeVerificationScreen
+import dev.whysoezzy.auth.presentation.email.EmailInputScreen
+import dev.whysoezzy.auth.presentation.name.NameInputMode
 import dev.whysoezzy.auth.presentation.name.NameInputScreen
-import dev.whysoezzy.auth.presentation.phone.PhoneInputScreen
 import dev.whysoezzy.auth.presentation.success.AuthSuccessScreen
 import dev.whysoezzy.meet.navigation.MeetRoute
+import dev.whysoezzy.meet.navigation.registerLegacyAuthCompatibilityDestinations
+import dev.whysoezzy.meet.navigation.resolveFromDurableSession
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
-fun NavGraphBuilder.authNavigation(navController: NavController) {
+fun NavGraphBuilder.authNavigation(
+    navController: NavController,
+    startDestination: String = MeetRoute.EmailInput.route,
+    onLegacyDestinationComposed: ((Int) -> Unit)? = null,
+    onLegacyRedirectRequested: (() -> Unit)? = null,
+) {
     navigation(
-        startDestination = MeetRoute.PhoneInput.route,
+        startDestination = startDestination,
         route = MeetRoute.Auth.route,
     ) {
-        // 1. Ввод телефона
-        composable(MeetRoute.PhoneInput.route) {
-            PhoneInputScreen(
-                onPhoneSubmitted = { phoneNumber ->
+        composable(MeetRoute.EmailInput.route) {
+            EmailInputScreen(
+                onAttemptStarted = { attemptId ->
                     navController.navigate(
-                        MeetRoute.CodeVerification.createRoute(phoneNumber),
+                        MeetRoute.CodeVerification.destinationId,
+                        bundleOf("attemptId" to attemptId),
                     )
                 },
                 onBackPressed = { navController.popBackStack() },
             )
         }
 
-        // 2. Ввод кода подтверждения
-        composable(MeetRoute.CodeVerification.route) { backStackEntry ->
-            val phone = backStackEntry.arguments?.getString("phoneNumber") ?: ""
-
+        composable(
+            route = MeetRoute.CodeVerification.route,
+            arguments = listOf(
+                androidx.navigation.navArgument("attemptId") {
+                    type = NavType.StringType
+                },
+            ),
+        ) { backStackEntry ->
+            val attemptId = backStackEntry.arguments?.getString("attemptId").orEmpty()
             CodeVerificationScreen(
-                phoneNumber = phone,
+                attemptId = attemptId,
                 onCodeVerifiedExisting = {
-                    // Существующий пользователь — сразу в Main, очищаем Auth stack
                     navController.navigate(MeetRoute.Main.route) {
                         popUpTo(MeetRoute.Auth.route) { inclusive = true }
                     }
                 },
-                onCodeVerifiedNew = { p, code ->
-                    // Новый пользователь — нужно ввести имя
-                    navController.navigate(MeetRoute.NameInput.createRoute(p, code))
+                onCodeVerifiedNew = {
+                    navController.navigate(MeetRoute.NameInput.route) {
+                        popUpTo(MeetRoute.Auth.route) { inclusive = false }
+                    }
                 },
                 onBackPressed = { navController.popBackStack() },
             )
         }
 
-        // 3. Ввод имени (только для новых пользователей)
         composable(MeetRoute.NameInput.route) {
             NameInputScreen(
+                mode = NameInputMode.Onboarding,
                 onNameSubmitted = {
                     navController.navigate(MeetRoute.AuthSuccess.route)
                 },
+                onProfileCompleted = {},
+                onResolveFromDurableSession = navController::resolveFromDurableSession,
                 onBackPressed = { navController.popBackStack() },
             )
         }
 
-        // 4. Экран успешной регистрации
         composable(MeetRoute.AuthSuccess.route) {
+            val sessionRepository: AuthSessionRepository = koinInject()
+            val scope = rememberCoroutineScope()
             AuthSuccessScreen(
                 onContinueClicked = {
-                    navController.navigate(MeetRoute.Main.route) {
-                        popUpTo(MeetRoute.Auth.route) { inclusive = true }
+                    scope.launch {
+                        if (sessionRepository.compareAndSetStage(
+                                expected = AuthSession.Stage.Welcome,
+                                next = AuthSession.Stage.Ready,
+                            )
+                        ) {
+                            navController.navigate(MeetRoute.Main.route) {
+                                popUpTo(MeetRoute.Auth.route) { inclusive = true }
+                            }
+                        } else {
+                            navController.resolveFromDurableSession(sessionRepository.read())
+                        }
                     }
                 },
             )
         }
+
+        registerLegacyAuthCompatibilityDestinations(
+            builder = this,
+            navController = navController,
+            onLegacyDestinationComposed = onLegacyDestinationComposed,
+            onLegacyRedirectRequested = onLegacyRedirectRequested,
+        )
     }
 }
