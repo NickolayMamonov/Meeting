@@ -1,10 +1,13 @@
 package dev.whysoezzy.auth.presentation.name
 
 import app.cash.turbine.test
+import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.auth.domain.repository.UserProfileUpdater
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -22,8 +25,21 @@ class NameInputViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val userProfileUpdater: UserProfileUpdater = mockk()
+    private val sessionRepository: AuthSessionRepository = mockk(relaxed = true)
 
-    private fun viewModel() = NameInputViewModel(userProfileUpdater)
+    private fun viewModel(
+        mode: NameInputMode = NameInputMode.Onboarding,
+        stage: AuthSession.Stage = AuthSession.Stage.NeedsName,
+    ): NameInputViewModel {
+        coEvery { sessionRepository.read() } returns AuthSession(1L, stage)
+        coEvery {
+            sessionRepository.compareAndSetStage(
+                AuthSession.Stage.NeedsName,
+                AuthSession.Stage.Welcome,
+            )
+        } returns true
+        return NameInputViewModel(mode, userProfileUpdater, sessionRepository)
+    }
 
     // ==================== updateName / updateSurname ====================
 
@@ -153,5 +169,167 @@ class NameInputViewModelTest {
         assertNotNull(state.nameError)
         assertTrue(!state.isLoading)
         assertTrue(vm.uiState.value.nameError is NameFieldError.Remote)
+    }
+
+    @Test
+    fun `profile failure emits no navigation and remains retryable`() = runTest {
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns
+            Result.failure(RuntimeException("Server error"))
+        val vm = viewModel(NameInputMode.ProfileCompletion, AuthSession.Stage.Ready)
+        vm.onEvent(NameInputEvent.UpdateName("Иван"))
+        vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
+
+        vm.navEvent.test {
+            vm.onEvent(NameInputEvent.Continue)
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+
+        assertTrue(!vm.uiState.value.isSubmitted)
+        assertTrue(!vm.uiState.value.isLoading)
+        coVerify(exactly = 0) { sessionRepository.compareAndSetStage(any(), any()) }
+    }
+
+    @Test
+    fun `onboarding orders profile update before durable CAS`() = runTest {
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        val vm = viewModel()
+        vm.onEvent(NameInputEvent.UpdateName("Иван"))
+        vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
+
+        vm.navEvent.test {
+            vm.onEvent(NameInputEvent.Continue)
+            advanceUntilIdle()
+            assertEquals(NameInputNavEvent.NavigateToSuccess, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerifyOrder {
+            userProfileUpdater.updateName("Иван", "Иванов")
+            sessionRepository.compareAndSetStage(
+                AuthSession.Stage.NeedsName,
+                AuthSession.Stage.Welcome,
+            )
+        }
+    }
+
+    @Test
+    fun `profile completion updates Ready without stage mutation`() = runTest {
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        val vm = viewModel(NameInputMode.ProfileCompletion, AuthSession.Stage.Ready)
+        vm.onEvent(NameInputEvent.UpdateName("Иван"))
+        vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
+
+        vm.navEvent.test {
+            vm.onEvent(NameInputEvent.Continue)
+            advanceUntilIdle()
+            assertEquals(NameInputNavEvent.NavigateToProfile, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify(exactly = 0) { sessionRepository.compareAndSetStage(any(), any()) }
+    }
+
+    @Test
+    fun `unexpected stage resolves without profile IO`() = runTest {
+        val vm = viewModel(NameInputMode.Onboarding, AuthSession.Stage.Ready)
+        vm.onEvent(NameInputEvent.UpdateName("Иван"))
+        vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
+
+        vm.navEvent.test {
+            vm.onEvent(NameInputEvent.Continue)
+            advanceUntilIdle()
+            assertEquals(
+                NameInputNavEvent.ResolveFromDurableSession(AuthSession(1L, AuthSession.Stage.Ready)),
+                awaitItem(),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify(exactly = 0) { userProfileUpdater.updateName(any(), any()) }
+    }
+
+    @Test
+    fun `concurrent Welcome is accepted through durable resolution`() = runTest {
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        val vm = viewModel()
+        coEvery {
+            sessionRepository.read()
+        } returnsMany listOf(
+            AuthSession(1L, AuthSession.Stage.NeedsName),
+            AuthSession(1L, AuthSession.Stage.Welcome),
+        )
+        coEvery {
+            sessionRepository.compareAndSetStage(
+                AuthSession.Stage.NeedsName,
+                AuthSession.Stage.Welcome,
+            )
+        } returns false
+        vm.onEvent(NameInputEvent.UpdateName("Иван"))
+        vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
+
+        vm.navEvent.test {
+            vm.onEvent(NameInputEvent.Continue)
+            advanceUntilIdle()
+            assertEquals(
+                NameInputNavEvent.ResolveFromDurableSession(
+                    AuthSession(1L, AuthSession.Stage.Welcome),
+                ),
+                awaitItem(),
+            )
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `CAS failure with unchanged NeedsName does not enter auth success`() = runTest {
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        val vm = viewModel()
+        coEvery {
+            sessionRepository.compareAndSetStage(
+                AuthSession.Stage.NeedsName,
+                AuthSession.Stage.Welcome,
+            )
+        } returns false
+        vm.onEvent(NameInputEvent.UpdateName("Иван"))
+        vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
+
+        vm.navEvent.test {
+            vm.onEvent(NameInputEvent.Continue)
+            advanceUntilIdle()
+            assertEquals(
+                NameInputNavEvent.ResolveFromDurableSession(
+                    AuthSession(1L, AuthSession.Stage.NeedsName),
+                ),
+                awaitItem(),
+            )
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `profile recheck resolves a concurrent stage change without stage write`() = runTest {
+        coEvery { userProfileUpdater.updateName(any(), any()) } returns Result.success(Unit)
+        val vm = viewModel(NameInputMode.ProfileCompletion, AuthSession.Stage.Ready)
+        coEvery { sessionRepository.read() } returnsMany listOf(
+            AuthSession(1L, AuthSession.Stage.Ready),
+            AuthSession(1L, AuthSession.Stage.Welcome),
+        )
+        vm.onEvent(NameInputEvent.UpdateName("Иван"))
+        vm.onEvent(NameInputEvent.UpdateSurname("Иванов"))
+
+        vm.navEvent.test {
+            vm.onEvent(NameInputEvent.Continue)
+            advanceUntilIdle()
+            assertEquals(
+                NameInputNavEvent.ResolveFromDurableSession(
+                    AuthSession(1L, AuthSession.Stage.Welcome),
+                ),
+                awaitItem(),
+            )
+            expectNoEvents()
+        }
+
+        coVerify(exactly = 0) { sessionRepository.compareAndSetStage(any(), any()) }
     }
 }

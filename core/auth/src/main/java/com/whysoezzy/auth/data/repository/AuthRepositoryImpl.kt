@@ -5,7 +5,9 @@ import com.whysoezzy.auth.data.api.AuthApi
 import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.repository.AuthRepository
+import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.network.safeApiCall
 import io.ktor.client.plugins.ResponseException
@@ -73,6 +75,7 @@ internal fun mapAuthFailure(
 internal class AuthRepositoryImpl(
     private val authApi: AuthApi,
     private val tokenManager: TokenManager,
+    private val sessionRepository: AuthSessionRepository? = null,
 ) : AuthRepository {
     override suspend fun requestEmailOtp(email: String): AuthOutcome<Unit> =
         emailApiCall(AuthEndpoint.Send) {
@@ -95,9 +98,24 @@ internal class AuthRepositoryImpl(
                     refreshToken = response.refreshToken,
                     userId = response.user.id,
                 )
+                sessionRepository?.saveAuthenticated(
+                    userId = response.user.id,
+                    stage = if (response.isNewUser) {
+                        AuthSession.Stage.NeedsName
+                    } else {
+                        AuthSession.Stage.Ready
+                    },
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
+                withContext(NonCancellable) {
+                    try {
+                        sessionRepository?.clear()
+                    } finally {
+                        tokenManager.clearTokens()
+                    }
+                }
                 throw SessionPersistenceException()
             }
 
@@ -132,7 +150,11 @@ internal class AuthRepositoryImpl(
             Timber.w(e, "Server logout failed, clearing local tokens anyway")
         } finally {
             withContext(NonCancellable) {
-                tokenManager.clearTokens()
+                try {
+                    sessionRepository?.clear()
+                } finally {
+                    tokenManager.clearTokens()
+                }
             }
         }
     }

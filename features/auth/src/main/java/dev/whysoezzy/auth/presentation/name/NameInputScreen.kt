@@ -1,5 +1,6 @@
 package dev.whysoezzy.auth.presentation.name
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.whysoezzy.auth.domain.models.AuthSession
 import dev.whysoezzy.auth.R
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
@@ -33,14 +35,18 @@ import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 import dev.whysoezzy.uikit.R as UIKitR
 
 @Composable
 fun NameInputScreen(
+    mode: NameInputMode,
     onNameSubmitted: () -> Unit,
+    onProfileCompleted: () -> Unit,
+    onResolveFromDurableSession: (AuthSession) -> Unit,
     onBackPressed: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: NameInputViewModel = koinViewModel(),
+    viewModel: NameInputViewModel = koinViewModel { parametersOf(mode) },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -50,10 +56,14 @@ fun NameInputScreen(
             viewModel.navEvent.collect { event ->
                 when (event) {
                     is NameInputNavEvent.NavigateToSuccess -> onNameSubmitted()
+                    is NameInputNavEvent.NavigateToProfile -> onProfileCompleted()
+                    is NameInputNavEvent.ResolveFromDurableSession ->
+                        onResolveFromDurableSession(event.session)
                 }
             }
         }
     }
+    BackHandler(onBack = onBackPressed)
 
     Scaffold { paddingValues ->
         NameInputContent(

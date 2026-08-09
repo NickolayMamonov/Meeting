@@ -2,8 +2,12 @@ package dev.whysoezzy.auth.presentation.name
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.auth.domain.repository.UserProfileUpdater
 import com.whysoezzy.common.error.ErrorType
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -14,22 +18,25 @@ import kotlinx.coroutines.launch
 
 sealed interface NameInputNavEvent {
     data object NavigateToSuccess : NameInputNavEvent
+
+    data object NavigateToProfile : NameInputNavEvent
+
+    data class ResolveFromDurableSession(
+        val session: AuthSession,
+    ) : NameInputNavEvent
 }
 
-/**
- * NameInputViewModel — экран для новых пользователей.
- * Сессия уже аутентифицирована (verify-otp прошёл на CodeVerificationScreen,
- * токены уже сохранены в TokenManager).
- * Здесь просто обновляем имя/фамилию через PUT /profile.
- */
 class NameInputViewModel(
+    private val mode: NameInputMode,
     private val userProfileUpdater: UserProfileUpdater,
+    private val sessionRepository: AuthSessionRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NameInputUiState())
     val uiState: StateFlow<NameInputUiState> = _uiState.asStateFlow()
 
     private val _navEvent = MutableSharedFlow<NameInputNavEvent>(extraBufferCapacity = 1)
     val navEvent: SharedFlow<NameInputNavEvent> = _navEvent.asSharedFlow()
+    private var submission: Job? = null
 
     fun onEvent(event: NameInputEvent) {
         when (event) {
@@ -72,14 +79,17 @@ class NameInputViewModel(
     }
 
     private fun validateAndSubmit() {
+        if (submission?.isActive == true) return
+
         val state = _uiState.value
         val nameError = validateName(state.name)
         val surnameError = validateSurname(state.surname)
-
         _uiState.value = state.copy(nameError = nameError, surnameError = surnameError)
         if (nameError != null || surnameError != null) return
 
-        viewModelScope.launch {
+        val name = state.name
+        val surname = state.surname
+        submission = viewModelScope.launch {
             _uiState.value =
                 _uiState.value.copy(
                     isLoading = true,
@@ -87,23 +97,90 @@ class NameInputViewModel(
                     surnameError = null,
                 )
 
-            userProfileUpdater
-                .updateName(
-                    name = _uiState.value.name,
-                    surname = _uiState.value.surname,
-                ).onSuccess {
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isLoading = false,
-                            isSubmitted = true,
-                        )
-                    _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
-                }.onFailure {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        nameError = NameFieldError.Remote(ErrorType.Unknown),
-                    )
+            try {
+                val current = sessionRepository.read()
+                when (mode) {
+                    NameInputMode.Onboarding -> submitOnboarding(current, name, surname)
+                    NameInputMode.ProfileCompletion -> submitProfileCompletion(current, name, surname)
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                showFailure()
+            }
         }
+    }
+
+    private suspend fun submitOnboarding(
+        current: AuthSession,
+        name: String,
+        surname: String,
+    ) {
+        if (current.stage != AuthSession.Stage.NeedsName) {
+            resolveCurrentSession()
+            return
+        }
+
+        val result = userProfileUpdater.updateName(name, surname)
+        if (result.isFailure) {
+            showFailure()
+            return
+        }
+
+        if (sessionRepository.compareAndSetStage(
+                expected = AuthSession.Stage.NeedsName,
+                next = AuthSession.Stage.Welcome,
+            )
+        ) {
+            markSubmitted()
+            _navEvent.emit(NameInputNavEvent.NavigateToSuccess)
+        } else {
+            resolveCurrentSession()
+        }
+    }
+
+    private suspend fun submitProfileCompletion(
+        current: AuthSession,
+        name: String,
+        surname: String,
+    ) {
+        if (current.stage != AuthSession.Stage.Ready) {
+            resolveCurrentSession()
+            return
+        }
+
+        val result = userProfileUpdater.updateName(name, surname)
+        if (result.isFailure) {
+            showFailure()
+            return
+        }
+
+        if (sessionRepository.read().stage == AuthSession.Stage.Ready) {
+            markSubmitted()
+            _navEvent.emit(NameInputNavEvent.NavigateToProfile)
+        } else {
+            resolveCurrentSession()
+        }
+    }
+
+    private suspend fun resolveCurrentSession() {
+        _uiState.value = _uiState.value.copy(isLoading = false)
+        _navEvent.emit(NameInputNavEvent.ResolveFromDurableSession(sessionRepository.read()))
+    }
+
+    private fun showFailure() {
+        _uiState.value =
+            _uiState.value.copy(
+                isLoading = false,
+                nameError = NameFieldError.Remote(ErrorType.Unknown),
+            )
+    }
+
+    private suspend fun markSubmitted() {
+        _uiState.value =
+            _uiState.value.copy(
+                isLoading = false,
+                isSubmitted = true,
+            )
     }
 }

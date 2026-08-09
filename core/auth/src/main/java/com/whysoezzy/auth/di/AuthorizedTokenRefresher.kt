@@ -2,6 +2,7 @@ package com.whysoezzy.auth.di
 
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.domain.repository.AuthRepository
+import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.common.error.AppException
 import com.whysoezzy.network.error.ApiException
 import timber.log.Timber
@@ -13,9 +14,10 @@ import kotlin.coroutines.cancellation.CancellationException
 internal suspend fun refreshAuthorizedTokens(
     authRepository: AuthRepository,
     tokenManager: TokenManager,
+    sessionRepository: AuthSessionRepository? = null,
 ): Pair<String, String>? {
     if (tokenManager.getRefreshToken().isNullOrBlank()) {
-        tokenManager.clearTokens()
+        clearSession(tokenManager, sessionRepository)
         return null
     }
 
@@ -23,7 +25,7 @@ internal suspend fun refreshAuthorizedTokens(
         val result = authRepository.refreshToken()
         val accessToken = result.getOrElse { error ->
             if (error is AppException.UnauthorizedError || error is ApiException.UnauthorizedError) {
-                tokenManager.clearTokens()
+                clearSession(tokenManager, sessionRepository)
             } else {
                 Timber.w(error, "Token refresh failed; preserving local session for retry")
             }
@@ -31,7 +33,7 @@ internal suspend fun refreshAuthorizedTokens(
         }
         val refreshToken = tokenManager.getRefreshToken()
         if (refreshToken.isNullOrBlank()) {
-            tokenManager.clearTokens()
+            clearSession(tokenManager, sessionRepository)
             return null
         }
         return accessToken to refreshToken
@@ -40,5 +42,16 @@ internal suspend fun refreshAuthorizedTokens(
     } catch (e: Exception) {
         Timber.w(e, "Token refresh failed; preserving local session for retry")
         return null
+    }
+}
+
+private suspend fun clearSession(
+    tokenManager: TokenManager,
+    sessionRepository: AuthSessionRepository?,
+) {
+    try {
+        sessionRepository?.clear()
+    } finally {
+        tokenManager.clearTokens()
     }
 }

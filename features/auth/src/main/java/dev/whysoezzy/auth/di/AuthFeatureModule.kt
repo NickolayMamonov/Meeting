@@ -29,5 +29,11 @@ val authFeatureModule =
             )
         }
 
-        viewModel { NameInputViewModel(get<UserProfileUpdater>()) }
+        viewModel { (mode: dev.whysoezzy.auth.presentation.name.NameInputMode) ->
+            NameInputViewModel(
+                mode = mode,
+                userProfileUpdater = get<UserProfileUpdater>(),
+                sessionRepository = get(),
+            )
+        }
     }

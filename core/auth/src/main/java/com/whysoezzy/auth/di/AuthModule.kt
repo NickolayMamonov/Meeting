@@ -10,6 +10,8 @@ import com.whysoezzy.auth.domain.AuthClock
 import com.whysoezzy.auth.domain.EmailOtpCoordinator
 import com.whysoezzy.auth.domain.models.EmailAddressParser
 import com.whysoezzy.auth.domain.repository.AuthRepository
+import com.whysoezzy.auth.domain.repository.AuthSessionRepository
+import com.whysoezzy.auth.domain.repository.DataStoreAuthSessionRepository
 import com.whysoezzy.auth.domain.repository.DataStorePendingEmailOtpStore
 import com.whysoezzy.auth.domain.repository.PendingEmailOtpStore
 import com.whysoezzy.auth.domain.usecase.ClearEmailOtpAttemptUseCase
@@ -38,7 +40,14 @@ val authModule =
 
         single<AuthApi> { AuthApiKtor(get(named("publicClient"))) }
 
-        single<AuthRepository> { AuthRepositoryImpl(authApi = get(), tokenManager = get()) }
+        single<AuthRepository> {
+            AuthRepositoryImpl(
+                authApi = get(),
+                tokenManager = get(),
+                sessionRepository = get(),
+            )
+        }
+        single<AuthSessionRepository> { DataStoreAuthSessionRepository(androidContext()) }
         single<PendingEmailOtpStore> { DataStorePendingEmailOtpStore(androidContext()) }
         single { EmailAddressParser() }
         single<AuthClock> { AuthClock { System.currentTimeMillis() } }
@@ -61,6 +70,7 @@ val authModule =
                     refreshAuthorizedTokens(
                         authRepository = get(),
                         tokenManager = tokenManager,
+                        sessionRepository = get(),
                     )
                 },
             )

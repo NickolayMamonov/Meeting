@@ -1,17 +1,24 @@
 package dev.whysoezzy.meet.navigation.routes
 
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.os.bundleOf
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import dev.whysoezzy.auth.presentation.code.CodeVerificationScreen
 import dev.whysoezzy.auth.presentation.email.EmailInputScreen
+import dev.whysoezzy.auth.presentation.name.NameInputMode
 import dev.whysoezzy.auth.presentation.name.NameInputScreen
 import dev.whysoezzy.auth.presentation.success.AuthSuccessScreen
 import dev.whysoezzy.meet.navigation.MeetRoute
 import dev.whysoezzy.meet.navigation.registerLegacyAuthCompatibilityDestinations
+import dev.whysoezzy.meet.navigation.resolveFromDurableSession
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 fun NavGraphBuilder.authNavigation(
     navController: NavController,
@@ -62,18 +69,33 @@ fun NavGraphBuilder.authNavigation(
 
         composable(MeetRoute.NameInput.route) {
             NameInputScreen(
+                mode = NameInputMode.Onboarding,
                 onNameSubmitted = {
                     navController.navigate(MeetRoute.AuthSuccess.route)
                 },
+                onProfileCompleted = {},
+                onResolveFromDurableSession = navController::resolveFromDurableSession,
                 onBackPressed = { navController.popBackStack() },
             )
         }
 
         composable(MeetRoute.AuthSuccess.route) {
+            val sessionRepository: AuthSessionRepository = koinInject()
+            val scope = rememberCoroutineScope()
             AuthSuccessScreen(
                 onContinueClicked = {
-                    navController.navigate(MeetRoute.Main.route) {
-                        popUpTo(MeetRoute.Auth.route) { inclusive = true }
+                    scope.launch {
+                        if (sessionRepository.compareAndSetStage(
+                                expected = AuthSession.Stage.Welcome,
+                                next = AuthSession.Stage.Ready,
+                            )
+                        ) {
+                            navController.navigate(MeetRoute.Main.route) {
+                                popUpTo(MeetRoute.Auth.route) { inclusive = true }
+                            }
+                        } else {
+                            navController.resolveFromDurableSession(sessionRepository.read())
+                        }
                     }
                 },
             )

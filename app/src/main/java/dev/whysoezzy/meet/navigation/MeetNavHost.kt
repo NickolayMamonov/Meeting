@@ -12,6 +12,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.EmailOtpAttemptResult
 import dev.whysoezzy.meet.navigation.routes.authNavigation
 import dev.whysoezzy.meet.navigation.routes.communitiesNavigation
@@ -27,9 +28,10 @@ fun MeetNavHost(
     val authViewModel: AuthCheckViewModel = koinViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
     val pendingAttempt by authViewModel.pendingAttempt.collectAsStateWithLifecycle()
+    val durableSession by authViewModel.durableSession.collectAsStateWithLifecycle()
 
     // Показываем SplashScreen пока проверяем авторизацию
-    if (isLoggedIn == null || pendingAttempt == null) {
+    if (isLoggedIn == null || pendingAttempt == null || durableSession == null) {
 //        SplashScreen()
         return
     }
@@ -38,6 +40,7 @@ fun MeetNavHost(
         navController = navController,
         isLoggedIn = requireNotNull(isLoggedIn),
         pendingAttempt = requireNotNull(pendingAttempt),
+        durableSession = requireNotNull(durableSession),
         modifier = modifier,
     )
 }
@@ -47,6 +50,7 @@ internal fun MeetNavHostContent(
     navController: NavHostController,
     isLoggedIn: Boolean,
     pendingAttempt: EmailOtpAttemptResult,
+    durableSession: AuthSession? = null,
     modifier: Modifier = Modifier,
 ) {
     // NavHost remembers its graph by the builder lambda. Keep mutable recovery values behind
@@ -85,6 +89,7 @@ internal fun MeetNavHostContent(
     AuthStateNavigationEffect(
         navController = navController,
         isLoggedIn = isLoggedIn,
+        durableSession = durableSession,
     )
 }
 
@@ -92,8 +97,13 @@ internal fun MeetNavHostContent(
 internal fun AuthStateNavigationEffect(
     navController: NavHostController,
     isLoggedIn: Boolean?,
+    durableSession: AuthSession? = null,
 ) {
-    LaunchedEffect(isLoggedIn) {
+    LaunchedEffect(isLoggedIn, durableSession) {
+        if (durableSession != null) {
+            navController.resolveFromDurableSession(durableSession)
+            return@LaunchedEffect
+        }
         when {
             isLoggedIn == false -> {
                 if (!navController.currentDestination.isInAuthGraph()) {
