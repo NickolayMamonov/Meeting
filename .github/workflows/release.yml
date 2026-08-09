@@ -3,6 +3,24 @@ name: Android release
 on:
   push:
     branches: [dev]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing Release Please tag to recover
+        required: true
+        type: string
+      release_id:
+        description: Existing draft release ID
+        required: true
+        type: string
+      source_sha:
+        description: Release Please source commit
+        required: true
+        type: string
+      source_run_id:
+        description: Prior stable evidence run to reuse
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -10,6 +28,7 @@ permissions:
 jobs:
   release-please:
     name: Release Please
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,8 +39,7 @@ jobs:
       release_id: ${{ steps.release.outputs.id }}
       sha: ${{ steps.release.outputs.sha }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Release Please
         id: release
         uses: googleapis/release-please-action@a02a34c4d625f9be7cb89156071d8567266a2445 # v4.2.0
@@ -31,121 +49,191 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  stable:
-    name: Stable Android publication
+  stable-build:
+    name: Build unsigned stable artifacts
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: android-release
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    concurrency:
-      group: android-release-${{ needs.release-please.outputs.tag_name }}
-      cancel-in-progress: false
+      contents: read
     steps:
-      - name: Checkout exact Release Please tag
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
           fetch-depth: 0
-      - name: Set up Java
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
           java-version: "21"
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4.4.2
-      - name: Validate Release Please authority
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4.4.2
+      - name: Validate Release Please authority before build
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
           RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
           RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$RELEASE_TAG" = "v$(python -c 'import json; print(json.load(open("version.json"))["version"])')"
+          version="$(python -c 'import json; print(json.load(open("version.json"))["version"])')"
+          test "$RELEASE_TAG" = "v$version"
           test "$(git rev-list -n1 "$RELEASE_TAG")" = "$RELEASE_SHA"
           git merge-base --is-ancestor "$RELEASE_SHA" origin/dev
-          count="$(gh release list --limit 100 --json tagName,isDraft,publishedAt \
-            --jq "[.[] | select(.tagName == \"$RELEASE_TAG\")] | length")"
-          test "$count" = 1
-          authority="$(gh release view "$RELEASE_TAG" --json isDraft,publishedAt)"
-          test "$(jq -r '.isDraft' <<<"$authority")" = true
-          test "$(jq -r '.publishedAt // empty' <<<"$authority")" = ""
-      - name: Decode protected release inputs
-        id: inputs
+          state="$(gh release view "$RELEASE_TAG" --json id,tagName,isDraft,publishedAt)"
+          test "$(jq -r '.id' <<<"$state")" = "$RELEASE_ID"
+          test "$(jq -r '.tagName' <<<"$state")" = "$RELEASE_TAG"
+          test "$(jq -r '.isDraft' <<<"$state")" = true
+          test -z "$(jq -r '.publishedAt // empty' <<<"$state")"
+      - name: Provision stable Firebase configuration
         env:
           FIREBASE_JSON_B64: ${{ secrets.RELEASE_GOOGLE_SERVICES_JSON_BASE64 }}
-          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          temp="$RUNNER_TEMP/android-release-inputs"
-          mkdir -p "$temp"
-          chmod 700 "$temp"
-          printf '%s' "$FIREBASE_JSON_B64" | base64 --decode > "$temp/google-services.json"
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$temp/release.jks"
-          chmod 600 "$temp"/*
-          echo "firebase=$temp/google-services.json" >> "$GITHUB_OUTPUT"
-          echo "keystore=$temp/release.jks" >> "$GITHUB_OUTPUT"
-      - name: Build and verify stable artifacts
+        run: printf '%s' "$FIREBASE_JSON_B64" | base64 --decode > app/google-services.json
+      - name: Build unsigned stable artifacts
         env:
           ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ vars.BASE_URL_RELEASE }}
           ORG_GRADLE_PROJECT_RELEASE_SPKI_PINS: ${{ vars.RELEASE_SPKI_PINS }}
-          ORG_GRADLE_PROJECT_ANDROID_RELEASE_KEYSTORE_FILE: ${{ steps.inputs.outputs.keystore }}
-          ORG_GRADLE_PROJECT_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          ORG_GRADLE_PROJECT_ANDROID_RELEASE_KEY_ALIAS: meet-release
-          ORG_GRADLE_PROJECT_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           ORG_GRADLE_PROJECT_ANDROID_RELEASE_CERT_SHA256: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
           ORG_GRADLE_PROJECT_RELEASE_COMMIT_SHA: ${{ needs.release-please.outputs.sha }}
           ORG_GRADLE_PROJECT_RELEASE_PUBLISHING: "true"
         run: |
           set -euo pipefail
-          cp "${{ steps.inputs.outputs.firebase }}" app/google-services.json
-          ./gradlew generateReleaseBuildMetadata validateReleasePublishingInputs ktlintCheck test :app:lint \
+          ./gradlew generateReleaseBuildMetadata validateReleasePublishingInputs ktlintCheck testDebugUnitTest :app:lint \
             :app:assembleRelease :app:bundleRelease
-      - name: Verify distributable signatures
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-unsigned-${{ needs.release-please.outputs.tag_name }}
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/mapping/release/**
+            app/build/outputs/native-debug-symbols/release/**
+            app/build/release-metadata/release-build.json
+          if-no-files-found: error
+      - name: Remove Firebase configuration
+        if: ${{ always() }}
+        run: rm -f app/google-services.json
+
+  stable-sign:
+    name: Sign stable artifacts on isolated runner
+    needs: [release-please, stable-build]
+    if: ${{ needs.stable-build.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: android-release-signing
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-unsigned-${{ needs.release-please.outputs.tag_name }}
+          path: unsigned
+      - name: Decode release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
-          aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
-          bundletool_jar="$(find "$HOME/.gradle/caches/modules-2/files-2.1/com.android.tools.build/bundletool" -name '*.jar' -print | sort -V | tail -n 1)"
-          test -n "$bundletool_jar"
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+      - name: Sign and verify stable artifacts
+        env:
+          STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          EXPECTED_CERT: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
+        run: |
+          set -euo pipefail
+          apk="$(find unsigned -name '*.apk' -print -quit)"
+          aab="$(find unsigned -name '*.aab' -print -quit)"
+          test -n "$apk" && test -n "$aab"
+          apksigner sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias meet-release \
+            --ks-pass "pass:$STORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" "$apk"
+          jarsigner -keystore "$RUNNER_TEMP/release.jks" -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" "$aab" meet-release
+          apksigner verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-cert.txt"
+          keytool -printcert -jarfile "$aab" > "$RUNNER_TEMP/aab-cert.txt"
+          expected="$(printf '%s' "$EXPECTED_CERT" | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          apk_actual="$(sed -n 's/.*SHA-256 digest: //p' "$RUNNER_TEMP/apk-cert.txt" | head -n1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          aab_actual="$(sed -n 's/.*SHA256: //p' "$RUNNER_TEMP/aab-cert.txt" | head -n1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          test "$apk_actual" = "$expected" && test "$aab_actual" = "$expected"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-signed-${{ needs.release-please.outputs.tag_name }}
+          path: unsigned
+          if-no-files-found: error
+      - name: Remove release signing inputs
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/release.jks"
+
+  stable-evidence:
+    name: Verify and attest stable artifacts
+    needs: [release-please, stable-sign]
+    if: ${{ needs.stable-sign.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          fetch-depth: 0
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-signed-${{ needs.release-please.outputs.tag_name }}
+          path: signed
+      - name: Download pinned Bundletool
+        env:
+          BUNDLETOOL_VERSION: ${{ vars.BUNDLETOOL_VERSION }}
+          BUNDLETOOL_SHA256: ${{ vars.BUNDLETOOL_SHA256 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$BUNDLETOOL_VERSION" | grep -Eq '^1\.[0-9]+\.[0-9]+$'
+          printf '%s' "$BUNDLETOOL_SHA256" | grep -Eq '^[0-9A-Fa-f]{64}$'
+          curl --fail --location --retry 3 \
+            "https://github.com/google/bundletool/releases/download/$BUNDLETOOL_VERSION/bundletool-all-$BUNDLETOOL_VERSION.jar" \
+            --output "$RUNNER_TEMP/bundletool.jar"
+          echo "$BUNDLETOOL_SHA256  $RUNNER_TEMP/bundletool.jar" | sha256sum --check
+      - name: Verify APK, AAB, package, version, and certificate identity
+        env:
+          BUNDLETOOL_SHA256: ${{ vars.BUNDLETOOL_SHA256 }}
+        run: |
+          set -euo pipefail
+          metadata="$(find signed -name release-build.json -print -quit)"
+          apk="$(find signed -name '*.apk' -print -quit)"
+          aab="$(find signed -name '*.aab' -print -quit)"
           python scripts/release/verify_android_artifacts.py \
-            --metadata app/build/release-metadata/release-build.json \
-            --apk "$apk" --aab "$aab" --bundletool-jar "$bundletool_jar"
+            --metadata "$metadata" --apk "$apk" --aab "$aab" \
+            --bundletool-jar "$RUNNER_TEMP/bundletool.jar" \
+            --bundletool-sha256 "$BUNDLETOOL_SHA256"
       - name: Prepare deterministic release evidence
         env:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
           RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
         run: |
           set -euo pipefail
-          apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
-          aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
-          mapping="$(find app/build/outputs/mapping/release -type f -name '*.txt' -print -quit || true)"
-          symbols="$(find app/build/outputs/native-debug-symbols/release -type f -print -quit || true)"
+          metadata="$(find signed -name release-build.json -print -quit)"
+          apk="$(find signed -name '*.apk' -print -quit)"
+          aab="$(find signed -name '*.aab' -print -quit)"
+          mapping="$(find signed -type f -path '*/mapping/release/*' -print -quit || true)"
+          symbols="$(find signed -type f -path '*/native-debug-symbols/release/*' -print -quit || true)"
           mkdir -p release-output
-          package_args=(
-            --metadata app/build/release-metadata/release-build.json
-            --output release-output --apk "$apk" --aab "$aab"
-            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA"
-            --source-branch dev --workflow "${GITHUB_WORKFLOW}"
-            --prepare-only
-          )
-          if test -n "$mapping"; then package_args+=(--mapping "$mapping"); fi
-          if test -n "$symbols"; then package_args+=(--symbols "$symbols"); fi
-          python scripts/release/package_artifacts.py "${package_args[@]}"
-      - name: Attest final subjects
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+          args=(--metadata "$metadata" --output release-output --apk "$apk" --aab "$aab"
+            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA" --source-branch dev
+            --workflow "${GITHUB_WORKFLOW}" --prepare-only)
+          test -z "$mapping" || args+=(--mapping "$mapping")
+          test -z "$symbols" || args+=(--symbols "$symbols")
+          python scripts/release/package_artifacts.py "${args[@]}"
+      - uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
           subject-path: release-output/*
-      - name: Collect canonical attestation evidence
+      - name: Collect exhaustive canonical attestation evidence
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
-          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           set -euo pipefail
           python scripts/release/collect_attestation_evidence.py \
@@ -153,69 +241,213 @@ jobs:
             --output "$RUNNER_TEMP/release-attestation-evidence.json" \
             --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
-            --source-ref refs/heads/dev \
-            --source-sha "$RELEASE_SHA" \
-            --run-id "$GITHUB_RUN_ID" \
-            --run-attempt "$GITHUB_RUN_ATTEMPT"
-      - name: Finalize deterministic release evidence
+            --source-ref refs/heads/dev --source-sha "${{ needs.release-please.outputs.sha }}" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
+      - name: Finalize and verify release evidence
         env:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
           RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
         run: |
           set -euo pipefail
-          apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
-          aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
-          mapping="$(find app/build/outputs/mapping/release -type f -name '*.txt' -print -quit || true)"
-          symbols="$(find app/build/outputs/native-debug-symbols/release -type f -print -quit || true)"
-          package_args=(
-            --metadata app/build/release-metadata/release-build.json
-            --output release-output --apk "$apk" --aab "$aab"
-            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA"
-            --source-branch dev --workflow "${GITHUB_WORKFLOW}"
-            --attestation-evidence "$RUNNER_TEMP/release-attestation-evidence.json"
-          )
-          if test -n "$mapping"; then package_args+=(--mapping "$mapping"); fi
-          if test -n "$symbols"; then package_args+=(--symbols "$symbols"); fi
-          python scripts/release/package_artifacts.py "${package_args[@]}"
+          metadata="$(find signed -name release-build.json -print -quit)"
+          apk="$(find signed -name '*.apk' -print -quit)"
+          aab="$(find signed -name '*.aab' -print -quit)"
+          args=(--metadata "$metadata" --output release-output --apk "$apk" --aab "$aab"
+            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA" --source-branch dev
+            --workflow "${GITHUB_WORKFLOW}"
+            --attestation-evidence "$RUNNER_TEMP/release-attestation-evidence.json")
+          mapping="$(find signed -type f -path '*/mapping/release/*' -print -quit || true)"
+          symbols="$(find signed -type f -path '*/native-debug-symbols/release/*' -print -quit || true)"
+          test -z "$mapping" || args+=(--mapping "$mapping")
+          test -z "$symbols" || args+=(--symbols "$symbols")
+          python scripts/release/package_artifacts.py "${args[@]}"
           python scripts/release/verify_chain.py release-output
-      - name: Upload verified assets to draft
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-evidence-${{ needs.release-please.outputs.tag_name }}
+          path: release-output
+          if-no-files-found: error
+
+  stable-mutate:
+    name: Upload and publish verified draft
+    needs: [release-please, stable-evidence]
+    if: ${{ needs.stable-evidence.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: android-release-upload
+    permissions:
+      contents: write
+    concurrency:
+      group: android-release-${{ needs.release-please.outputs.tag_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-evidence-${{ needs.release-please.outputs.tag_name }}
+          path: release-output
+      - name: Require protected runtime evidence
         env:
-          GH_TOKEN: ${{ github.token }}
+          RUNTIME_GATE_EVIDENCE_JSON: ${{ secrets.RUNTIME_GATE_EVIDENCE_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "$RUNTIME_GATE_EVIDENCE_JSON"
+          printf '%s' "$RUNTIME_GATE_EVIDENCE_JSON" > "$RUNNER_TEMP/runtime-evidence.json"
+          python scripts/release/runtime_gate.py --evidence "$RUNNER_TEMP/runtime-evidence.json"
+      - name: Reject state races and unknown assets before mutation
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
+          RELEASE_UPLOAD_ACTOR: ${{ vars.RELEASE_UPLOAD_ACTOR }}
+          RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_UPLOAD_ACTOR" && test -n "$RELEASE_PLEASE_ACTOR"
+          state="$RUNNER_TEMP/release-state.json"
+          gh release view "$RELEASE_TAG" --json id,tagName,isDraft,publishedAt,author,assets > "$state"
+          mapfile -t expected < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          args=(--state "$state" --release-id "$RELEASE_ID" --tag "$RELEASE_TAG"
+            --uploader "$RELEASE_UPLOAD_ACTOR" --release-author "$RELEASE_PLEASE_ACTOR")
+          for name in "${expected[@]}"; do args+=(--expected-name "$name"); done
+          python scripts/release/release_mutation_gate.py "${args[@]}"
+      - name: Replace only pipeline-owned draft assets
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           set -euo pipefail
-          gh release upload "$RELEASE_TAG" release-output/* --clobber
-          authority="$(gh release view "$RELEASE_TAG" --json isDraft,publishedAt)"
-          test "$(jq -r '.isDraft' <<<"$authority")" = true
-          test "$(jq -r '.publishedAt // empty' <<<"$authority")" = ""
-          remote="$RUNNER_TEMP/android-release-assets"
-          rm -rf "$remote"
-          mkdir -p "$remote"
-          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/android-release-assets.json"
-          gh release download "$RELEASE_TAG" --dir "$remote" --clobber
-          python scripts/release/verify_remote_assets.py \
-            release-output "$RUNNER_TEMP/android-release-assets.json" "$remote"
-      - name: Publish only after remote verification
+          state="$RUNNER_TEMP/release-assets.json"
+          gh release view "$RELEASE_TAG" --json assets > "$state"
+          while IFS= read -r name; do
+            if jq -e --arg name "$name" '.assets[] | select(.name == $name)' "$state" >/dev/null; then
+              gh release delete-asset "$RELEASE_TAG" "$name" --yes
+            fi
+            gh release upload "$RELEASE_TAG" "release-output/$name"
+          done < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+      - name: Verify remote assets and final draft authority
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
+          RELEASE_UPLOAD_ACTOR: ${{ vars.RELEASE_UPLOAD_ACTOR }}
+          RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
         run: |
           set -euo pipefail
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
-          test -z "$(gh release view "$RELEASE_TAG" --json publishedAt --jq '.publishedAt // empty')"
-          remote="$RUNNER_TEMP/android-release-assets-final"
-          rm -rf "$remote"
+          state="$RUNNER_TEMP/release-state-final.json"
+          gh release view "$RELEASE_TAG" --json id,tagName,isDraft,publishedAt,author,assets > "$state"
+          names="$(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)"
+          args=(--state "$state" --release-id "$RELEASE_ID" --tag "$RELEASE_TAG"
+            --uploader "$RELEASE_UPLOAD_ACTOR" --release-author "$RELEASE_PLEASE_ACTOR")
+          while IFS= read -r name; do args+=(--expected-name "$name"); done <<<"$names"
+          python scripts/release/release_mutation_gate.py "${args[@]}"
+          remote="$RUNNER_TEMP/release-assets"
           mkdir -p "$remote"
-          gh release view "$RELEASE_TAG" --json isDraft,publishedAt > "$RUNNER_TEMP/android-release-authority-final.json"
-          test "$(jq -r '.isDraft' "$RUNNER_TEMP/android-release-authority-final.json")" = true
-          test "$(jq -r '.publishedAt // empty' "$RUNNER_TEMP/android-release-authority-final.json")" = ""
-          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/android-release-assets-final.json"
           gh release download "$RELEASE_TAG" --dir "$remote" --clobber
-          python scripts/release/verify_remote_assets.py \
-            release-output "$RUNNER_TEMP/android-release-assets-final.json" "$remote"
+          python scripts/release/verify_remote_assets.py release-output "$state" "$remote"
+      - name: Publish as the final single mutation
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
+          RELEASE_UPLOAD_ACTOR: ${{ vars.RELEASE_UPLOAD_ACTOR }}
+          RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/release-authority-before-publish.json"
+          gh release view "$RELEASE_TAG" --json id,tagName,isDraft,publishedAt,author,assets > "$state"
+          names="$(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)"
+          args=(--state "$state" --release-id "$RELEASE_ID" --tag "$RELEASE_TAG"
+            --uploader "$RELEASE_UPLOAD_ACTOR" --release-author "$RELEASE_PLEASE_ACTOR")
+          while IFS= read -r name; do args+=(--expected-name "$name"); done <<<"$names"
+          python scripts/release/release_mutation_gate.py "${args[@]}"
           gh release edit "$RELEASE_TAG" --draft=false
-      - name: Remove protected inputs
-        if: ${{ always() }}
+
+  recovery:
+    name: Protected recovery and runtime publication gates
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: android-release-upload
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: android-release-${{ inputs.tag }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 1
+      - name: Download exact prior evidence and validate draft
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
         run: |
-          rm -rf "$RUNNER_TEMP/android-release-inputs"
-          rm -f app/google-services.json
+          set -euo pipefail
+          state="$RUNNER_TEMP/recovery-state.json"
+          gh release view "${{ inputs.tag }}" --json id,tagName,isDraft,publishedAt,author,assets > "$state"
+          gh run download "${{ inputs.source_run_id }}" --name "android-release-evidence-${{ inputs.tag }}" --dir release-output
+          python scripts/release/recovery_gate.py \
+            --state "$state" --candidate release-output/release-candidate.json \
+            --release-id "${{ inputs.release_id }}" --tag "${{ inputs.tag }}" \
+            --source-sha "${{ inputs.source_sha }}"
+          python scripts/release/verify_chain.py release-output
+      - name: Require protected runtime evidence
+        env:
+          RUNTIME_GATE_EVIDENCE_JSON: ${{ secrets.RUNTIME_GATE_EVIDENCE_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "$RUNTIME_GATE_EVIDENCE_JSON"
+          printf '%s' "$RUNTIME_GATE_EVIDENCE_JSON" > "$RUNNER_TEMP/runtime-evidence.json"
+          python scripts/release/runtime_gate.py --evidence "$RUNNER_TEMP/runtime-evidence.json"
+      - name: Reject recovery state races and unknown assets
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
+          RELEASE_UPLOAD_ACTOR: ${{ vars.RELEASE_UPLOAD_ACTOR }}
+          RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_UPLOAD_ACTOR" && test -n "$RELEASE_PLEASE_ACTOR"
+          mapfile -t expected < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          state="$RUNNER_TEMP/recovery-mutation-state.json"
+          gh release view "${{ inputs.tag }}" --json id,tagName,isDraft,publishedAt,author,assets > "$state"
+          args=(--state "$state" --release-id "${{ inputs.release_id }}" --tag "${{ inputs.tag }}"
+            --uploader "$RELEASE_UPLOAD_ACTOR" --release-author "$RELEASE_PLEASE_ACTOR")
+          for name in "${expected[@]}"; do args+=(--expected-name "$name"); done
+          python scripts/release/release_mutation_gate.py "${args[@]}"
+      - name: Replace only recovery-owned draft assets
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/recovery-assets.json"
+          gh release view "${{ inputs.tag }}" --json assets > "$state"
+          while IFS= read -r name; do
+            if jq -e --arg name "$name" '.assets[] | select(.name == $name)' "$state" >/dev/null; then
+              gh release delete-asset "${{ inputs.tag }}" "$name" --yes
+            fi
+            gh release upload "${{ inputs.tag }}" "release-output/$name"
+          done < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+      - name: Verify recovery assets and publish once
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
+          RELEASE_UPLOAD_ACTOR: ${{ vars.RELEASE_UPLOAD_ACTOR }}
+          RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/recovery-final-state.json"
+          gh release view "${{ inputs.tag }}" --json id,tagName,isDraft,publishedAt,author,assets > "$state"
+          names="$(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)"
+          args=(--state "$state" --release-id "${{ inputs.release_id }}" --tag "${{ inputs.tag }}"
+            --uploader "$RELEASE_UPLOAD_ACTOR" --release-author "$RELEASE_PLEASE_ACTOR")
+          while IFS= read -r name; do args+=(--expected-name "$name"); done <<<"$names"
+          python scripts/release/release_mutation_gate.py "${args[@]}"
+          remote="$RUNNER_TEMP/recovery-assets"
+          mkdir -p "$remote"
+          gh release download "${{ inputs.tag }}" --dir "$remote" --clobber
+          python scripts/release/verify_remote_assets.py release-output "$state" "$remote"
+          gh release edit "${{ inputs.tag }}" --draft=false

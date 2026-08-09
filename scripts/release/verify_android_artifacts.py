@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -22,6 +23,14 @@ def run(command: Sequence[str]) -> str:
     except (OSError, subprocess.CalledProcessError) as error:
         raise ArtifactError(f"command failed: {' '.join(command)}") from error
     return result.stdout + result.stderr
+
+
+def file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def metadata_value(metadata: dict, *names: str) -> str:
@@ -57,12 +66,28 @@ def verify_apk(apk: Path, metadata: dict) -> None:
         raise ArtifactError("APK version name does not match canonical metadata")
     if version_code != metadata_value(metadata, "versionCode", "version_code"):
         raise ArtifactError("APK version code does not match canonical metadata")
+    debuggable = run(["apkanalyzer", "manifest", "debuggable", str(apk)]).strip().lower()
+    if debuggable == "true":
+        raise ArtifactError("APK is debuggable")
 
 
 def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
     run(["jarsigner", "-verify", "-strict", str(aab)])
+    signer_output = run(["keytool", "-printcert", "-jarfile", str(aab)])
+    signer_digests = re.findall(
+        r"SHA256:\s*([0-9a-f: ]+)", signer_output, flags=re.IGNORECASE
+    )
+    if not signer_digests:
+        raise ArtifactError("AAB signer output did not contain a SHA-256 certificate digest")
+    expected = normalized_digest(metadata_value(metadata, "expectedCertificateSha256", "signingFingerprint"))
+    if normalized_digest(signer_digests[0]) != expected:
+        raise ArtifactError("AAB certificate does not match canonical metadata")
     output = run(["java", "-jar", str(bundletool_jar), "dump", "manifest", f"--bundle={aab}"])
-    root = ET.fromstring(output)
+    start = output.find("<manifest")
+    end = output.rfind("</manifest>")
+    if start < 0 or end < start:
+        raise ArtifactError("Bundletool did not return an Android manifest")
+    root = ET.fromstring(output[start : end + len("</manifest>")])
     android_namespace = "{http://schemas.android.com/apk/res/android}"
     if root.attrib.get("package") != metadata_value(metadata, "applicationId", "application_id"):
         raise ArtifactError("AAB application ID does not match canonical metadata")
@@ -74,21 +99,32 @@ def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
         metadata, "versionCode", "version_code"
     ):
         raise ArtifactError("AAB version code does not match canonical metadata")
+    if root.attrib.get(android_namespace + "debuggable", "false").lower() == "true":
+        raise ArtifactError("AAB is debuggable")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--apk", type=Path, required=True)
-    parser.add_argument("--aab", type=Path, required=True)
-    parser.add_argument("--bundletool-jar", type=Path, required=True)
+    parser.add_argument("--aab", type=Path)
+    parser.add_argument("--bundletool-jar", type=Path)
+    parser.add_argument("--bundletool-sha256")
     try:
         args = parser.parse_args()
         metadata = json.loads(args.metadata.read_text(encoding="utf-8"))
         if not isinstance(metadata, dict):
             raise ArtifactError("metadata must be an object")
         verify_apk(args.apk, metadata)
-        verify_bundle(args.aab, metadata, args.bundletool_jar)
+        if args.aab is not None:
+            if args.bundletool_jar is None:
+                raise ArtifactError("bundletool JAR is required for AAB verification")
+            if args.bundletool_sha256 is None:
+                raise ArtifactError("bundletool SHA-256 is required for AAB verification")
+            expected_bundletool_digest = normalized_digest(args.bundletool_sha256)
+            if file_digest(args.bundletool_jar) != expected_bundletool_digest:
+                raise ArtifactError("bundletool digest does not match the pinned SHA-256")
+            verify_bundle(args.aab, metadata, args.bundletool_jar)
     except (ArtifactError, OSError, ValueError, ET.ParseError, KeyError, json.JSONDecodeError) as error:
         print(f"Android artifact verification failed: {error}")
         return 1

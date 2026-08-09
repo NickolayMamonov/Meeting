@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "123456789012",
+    "project_id": "meeting-ci",
+    "storage_bucket": "meeting-ci.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789012:android:0000000000000000",
+        "android_client_info": {
+          "package_name": "dev.whysoezzy.meet"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789012:android:1111111111111111",
+        "android_client_info": {
+          "package_name": "dev.whysoezzy.meet.debug"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        }
+      ]
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789012:android:2222222222222222",
+        "android_client_info": {
+          "package_name": "dev.whysoezzy.meet.snapshot"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
+        }
+      ]
+    }
+  ],
+  "configuration_version": "1"
+}

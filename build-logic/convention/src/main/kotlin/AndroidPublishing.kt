@@ -81,10 +81,6 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             commitSha.convention(snapshotCommitSha)
             expectedCertificateSha256.convention(snapshotExpectedCertificate)
             signingPropertyPrefix.convention("ANDROID_SNAPSHOT")
-            storeFilePath.convention(publishingInput("ANDROID_SNAPSHOT_KEYSTORE_FILE"))
-            storePassword.convention(publishingInput("ANDROID_SNAPSHOT_STORE_PASSWORD"))
-            keyAlias.convention(publishingInput("ANDROID_SNAPSHOT_KEY_ALIAS"))
-            keyPassword.convention(publishingInput("ANDROID_SNAPSHOT_KEY_PASSWORD"))
             dependsOn(validateVersion)
         }
 
@@ -95,10 +91,6 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             this.versionFile.set(versionFile)
             this.baseUrl.convention(baseUrl)
             this.pins.convention(pins)
-            storeFilePath.convention(publishingInput("ANDROID_RELEASE_KEYSTORE_FILE"))
-            storePassword.convention(publishingInput("ANDROID_RELEASE_STORE_PASSWORD"))
-            keyAlias.convention(publishingInput("ANDROID_RELEASE_KEY_ALIAS"))
-            keyPassword.convention(publishingInput("ANDROID_RELEASE_KEY_PASSWORD"))
             expectedCertificateSha256.convention(expectedCertificate)
             dependsOn(validateVersion)
         }

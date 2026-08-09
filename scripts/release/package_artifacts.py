@@ -155,6 +155,10 @@ def package(args: argparse.Namespace) -> None:
     candidate = {
         "schema": 1,
         "kind": "release-candidate",
+        "channel": metadata["channel"],
+        "tag": authority["tag"],
+        "commit": commit,
+        "source_branch": source_branch,
         "manifest": {"name": manifest_path.name, "sha256": sha256_bytes(manifest_bytes)},
         "checksums": {"name": checksum_path.name, "sha256": checksum_digest},
         "distributable_digests": [

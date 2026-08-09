@@ -86,6 +86,8 @@ def pull_request_tuple(pr: Mapping[str, Any]) -> tuple[Any, ...]:
     base = pr.get("base", {})
     head_repository = head.get("repo") or {}
     base_repository = base.get("repo") or {}
+    labels = tuple(sorted(str(label.get("name", "")).strip().lower() for label in pr.get("labels", [])))
+    classification = classify_pull_request(pr)
     return (
         int(pr["number"]),
         str(head.get("sha", pr.get("head_sha", ""))),
@@ -96,6 +98,8 @@ def pull_request_tuple(pr: Mapping[str, Any]) -> tuple[Any, ...]:
         str(base_repository.get("full_name", pr.get("base_repository", ""))),
         str(pr.get("state", "")),
         bool(pr.get("draft", False)),
+        labels,
+        classification,
     )
 
 
@@ -115,7 +119,19 @@ def verify_pull_request_snapshot(
     _require(first is not second, "live PR snapshots are not independent")
     _require(first_tuple == second_tuple, "live PR tuple changed between verification reads")
     _require(event_tuple == first_tuple, "event PR tuple disagrees with live PR")
-    _, head_sha, head_ref, head_repository, base_ref, base_sha, base_repository, state, draft = first_tuple
+    (
+        _,
+        head_sha,
+        head_ref,
+        head_repository,
+        base_ref,
+        base_sha,
+        base_repository,
+        state,
+        draft,
+        _labels,
+        _classification,
+    ) = first_tuple
     _require(bool(head_sha and head_ref and base_sha), "live PR tuple is incomplete")
     _require(bool(head_repository), "PR head repository is missing")
     _require(base_repository == repository, "PR base repository mismatch")
@@ -442,6 +458,7 @@ class ProducerEvidence:
     artifact_name: str
     artifact_digest: str
     artifact_id: int
+    head_sha: str
 
 
 def _producer_key(run: Mapping[str, Any]) -> tuple[int, int, int]:
@@ -502,8 +519,31 @@ def select_latest_producer_evidence(
         artifact_name=artifact_name,
         artifact_digest=digest,
         artifact_id=int(artifact["id"]),
+        head_sha=str(latest.get("head_sha", "")),
     )
 
 
 def verify_producer_snapshot(first: Mapping[str, Any], second: Mapping[str, Any]) -> None:
     stable_read(first, second, "producer workflow/artifact enumeration")
+
+
+def verify_producer_artifact(
+    payload: Mapping[str, Any],
+    selected: ProducerEvidence,
+    *,
+    repository: str,
+    workflow_path: str,
+) -> None:
+    """Bind the downloaded protected-master artifact to its selected run."""
+
+    _require(payload.get("schema") == 1, "producer evidence schema is unsupported")
+    _require(payload.get("repository") == repository, "producer artifact repository mismatch")
+    _require(payload.get("workflow_path") == workflow_path, "producer artifact workflow mismatch")
+    _require(payload.get("ref") == "refs/heads/master", "producer artifact ref is not protected master")
+    if selected.head_sha:
+        _require(payload.get("sha") == selected.head_sha, "producer artifact commit SHA mismatch")
+    _require(int(payload.get("run_id", -1)) == selected.run_id, "producer artifact run ID mismatch")
+    _require(int(payload.get("run_number", -1)) == selected.run_number, "producer artifact run number mismatch")
+    _require(int(payload.get("run_attempt", -1)) == selected.run_attempt, "producer artifact attempt mismatch")
+    _require(payload.get("status") == "completed", "producer artifact producer status is not completed")
+    _require(payload.get("conclusion") == "success", "producer artifact producer conclusion is not success")
