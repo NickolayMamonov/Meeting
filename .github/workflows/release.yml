@@ -1,0 +1,161 @@
+name: Android release
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      release_id: ${{ steps.release.outputs.id }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@a02a34c4d625f9be7cb89156071d8567266a2445 # v4.2.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: dev
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  stable:
+    name: Stable Android publication
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: android-release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    concurrency:
+      group: android-release-${{ needs.release-please.outputs.tag_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout exact Release Please tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          fetch-depth: 0
+      - name: Set up Java
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4.4.2
+      - name: Validate Release Please authority
+        env:
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+          RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$RELEASE_TAG" = "v$(python -c 'import json; print(json.load(open("version.json"))["version"])')"
+          test "$(git rev-list -n1 "$RELEASE_TAG")" = "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/dev
+          count="$(gh release list --limit 100 --json tagName,isDraft,isPublished \
+            --jq "[.[] | select(.tagName == \"$RELEASE_TAG\")] | length")"
+          test "$count" = 1
+          gh release view "$RELEASE_TAG" --json isDraft,isPublished --jq \
+            'select(.isDraft == true and .isPublished == false)' >/dev/null
+      - name: Decode protected release inputs
+        id: inputs
+        env:
+          FIREBASE_JSON_B64: ${{ secrets.RELEASE_GOOGLE_SERVICES_JSON_BASE64 }}
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          temp="$RUNNER_TEMP/android-release-inputs"
+          mkdir -p "$temp"
+          chmod 700 "$temp"
+          printf '%s' "$FIREBASE_JSON_B64" | base64 --decode > "$temp/google-services.json"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$temp/release.jks"
+          chmod 600 "$temp"/*
+          echo "firebase=$temp/google-services.json" >> "$GITHUB_OUTPUT"
+          echo "keystore=$temp/release.jks" >> "$GITHUB_OUTPUT"
+      - name: Build and verify stable artifacts
+        env:
+          ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ vars.BASE_URL_RELEASE }}
+          ORG_GRADLE_PROJECT_RELEASE_SPKI_PINS: ${{ vars.RELEASE_SPKI_PINS }}
+          ORG_GRADLE_PROJECT_ANDROID_RELEASE_KEYSTORE_FILE: ${{ steps.inputs.outputs.keystore }}
+          ORG_GRADLE_PROJECT_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_ANDROID_RELEASE_KEY_ALIAS: meet-release
+          ORG_GRADLE_PROJECT_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          ORG_GRADLE_PROJECT_ANDROID_RELEASE_CERT_SHA256: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
+          ORG_GRADLE_PROJECT_RELEASE_COMMIT_SHA: ${{ needs.release-please.outputs.sha }}
+          ORG_GRADLE_PROJECT_RELEASE_PUBLISHING: "true"
+        run: |
+          set -euo pipefail
+          cp "${{ steps.inputs.outputs.firebase }}" app/google-services.json
+          ./gradlew generateReleaseBuildMetadata validateReleasePublishingInputs ktlintCheck test :app:lint \
+            :app:assembleRelease :app:bundleRelease
+      - name: Verify distributable signatures
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
+          aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
+          apksigner verify --verbose --print-certs "$apk"
+          jarsigner -verify -strict "$aab"
+      - name: Package deterministic release evidence
+        env:
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
+          aab="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
+          mkdir -p release-output
+          python scripts/release/package_artifacts.py \
+            --metadata app/build/release-metadata/release-build.json \
+            --output release-output --apk "$apk" --aab "$aab" \
+            --tag "$RELEASE_TAG" --commit "$RELEASE_SHA" \
+            --source-branch dev --workflow "${GITHUB_WORKFLOW}"
+          python scripts/release/verify_chain.py release-output
+      - name: Attest final subjects
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-path: |
+            release-output/*.apk
+            release-output/*.aab
+            release-output/release-manifest.json
+            release-output/SHA256SUMS
+            release-output/release-candidate.json
+      - name: Upload verified assets to draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" release-output/* --clobber
+          gh release view "$RELEASE_TAG" --json isDraft,isPublished --jq \
+            'select(.isDraft == true and .isPublished == false)' >/dev/null
+      - name: Publish only after remote verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+          test "$(gh release view "$RELEASE_TAG" --json isPublished --jq .isPublished)" = false
+          gh release edit "$RELEASE_TAG" --draft=false
+      - name: Remove protected inputs
+        if: ${{ always() }}
+        run: |
+          rm -rf "$RUNNER_TEMP/android-release-inputs"
+          rm -f app/google-services.json
