@@ -15,6 +15,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 configureKotlinAndroid(this)
                 defaultConfig.targetSdk = 36
                 configureAndroidCompose(this)
+                configureAndroidPublishing(this)
             }
         }
     }

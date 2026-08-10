@@ -21,3 +21,15 @@ local.properties
 /build-logic/build
 /build-logic/convention/build
 /build-logic/.gradle
+/build-logic/.kotlin
+
+# Android release credentials and generated evidence
+*.jks
+*.keystore
+*.p12
+scripts/release/*.cer
+scripts/release/*.sha256
+scripts/release/*password*
+release-output/
+snapshot-output/
+scripts/release/__pycache__/

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "bump-minor-pre-major": true,
+  "include-v-in-tag": true,
+  "initial-version": "1.0.0",
+  "draft": true,
+  "target-branch": "dev",
+  "changelog-path": "CHANGELOG.md",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "version-file": "version.json",
+      "extra-files": [
+        "version.json"
+      ]
+    }
+  }
+}
