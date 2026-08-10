@@ -14,9 +14,14 @@
   independent reviewer is provisioned; this implementation does not weaken
   or self-approve that protection.
 - The `release-please-credential-audit` check is unconditional on
-  `pull_request` and `merge_group`. It reports N/A only when a PR carries an
-  explicit `non-release` label or `Release-Classification: non-release` body
-  marker. Release Please's `autorelease: pending` label or its
+  `pull_request_target` and `merge_group`. The workflow must be installed on
+  the protected base branch before this check is required: GitHub evaluates
+  `pull_request_target` from that protected base revision, so a PR cannot
+  modify the token-bearing workflow definition. The verifier is then checked
+  out at the exact base SHA before the token is injected. It reports N/A only
+  when a PR carries an explicit `non-release` label or
+  `Release-Classification: non-release` body marker. Release Please's
+  `autorelease: pending` label or its
   `release-please--branches--dev` head branch is an explicit release
   classification. Missing or ambiguous classification is a release failure.
 - The same workflow has a protected-`master` producer job. It uploads exactly
@@ -94,6 +99,9 @@ run attempt/conclusion, and every producer/authoritative attestation statement
 to that same producer execution. The final recovery mutation job consumes only
 the verified declarative artifact and does not check out or execute release
 source code while `RELEASE_UPLOAD_TOKEN` is present.
+Asset replacement uses the exact `https://uploads.github.com` endpoint with
+`curl`; do not use `gh api --hostname uploads.github.com`, because GitHub CLI
+rewrites that hostname to `api.uploads.github.com`.
 Runtime publication also requires externally recorded evidence bound to the
 exact verified release: `release_id`, `tag`, `source_sha`,
 `candidate_sha256`, and `manifest_sha256` must match the API-verified draft and

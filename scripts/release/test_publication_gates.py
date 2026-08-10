@@ -325,7 +325,12 @@ class PublicationGateTest(unittest.TestCase):
         self.assertIn("--paginate --slurp", recovery)
         mutation = workflow.split("\n  stable-mutate:\n", 1)[1]
         self.assertNotIn("gh release upload", mutation)
-        self.assertIn('releases/$RELEASE_ID/assets?name=$name', mutation)
+        self.assertIn(
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/"
+            "$RELEASE_ID/assets?name=$encoded_name",
+            mutation,
+        )
+        self.assertNotIn("gh api --hostname uploads.github.com", mutation)
 
     def test_recovery_binds_successful_stable_producer_and_zip_digest(self):
         with tempfile.TemporaryDirectory() as temporary:
