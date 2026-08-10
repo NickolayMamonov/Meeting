@@ -89,6 +89,8 @@ jobs:
     needs: [static-analysis, unit-tests, assemble]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' && needs.static-analysis.result == 'success' && needs.unit-tests.result == 'success' && needs.assemble.result == 'success' }}
     runs-on: ubuntu-latest
+    environment:
+      name: android-snapshot-signing
     permissions:
       contents: read
     steps:
@@ -148,8 +150,12 @@ jobs:
           set -euo pipefail
           apk="$(find unsigned -name '*.apk' -print -quit)"
           test -n "$apk"
+          umask 077
+          printf '%s' "$STORE_PASSWORD" > "$RUNNER_TEMP/snapshot-store-password"
+          printf '%s' "$KEY_PASSWORD" > "$RUNNER_TEMP/snapshot-key-password"
           apksigner sign --ks "$RUNNER_TEMP/snapshot-release.jks" --ks-key-alias meet-release \
-            --ks-pass "pass:$STORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" "$apk"
+            --ks-pass "file:$RUNNER_TEMP/snapshot-store-password" \
+            --key-pass "file:$RUNNER_TEMP/snapshot-key-password" "$apk"
           apksigner verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/snapshot-signer.txt"
           grep -Eiq 'key algorithm: RSA' "$RUNNER_TEMP/snapshot-signer.txt"
           grep -Eiq 'key size( \(bits\))?: 4096' "$RUNNER_TEMP/snapshot-signer.txt"
@@ -165,7 +171,9 @@ jobs:
           if-no-files-found: error
       - name: Remove snapshot signing inputs
         if: ${{ always() }}
-        run: rm -f "$RUNNER_TEMP/snapshot-release.jks"
+        run: rm -f "$RUNNER_TEMP/snapshot-release.jks" \
+          "$RUNNER_TEMP/snapshot-store-password" \
+          "$RUNNER_TEMP/snapshot-key-password"
 
   snapshot-evidence:
     name: Publish verified dev snapshot artifact

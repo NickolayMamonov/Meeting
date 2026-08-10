@@ -149,10 +149,14 @@ jobs:
           apk="$(find unsigned -name '*.apk' -print -quit)"
           aab="$(find unsigned -name '*.aab' -print -quit)"
           test -n "$apk" && test -n "$aab"
+          umask 077
+          printf '%s' "$STORE_PASSWORD" > "$RUNNER_TEMP/release-store-password"
+          printf '%s' "$KEY_PASSWORD" > "$RUNNER_TEMP/release-key-password"
           apksigner sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias meet-release \
-            --ks-pass "pass:$STORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" "$apk"
-          jarsigner -keystore "$RUNNER_TEMP/release.jks" -storepass "$STORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" "$aab" meet-release
+            --ks-pass "file:$RUNNER_TEMP/release-store-password" \
+            --key-pass "file:$RUNNER_TEMP/release-key-password" "$apk"
+          printf '%s\n%s\n' "$STORE_PASSWORD" "$KEY_PASSWORD" | \
+            jarsigner -keystore "$RUNNER_TEMP/release.jks" "$aab" meet-release
           apksigner verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-cert.txt"
           keytool -printcert -jarfile "$aab" > "$RUNNER_TEMP/aab-cert.txt"
           grep -Eiq 'key algorithm: RSA' "$RUNNER_TEMP/apk-cert.txt"
@@ -169,7 +173,9 @@ jobs:
           if-no-files-found: error
       - name: Remove release signing inputs
         if: ${{ always() }}
-        run: rm -f "$RUNNER_TEMP/release.jks"
+        run: rm -f "$RUNNER_TEMP/release.jks" \
+          "$RUNNER_TEMP/release-store-password" \
+          "$RUNNER_TEMP/release-key-password"
 
   stable-evidence:
     name: Verify and attest stable artifacts

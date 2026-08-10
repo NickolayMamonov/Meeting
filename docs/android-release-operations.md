@@ -112,6 +112,21 @@ generate anything during preflight. Execution requires explicit confirmation,
 uses RSA-4096 alias `meet-release`, verifies backup bytes and fingerprint, and
 keeps passwords out of arguments and logs.
 
+After the offline backup has been verified, the optional
+`-ProvisionGitHubSecrets` switch streams the generated keystore and passwords
+to `gh secret set --env android-release` through standard input. Use
+`-GitHubRepository OWNER/REPOSITORY` when running outside the checkout. Secret
+values are never command-line arguments or written into the repository:
+
+```powershell
+./scripts/release/Initialize-AndroidReleaseSigning.ps1 `
+  -Mode Execute `
+  -OfflineBackupDirectory 'D:\offline\meet-release' `
+  -CredentialHandoffDirectory 'C:\secure\meet-release-handoff' `
+  -ProvisionGitHubSecrets `
+  -GitHubRepository 'NickolayMamonov/Meeting'
+```
+
 For leaked signing material, revoke access, preserve evidence, and make an
 explicit migration decision. Do not rotate automatically in CI or rewrite a
 published tag/release.

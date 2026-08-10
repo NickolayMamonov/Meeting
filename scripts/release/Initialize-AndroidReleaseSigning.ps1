@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $OfflineBackupDirectory,
     [Parameter(Mandatory = $true)]
-    [string] $CredentialHandoffDirectory
+    [string] $CredentialHandoffDirectory,
+    [switch] $ProvisionGitHubSecrets,
+    [string] $GitHubRepository
 )
 
 $ErrorActionPreference = "Stop"
@@ -56,6 +58,9 @@ if (Test-Path -LiteralPath $handoff) {
 }
 if (-not (Get-Command keytool -ErrorAction SilentlyContinue)) {
     throw "keytool is required"
+}
+if ($ProvisionGitHubSecrets -and -not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    throw "gh is required when -ProvisionGitHubSecrets is selected"
 }
 
 if ($Mode -eq "Preflight") {
@@ -114,5 +119,30 @@ Copy-Item -LiteralPath $keystore -Destination $backupKeystore
 if ((Get-FileHash $keystore).Hash -ne (Get-FileHash $backupKeystore).Hash) {
     throw "Offline backup verification failed"
 }
+
+if ($ProvisionGitHubSecrets) {
+    function Set-GitHubEnvironmentSecret([string] $Name, [scriptblock] $WriteValue) {
+        $arguments = @("secret", "set", $Name, "--env", "android-release")
+        if (-not [string]::IsNullOrWhiteSpace($GitHubRepository)) {
+            $arguments += @("--repo", $GitHubRepository)
+        }
+        & $WriteValue | & gh @arguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh secret set failed for environment secret '$Name'"
+        }
+    }
+
+    Set-GitHubEnvironmentSecret "RELEASE_KEYSTORE_BASE64" {
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes($keystore))
+    }
+    Set-GitHubEnvironmentSecret "RELEASE_KEYSTORE_PASSWORD" {
+        [IO.File]::ReadAllText($storePasswordFile)
+    }
+    Set-GitHubEnvironmentSecret "RELEASE_KEY_PASSWORD" {
+        [IO.File]::ReadAllText($keyPasswordFile)
+    }
+    Write-Host "Provisioned signing secrets to the android-release Environment through gh stdin."
+}
+
 Write-Host "Generated and backed up one meet-release identity with fingerprint $hash."
 Write-Host "Provisioning is intentionally operator-controlled; CI has no key-generation path."
