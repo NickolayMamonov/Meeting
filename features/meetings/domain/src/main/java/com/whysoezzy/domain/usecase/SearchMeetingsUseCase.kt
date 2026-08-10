@@ -2,6 +2,7 @@ package com.whysoezzy.domain.usecase
 
 import com.whysoezzy.domain.models.SearchData
 import com.whysoezzy.domain.repository.MeetingsRepository
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Поиск встреч. Для поиска сообществ используется SearchCommunitiesUseCase из communities:domain.
@@ -14,6 +15,8 @@ class SearchMeetingsUseCase(
         return try {
             val meetings = meetingsRepository.searchEvents(query).getOrThrow()
             Result.success(SearchData(meetings = meetings, communities = emptyList()))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

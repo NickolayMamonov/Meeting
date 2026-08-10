@@ -7,6 +7,7 @@ import androidx.paging.cachedIn
 import androidx.paging.map
 import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.common.error.toErrorType
+import com.whysoezzy.domain.models.SearchData
 import com.whysoezzy.domain.usecase.GetMainScreenDataUseCase
 import com.whysoezzy.domain.usecase.GetPagedMeetingsUseCase
 import com.whysoezzy.domain.usecase.ManageCommunitySubscriptionUseCase
@@ -22,6 +23,7 @@ import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.models.UIKitMeetingTag
 import dev.whysoezzy.uikit.models.UIKitTagState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +31,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,12 +49,14 @@ sealed interface MainScreenNavEvent {
     ) : MainScreenNavEvent
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class MainScreenViewModel(
     private val getMainScreenDataUseCase: GetMainScreenDataUseCase,
     private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
     private val getPagedMeetingsUseCase: GetPagedMeetingsUseCase,
     private val searchMeetingsUseCase: SearchMeetingsUseCase,
     private val dispatchers: DispatcherProvider,
+    private val searchDebounceMillis: Long = DEFAULT_SEARCH_DEBOUNCE_MILLIS,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MainScreenUiState>(MainScreenUiState.Loading)
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
@@ -61,8 +68,11 @@ class MainScreenViewModel(
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     private val activeTagId = MutableStateFlow<Long?>(null)
+    private val searchRequests = MutableStateFlow<SearchRequest?>(null)
+    private var nextSearchRequestId = 0L
+    private var activeSearchRequestId = 0L
+    private var lastCanonicalQuery: String? = null
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     val pagedMeetings: Flow<PagingData<UIKitMeetingInfo>> =
         activeTagId
             .flatMapLatest { tagId -> getPagedMeetingsUseCase(tagId) }
@@ -70,6 +80,22 @@ class MainScreenViewModel(
             .cachedIn(viewModelScope)
 
     init {
+        viewModelScope.launch {
+            searchRequests
+                .filterNotNull()
+                .flatMapLatest { request ->
+                    flow {
+                        val query = request.query ?: return@flow
+                        delay(searchDebounceMillis)
+                        emit(
+                            SearchOutcome(
+                                request = request,
+                                result = searchMeetingsUseCase(query),
+                            ),
+                        )
+                    }
+                }.collect { outcome -> applySearchOutcome(outcome) }
+        }
         loadMainScreenData()
     }
 
@@ -93,6 +119,7 @@ class MainScreenViewModel(
 
     private fun loadMainScreenData() {
         viewModelScope.launch {
+            invalidateSearch()
             _uiState.value = MainScreenUiState.Loading
 
             getMainScreenDataUseCase()
@@ -137,6 +164,7 @@ class MainScreenViewModel(
                             adBlocks = data.adBlocks.toUIKitAdBlocks(),
                         )
                     }
+                    invalidateSearch()
                     _uiState.value = MainScreenUiState.Success(
                         heroMeetings = mapped.heroMeetings,
                         popularMeetings = mapped.popularMeetings,
@@ -157,27 +185,63 @@ class MainScreenViewModel(
 
         if (query.isBlank()) {
             // пустой запрос → показываем paged-список; результаты поиска очищаем
+            invalidateSearch()
             _uiState.value = (_uiState.value as MainScreenUiState.Success).copy(allMeetings = emptyList())
             return
         }
 
-        viewModelScope.launch {
-            searchMeetingsUseCase(query)
-                .onSuccess { searchData ->
-                    val mapped = withContext(dispatchers.default) {
-                        searchData.meetings.toUIKitMeetingInfos()
-                    }
-                    val latest = _uiState.value as? MainScreenUiState.Success ?: return@launch
-                    if (latest.searchQuery == query) {
-                        _uiState.value = latest.copy(allMeetings = mapped)
-                    }
-                }.onFailure {
-                    val latest = _uiState.value as? MainScreenUiState.Success ?: return@launch
-                    if (latest.searchQuery == query) {
-                        _uiState.value = latest.copy(allMeetings = emptyList())
-                    }
-                }
+        if (lastCanonicalQuery == query) {
+            return
         }
+
+        val request = SearchRequest(
+            id = ++nextSearchRequestId,
+            query = query,
+        )
+        activeSearchRequestId = request.id
+        lastCanonicalQuery = query
+        searchRequests.value = request
+    }
+
+    private suspend fun applySearchOutcome(outcome: SearchOutcome) {
+        val request = outcome.request
+        if (request.id != activeSearchRequestId || request.query == null) {
+            return
+        }
+
+        val latest = _uiState.value as? MainScreenUiState.Success ?: return
+        if (latest.searchQuery != request.query) {
+            return
+        }
+
+        outcome.result
+            .onSuccess { searchData ->
+                val mapped = withContext(dispatchers.default) {
+                    searchData.meetings.toUIKitMeetingInfos()
+                }
+                if (request.id != activeSearchRequestId) {
+                    return@onSuccess
+                }
+                val current = _uiState.value as? MainScreenUiState.Success ?: return@onSuccess
+                if (current.searchQuery == request.query) {
+                    _uiState.value = current.copy(allMeetings = mapped)
+                }
+            }.onFailure {
+                val current = _uiState.value as? MainScreenUiState.Success ?: return@onFailure
+                if (request.id == activeSearchRequestId && current.searchQuery == request.query) {
+                    _uiState.value = current.copy(allMeetings = emptyList())
+                }
+            }
+    }
+
+    private fun invalidateSearch() {
+        val request = SearchRequest(
+            id = ++nextSearchRequestId,
+            query = null,
+        )
+        activeSearchRequestId = request.id
+        lastCanonicalQuery = null
+        searchRequests.value = request
     }
 
     /**
@@ -188,6 +252,7 @@ class MainScreenViewModel(
         val currentState = _uiState.value as? MainScreenUiState.Success ?: return
 
         // выбор тега сбрасывает активный поиск (режимы взаимоисключающие)
+        invalidateSearch()
         _uiState.value = currentState.copy(
             searchQuery = "",
             allMeetings = emptyList(),
@@ -198,6 +263,16 @@ class MainScreenViewModel(
 
         activeTagId.value = tagId
     }
+
+    private data class SearchRequest(
+        val id: Long,
+        val query: String?,
+    )
+
+    private data class SearchOutcome(
+        val request: SearchRequest,
+        val result: Result<SearchData>,
+    )
 
     /**
      * Оптимистичное обновление подписки.
@@ -234,4 +309,8 @@ class MainScreenViewModel(
         val communities: List<UIKitCommunityInfo>,
         val adBlocks: List<UIKitAdBlock>,
     )
+
+    private companion object {
+        const val DEFAULT_SEARCH_DEBOUNCE_MILLIS = 300L
+    }
 }
