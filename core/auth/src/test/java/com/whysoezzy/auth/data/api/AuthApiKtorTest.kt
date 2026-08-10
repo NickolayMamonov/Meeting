@@ -13,6 +13,7 @@ import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -37,8 +38,71 @@ class AuthApiKtorTest {
         append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
     }
 
-    private fun buildClient(mockEngine: MockEngine): HttpClient =
-        KtorNetworkModule.provideHttpClient(mockEngine)
+    private suspend fun <T> withClient(
+        mockEngine: MockEngine,
+        block: suspend (HttpClient) -> T,
+    ): T {
+        val client = KtorNetworkModule.provideHttpClient(mockEngine)
+        return try {
+            block(client)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun `auth operations use exact HTTP contracts`() = runTest {
+        val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
+        val response = AuthResponse(
+            accessToken = "access",
+            refreshToken = "refresh",
+            isNewUser = false,
+            user = AuthUserDto(id = 7L, name = "Ada", surname = "Lovelace"),
+        )
+        val engine = MockEngine { request ->
+            requests += request
+            when (request.url.encodedPath) {
+                "/auth/email/send-otp" -> respond(
+                    content = """{"message":"sent"}""",
+                    headers = jsonHeaders,
+                )
+                "/auth/email/verify-otp" -> respond(
+                    content = json.encodeToString(response),
+                    headers = jsonHeaders,
+                )
+                "/auth/refresh" -> respond(
+                    content = """{"accessToken":"new-access","refreshToken":"new-refresh"}""",
+                    headers = jsonHeaders,
+                )
+                "/auth/logout" -> respond(
+                    content = """{"message":"logged out"}""",
+                    headers = jsonHeaders,
+                )
+                else -> error("Unexpected auth path: ${request.url.encodedPath}")
+            }
+        }
+
+        withClient(engine) { client ->
+            val api = AuthApiKtor(client)
+            api.requestEmailOtp("person@example.com")
+            api.verifyEmailOtp("person@example.com", "123456")
+            api.refreshToken("old-refresh")
+            api.logout()
+        }
+
+        assertEquals(
+            listOf(
+                HttpMethod.Post to "/auth/email/send-otp",
+                HttpMethod.Post to "/auth/email/verify-otp",
+                HttpMethod.Post to "/auth/refresh",
+                HttpMethod.Post to "/auth/logout",
+            ),
+            requests.map { it.method to it.url.encodedPath },
+        )
+        assertTrue(requests[0].body.toByteArray().isNotEmpty())
+        assertTrue(requests[1].body.toByteArray().isNotEmpty())
+        assertTrue(requests[2].body.toByteArray().isNotEmpty())
+    }
 
     // ==================== email OTP request ====================
 
@@ -50,7 +114,7 @@ class AuthApiKtorTest {
             respond(content = """{"message":"ok"}""", headers = jsonHeaders)
         }
 
-        AuthApiKtor(buildClient(engine)).requestEmailOtp("person@example.com")
+        withClient(engine) { AuthApiKtor(it).requestEmailOtp("person@example.com") }
 
         assertEquals(
             SendOtpRequest("person@example.com"),
@@ -64,7 +128,7 @@ class AuthApiKtorTest {
             respond(content = """{"message":"OTP sent"}""", headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).requestEmailOtp("person@example.com")
+        val result = withClient(engine) { AuthApiKtor(it).requestEmailOtp("person@example.com") }
 
         assertEquals("OTP sent", result.message)
     }
@@ -83,7 +147,7 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(expected), headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).verifyEmailOtp("person@example.com", "123456")
+        val result = withClient(engine) { AuthApiKtor(it).verifyEmailOtp("person@example.com", "123456") }
 
         assertEquals("access123", result.accessToken)
         assertEquals("refresh456", result.refreshToken)
@@ -103,7 +167,7 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(response), headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).verifyEmailOtp("person@example.com", "567890")
+        val result = withClient(engine) { AuthApiKtor(it).verifyEmailOtp("person@example.com", "567890") }
 
         assertTrue(result.isNewUser)
     }
@@ -122,7 +186,7 @@ class AuthApiKtorTest {
             respond(content = json.encodeToString(response), headers = jsonHeaders)
         }
 
-        AuthApiKtor(buildClient(engine)).verifyEmailOtp("person@example.com", "123456")
+        withClient(engine) { AuthApiKtor(it).verifyEmailOtp("person@example.com", "123456") }
 
         assertEquals(
             VerifyOtpRequest(
@@ -146,7 +210,7 @@ class AuthApiKtorTest {
             )
         }
 
-        val result = AuthApiKtor(buildClient(engine)).refreshToken("oldRefresh")
+        val result = withClient(engine) { AuthApiKtor(it).refreshToken("oldRefresh") }
 
         assertEquals("newAccess", result.accessToken)
         assertEquals("newRefresh", result.refreshToken)
@@ -158,7 +222,7 @@ class AuthApiKtorTest {
             respond(content = """{"accessToken":"newAccess"}""", headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).refreshToken("oldRefresh")
+        val result = withClient(engine) { AuthApiKtor(it).refreshToken("oldRefresh") }
 
         assertEquals("newAccess", result.accessToken)
         assertEquals(null, result.refreshToken)
@@ -175,7 +239,7 @@ class AuthApiKtorTest {
             )
         }
 
-        AuthApiKtor(buildClient(engine)).refreshToken("myOldRefreshToken")
+        withClient(engine) { AuthApiKtor(it).refreshToken("myOldRefreshToken") }
 
         assertTrue(capturedBody.contains("myOldRefreshToken"))
     }
@@ -190,7 +254,7 @@ class AuthApiKtorTest {
             respond(content = """{"message":"logged out"}""", headers = jsonHeaders)
         }
 
-        AuthApiKtor(buildClient(engine)).logout()
+        withClient(engine) { AuthApiKtor(it).logout() }
 
         assertTrue(capturedPath.contains("auth/logout"))
     }
@@ -201,7 +265,7 @@ class AuthApiKtorTest {
             respond(content = """{"message":"logged out"}""", headers = jsonHeaders)
         }
 
-        val result = AuthApiKtor(buildClient(engine)).logout()
+        val result = withClient(engine) { AuthApiKtor(it).logout() }
 
         assertEquals("logged out", result["message"])
     }

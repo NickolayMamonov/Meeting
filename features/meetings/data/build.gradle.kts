@@ -24,6 +24,7 @@ dependencies {
     implementation(libs.androidx.paging.runtime)
 
     testImplementation(project(":core:testing"))
+    testImplementation(libs.ktor.client.mock)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
