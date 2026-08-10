@@ -90,6 +90,8 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' && needs.static-analysis.result == 'success' && needs.unit-tests.result == 'success' && needs.assemble.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
+      # Firebase and certificate inputs are environment-scoped; the consumer
+      # job must enter the protected snapshot boundary before checkout/build.
       name: android-snapshot-signing
     permissions:
       contents: read
