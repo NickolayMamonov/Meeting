@@ -645,6 +645,8 @@ def run(fixture_path: str | None) -> str:
     fixture = _fixture(fixture_path) if fixture_path else None
     event = fixture["event"] if fixture else _event()
     event_name = os.environ.get("GITHUB_EVENT_NAME", event.get("event_name", ""))
+    if event_name == "pull_request_target":
+        event_name = "pull_request"
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     token = os.environ.get("GITHUB_TOKEN", "")
     api = GitHubApi(repository, token) if not fixture else None

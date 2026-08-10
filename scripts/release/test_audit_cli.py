@@ -14,6 +14,9 @@ from release_evidence import EvidenceError
 
 
 WORKFLOW_PATH = ".github/workflows/release-please-credential-audit.yml"
+BOOTSTRAP_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "missing-verifier-pull-request-target.json"
+)
 
 
 def pr(*, classification="release", head_sha="h", base_sha="base"):
@@ -106,6 +109,16 @@ class AuditCliTest(unittest.TestCase):
         )
         with self.assertRaises(EvidenceError):
             self.fixture_run(fixture)
+
+    def test_missing_verifier_pull_request_target_fixture_is_na(self):
+        event = json.loads(BOOTSTRAP_FIXTURE.read_text(encoding="utf-8"))
+        fixture = {
+            "event": event,
+            "live_pr_first": event["pull_request"],
+            "live_pr_second": json.loads(json.dumps(event["pull_request"])),
+        }
+        self.assertEqual(event["event_name"], "pull_request_target")
+        self.assertEqual(self.fixture_run(fixture), "N/A")
 
     def test_producer_fixture_race_fails_closed(self):
         fixture = {

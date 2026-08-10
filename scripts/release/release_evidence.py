@@ -191,6 +191,8 @@ def required_check_decision(
     release-relevant because their exact PR mapping must be proved.
     """
 
+    if event_name == "pull_request_target":
+        event_name = "pull_request"
     if event_name not in {"pull_request", "merge_group"}:
         raise EvidenceError("credential audit only supports pull_request and merge_group")
     if event_name == "pull_request" and pr is not None:

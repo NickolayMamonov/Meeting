@@ -1,0 +1,28 @@
+{
+  "event_name": "pull_request_target",
+  "pull_request": {
+    "number": 7,
+    "state": "open",
+    "draft": false,
+    "labels": [
+      {
+        "name": " NON-RELEASE "
+      }
+    ],
+    "body": "Release-Classification: Non-Release\n",
+    "head": {
+      "sha": "h",
+      "ref": "feature",
+      "repo": {
+        "full_name": "owner/repo"
+      }
+    },
+    "base": {
+      "sha": "base",
+      "ref": "dev",
+      "repo": {
+        "full_name": "owner/repo"
+      }
+    }
+  }
+}
