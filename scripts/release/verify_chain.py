@@ -134,6 +134,18 @@ def verify(directory: Path) -> None:
         identities.add(linked["attestation_identity"])
     if covered_subjects != expected_subjects:
         raise ChainError("attestation coverage is not exact")
+    expected_files = {
+        "release-authority.json",
+        manifest_path.name,
+        "SHA256SUMS",
+        "release-candidate.json",
+        "recovery-envelope.json",
+        *(item["name"] for item in manifest.get("artifacts", [])),
+        *(reference["name"] for reference in references),
+    }
+    actual_files = {path.name for path in directory.iterdir() if path.is_file()}
+    if actual_files != expected_files:
+        raise ChainError("release evidence contains unreferenced or missing files")
 
 
 def main() -> int:

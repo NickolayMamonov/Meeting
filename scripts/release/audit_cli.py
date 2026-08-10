@@ -116,6 +116,7 @@ class GitHubApi:
               entries(first: 100, after: $after) {
                 nodes {
                   id
+                  state
                   solo
                   pullRequest {
                     number
@@ -189,6 +190,7 @@ class GitHubApi:
         conclusions = self.required_check_conclusions(head_sha, required_checks)
         entry = {
             "id": raw_entry.get("id"),
+            "state": raw_entry.get("state"),
             "target_branch": branch,
             "exhaustive": True,
             "pull_request_numbers": [number],
@@ -328,6 +330,7 @@ class GitHubApi:
         conclusions = self.required_check_conclusions(head_sha, required_checks)
         entry = {
             "id": entry_raw.get("id"),
+            "state": entry_raw.get("state"),
             "target_branch": branch,
             "exhaustive": True,
             "pull_request_numbers": [number],

@@ -131,6 +131,7 @@ class AuditCliTest(unittest.TestCase):
         }
         entry = {
             "id": "q1",
+            "state": "QUEUED",
             "target_branch": "dev",
             "exhaustive": True,
             "pull_request_numbers": [7],

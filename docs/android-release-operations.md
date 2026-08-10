@@ -94,10 +94,14 @@ run attempt/conclusion, and every producer/authoritative attestation statement
 to that same producer execution. The final recovery mutation job consumes only
 the verified declarative artifact and does not check out or execute release
 source code while `RELEASE_UPLOAD_TOKEN` is present.
-Runtime publication also requires externally recorded Firebase package,
-certificate, TLS/SPKI, backend revision, authenticated-device, install, and
-authenticated-API gates; it must explicitly state that emulator/device state
-was not reset.
+Runtime publication also requires externally recorded evidence bound to the
+exact verified release: `release_id`, `tag`, `source_sha`,
+`candidate_sha256`, and `manifest_sha256` must match the API-verified draft and
+the downloaded candidate/manifest bytes. The runtime Firebase package,
+signing certificate fingerprint, and TLS/SPKI pin set must then match the
+verified stable manifest exactly. Backend revision, authenticated-device,
+install, and authenticated-API gates remain required; the evidence must
+explicitly state that emulator/device state was not reset.
 
 ## Signing bootstrap and incident response
 

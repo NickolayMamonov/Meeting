@@ -112,7 +112,7 @@ class EvidenceTest(unittest.TestCase):
             ],
         }
         entry = {
-            "id": "q1", "target_branch": "dev", "exhaustive": True,
+            "id": "q1", "state": "QUEUED", "target_branch": "dev", "exhaustive": True,
             "pull_request_numbers": [7], "head_sha": "head",
             "base_ref": "dev", "base_sha": "base",
             "required_check_conclusions": {
@@ -141,6 +141,15 @@ class EvidenceTest(unittest.TestCase):
                 {"queue_entry_id": "q1", "target_branch": "dev",
                  "pr_tuple": (7, "head", "dev", "base")},
                 [{**entry, "head_sha": "moved"}],
+                {7: {"number": 7, "state": "open", "draft": False,
+                     "head_sha": "head", "base_ref": "dev", "base_sha": "base"}},
+                required_checks=rule["required_checks"],
+            )
+        with self.assertRaises(EvidenceError):
+            map_merge_group_to_pr(
+                {"queue_entry_id": "q1", "target_branch": "dev",
+                 "pr_tuple": (7, "head", "dev", "base")},
+                [{**entry, "state": "DEQUEUED"}],
                 {7: {"number": 7, "state": "open", "draft": False,
                      "head_sha": "head", "base_ref": "dev", "base_sha": "base"}},
                 required_checks=rule["required_checks"],

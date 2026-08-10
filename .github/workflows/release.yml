@@ -51,6 +51,8 @@ jobs:
   stable-build:
     name: Build unsigned stable artifacts
     needs: release-please
+    outputs:
+      release_id: ${{ steps.authority.outputs.release_id }}
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     environment:
@@ -68,6 +70,7 @@ jobs:
           java-version: "21"
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4.4.2
       - name: Validate Release Please authority before build
+        id: authority
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
@@ -80,6 +83,7 @@ jobs:
           git merge-base --is-ancestor "$RELEASE_SHA" origin/dev
           release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .id)"
           test "$release_id" -gt 0
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
           state="$(gh release view "$RELEASE_TAG" --json id,tagName,isDraft,publishedAt)"
           test "$(jq -r '.id' <<<"$state")" = "$release_id"
           test "$(jq -r '.tagName' <<<"$state")" = "$RELEASE_TAG"
@@ -273,7 +277,7 @@ jobs:
 
   stable-runtime-gate:
     name: Protected runtime publication gate
-    needs: [release-please, stable-evidence]
+    needs: [release-please, stable-build, stable-evidence]
     if: ${{ needs.stable-evidence.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
@@ -285,18 +289,36 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
           fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-evidence-${{ needs.release-please.outputs.tag_name }}
+          path: release-output
       - name: Require protected runtime evidence
         env:
           RUNTIME_GATE_EVIDENCE_JSON: ${{ secrets.RUNTIME_GATE_EVIDENCE_JSON }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+          VERIFIED_RELEASE_ID: ${{ needs.stable-build.outputs.release_id }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test -n "$RUNTIME_GATE_EVIDENCE_JSON"
           printf '%s' "$RUNTIME_GATE_EVIDENCE_JSON" > "$RUNNER_TEMP/runtime-evidence.json"
-          python scripts/release/runtime_gate.py --evidence "$RUNNER_TEMP/runtime-evidence.json"
+          release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .id)"
+          test "$release_id" -gt 0
+          test "$release_id" = "$VERIFIED_RELEASE_ID"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            | jq -e --arg tag "$RELEASE_TAG" --argjson id "$release_id" \
+              '.id == $id and .tag_name == $tag and .draft == true and (.published_at == null)' >/dev/null
+          python scripts/release/runtime_gate.py \
+            --evidence "$RUNNER_TEMP/runtime-evidence.json" \
+            --candidate release-output/release-candidate.json \
+            --manifest release-output/release-manifest.json \
+            --release-id "$release_id" --tag "$RELEASE_TAG" --source-sha "$RELEASE_SHA"
 
   stable-mutate:
     name: Upload and publish verified draft
-    needs: [release-please, stable-evidence, stable-runtime-gate]
+    needs: [release-please, stable-build, stable-evidence, stable-runtime-gate]
     if: ${{ needs.stable-runtime-gate.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
@@ -315,16 +337,39 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+          VERIFIED_RELEASE_ID: ${{ needs.stable-build.outputs.release_id }}
           RELEASE_UPLOAD_ACTOR: ${{ vars.RELEASE_UPLOAD_ACTOR }}
           RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_UPLOAD_ACTOR" && test -n "$RELEASE_PLEASE_ACTOR"
+          test "$VERIFIED_RELEASE_ID" -gt 0
           RELEASE_ID="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .id)"
           test "$RELEASE_ID" -gt 0
+          test "$RELEASE_ID" = "$VERIFIED_RELEASE_ID"
+          printf '%s' "$RELEASE_ID" > "$RUNNER_TEMP/verified-release-id"
           state="$RUNNER_TEMP/release-state.json"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$state"
-          mapfile -t expected < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$state"
+          manifest=release-output/release-manifest.json
+          envelope=release-output/recovery-envelope.json
+          jq -e --arg tag "$RELEASE_TAG" --arg sha "$RELEASE_SHA" \
+            '.schema == 1 and .channel == "release" and .tag == $tag and
+             .commit == $sha and .source_branch == "dev" and
+             ([.artifacts[].type] | index("apk")) != null and
+             ([.artifacts[].type] | index("aab")) != null and
+             all(.artifacts[]; (.name | type == "string") and
+               (split("/") | length == 1) and (.sha256 | test("^[0-9a-f]{64}$")))' \
+            "$manifest" >/dev/null
+          {
+            printf '%s\n' release-authority.json release-manifest.json SHA256SUMS \
+              release-candidate.json recovery-envelope.json
+            jq -r '.artifacts[].name' "$manifest"
+            jq -r '.attestations[].name' "$envelope"
+          } | sort -u > "$RUNNER_TEMP/expected-assets.txt"
+          mapfile -t expected < "$RUNNER_TEMP/expected-assets.txt"
+          mapfile -t actual < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          diff -u "$RUNNER_TEMP/expected-assets.txt" <(printf '%s\n' "${actual[@]}")
           jq -e --arg tag "$RELEASE_TAG" --argjson id "$RELEASE_ID" \
             --arg author "$RELEASE_PLEASE_ACTOR" \
             '.id == $id and .tag_name == $tag and .draft == true and
@@ -338,17 +383,21 @@ jobs:
       - name: Replace only pipeline-owned draft assets
         env:
           GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
-          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           set -euo pipefail
+          RELEASE_ID="$(cat "$RUNNER_TEMP/verified-release-id")"
           state="$RUNNER_TEMP/release-assets.json"
-          gh release view "$RELEASE_TAG" --json assets > "$state"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$state"
           while IFS= read -r name; do
             if jq -e --arg name "$name" '.assets[] | select(.name == $name)' "$state" >/dev/null; then
-              gh release delete-asset "$RELEASE_TAG" "$name" --yes
+              asset_id="$(jq -r --arg name "$name" '.assets[] | select(.name == $name) | .id' "$state")"
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
             fi
-            gh release upload "$RELEASE_TAG" "release-output/$name"
-          done < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+            gh api --hostname uploads.github.com --method POST \
+              "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$name" \
+              -H 'Content-Type: application/octet-stream' \
+              --input "release-output/$name" >/dev/null
+          done < "$RUNNER_TEMP/expected-assets.txt"
       - name: Verify remote assets and final draft authority
         env:
           GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
@@ -357,9 +406,10 @@ jobs:
           RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
         run: |
           set -euo pipefail
+          RELEASE_ID="$(cat "$RUNNER_TEMP/verified-release-id")"
           state="$RUNNER_TEMP/release-state-final.json"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$state"
-          RELEASE_ID="$(jq -r .id "$state")"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$state"
+          test "$(jq -r .id "$state")" = "$RELEASE_ID"
           jq -e --arg tag "$RELEASE_TAG" --argjson id "$RELEASE_ID" \
             --arg author "$RELEASE_PLEASE_ACTOR" \
             '.id == $id and .tag_name == $tag and .draft == true and
@@ -367,7 +417,7 @@ jobs:
           remote="$RUNNER_TEMP/release-assets"
           mkdir -p "$remote"
           mapfile -t remote_assets < <(jq -r '.assets[] | [.id, .name, .size, .digest, .uploader.login] | @tsv' "$state")
-          mapfile -t expected < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t expected < "$RUNNER_TEMP/expected-assets.txt"
           test "${#remote_assets[@]}" -eq "${#expected[@]}"
           for row in "${remote_assets[@]}"; do
             IFS=$'\t' read -r asset_id name size remote_digest uploader <<<"$row"
@@ -392,9 +442,10 @@ jobs:
           RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
         run: |
           set -euo pipefail
+          RELEASE_ID="$(cat "$RUNNER_TEMP/verified-release-id")"
           state="$RUNNER_TEMP/release-authority-before-publish.json"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$state"
-          RELEASE_ID="$(jq -r .id "$state")"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$state"
+          test "$(jq -r .id "$state")" = "$RELEASE_ID"
           jq -e --arg tag "$RELEASE_TAG" --argjson id "$RELEASE_ID" \
             --arg author "$RELEASE_PLEASE_ACTOR" \
             '.id == $id and .tag_name == $tag and .draft == true and
@@ -411,7 +462,23 @@ jobs:
     permissions:
       contents: read
       actions: read
+    env:
+      RECOVERY_TAG: ${{ inputs.tag }}
+      RECOVERY_RELEASE_ID: ${{ inputs.release_id }}
+      RECOVERY_SOURCE_SHA: ${{ inputs.source_sha }}
+      RECOVERY_SOURCE_RUN_ID: ${{ inputs.source_run_id }}
     steps:
+      - name: Validate workflow dispatch inputs
+        run: |
+          set -euo pipefail
+          [[ "$RECOVERY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RECOVERY_RELEASE_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$RECOVERY_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RECOVERY_SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 1
       - name: Resolve release and producer API evidence
         env:
           GH_TOKEN: ${{ github.token }}
@@ -420,6 +487,10 @@ jobs:
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
         run: |
           set -euo pipefail
+          [[ "$RECOVERY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RECOVERY_RELEASE_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$RECOVERY_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RECOVERY_SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           test "$SOURCE_RUN_ID" -gt 0
           release_state="$RUNNER_TEMP/recovery-release.json"
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_state"
@@ -431,8 +502,9 @@ jobs:
           gh api --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?per_page=100" \
             | jq '{jobs: [.[].jobs[]]}' > "$RUNNER_TEMP/recovery-jobs.json"
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100" \
-            > "$RUNNER_TEMP/recovery-artifacts.json"
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100" \
+            | jq '{artifacts: [.[].artifacts[]]}' > "$RUNNER_TEMP/recovery-artifacts.json"
           artifact_name="android-release-evidence-$RELEASE_TAG"
           artifact_count="$(jq --arg name "$artifact_name" \
             '[.artifacts[] | select(.name == $name)] | length' \
@@ -451,36 +523,44 @@ jobs:
           test "$actual_digest" = "${selected_digest#sha256:}"
           mkdir -p release-output
           unzip -q "$RUNNER_TEMP/recovery-evidence.zip" -d release-output
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.tag }}
-          fetch-depth: 1
       - name: Validate immutable producer provenance before recovery
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_ID_INPUT: ${{ inputs.release_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
         run: |
           set -euo pipefail
-          test "$(git rev-list -n1 "${{ inputs.tag }}")" = "${{ inputs.source_sha }}"
+          test "$(git rev-list -n1 "$RELEASE_TAG")" = "$SOURCE_SHA"
           python scripts/release/recovery_gate.py \
             --state "$RUNNER_TEMP/recovery-release.json" \
             --candidate release-output/release-candidate.json \
-            --release-id "${{ inputs.release_id }}" --tag "${{ inputs.tag }}" \
-            --source-sha "${{ inputs.source_sha }}" \
+            --release-id "$RELEASE_ID_INPUT" --tag "$RELEASE_TAG" \
+            --source-sha "$SOURCE_SHA" \
             --run-metadata "$RUNNER_TEMP/recovery-run.json" \
             --jobs "$RUNNER_TEMP/recovery-jobs.json" \
             --artifact-metadata "$RUNNER_TEMP/recovery-artifact.json" \
             --archive "$RUNNER_TEMP/recovery-evidence.zip" \
             --evidence-directory release-output \
             --repository "$GITHUB_REPOSITORY" \
-            --source-run-id "${{ inputs.source_run_id }}" \
-            --artifact-name "android-release-evidence-${{ inputs.tag }}"
+            --source-run-id "$SOURCE_RUN_ID" \
+            --artifact-name "android-release-evidence-${RELEASE_TAG}"
           python scripts/release/verify_chain.py release-output
       - name: Require protected runtime evidence
         env:
           RUNTIME_GATE_EVIDENCE_JSON: ${{ secrets.RUNTIME_GATE_EVIDENCE_JSON }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_ID_INPUT: ${{ inputs.release_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           test -n "$RUNTIME_GATE_EVIDENCE_JSON"
           printf '%s' "$RUNTIME_GATE_EVIDENCE_JSON" > "$RUNNER_TEMP/runtime-evidence.json"
-          python scripts/release/runtime_gate.py --evidence "$RUNNER_TEMP/runtime-evidence.json"
+          python scripts/release/runtime_gate.py \
+            --evidence "$RUNNER_TEMP/runtime-evidence.json" \
+            --candidate release-output/release-candidate.json \
+            --manifest release-output/release-manifest.json \
+            --release-id "$RELEASE_ID_INPUT" --tag "$RELEASE_TAG" --source-sha "$SOURCE_SHA"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android-recovery-evidence-${{ inputs.tag }}-${{ inputs.source_run_id }}
@@ -496,6 +576,11 @@ jobs:
       name: android-release-upload
     permissions:
       contents: write
+    env:
+      RECOVERY_TAG: ${{ inputs.tag }}
+      RECOVERY_RELEASE_ID: ${{ inputs.release_id }}
+      RECOVERY_SOURCE_SHA: ${{ inputs.source_sha }}
+      RECOVERY_SOURCE_RUN_ID: ${{ inputs.source_run_id }}
     concurrency:
       group: android-release-${{ inputs.tag }}
       cancel-in-progress: false
@@ -511,13 +596,37 @@ jobs:
           RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
         run: |
           set -euo pipefail
+          [[ "$RECOVERY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RECOVERY_RELEASE_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$RECOVERY_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RECOVERY_SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           test -n "$RELEASE_UPLOAD_ACTOR" && test -n "$RELEASE_PLEASE_ACTOR"
-          mapfile -t expected < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          manifest=release-output/release-manifest.json
+          envelope=release-output/recovery-envelope.json
+          jq -e --arg tag "$RECOVERY_TAG" --arg sha "$RECOVERY_SOURCE_SHA" \
+            '.schema == 1 and .channel == "release" and .tag == $tag and
+             .commit == $sha and .source_branch == "dev" and
+             ([.artifacts[].type] | index("apk")) != null and
+             ([.artifacts[].type] | index("aab")) != null and
+             all(.artifacts[]; (.name | type == "string") and
+               (split("/") | length == 1) and (.sha256 | test("^[0-9a-f]{64}$")))' \
+            "$manifest" >/dev/null
+          {
+            printf '%s\n' release-authority.json release-manifest.json SHA256SUMS \
+              release-candidate.json recovery-envelope.json
+            jq -r '.artifacts[].name' "$manifest"
+            jq -r '.attestations[].name' "$envelope"
+          } | sort -u > "$RUNNER_TEMP/expected-assets.txt"
+          mapfile -t expected < "$RUNNER_TEMP/expected-assets.txt"
+          mapfile -t actual < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          diff -u "$RUNNER_TEMP/expected-assets.txt" <(printf '%s\n' "${actual[@]}")
           state="$RUNNER_TEMP/recovery-mutation-state.json"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/${{ inputs.tag }}" > "$state"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RECOVERY_TAG" > "$state"
           RELEASE_ID="$(jq -r .id "$state")"
-          test "$RELEASE_ID" = "${{ inputs.release_id }}"
-          jq -e --arg tag "${{ inputs.tag }}" --argjson id "$RELEASE_ID" \
+          test "$RELEASE_ID" = "$RECOVERY_RELEASE_ID"
+          printf '%s' "$RELEASE_ID" > "$RUNNER_TEMP/verified-release-id"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$state"
+          jq -e --arg tag "$RECOVERY_TAG" --argjson id "$RELEASE_ID" \
             --arg author "$RELEASE_PLEASE_ACTOR" \
             '.id == $id and .tag_name == $tag and .draft == true and
              (.published_at == null) and .author.login == $author' "$state" >/dev/null
@@ -532,15 +641,19 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
         run: |
           set -euo pipefail
+          RELEASE_ID="$(cat "$RUNNER_TEMP/verified-release-id")"
           state="$RUNNER_TEMP/recovery-assets.json"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/${{ inputs.tag }}" > "$state"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$state"
           while IFS= read -r name; do
             if jq -e --arg name "$name" '.assets[] | select(.name == $name)' "$state" >/dev/null; then
               asset_id="$(jq -r --arg name "$name" '.assets[] | select(.name == $name) | .id' "$state")"
               gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
             fi
-            gh release upload "${{ inputs.tag }}" "release-output/$name"
-          done < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+            gh api --hostname uploads.github.com --method POST \
+              "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$name" \
+              -H 'Content-Type: application/octet-stream' \
+              --input "release-output/$name" >/dev/null
+          done < "$RUNNER_TEMP/expected-assets.txt"
       - name: Verify recovery assets and publish once
         env:
           GH_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
@@ -548,18 +661,19 @@ jobs:
           RELEASE_PLEASE_ACTOR: ${{ vars.RELEASE_PLEASE_ACTOR }}
         run: |
           set -euo pipefail
+          RELEASE_ID="$(cat "$RUNNER_TEMP/verified-release-id")"
           state="$RUNNER_TEMP/recovery-final-state.json"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/${{ inputs.tag }}" > "$state"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$state"
           RELEASE_ID="$(jq -r .id "$state")"
-          test "$RELEASE_ID" = "${{ inputs.release_id }}"
-          jq -e --arg tag "${{ inputs.tag }}" --argjson id "$RELEASE_ID" \
+          test "$RELEASE_ID" = "$RECOVERY_RELEASE_ID"
+          jq -e --arg tag "$RECOVERY_TAG" --argjson id "$RELEASE_ID" \
             --arg author "$RELEASE_PLEASE_ACTOR" \
             '.id == $id and .tag_name == $tag and .draft == true and
              (.published_at == null) and .author.login == $author' "$state" >/dev/null
           remote="$RUNNER_TEMP/recovery-assets"
           mkdir -p "$remote"
           mapfile -t remote_assets < <(jq -r '.assets[] | [.id, .name, .size, .digest, .uploader.login] | @tsv' "$state")
-          mapfile -t expected < <(find release-output -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t expected < "$RUNNER_TEMP/expected-assets.txt"
           test "${#remote_assets[@]}" -eq "${#expected[@]}"
           for row in "${remote_assets[@]}"; do
             IFS=$'\t' read -r asset_id name size remote_digest uploader <<<"$row"

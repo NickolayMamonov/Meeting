@@ -21,6 +21,11 @@ class EvidenceError(ValueError):
     """Raised when release evidence is missing, ambiguous, or inconsistent."""
 
 
+ACTIVE_MERGE_QUEUE_STATES = frozenset(
+    {"QUEUED", "BUILDING", "AWAITING_CHECKS", "READY", "MERGING"}
+)
+
+
 def canonical_json(value: Any) -> bytes:
     return (
         json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -255,6 +260,10 @@ def map_merge_group_to_pr(
     _require(
         entry.get("exhaustive") is True,
         "merge queue entry is not from an exhaustive enumeration",
+    )
+    _require(
+        entry.get("state") in ACTIVE_MERGE_QUEUE_STATES,
+        "merge queue entry is not active",
     )
     target_branch = str(group.get("target_branch", ""))
     _require(target_branch == "dev", "merge group target branch mismatch")
