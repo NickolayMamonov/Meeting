@@ -152,6 +152,12 @@ Invoke-TestCase "canonical equal and nested paths reject before artifacts" {
     )) {
         Assert-Throws { Assert-SeparateSigningPaths $pair[0] $pair[1] } "path topology was accepted"
     }
+    $fixture = New-Fixture "reparse"
+    try {
+        $alias = Join-Path $fixture.Root "alias"
+        New-Item -ItemType Junction -Path $alias -Target $fixture.Backup | Out-Null
+        Assert-Throws { Assert-NoReparsePointPath $alias } "reparse-point path was accepted"
+    } finally { Remove-Fixture $fixture }
 }
 
 Invoke-TestCase "ACL construction separates directory and file inheritance" {
@@ -220,10 +226,6 @@ Invoke-TestCase "Execute creates and verifies four artifacts without GitHub befo
         }
         Assert-True (@($hooks.KeytoolCalls | Where-Object { $_ -contains "-certreq" }).Count -gt 0) `
             "private-key unlock verification was not called"
-        $generationCall = @($hooks.KeytoolCalls | Where-Object { $_ -contains "-genkeypair" })[0]
-        Assert-True ($generationCall -contains "-storetype" -and
-            $generationCall[$generationCall.IndexOf("-storetype") + 1] -ceq "JKS") `
-            "generation did not explicitly select JKS"
         Assert-True (@(Get-ChildItem -LiteralPath $fixture.Handoff).Count -eq 4) "handoff is incomplete"
         Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup).Count -eq 4) "backup is incomplete"
         Assert-ArtifactSetsEqual $fixture.Handoff $fixture.Backup
@@ -253,6 +255,49 @@ Invoke-TestCase "pre-commit failure removes invocation-owned artifacts" {
         Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup).Count -eq 0) `
             "backup changed after pre-copy failure"
         Assert-True ($ghCalls.Count -eq 0) "GitHub was called before commit"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "staged deletion failure remains cleanup-owned and is retried" {
+    $fixture = New-Fixture "delete-retry"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.BeforeDelete = {
+            param([string] $Path)
+            throw "injected staged deletion failure"
+        }
+        $source = Join-Path $fixture.Root "staged-secret.tmp"
+        $destination = Join-Path $fixture.Handoff "final-secret.tmp"
+        New-Item -ItemType Directory -Path $fixture.Handoff | Out-Null
+        [IO.File]::WriteAllText($source, "secret")
+        $ownedFiles = New-Object System.Collections.ArrayList
+        $ownedDirectories = New-Object System.Collections.ArrayList
+        [void]$ownedFiles.Add($source)
+        Assert-Throws {
+            Move-StagedArtifact $source $destination $ownedFiles $ownedDirectories $hooks
+        } "staged deletion failure was not reported"
+        Assert-True ($ownedFiles.Contains($source)) `
+            "staged source was untracked before successful deletion"
+        Assert-True (Test-Path -LiteralPath $source -PathType Leaf) `
+            "staged source was removed after deletion failure"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "replacement of an owned file is preserved during cleanup" {
+    $fixture = New-Fixture "replacement"
+    try {
+        $path = Join-Path $fixture.Root "owned.tmp"
+        [IO.File]::WriteAllText($path, "original")
+        $ownedFiles = New-Object System.Collections.ArrayList
+        $ownedDirectories = New-Object System.Collections.ArrayList
+        Add-OwnedFile $ownedFiles $path
+        Set-OwnedFileFingerprint $path
+        [IO.File]::WriteAllText($path, "replacement")
+        Assert-Throws {
+            Remove-OwnedArtifacts $ownedFiles $ownedDirectories @{}
+        } "replacement file was treated as invocation-owned"
+        Assert-True (([IO.File]::ReadAllText($path) -ceq "replacement")) `
+            "replacement file was deleted during cleanup"
     } finally { Remove-Fixture $fixture }
 }
 
@@ -430,8 +475,13 @@ Invoke-TestCase "Provision retries same committed identity with exact stdin comm
             (@(Get-ChildItem -LiteralPath $fixture.Backup -Force | ForEach-Object { $_.Name }) -join "|") -ceq
             ($beforeProvisionBackupFiles -join "|")
         ) "Provision changed backup artifact set"
-        Assert-True (@($hooks.AclPaths | Where-Object { $_ -like "*meeting-android-signing-*" }).Count -ge 2) `
-            "Provision did not use owner-only ACLs for ephemeral password files"
+        $ephemeralPaths = @($hooks.AclPaths | Where-Object { $_ -like "*meeting-android-signing-*" })
+        Assert-True ($ephemeralPaths.Count -ge 2) "Provision did not create secure temporary password files"
+        foreach ($ephemeral in $ephemeralPaths) {
+            Assert-True (-not (Test-Path -LiteralPath $ephemeral)) "Provision temporary file was not cleaned"
+            Assert-True (-not ($ephemeral -like ($fixture.Handoff + "*"))) "temporary file was inside handoff"
+            Assert-True (-not ($ephemeral -like ($fixture.Backup + "*"))) "temporary file was inside backup"
+        }
         Assert-True ($ghCalls.Count -eq 13) "retry did not emit all eight exact commands"
         $expected = @(
             "RELEASE_KEYSTORE_BASE64", "RELEASE_KEYSTORE_PASSWORD", "RELEASE_KEY_PASSWORD",

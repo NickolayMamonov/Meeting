@@ -19,6 +19,7 @@ $script:AndroidSigningArtifactNames = @(
     "meet-release.sha256",
     "meet-release-passwords.txt"
 )
+$script:OwnedFileFingerprints = @{}
 
 if (-not $Library -and ([string]::IsNullOrWhiteSpace($OfflineBackupDirectory) -or
     [string]::IsNullOrWhiteSpace($CredentialHandoffDirectory))) {
@@ -70,6 +71,22 @@ function Assert-SeparateSigningPaths([string] $Backup, [string] $Handoff) {
     }
 }
 
+function Assert-NoReparsePointPath([string] $Path) {
+    $canonical = ConvertTo-CanonicalPath $Path
+    $root = [IO.Path]::GetPathRoot($canonical)
+    $current = $root
+    foreach ($component in @($canonical.Substring($root.Length) -split "\\" |
+            Where-Object { $_.Length -gt 0 })) {
+        $current = Join-Path $current $component
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Signing paths must not contain reparse-point components"
+            }
+        }
+    }
+}
+
 function Assert-NewPath([string] $Path) {
     if (Test-Path -LiteralPath $Path) {
         throw "Refusing to overwrite existing path"
@@ -82,8 +99,20 @@ function Add-OwnedFile([System.Collections.ArrayList] $OwnedFiles, [string] $Pat
     }
 }
 
+function Set-OwnedFileFingerprint([string] $Path) {
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        $item = Get-Item -LiteralPath $Path -Force
+        $script:OwnedFileFingerprints[$Path] = [pscustomobject]@{
+            Bytes = [IO.File]::ReadAllBytes($Path)
+            Length = $item.Length
+            CreationTimeUtc = $item.CreationTimeUtc
+        }
+    }
+}
+
 function Remove-OwnedFile([System.Collections.ArrayList] $OwnedFiles, [string] $Path) {
     [void]$OwnedFiles.Remove($Path)
+    [void]$script:OwnedFileFingerprints.Remove($Path)
 }
 
 function Remove-OwnedDirectory(
@@ -117,7 +146,7 @@ function New-SecureEphemeralFile(
     [hashtable] $Hooks,
     [System.Collections.ArrayList] $OwnedFiles
 ) {
-    do {
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
         $path = Get-InvocationTempPath ".tmp"
         try {
             $stream = [IO.File]::Open(
@@ -129,9 +158,15 @@ function New-SecureEphemeralFile(
             $stream.Dispose()
             break
         } catch [IO.IOException] {
-            continue
+            if (Test-Path -LiteralPath $path) {
+                if ($attempt -eq 10) {
+                    throw "Unable to create secure temporary file after repeated name collisions"
+                }
+                continue
+            }
+            throw "Unable to create secure temporary file"
         }
-    } while ($true)
+    }
     Add-OwnedFile $OwnedFiles $path
     Set-OwnerOnlyAcl $path $false $Hooks
     return $path
@@ -141,15 +176,21 @@ function New-SecureEphemeralDirectory(
     [hashtable] $Hooks,
     [System.Collections.ArrayList] $OwnedRecursiveDirectories
 ) {
-    do {
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
         $path = Get-InvocationTempPath ""
         try {
             New-Item -ItemType Directory -Path $path -ErrorAction Stop | Out-Null
             break
         } catch [IO.IOException] {
-            continue
+            if (Test-Path -LiteralPath $path) {
+                if ($attempt -eq 10) {
+                    throw "Unable to create secure temporary directory after repeated name collisions"
+                }
+                continue
+            }
+            throw "Unable to create secure temporary directory"
         }
-    } while ($true)
+    }
     [void]$OwnedRecursiveDirectories.Add($path)
     Set-OwnerOnlyAcl $path $true $Hooks
     return $path
@@ -177,6 +218,7 @@ function Move-StagedArtifact(
             Add-OwnedFile $OwnedFiles $Destination
             try {
                 $sourceStream.CopyTo($destinationStream)
+                $destinationStream.Flush()
             } finally {
                 $destinationStream.Dispose()
             }
@@ -184,13 +226,20 @@ function Move-StagedArtifact(
             $sourceStream.Dispose()
         }
     } catch {
-        if (Test-Path -LiteralPath $Destination -PathType Leaf) {
+        if ((Test-Path -LiteralPath $Destination -PathType Leaf) -and
+            -not $OwnedFiles.Contains($Destination)) {
             throw "Refusing to overwrite a path created concurrently"
         }
         throw
     }
-    Remove-OwnedFile $OwnedFiles $Source
+    if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeDelete")) {
+        & $Hooks["BeforeDelete"] $Source
+    }
     Remove-Item -LiteralPath $Source -Force
+    Remove-OwnedFile $OwnedFiles $Source
+    if ($OwnedFiles.Contains($Destination)) {
+        Set-OwnedFileFingerprint $Destination
+    }
     if (Test-IsAclSupportedPath $Destination) {
         Set-OwnerOnlyAcl $Destination $false $Hooks
     }
@@ -266,6 +315,7 @@ function Write-ExclusiveText(
         } finally {
             $writer.Dispose()
         }
+        Set-OwnedFileFingerprint $Path
     } finally {
         $stream.Dispose()
     }
@@ -565,6 +615,7 @@ function Copy-SigningArtifact(
         } finally {
             $destinationStream.Dispose()
         }
+        Set-OwnedFileFingerprint $Destination
         if (Test-IsAclSupportedPath $Destination) {
             Set-OwnerOnlyAcl $Destination $false $Hooks
         }
@@ -626,12 +677,49 @@ function Invoke-AllGitHubProvisioning(
 
 function Remove-OwnedArtifacts(
     [System.Collections.ArrayList] $OwnedFiles,
-    [System.Collections.ArrayList] $OwnedDirectories
+    [System.Collections.ArrayList] $OwnedDirectories,
+    [hashtable] $Hooks
 ) {
     $cleanupFailures = New-Object System.Collections.ArrayList
+    $retryFiles = New-Object System.Collections.ArrayList
     foreach ($path in @($OwnedFiles | Sort-Object Length -Descending)) {
         if (Test-Path -LiteralPath $path -PathType Leaf) {
             try {
+                if ($script:OwnedFileFingerprints.ContainsKey($path)) {
+                    $expected = $script:OwnedFileFingerprints[$path]
+                    $item = Get-Item -LiteralPath $path -Force
+                    $actual = [IO.File]::ReadAllBytes($path)
+                    if ($item.Length -ne $expected.Length -or
+                        $item.CreationTimeUtc -ne $expected.CreationTimeUtc -or
+                        -not (Compare-Bytes ([byte[]]$expected.Bytes) $actual)) {
+                        throw "Invocation-owned file identity changed"
+                    }
+                }
+                if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeDelete")) {
+                    & $Hooks["BeforeDelete"] $path
+                }
+                Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+            } catch {
+                [void]$retryFiles.Add($path)
+            }
+        }
+    }
+    foreach ($path in @($retryFiles)) {
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            try {
+                if ($script:OwnedFileFingerprints.ContainsKey($path)) {
+                    $expected = $script:OwnedFileFingerprints[$path]
+                    $item = Get-Item -LiteralPath $path -Force
+                    $actual = [IO.File]::ReadAllBytes($path)
+                    if ($item.Length -ne $expected.Length -or
+                        $item.CreationTimeUtc -ne $expected.CreationTimeUtc -or
+                        -not (Compare-Bytes ([byte[]]$expected.Bytes) $actual)) {
+                        throw "Invocation-owned file identity changed"
+                    }
+                }
+                if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeDelete")) {
+                    & $Hooks["BeforeDelete"] $path
+                }
                 Remove-Item -LiteralPath $path -Force -ErrorAction Stop
             } catch {
                 [void]$cleanupFailures.Add($path)
@@ -653,6 +741,19 @@ function Remove-OwnedArtifacts(
     if ($cleanupFailures.Count -gt 0) {
         throw "Cleanup failed for invocation-owned paths: $($cleanupFailures -join ', ')"
     }
+}
+
+function Remove-OwnedTemporaryFiles(
+    [string[]] $Paths,
+    [hashtable] $Hooks
+) {
+    $temporaryFiles = New-Object System.Collections.ArrayList
+    foreach ($path in $Paths) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) {
+            Add-OwnedFile $temporaryFiles $path
+        }
+    }
+    Remove-OwnedArtifacts $temporaryFiles (New-Object System.Collections.ArrayList) $Hooks
 }
 
 function Get-SigningPaths([string] $Backup, [string] $Handoff) {
@@ -690,6 +791,8 @@ function Invoke-AndroidSigningBootstrap {
 
     $backup = ConvertTo-CanonicalPath $BackupDirectory
     $handoff = ConvertTo-CanonicalPath $HandoffDirectory
+    Assert-NoReparsePointPath $backup
+    Assert-NoReparsePointPath $handoff
     Assert-SeparateSigningPaths $backup $handoff
     $paths = Get-SigningPaths $backup $handoff
     $ownedFiles = New-Object System.Collections.ArrayList
@@ -712,8 +815,10 @@ function Invoke-AndroidSigningBootstrap {
             $metadata = Read-RecoveryMetadata $paths.Recovery
             $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
             [IO.File]::WriteAllText($temporaryStorePasswordFile, $metadata.StorePassword)
+            Set-OwnedFileFingerprint $temporaryStorePasswordFile
             $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
             [IO.File]::WriteAllText($temporaryKeyPasswordFile, $metadata.KeyPassword)
+            Set-OwnedFileFingerprint $temporaryKeyPasswordFile
             $local = Assert-ArtifactSet $Hooks $handoff $temporaryStorePasswordFile $temporaryKeyPasswordFile
             $offline = Assert-ArtifactSet $Hooks $backup $temporaryStorePasswordFile $temporaryKeyPasswordFile
             Assert-ArtifactSetsEqual $handoff $backup
@@ -732,7 +837,7 @@ function Invoke-AndroidSigningBootstrap {
             }
             throw "Provision failed before or during GitHub mutation; handoff and offline backup were preserved. Rerun -Mode Provision with the same paths. No secret values were printed."
         } finally {
-            Remove-OwnedArtifacts $ownedFiles $ownedDirectories
+            Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
         }
     }
 
@@ -778,8 +883,10 @@ function Invoke-AndroidSigningBootstrap {
         }
         $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
         [IO.File]::WriteAllText($temporaryStorePasswordFile, $storePassword)
+        Set-OwnedFileFingerprint $temporaryStorePasswordFile
         $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
         [IO.File]::WriteAllText($temporaryKeyPasswordFile, $keyPassword)
+        Set-OwnedFileFingerprint $temporaryKeyPasswordFile
         $stagingDirectory = New-SecureEphemeralDirectory $Hooks $ownedDirectories
         Assert-NewPath $paths.Keystore
         $stagedKeystore = Join-Path $stagingDirectory "meet-release.jks"
@@ -796,6 +903,7 @@ function Invoke-AndroidSigningBootstrap {
             throw "keytool did not create the staged keystore"
         }
         Add-OwnedFile $ownedFiles $stagedKeystore
+        Set-OwnedFileFingerprint $stagedKeystore
         Move-StagedArtifact $stagedKeystore $paths.Keystore $ownedFiles $ownedDirectories $Hooks
 
         Assert-NewPath $paths.Certificate
@@ -811,6 +919,7 @@ function Invoke-AndroidSigningBootstrap {
             throw "keytool did not create the staged certificate"
         }
         Add-OwnedFile $ownedFiles $stagedCertificate
+        Set-OwnedFileFingerprint $stagedCertificate
         Move-StagedArtifact $stagedCertificate $paths.Certificate $ownedFiles $ownedDirectories $Hooks
 
         Assert-NewPath $paths.Fingerprint
@@ -859,7 +968,7 @@ function Invoke-AndroidSigningBootstrap {
         }
         if (-not $backupCommitted) {
             try {
-                Remove-OwnedArtifacts $ownedFiles $ownedDirectories
+                Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
             } catch {
                 throw "Signing bootstrap failed before backup commit and cleanup was incomplete. Inspect only the reported invocation-owned paths before retrying. No secret values were printed."
             }
@@ -868,14 +977,10 @@ function Invoke-AndroidSigningBootstrap {
         throw "GitHub provisioning failed after backup commit; handoff and offline backup were preserved. Rerun -Mode Provision with the same paths. No secret values were printed."
     } finally {
         $temporaryCleanupFailures = New-Object System.Collections.ArrayList
-        foreach ($path in @($temporaryStorePasswordFile, $temporaryKeyPasswordFile)) {
-            if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path -LiteralPath $path -PathType Leaf)) {
-                try {
-                    Remove-Item -LiteralPath $path -Force -ErrorAction Stop
-                } catch {
-                    [void]$temporaryCleanupFailures.Add($path)
-                }
-            }
+        try {
+            Remove-OwnedTemporaryFiles @($temporaryStorePasswordFile, $temporaryKeyPasswordFile) $Hooks
+        } catch {
+            [void]$temporaryCleanupFailures.Add("temporary invocation-owned files")
         }
         if ($temporaryCleanupFailures.Count -gt 0) {
             throw "Cleanup failed for invocation-owned temporary paths: $($temporaryCleanupFailures -join ', ')"
