@@ -221,6 +221,7 @@ jobs:
           aab="$(find signed -name '*.aab' -print -quit)"
           python scripts/release/verify_android_artifacts.py \
             --metadata "$metadata" --apk "$apk" --aab "$aab" \
+            --apksigner apksigner \
             --bundletool-jar "$RUNNER_TEMP/bundletool.jar" \
             --bundletool-sha256 "$BUNDLETOOL_SHA256"
       - name: Prepare deterministic release evidence
