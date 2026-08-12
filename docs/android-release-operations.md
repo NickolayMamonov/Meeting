@@ -114,17 +114,88 @@ explicitly state that emulator/device state was not reset.
 ## Signing bootstrap and incident response
 
 Run `scripts/release/Initialize-AndroidReleaseSigning.ps1` in preflight mode
-first. It requires an existing offline backup and a separate credential
-handoff path, refuses overwrites, displays all target paths, and does not
-generate anything during preflight. Execution requires explicit confirmation,
-uses RSA-4096 alias `meet-release`, verifies backup bytes and fingerprint, and
-keeps passwords out of arguments and logs.
+first. It requires an existing, empty offline backup and a separate absent
+credential handoff path, rejects canonically equal or nested paths in either
+direction, refuses overwrites, displays the target paths, and does not
+generate anything during preflight. Execute requires the exact
+`CREATE-ANDROID-RELEASE-KEY` confirmation, uses one RSA-4096 `meet-release`
+identity, and creates exactly these four artifacts in both locations:
 
-After the offline backup has been verified, the optional
-`-ProvisionGitHubSecrets` switch streams the generated keystore and passwords
-to `gh secret set --env android-release` through standard input. Use
-`-GitHubRepository OWNER/REPOSITORY` when running outside the checkout. Secret
-values are never command-line arguments or written into the repository:
+- `meet-release.jks`;
+- `meet-release.cer`;
+- `meet-release.sha256`, normalized to the certificate-derived SHA-256;
+- `meet-release-passwords.txt`, containing the store password, key password,
+  alias, and certificate fingerprint.
+
+Execution creates and verifies the local identity first, copies all four
+artifacts to the initially empty backup using exclusive destinations on the
+backup volume itself, compares each corresponding byte sequence and semantic
+identity field, and only then commits the backup and permits a GitHub call.
+Backup copies never use a system-temporary staging file or an overwrite-capable
+move across volumes. A destination is cleanup-owned only after this invocation
+successfully creates it exclusively; a pre-existing or race-created destination
+is never overwritten or removed. If an invocation-owned backup copy fails after
+creation, its partial bytes are preserved for diagnosis rather than being
+mistaken for a pre-existing artifact.
+
+The generated keystore explicitly uses JKS because the workflow records
+distinct store and private-key passwords. Identity verification uses
+`keytool -list` with the store password only (the JDK does not support a
+key-password option for `-list`), then performs a non-mutating `keytool
+-certreq` check with both passwords before comparing the exported certificate.
+This catches a wrong private-key password instead of validating only keystore
+metadata.
+
+With `-ProvisionGitHubSecrets`, Execute streams values to `gh` through
+standard input only. It writes the exact secret and variable names consumed by
+the release workflows:
+
+- `android-release`: `RELEASE_KEYSTORE_BASE64`,
+  `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_PASSWORD`, and
+  `RELEASE_CERTIFICATE_SHA256`;
+- `android-snapshot-signing`: `SNAPSHOT_RELEASE_KEYSTORE_BASE64`,
+  `SNAPSHOT_RELEASE_KEYSTORE_PASSWORD`, `SNAPSHOT_RELEASE_KEY_PASSWORD`, and
+  `RELEASE_CERTIFICATE_SHA256`.
+
+Use `-GitHubRepository OWNER/REPOSITORY` when running outside the checkout.
+Secret values, base64 keystore bytes, and key material are never command-line
+arguments or printed.
+
+If a post-commit GitHub write fails, do **not** rerun Execute and do not create
+a second identity. Keep both the local handoff and the verified backup,
+reconnect the removable media only as required for verification, and rerun
+Provision with the exact same paths:
+
+```powershell
+./scripts/release/Initialize-AndroidReleaseSigning.ps1 `
+  -Mode Provision `
+  -OfflineBackupDirectory 'D:\offline\meet-release' `
+  -CredentialHandoffDirectory 'C:\secure\meet-release-handoff' `
+  -GitHubRepository 'NickolayMamonov/Meeting'
+```
+
+Provision is the identity-preserving retry entry point. It retains path
+separation checks, accepts populated committed locations, performs no key
+generation or artifact copy/overwrite, and fully verifies both four-artifact
+sets, byte equality, alias `meet-release`, both passwords,
+keystore/certificate identity, and the certificate-derived fingerprint before
+the first `gh` call. Its preserved passwords are written only to collision-
+resistant owner-only temporary files under the system temporary directory,
+outside both identity directories; those files are guaranteed to be removed
+before Provision returns or fails. Provision does not create, ACL, copy, or
+overwrite any target artifact. It then idempotently rewrites the complete
+command set above through stdin.
+After a failure between environment writes, rerun Provision on the same paths;
+never use Execute for recovery. Verify only names and non-secret status, then
+disconnect the USB and store it offline again.
+
+The backup media is FAT32. FAT32 does not provide the Windows ACL
+confidentiality assumed for the local handoff, and physical access to the
+connected USB grants access to the signing identity and plaintext recovery
+metadata. Keep the removable media under physical control, disconnect it
+after verification or Provision recovery, and store it offline. If the USB is
+unavailable or compromise is suspected, stop and follow explicit credential
+rotation/incident handling; do not silently generate a replacement identity.
 
 ```powershell
 ./scripts/release/Initialize-AndroidReleaseSigning.ps1 `
