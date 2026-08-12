@@ -81,6 +81,18 @@ def _selected_build_tools(root: Path) -> tuple[tuple[int, ...], Path]:
 
 def _package_revision(directory: Path, package_name: str = "build-tools") -> tuple[int, ...]:
     properties = directory / "source.properties"
+    canonical_directory = directory.resolve()
+    try:
+        properties = properties.resolve()
+        properties.relative_to(canonical_directory)
+    except ValueError as error:
+        raise AndroidSdkToolError(
+            f"Android SDK {package_name} package metadata escapes its package"
+        ) from error
+    if not properties.is_file():
+        raise AndroidSdkToolError(
+            f"Android SDK {package_name} package metadata is not a regular file"
+        )
     try:
         lines = properties.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeError) as error:
@@ -151,6 +163,12 @@ def _selected_cmdline_tools(root: Path) -> tuple[tuple[int, ...], Path]:
     if not packages_root.is_dir():
         raise AndroidSdkToolError("Android SDK cmdline-tools directory is missing")
     canonical_root = packages_root.resolve()
+    try:
+        canonical_root.relative_to(root.resolve())
+    except ValueError as error:
+        raise AndroidSdkToolError(
+            "Android SDK cmdline-tools directory escapes its SDK root"
+        ) from error
     candidates = []
     for child in packages_root.iterdir():
         if child.is_dir():
@@ -161,6 +179,10 @@ def _selected_cmdline_tools(root: Path) -> tuple[tuple[int, ...], Path]:
                 raise AndroidSdkToolError(
                     "Android SDK cmdline-tools package escapes its SDK directory"
                 ) from error
+            if not package.is_dir():
+                raise AndroidSdkToolError(
+                    "Android SDK cmdline-tools package is not a regular directory"
+                )
             candidates.append((_package_revision(package, "cmdline-tools"), package))
     if not candidates:
         raise AndroidSdkToolError("no Android SDK cmdline-tools package")

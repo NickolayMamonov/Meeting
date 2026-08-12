@@ -309,6 +309,37 @@ class AndroidSdkToolsTest(unittest.TestCase):
             with self.assertRaises(AndroidSdkToolError):
                 resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
 
+    def test_apkanalyzer_cmdline_tools_symlink_escape_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            outside_root = Path(outside)
+            self.make_analyzer_sdk(outside_root, [("latest", "14.0.0", True)])
+            command_line_tools = root / "cmdline-tools"
+            try:
+                command_line_tools.symlink_to(
+                    outside_root / "cmdline-tools", target_is_directory=True
+                )
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable in this environment")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_source_properties_symlink_escape_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            outside_root = Path(outside)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            external_metadata = outside_root / "source.properties"
+            external_metadata.write_text("Pkg.Revision = 15.0.0\n", encoding="utf-8")
+            metadata = root / "cmdline-tools/latest/source.properties"
+            metadata.unlink()
+            try:
+                metadata.symlink_to(external_metadata)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable in this environment")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
     def test_cli_default_and_explicit_success_contract(self):
         expected = Path("/sdk/build-tools/36.1.0/apksigner")
         for argv in (["android_sdk_tools.py"], ["android_sdk_tools.py", "apksigner"]):
