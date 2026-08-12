@@ -179,12 +179,44 @@ function Invoke-VerifiedBaselineChild {
         [string] $Commit,
         [string] $Path,
         [string] $OutputPath,
-        [scriptblock] $Child
+        [string] $ChildScriptPath,
+        [scriptblock] $ChildScript
     )
 
     $evidence = Get-VerifiedBaselineScript -Commit $Commit -Path $Path `
         -OutputPath $OutputPath
-    $childResult = & $Child $evidence.OutputPath
+    $childText = & $ChildScript $evidence.OutputPath
+    [IO.File]::WriteAllText($ChildScriptPath, [string]$childText)
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = "powershell.exe"
+    $startInfo.Arguments = ((@(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $ChildScriptPath
+    ) | ForEach-Object {
+        ConvertTo-WindowsProcessArgument $_
+    }) -join " ")
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw "Unable to start baseline child"
+        }
+        $childOutput = $process.StandardOutput.ReadToEnd()
+        $childError = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        $childResult = [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Output = $childOutput + $childError
+        }
+    } finally {
+        $process.Dispose()
+    }
     return [pscustomobject]@{
         Evidence = $evidence
         ChildResult = $childResult
@@ -261,12 +293,18 @@ try {
         }
         $childMarker = Join-Path $baselineRoot `
             ($case.Name.Replace(" ", "-") + "-child-invoked")
+        $childScript = Join-Path $baselineRoot `
+            ($case.Name.Replace(" ", "-") + "-child.ps1")
+        $markerLiteral = ConvertTo-PowerShellLiteral $childMarker
         $threw = $false
         try {
             Invoke-VerifiedBaselineChild -Commit $case.Commit -Path $case.Path `
-                -OutputPath $case.OutputPath -Child {
+                -OutputPath $case.OutputPath -ChildScriptPath $childScript `
+                -ChildScript {
                     param([string] $VerifiedScriptPath)
-                    [IO.File]::WriteAllText($childMarker, $VerifiedScriptPath)
+                    @"
+[IO.File]::WriteAllText($markerLiteral, "child-invoked")
+"@
                 } | Out-Null
         } catch {
             $threw = $true
@@ -303,27 +341,17 @@ try {
         "-dname", "CN=MEE3-38 Disposable Baseline Probe, OU=NON-RELEASE, O=Meeting Tests"
     )
     $baselineInvocation = Invoke-VerifiedBaselineChild -Commit $baselineSha `
-        -Path $baselineScriptPath -OutputPath $baselineScript -Child {
+        -Path $baselineScriptPath -OutputPath $baselineScript `
+        -ChildScriptPath (Join-Path $baselineRoot "baseline-probe.ps1") `
+        -ChildScript {
             param([string] $VerifiedScriptPath)
-            $probe = Join-Path $baselineRoot "baseline-probe.ps1"
-            $probeText = @"
+            @"
 `$ErrorActionPreference = "Stop"
 . $(ConvertTo-PowerShellLiteral $VerifiedScriptPath) -Library
 Invoke-Keytool @{} @($(($sameMechanismArguments | ForEach-Object {
     ConvertTo-PowerShellLiteral $_
 }) -join ", ")) @() | Out-Null
 "@
-            [IO.File]::WriteAllText($probe, $probeText)
-            $previous = $ErrorActionPreference
-            $ErrorActionPreference = "Continue"
-            $output = (& powershell.exe -NoProfile -ExecutionPolicy Bypass `
-                -File $probe 2>&1 | Out-String)
-            $exitCode = $LASTEXITCODE
-            $ErrorActionPreference = $previous
-            [pscustomobject]@{
-                Output = $output
-                ExitCode = $exitCode
-            }
         }
     $baselineEvidence = $baselineInvocation.Evidence
     Assert-True ($baselineEvidence.Commit -ceq $baselineSha) `
