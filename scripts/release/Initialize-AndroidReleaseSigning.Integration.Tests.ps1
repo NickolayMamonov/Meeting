@@ -54,6 +54,87 @@ function ConvertTo-PowerShellLiteral([string] $Value) {
     return "'" + $Value.Replace("'", "''") + "'"
 }
 
+function Invoke-GitText([string] $Arguments) {
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = "git"
+    $startInfo.Arguments = $Arguments
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw "Unable to start git"
+        }
+        $output = $process.StandardOutput.ReadToEnd()
+        $null = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Output = $output
+        }
+    } finally {
+        $process.Dispose()
+    }
+}
+
+function Get-VerifiedBaselineScript {
+    param(
+        [string] $Commit,
+        [string] $Path,
+        [string] $OutputPath
+    )
+
+    $resolvedCommit = (Invoke-GitText "rev-parse --verify ${Commit}^{commit}").Output.Trim()
+    $commitResult = Invoke-GitText "rev-parse --verify ${Commit}^{commit}"
+    Assert-True ($commitResult.ExitCode -eq 0 -and $resolvedCommit -ceq $Commit) `
+        "baseline commit is unavailable or did not resolve to the requested exact SHA"
+
+    $commitObjectResult = Invoke-GitText "cat-file -e ${Commit}^{commit}"
+    Assert-True ($commitObjectResult.ExitCode -eq 0) `
+        "baseline commit object is unavailable"
+
+    $pathObjectResult = Invoke-GitText "cat-file -e ${Commit}:${Path}"
+    Assert-True ($pathObjectResult.ExitCode -eq 0) `
+        "baseline script path is unavailable at the requested commit"
+
+    $expectedBlobResult = Invoke-GitText "rev-parse ${Commit}:${Path}"
+    $expectedBlob = $expectedBlobResult.Output.Trim()
+    Assert-True ($expectedBlobResult.ExitCode -eq 0 -and
+        $expectedBlob -match '^[0-9a-f]{40}$') `
+        "baseline script provenance could not be resolved"
+
+    $showResult = Invoke-GitText `
+        "show --format= --no-ext-diff --no-textconv ${Commit}:${Path}"
+    Assert-True ($showResult.ExitCode -eq 0) `
+        "baseline script extraction failed"
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$showResult.Output)) `
+        "baseline script extraction produced empty content"
+
+    [IO.File]::WriteAllText(
+        $OutputPath,
+        [string]$showResult.Output,
+        (New-Object Text.UTF8Encoding($false))
+    )
+    Assert-True (Test-Path -LiteralPath $OutputPath -PathType Leaf) `
+        "baseline script extraction produced no file"
+
+    $actualBlobResult = Invoke-GitText "hash-object $OutputPath"
+    $actualBlob = $actualBlobResult.Output.Trim()
+    Assert-True ($actualBlobResult.ExitCode -eq 0 -and
+        $actualBlob -ceq $expectedBlob) `
+        "extracted baseline script provenance does not match the requested commit and path"
+
+    return [pscustomobject]@{
+        Commit = $resolvedCommit
+        Path = $Path
+        Blob = $expectedBlob
+        OutputPath = $OutputPath
+    }
+}
+
 function Assert-NoSensitiveOutput([string] $Output) {
     foreach ($term in @(
         "disposable-store-password", "disposable-key-password",
@@ -95,15 +176,53 @@ try {
     # loaded in a separate PS5.1 process and invoked with the same keytool
     # arguments and password-file transport used by the corrected adapter.
     $baselineSha = "7aec34b8dd27c4bf2de68bcbee86ebfdf48cb059"
-    $resolvedBaseline = (& git rev-parse $baselineSha).Trim()
-    Assert-True ($resolvedBaseline -ceq $baselineSha) `
-        "approved baseline did not resolve to the requested exact SHA"
-
+    $baselineScriptPath = "scripts/release/Initialize-AndroidReleaseSigning.ps1"
     $baselineRoot = Join-Path $successFixture.Root "baseline"
     New-Item -ItemType Directory -Path $baselineRoot | Out-Null
     $baselineScript = Join-Path $baselineRoot "Initialize-AndroidReleaseSigning.baseline.ps1"
-    & git show "${baselineSha}:scripts/release/Initialize-AndroidReleaseSigning.ps1" |
-        Set-Content -LiteralPath $baselineScript -Encoding UTF8
+    foreach ($case in @(
+        @{
+            Name = "missing baseline commit object"
+            Commit = "0000000000000000000000000000000000000000"
+            Path = $baselineScriptPath
+            OutputPath = Join-Path $baselineRoot "missing-object.ps1"
+        },
+        @{
+            Name = "missing baseline script path"
+            Commit = $baselineSha
+            Path = "scripts/release/does-not-exist.ps1"
+            OutputPath = Join-Path $baselineRoot "missing-path.ps1"
+        },
+        @{
+            Name = "baseline extraction failure"
+            Commit = $baselineSha
+            Path = $baselineScriptPath
+            OutputPath = Join-Path $baselineRoot "extraction-failure"
+        }
+    )) {
+        if ($case.Name -ceq "baseline extraction failure") {
+            New-Item -ItemType Directory -Path $case.OutputPath | Out-Null
+        }
+        $childMarker = Join-Path $baselineRoot `
+            ($case.Name.Replace(" ", "-") + "-child-invoked")
+        $threw = $false
+        try {
+            Get-VerifiedBaselineScript -Commit $case.Commit -Path $case.Path `
+                -OutputPath $case.OutputPath | Out-Null
+            [IO.File]::WriteAllText($childMarker, "child-invoked")
+        } catch {
+            $threw = $true
+        }
+        Assert-True $threw "$($case.Name) was accepted"
+        Assert-True (-not (Test-Path -LiteralPath $childMarker)) `
+            "$($case.Name) launched the baseline child before verification"
+    }
+
+    $baselineEvidence = Get-VerifiedBaselineScript -Commit $baselineSha `
+        -Path $baselineScriptPath -OutputPath $baselineScript
+    Assert-True ($baselineEvidence.Commit -ceq $baselineSha) `
+        "approved baseline did not resolve to the requested exact SHA"
+    $expectedBaselineBlob = $baselineEvidence.Blob
     $baselineStore = Join-Path $baselineRoot "store-password"
     $baselineKey = Join-Path $baselineRoot "key-password"
     $baselineKeystore = Join-Path $baselineRoot "baseline.jks"
