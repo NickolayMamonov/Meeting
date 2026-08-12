@@ -127,6 +127,57 @@ identity, and creates exactly these four artifacts in both locations:
 - `meet-release-passwords.txt`, containing the store password, key password,
   alias, and certificate fingerprint.
 
+### Bounded failure diagnostics
+
+Bootstrap failures report only an allowlisted operation stage and bounded
+category, together with backup-commit, cleanup, and recovery state. This is
+the complete operator-visible diagnostic boundary: do not add raw exception
+messages, child-process output, command arguments, paths, passwords, base64,
+keystore or certificate bytes, private-key material, or recovery values to CI,
+task comments, tickets, or chat.
+
+Record the exact source SHA, mode, stage, category, whether the backup was
+committed, and whether cleanup completed. Before backup commit, a failed
+Execute removes only invocation-owned artifacts whose recorded identity still
+matches; pre-existing, changed, race-created, and deliberately preserved
+partial backup files are not deletion-owned. Do not retry Execute after a
+pre-commit failure until the bounded evidence and retained paths have been
+reviewed. After backup commit, preserve both complete identity sets and recover
+only with `-Mode Provision` using the same paths.
+
+The live failure corrected by this bootstrap was a Windows PowerShell 5.1
+native-process boundary: Temurin 21 `keytool` writes ordinary progress and
+warning text to stderr while returning success, and the baseline adapter let
+PowerShell promote that stderr to a terminating native-command error. The
+corrected adapter suppresses native stderr and uses the process exit status as
+the success signal. The disposable integration suite proves this mechanism
+fails on the exact approved baseline
+`7aec34b8dd27c4bf2de68bcbee86ebfdf48cb059` and passes with the corrected
+adapter under the same PowerShell 5.1/JDK 21 invocation.
+
+Validation, Preflight, Execute, Provision, ACL, child-process, and cleanup
+failures pass through the same bounded stage/category formatter. The
+`Error` test hook is not an operator-visible diagnostic channel and is
+rejected by the disposable identity authority; raw exception messages are
+never forwarded to hooks or emitted by the script.
+
+### Disposable Windows integration
+
+The `Android signing bootstrap (Windows PowerShell 5.1)` CI check is the
+production-shaped regression boundary. It runs on `windows-2022` with Temurin
+21, pinned actions, the exact pull-request head SHA, read-only repository
+permission, checkout credential persistence disabled, and credential
+assertions before parsing or running either suite.
+
+The integration suite may create only unmistakably non-release, one-day
+identities beneath GUID-named system-temporary roots. It must use real Windows
+PowerShell 5.1, JDK keytool, ACL, password-file, hashing, copy, verification,
+and cleanup behavior. It must not use the approved USB or handoff paths, accept
+production identity settings, provision GitHub, or retain fixture artifacts.
+Its `finally` cleanup is mandatory on success and failure. These fixtures are
+test evidence only and must never be promoted, copied to operational media, or
+used as release credentials.
+
 Execution creates and verifies the local identity first, copies all four
 artifacts to the initially empty backup using exclusive destinations on the
 backup volume itself, compares each corresponding byte sequence and semantic
@@ -196,6 +247,21 @@ metadata. Keep the removable media under physical control, disconnect it
 after verification or Provision recovery, and store it offline. If the USB is
 unavailable or compromise is suspected, stop and follow explicit credential
 rotation/incident handling; do not silently generate a replacement identity.
+
+### Corrected-bootstrap rollout
+
+Rollout requires parser, deterministic, disposable integration, Python release,
+diff, hosted CI, and independent review evidence on one exact final SHA. Merge
+normally to `dev`; this correction does not authorize a stable Android release.
+
+Immediately before the authorized attempt, verify that
+`D:\meets\android-signing-backup` still exists and is empty and that
+`C:\Users\whysoezzy\Documents\meets\android-release-handoff` is absent. Run
+Preflight against those exact paths, review its result, and authorize exactly
+one new Execute attempt. A pre-commit failure stops rollout pending review. If
+the backup commits but GitHub provisioning is incomplete, preserve both sets
+and use only same-identity Provision; never rerun Execute or generate a
+replacement identity.
 
 ```powershell
 ./scripts/release/Initialize-AndroidReleaseSigning.ps1 `

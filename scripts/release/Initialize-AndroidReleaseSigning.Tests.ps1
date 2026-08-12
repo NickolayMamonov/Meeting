@@ -3,6 +3,7 @@ Set-StrictMode -Version Latest
 
 $scriptPath = Join-Path $PSScriptRoot "Initialize-AndroidReleaseSigning.ps1"
 . $scriptPath -Library
+Enable-DeterministicTestAuthority "MEE3-38-DETERMINISTIC-TEST-V1"
 
 function Assert-True([bool] $Condition, [string] $Message) {
     if (-not $Condition) {
@@ -18,6 +19,19 @@ function Assert-Throws([scriptblock] $Action, [string] $Message) {
         $thrown = $true
     }
     Assert-True $thrown $Message
+}
+
+function Assert-InputValidationOnly([scriptblock] $Action, [string] $Message) {
+    try {
+        & $Action
+    } catch {
+        Assert-True ($_.Exception.Data["SigningStage"] -ceq "input-validation") `
+            "$Message did not fail at input-validation"
+        Assert-True ($_.Exception.Data["SigningCategory"] -ceq "validation") `
+            "$Message did not fail with validation category"
+        return
+    }
+    throw "ASSERTION FAILED: $Message was accepted"
 }
 
 function New-Fixture([string] $Name) {
@@ -182,6 +196,138 @@ Invoke-TestCase "preflight is fresh, empty, and artifact-free" {
     } finally { Remove-Fixture $fixture }
 }
 
+Invoke-TestCase "CLI hooks fail closed before path access with bounded diagnostics" {
+    $fixture = New-Fixture "cli-hook-authority"
+    $child = Join-Path $fixture.Root "invoke-cli-hooks.ps1"
+    try {
+        $childText = @"
+`$hooks = @{ Gh = { param(`$Arguments, `$InputValue) } }
+& $(($scriptPath.Replace("'", "''"))) -Mode Preflight `
+    -OfflineBackupDirectory '$(($fixture.Backup.Replace("'", "''")))' `
+    -CredentialHandoffDirectory '$(($fixture.Handoff.Replace("'", "''")))' `
+    -TestHooks `$hooks
+"@
+        [IO.File]::WriteAllText($child, $childText)
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass `
+            -File $child 2>&1 | Out-String
+        $ErrorActionPreference = $previousErrorActionPreference
+        Assert-True ($LASTEXITCODE -ne 0) "CLI hook authority was accepted"
+        Assert-True ($output -like "*stage=input-validation*category=*") `
+            "CLI hook rejection was not bounded at input-validation"
+        Assert-True (-not (Test-Path -LiteralPath $fixture.Handoff)) `
+            "CLI hook rejection created the handoff"
+        Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup -Force).Count -eq 0) `
+            "CLI hook rejection changed the backup"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "ACL and Provision failures retain causal bounded stages" {
+    $missingAclPath = Join-Path ([IO.Path]::GetTempPath()) `
+        ("missing-signing-acl-" + [guid]::NewGuid().ToString("N"))
+    try {
+        try {
+            Set-OwnerOnlyAcl $missingAclPath $false @{} "handoff-acl"
+            throw "missing ACL path was accepted"
+        } catch {
+            Assert-True ($_.Exception.Data["SigningStage"] -ceq "handoff-acl") `
+                "ACL failure lost its handoff-acl stage"
+            Assert-True ($script:SigningCategories -contains [string]$_.Exception.Data["SigningCategory"]) `
+                "ACL failure category was not bounded"
+        }
+    } finally {
+        if (Test-Path -LiteralPath $missingAclPath) {
+            Remove-Item -LiteralPath $missingAclPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $fixture = New-Fixture "provision-diagnostic"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        New-Item -ItemType Directory -Path $fixture.Handoff | Out-Null
+        $output = try {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Provision `
+                -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                -Provision $true -Repository "owner/repo" -Hooks $hooks
+            "UNEXPECTED_SUCCESS"
+        } catch {
+            $_.Exception.Message
+        }
+        Assert-True ($output -match "stage=preflight category=(path-conflict|unknown)") `
+            "Provision precondition was not bounded"
+        Assert-True ($output -notmatch "Provision requires populated|Exception|Path:|owner/repo") `
+            "Provision exposed raw diagnostic text"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "disposable seam requires exact ordinal Confirm and Secret hooks" {
+    $fixture = New-Fixture "hook-authority"
+    try {
+        $identity = @{
+            ValidityDays = 1
+            DistinguishedName = "CN=MEE3-38 Disposable Integration Test, OU=NON-RELEASE, O=Meeting Tests"
+        }
+        $allowed = @{
+            Confirm = { "CREATE-ANDROID-RELEASE-KEY" }
+            Secret = { param([string] $Name) "disposable-$Name" }
+        }
+        $forbidden = @(
+            "Keytool", "CertificateBytes", "Hash", "Acl", "BeforeMove",
+            "BeforeCopy", "Copy", "BeforeDelete", "Gh", "Error", "Future"
+        )
+        foreach ($key in $forbidden) {
+            $hooks = @{} + $allowed
+            $hooks[$key] = { }
+            Assert-InputValidationOnly {
+                Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                    -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                    -Provision $false -Repository "" -Hooks $hooks `
+                    -IntegrationTestAuthority "MEE3-38-DISPOSABLE-NONRELEASE-V1" `
+                    -IntegrationTestIdentity $identity
+            } "forbidden hook $key"
+        }
+        foreach ($hooks in @(
+            $null,
+            @{ Confirm = $allowed.Confirm },
+            @{ Secret = $allowed.Secret },
+            @{ confirm = $allowed.Confirm; Secret = $allowed.Secret },
+            @{ Confirm = $allowed.Confirm; SECRET = $allowed.Secret },
+            @{ Confirm = $null; Secret = $allowed.Secret },
+            @{ Confirm = "not-a-script"; Secret = $allowed.Secret }
+        )) {
+            Assert-InputValidationOnly {
+                Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                    -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                    -Provision $false -Repository "" -Hooks $hooks `
+                    -IntegrationTestAuthority "MEE3-38-DISPOSABLE-NONRELEASE-V1" `
+                    -IntegrationTestIdentity $identity
+            } "invalid exact hook set"
+        }
+        foreach ($invalidIdentity in @(
+            @{ ValidityDays = 1 },
+            @{ DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = "1"; DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = 2; DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = 1; DistinguishedName = "CN=Meet Android Release, OU=Release, O=Meet" },
+            @{ validityDays = 1; DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = 1; DistinguishedName = $identity.DistinguishedName; Extra = $true }
+        )) {
+            Assert-InputValidationOnly {
+                Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                    -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                    -Provision $false -Repository "" -Hooks $allowed `
+                    -IntegrationTestAuthority "MEE3-38-DISPOSABLE-NONRELEASE-V1" `
+                    -IntegrationTestIdentity $invalidIdentity
+            } "invalid disposable identity"
+        }
+        Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup -Force).Count -eq 0) `
+            "input-validation negatives mutated backup sentinel"
+        Assert-True (-not (Test-Path -LiteralPath $fixture.Handoff)) `
+            "input-validation negatives created handoff"
+    } finally { Remove-Fixture $fixture }
+}
+
 Invoke-TestCase "Execute refuses overwrite and confirmation mismatch" {
     $fixture = New-Fixture "refusal"
     try {
@@ -255,6 +401,52 @@ Invoke-TestCase "pre-commit failure removes invocation-owned artifacts" {
         Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup).Count -eq 0) `
             "backup changed after pre-copy failure"
         Assert-True ($ghCalls.Count -eq 0) "GitHub was called before commit"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "normal exclusive backup ownership fingerprints before cleanup" {
+    $fixture = New-Fixture "normal-copy-fingerprint"
+    try {
+        $source = Join-Path $fixture.Root "source.bin"
+        $destination = Join-Path $fixture.Root "destination.bin"
+        [IO.File]::WriteAllText($source, "original-copy")
+        $ownedFiles = New-Object System.Collections.ArrayList
+        Copy-FileExclusively $source $destination $ownedFiles @{} "backup-copy"
+        Assert-True ($ownedFiles.Contains($destination)) `
+            "normal exclusive copy did not retain destination ownership"
+        Assert-True ($script:OwnedFileFingerprints.ContainsKey($destination)) `
+            "normal exclusive copy did not record destination fingerprint"
+        [IO.File]::WriteAllText($destination, "race-replacement")
+        Assert-Throws {
+            Remove-OwnedArtifacts $ownedFiles (New-Object System.Collections.ArrayList) @{}
+        } "modified normal-copy destination was deleted"
+        Assert-True (([IO.File]::ReadAllText($destination) -ceq "race-replacement")) `
+            "modified normal-copy destination was not preserved"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "Execute retains initiating stage when artifact cleanup fails" {
+    $fixture = New-Fixture "cleanup-diagnostic"
+    try {
+        $ghCalls = New-Object System.Collections.ArrayList
+        $hooks = New-TestHooks $ghCalls
+        $hooks.BeforeCopy = {
+            param([string] $Source, [string] $Destination)
+            throw "primary copy failure"
+        }.GetNewClosure()
+        $hooks.Cleanup = { throw "cleanup delete failure" }
+        $output = try {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                -Provision $false -Repository "" -Hooks $hooks
+            "UNEXPECTED_SUCCESS"
+        } catch {
+            $_.Exception.Message
+        }
+        Assert-True ($output -match "stage=backup-copy category=unknown cleanup=False") `
+            "Execute cleanup failure replaced the initiating diagnostic: $output"
+        Assert-True ($output -notmatch "cleanup delete failure|primary copy failure|invocation-owned paths") `
+            "Execute cleanup exposed raw exception text"
     } finally { Remove-Fixture $fixture }
 }
 
@@ -506,4 +698,34 @@ Invoke-TestCase "Provision retries same committed identity with exact stdin comm
     } finally { Remove-Fixture $fixture }
 }
 
+Invoke-TestCase "Provision bounds cleanup failure without replacing primary failure" {
+    $fixture = New-Fixture "provision-cleanup-diagnostic"
+    try {
+        $ghCalls = New-Object System.Collections.ArrayList
+        $hooks = New-TestHooks $ghCalls
+        Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+            -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+            -Provision $false -Repository "" -Hooks $hooks
+        $hooks.Gh = {
+            param([string[]] $Arguments, [string] $InputValue)
+            throw "primary GitHub failure"
+        }
+        $hooks.Cleanup = { throw "cleanup delete failure" }
+        $output = try {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Provision `
+                -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                -Provision $true -Repository "owner/repo" -Hooks $hooks
+            "UNEXPECTED_SUCCESS"
+        } catch {
+            $_.Exception.Message
+        }
+        Assert-True ($output -match "stage=github-environment-write category=unknown cleanup=False") `
+            "Provision cleanup failure replaced the initiating diagnostic: $output"
+        Assert-True ($output -notmatch "cleanup delete failure|primary GitHub failure|invocation-owned paths") `
+            "Provision cleanup exposed raw exception text"
+    } finally { Remove-Fixture $fixture }
+}
+
+$global:LASTEXITCODE = 0
 Write-Host "All deterministic Android signing bootstrap tests passed."
+exit 0
