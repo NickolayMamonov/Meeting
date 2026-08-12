@@ -176,14 +176,15 @@ Provision with the exact same paths:
 
 Provision is the identity-preserving retry entry point. It retains path
 separation checks, accepts populated committed locations, performs no key
-generation or artifact copy/overwrite, creates no transient local password
-file, and fully verifies both four-artifact sets, byte equality, alias
-`meet-release`, both passwords, keystore/certificate identity, and the
-certificate-derived fingerprint before the first `gh` call. Provision's
-verification passes preserved passwords directly to the supported keytool
-operations; it does not create, ACL, copy, overwrite, or leave a local
-password-file artifact. It then idempotently rewrites the complete command set
-above through stdin.
+generation or artifact copy/overwrite, and fully verifies both four-artifact
+sets, byte equality, alias `meet-release`, both passwords,
+keystore/certificate identity, and the certificate-derived fingerprint before
+the first `gh` call. Its preserved passwords are written only to collision-
+resistant owner-only temporary files under the system temporary directory,
+outside both identity directories; those files are guaranteed to be removed
+before Provision returns or fails. Provision does not create, ACL, copy, or
+overwrite any target artifact. It then idempotently rewrites the complete
+command set above through stdin.
 After a failure between environment writes, rerun Provision on the same paths;
 never use Execute for recovery. Verify only names and non-secret status, then
 disconnect the USB and store it offline again.

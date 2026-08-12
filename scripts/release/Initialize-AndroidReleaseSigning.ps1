@@ -12,6 +12,66 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+public static class AndroidSigningNativeMethods
+{
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileDispositionInfo
+    {
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool DeleteFile;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetFileInformationByHandle(
+        IntPtr hFile,
+        int fileInformationClass,
+        ref FileDispositionInfo fileInformation,
+        uint bufferSize);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFile(
+        string fileName,
+        uint desiredAccess,
+        uint shareMode,
+        IntPtr securityAttributes,
+        uint creationDisposition,
+        uint flagsAndAttributes,
+        IntPtr templateFile);
+
+    public static SafeFileHandle OpenForDeletion(string path)
+    {
+        var handle = CreateFile(
+            path,
+            0x80000000u | 0x00010000u,
+            0x00000001u | 0x00000002u | 0x00000004u,
+            IntPtr.Zero,
+            3u,
+            0x00000080u,
+            IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            handle.Dispose();
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+        return handle;
+    }
+
+    public static bool MarkHandleForDeletion(SafeFileHandle handle)
+    {
+        var disposition = new FileDispositionInfo { DeleteFile = true };
+        return SetFileInformationByHandle(
+            handle.DangerousGetHandle(),
+            4,
+            ref disposition,
+            (uint)Marshal.SizeOf(typeof(FileDispositionInfo)));
+    }
+}
+"@
 
 $script:AndroidSigningArtifactNames = @(
     "meet-release.jks",
@@ -19,6 +79,7 @@ $script:AndroidSigningArtifactNames = @(
     "meet-release.sha256",
     "meet-release-passwords.txt"
 )
+$script:OwnedFileFingerprints = @{}
 
 if (-not $Library -and ([string]::IsNullOrWhiteSpace($OfflineBackupDirectory) -or
     [string]::IsNullOrWhiteSpace($CredentialHandoffDirectory))) {
@@ -70,6 +131,22 @@ function Assert-SeparateSigningPaths([string] $Backup, [string] $Handoff) {
     }
 }
 
+function Assert-NoReparsePointPath([string] $Path) {
+    $canonical = ConvertTo-CanonicalPath $Path
+    $root = [IO.Path]::GetPathRoot($canonical)
+    $current = $root
+    foreach ($component in @($canonical.Substring($root.Length) -split "\\" |
+            Where-Object { $_.Length -gt 0 })) {
+        $current = Join-Path $current $component
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Signing paths must not contain reparse-point components"
+            }
+        }
+    }
+}
+
 function Assert-NewPath([string] $Path) {
     if (Test-Path -LiteralPath $Path) {
         throw "Refusing to overwrite existing path"
@@ -82,8 +159,73 @@ function Add-OwnedFile([System.Collections.ArrayList] $OwnedFiles, [string] $Pat
     }
 }
 
+function Set-OwnedFileFingerprint([string] $Path) {
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        $item = Get-Item -LiteralPath $Path -Force
+        $script:OwnedFileFingerprints[$Path] = [pscustomobject]@{
+            Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
+            Length = $item.Length
+            CreationTimeUtc = $item.CreationTimeUtc
+        }
+    }
+}
+
+function Set-OwnedFileFingerprintFromStream(
+    [string] $Path,
+    [System.IO.FileStream] $Stream
+) {
+    if (-not $Stream.CanRead) {
+        Set-OwnedFileFingerprint $Path
+        return
+    }
+    $position = $Stream.Position
+    $Stream.Position = 0
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = [BitConverter]::ToString($sha256.ComputeHash($Stream)).Replace("-", "")
+    } finally {
+        $sha256.Dispose()
+        $Stream.Position = $position
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    $script:OwnedFileFingerprints[$Path] = [pscustomobject]@{
+        Hash = $hash
+        Length = $item.Length
+        CreationTimeUtc = $item.CreationTimeUtc
+    }
+}
+
+function Get-FileFingerprintFromStream(
+    [string] $Path,
+    [System.IO.FileStream] $Stream
+) {
+    if (-not $Stream.CanRead) {
+        $item = Get-Item -LiteralPath $Path -Force
+        return [pscustomobject]@{
+            Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
+            Length = $item.Length
+            CreationTimeUtc = $item.CreationTimeUtc
+        }
+    }
+    $position = $Stream.Position
+    $Stream.Position = 0
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = [BitConverter]::ToString($sha256.ComputeHash($Stream)).Replace("-", "")
+    } finally {
+        $sha256.Dispose()
+        $Stream.Position = $position
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    return [pscustomobject]@{
+        Hash = $hash
+        Length = $item.Length
+        CreationTimeUtc = $item.CreationTimeUtc
+    }
+}
 function Remove-OwnedFile([System.Collections.ArrayList] $OwnedFiles, [string] $Path) {
     [void]$OwnedFiles.Remove($Path)
+    [void]$script:OwnedFileFingerprints.Remove($Path)
 }
 
 function Remove-OwnedDirectory(
@@ -91,6 +233,32 @@ function Remove-OwnedDirectory(
     [string] $Path
 ) {
     [void]$OwnedDirectories.Remove($Path)
+}
+
+function Remove-VerifiedOwnedFile(
+    [string] $Path,
+    [pscustomobject] $Expected
+) {
+    if ($null -eq $Expected) {
+        throw "Invocation-owned file has no recorded identity"
+    }
+    $handle = [AndroidSigningNativeMethods]::OpenForDeletion($Path)
+    $stream = [IO.FileStream]::new($handle, [IO.FileAccess]::Read, 4096, $false)
+    try {
+        if ($null -ne $Expected) {
+            $actual = Get-FileFingerprintFromStream $Path $stream
+            if ($actual.Length -ne $Expected.Length -or
+                $actual.CreationTimeUtc -ne $Expected.CreationTimeUtc -or
+                $actual.Hash -cne $Expected.Hash) {
+                throw "Invocation-owned file identity changed"
+            }
+        }
+        if (-not [AndroidSigningNativeMethods]::MarkHandleForDeletion($stream.SafeFileHandle)) {
+            throw "Unable to mark invocation-owned file for deletion"
+        }
+    } finally {
+        $stream.Dispose()
+    }
 }
 
 function Get-InvocationTempPath([string] $Suffix) {
@@ -109,7 +277,7 @@ function Test-IsAclSupportedPath([string] $Path) {
         $drive = Get-CimInstance Win32_LogicalDisk -Filter ("DeviceID='" + $root.TrimEnd("\") + "'")
         return $null -eq $drive -or $drive.FileSystem -ne "FAT32"
     } catch {
-        return $false
+        throw "Unable to determine filesystem ACL support for signing path"
     }
 }
 
@@ -117,7 +285,8 @@ function New-SecureEphemeralFile(
     [hashtable] $Hooks,
     [System.Collections.ArrayList] $OwnedFiles
 ) {
-    do {
+    $created = $false
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
         $path = Get-InvocationTempPath ".tmp"
         try {
             $stream = [IO.File]::Open(
@@ -126,13 +295,23 @@ function New-SecureEphemeralFile(
                 [IO.FileAccess]::ReadWrite,
                 [IO.FileShare]::None
             )
+            Add-OwnedFile $OwnedFiles $path
             $stream.Dispose()
+            $created = $true
             break
         } catch [IO.IOException] {
-            continue
+            if (Test-Path -LiteralPath $path) {
+                if ($attempt -eq 10) {
+                    throw "Unable to create secure temporary file after repeated name collisions"
+                }
+                continue
+            }
+            throw "Unable to create secure temporary file"
         }
-    } while ($true)
-    Add-OwnedFile $OwnedFiles $path
+    }
+    if (-not $created) {
+        throw "Unable to create secure temporary file"
+    }
     Set-OwnerOnlyAcl $path $false $Hooks
     return $path
 }
@@ -141,15 +320,21 @@ function New-SecureEphemeralDirectory(
     [hashtable] $Hooks,
     [System.Collections.ArrayList] $OwnedRecursiveDirectories
 ) {
-    do {
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
         $path = Get-InvocationTempPath ""
         try {
             New-Item -ItemType Directory -Path $path -ErrorAction Stop | Out-Null
             break
         } catch [IO.IOException] {
-            continue
+            if (Test-Path -LiteralPath $path) {
+                if ($attempt -eq 10) {
+                    throw "Unable to create secure temporary directory after repeated name collisions"
+                }
+                continue
+            }
+            throw "Unable to create secure temporary directory"
         }
-    } while ($true)
+    }
     [void]$OwnedRecursiveDirectories.Add($path)
     Set-OwnerOnlyAcl $path $true $Hooks
     return $path
@@ -162,35 +347,62 @@ function Move-StagedArtifact(
     [System.Collections.ArrayList] $OwnedDirectories,
     [hashtable] $Hooks
 ) {
+    $sourceFingerprint = $null
+    if ($script:OwnedFileFingerprints.ContainsKey($Source)) {
+        $sourceFingerprint = $script:OwnedFileFingerprints[$Source]
+    }
     if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeMove")) {
         & $Hooks["BeforeMove"] $Source $Destination
     }
     try {
-        $sourceStream = [IO.File]::OpenRead($Source)
+        $sourceHandle = [AndroidSigningNativeMethods]::OpenForDeletion($Source)
+        $sourceStream = New-Object IO.FileStream(
+            $sourceHandle,
+            [IO.FileAccess]::Read
+        )
         try {
             $destinationStream = [IO.File]::Open(
                 $Destination,
                 [IO.FileMode]::CreateNew,
-                [IO.FileAccess]::Write,
+                [IO.FileAccess]::ReadWrite,
                 [IO.FileShare]::None
             )
             Add-OwnedFile $OwnedFiles $Destination
             try {
                 $sourceStream.CopyTo($destinationStream)
+                $destinationStream.Flush()
+                Set-OwnedFileFingerprintFromStream $Destination $destinationStream
             } finally {
                 $destinationStream.Dispose()
+            }
+            if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeDelete")) {
+                & $Hooks["BeforeDelete"] $Source
+            }
+            if ($null -ne $sourceFingerprint) {
+                $currentSource = Get-FileFingerprintFromStream $Source $sourceStream
+                if ($currentSource.Length -ne $sourceFingerprint.Length -or
+                    $currentSource.CreationTimeUtc -ne $sourceFingerprint.CreationTimeUtc -or
+                    $currentSource.Hash -cne $sourceFingerprint.Hash) {
+                    throw "Staged source identity changed before deletion"
+                }
+            } else {
+                throw "Staged source has no recorded identity"
+            }
+            if (-not [AndroidSigningNativeMethods]::MarkHandleForDeletion(
+                    $sourceStream.SafeFileHandle)) {
+                throw "Unable to mark staged source for deletion"
             }
         } finally {
             $sourceStream.Dispose()
         }
     } catch {
-        if (Test-Path -LiteralPath $Destination -PathType Leaf) {
+        if ((Test-Path -LiteralPath $Destination -PathType Leaf) -and
+            -not $OwnedFiles.Contains($Destination)) {
             throw "Refusing to overwrite a path created concurrently"
         }
         throw
     }
     Remove-OwnedFile $OwnedFiles $Source
-    Remove-Item -LiteralPath $Source -Force
     if (Test-IsAclSupportedPath $Destination) {
         Set-OwnerOnlyAcl $Destination $false $Hooks
     }
@@ -213,7 +425,7 @@ function Copy-FileExclusively(
         $destinationStream = [IO.File]::Open(
             $Destination,
             [IO.FileMode]::CreateNew,
-            [IO.FileAccess]::Write,
+            [IO.FileAccess]::ReadWrite,
             [IO.FileShare]::None
         )
         Add-OwnedFile $OwnedFiles $Destination
@@ -224,6 +436,7 @@ function Copy-FileExclusively(
             $sourceStream.CopyTo($destinationStream)
         }
         $destinationStream.Flush()
+        Set-OwnedFileFingerprintFromStream $Destination $destinationStream
     } catch {
         if ($destinationCreated) {
             Remove-OwnedFile $OwnedFiles $Destination
@@ -266,9 +479,25 @@ function Write-ExclusiveText(
         } finally {
             $writer.Dispose()
         }
+        Set-OwnedFileFingerprint $Path
     } finally {
         $stream.Dispose()
     }
+}
+
+function New-ExclusiveOwnedFile(
+    [string] $Path,
+    [System.Collections.ArrayList] $OwnedFiles
+) {
+    $stream = [IO.File]::Open(
+        $Path,
+        [IO.FileMode]::CreateNew,
+        [IO.FileAccess]::ReadWrite,
+        [IO.FileShare]::ReadWrite
+    )
+    Add-OwnedFile $OwnedFiles $Path
+    $stream.Dispose()
+    Set-OwnedFileFingerprint $Path
 }
 
 function Get-OwnerOnlyAclRule([bool] $IsDirectory) {
@@ -323,6 +552,70 @@ function Invoke-Keytool(
         throw "keytool command failed"
     }
     return $output
+}
+
+function Invoke-KeytoolWithOwnedOutput(
+    [hashtable] $Hooks,
+    [string[]] $Arguments,
+    [string] $OutputPath,
+    [System.Collections.ArrayList] $OwnedFiles,
+    [string[]] $PasswordInput = @()
+) {
+    $wasOwnedBeforeProducer = $OwnedFiles.Contains($OutputPath)
+    $reserved = if ($wasOwnedBeforeProducer) {
+        $script:OwnedFileFingerprints[$OutputPath]
+    } else {
+        $null
+    }
+    if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeKeytool")) {
+        & $Hooks["BeforeKeytool"] $OutputPath
+    }
+    $outputWasPresentBeforeProducer = Test-Path -LiteralPath $OutputPath -PathType Leaf
+    $producerStartedUtc = [DateTime]::UtcNow
+    try {
+        Invoke-Keytool $Hooks $Arguments $PasswordInput | Out-Null
+        if (-not (Test-Path -LiteralPath $OutputPath -PathType Leaf)) {
+            if ($wasOwnedBeforeProducer) {
+                Remove-OwnedFile $OwnedFiles $OutputPath
+            }
+            throw "keytool did not create its output"
+        }
+        if (-not $wasOwnedBeforeProducer -and $outputWasPresentBeforeProducer) {
+            throw "keytool output path was created concurrently"
+        }
+        if ($wasOwnedBeforeProducer -and
+            $null -ne $reserved -and
+            (Get-Item -LiteralPath $OutputPath -Force).CreationTimeUtc -ne $reserved.CreationTimeUtc) {
+            Remove-OwnedFile $OwnedFiles $OutputPath
+            throw "keytool output path was replaced concurrently"
+        }
+        if (-not $wasOwnedBeforeProducer -and -not $outputWasPresentBeforeProducer) {
+            Add-OwnedFile $OwnedFiles $OutputPath
+        }
+        Set-OwnedFileFingerprint $OutputPath
+    } catch {
+        if ($wasOwnedBeforeProducer) {
+            $changed = -not (Test-Path -LiteralPath $OutputPath -PathType Leaf)
+            if (-not $changed -and $null -ne $reserved) {
+                $current = Get-Item -LiteralPath $OutputPath -Force
+                $currentHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $OutputPath).Hash
+                $changed = $current.Length -ne $reserved.Length -or
+                    $current.CreationTimeUtc -ne $reserved.CreationTimeUtc -or
+                    $currentHash -cne $reserved.Hash
+            }
+            if ($changed) {
+                Remove-OwnedFile $OwnedFiles $OutputPath
+            }
+        } elseif (-not $outputWasPresentBeforeProducer -and
+            (Test-Path -LiteralPath $OutputPath -PathType Leaf)) {
+            $created = Get-Item -LiteralPath $OutputPath -Force
+            if ($created.CreationTimeUtc -gt $producerStartedUtc) {
+                Add-OwnedFile $OwnedFiles $OutputPath
+                Set-OwnedFileFingerprint $OutputPath
+            }
+        }
+        throw
+    }
 }
 
 function Get-PasswordArguments(
@@ -449,26 +742,34 @@ function Assert-KeystoreIdentity(
         Invoke-Keytool $Hooks $listArguments | Out-Null
     }
 
+    $requestOwned = New-Object System.Collections.ArrayList
     $requestPath = Get-InvocationTempPath ".csr"
+    try {
+        New-ExclusiveOwnedFile $requestPath $requestOwned
+    } catch {
+        if (Test-Path -LiteralPath $requestPath -PathType Leaf) {
+            Remove-Item -LiteralPath $requestPath -Force -ErrorAction SilentlyContinue
+        }
+        throw
+    }
     try {
         $requestArguments = @(
             "-certreq", "-keystore", $Keystore, "-storetype", "JKS",
             "-alias", $Metadata.Alias, "-file", $requestPath
         )
         if ($null -ne $Hooks -and $Hooks.ContainsKey("Keytool")) {
-            Invoke-Keytool $Hooks ($requestArguments + @(
+            Invoke-KeytoolWithOwnedOutput $Hooks ($requestArguments + @(
                 "-storepass", $Metadata.StorePassword, "-keypass", $Metadata.KeyPassword
-            )) | Out-Null
+            )) $requestPath $requestOwned
         } elseif (-not [string]::IsNullOrWhiteSpace($StorePasswordFile)) {
-            Invoke-Keytool $Hooks ($requestArguments + @(
+            Invoke-KeytoolWithOwnedOutput $Hooks ($requestArguments + @(
                 "-storepass:file", $StorePasswordFile, "-keypass:file", $KeyPasswordFile
-            )) | Out-Null
+            )) $requestPath $requestOwned
         } else {
-            Invoke-Keytool $Hooks ($requestArguments + @(
+            Invoke-KeytoolWithOwnedOutput $Hooks ($requestArguments + @(
                 "-storepass", $Metadata.StorePassword, "-keypass", $Metadata.KeyPassword
-            )) | Out-Null
+            )) $requestPath $requestOwned
         }
-
         $exported = Get-CertificateBytesFromKeystore $Hooks $Keystore $Metadata.StorePassword `
             $Metadata.Alias $StorePasswordFile
         $certificateBytes = [IO.File]::ReadAllBytes($Certificate)
@@ -476,8 +777,16 @@ function Assert-KeystoreIdentity(
             throw "Keystore certificate does not match the public certificate artifact"
         }
     } finally {
-        if (Test-Path -LiteralPath $requestPath -PathType Leaf) {
-            Remove-Item -LiteralPath $requestPath -Force -ErrorAction Stop
+        $requestCleanupFailure = $null
+        if ($requestOwned.Contains($requestPath)) {
+            try {
+                Remove-OwnedArtifacts $requestOwned (New-Object System.Collections.ArrayList) $Hooks
+            } catch {
+                $requestCleanupFailure = $_.Exception.Message
+            }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($requestCleanupFailure)) {
+            throw "Cleanup failed for certificate request: $requestCleanupFailure"
         }
     }
 }
@@ -497,6 +806,7 @@ function Assert-ArtifactSet(
     }
     foreach ($name in $script:AndroidSigningArtifactNames) {
         $path = Join-Path $Directory $name
+        Assert-NoReparsePointPath $path
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Signing artifact directory is incomplete"
         }
@@ -552,13 +862,14 @@ function Copy-SigningArtifact(
         $destinationStream = [IO.File]::Open(
             $Destination,
             [IO.FileMode]::CreateNew,
-            [IO.FileAccess]::Write,
+            [IO.FileAccess]::ReadWrite,
             [IO.FileShare]::None
         )
         Add-OwnedFile $OwnedFiles $Destination
         try {
             & $Hooks["Copy"] $Source $Destination $destinationStream
             $destinationStream.Flush()
+            Set-OwnedFileFingerprintFromStream $Destination $destinationStream
         } catch {
             Remove-OwnedFile $OwnedFiles $Destination
             throw
@@ -626,13 +937,42 @@ function Invoke-AllGitHubProvisioning(
 
 function Remove-OwnedArtifacts(
     [System.Collections.ArrayList] $OwnedFiles,
-    [System.Collections.ArrayList] $OwnedDirectories
+    [System.Collections.ArrayList] $OwnedDirectories,
+    [hashtable] $Hooks
 ) {
     $cleanupFailures = New-Object System.Collections.ArrayList
+    $retryFiles = New-Object System.Collections.ArrayList
     foreach ($path in @($OwnedFiles | Sort-Object Length -Descending)) {
         if (Test-Path -LiteralPath $path -PathType Leaf) {
             try {
-                Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+                if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeDelete")) {
+                    & $Hooks["BeforeDelete"] $path
+                }
+                $expected = if ($script:OwnedFileFingerprints.ContainsKey($path)) {
+                    $script:OwnedFileFingerprints[$path]
+                } else {
+                    $null
+                }
+                Remove-VerifiedOwnedFile $path $expected
+                [void]$script:OwnedFileFingerprints.Remove($path)
+            } catch {
+                [void]$retryFiles.Add($path)
+            }
+        }
+    }
+    foreach ($path in @($retryFiles)) {
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            try {
+                if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeDelete")) {
+                    & $Hooks["BeforeDelete"] $path
+                }
+                $expected = if ($script:OwnedFileFingerprints.ContainsKey($path)) {
+                    $script:OwnedFileFingerprints[$path]
+                } else {
+                    $null
+                }
+                Remove-VerifiedOwnedFile $path $expected
+                [void]$script:OwnedFileFingerprints.Remove($path)
             } catch {
                 [void]$cleanupFailures.Add($path)
             }
@@ -653,6 +993,19 @@ function Remove-OwnedArtifacts(
     if ($cleanupFailures.Count -gt 0) {
         throw "Cleanup failed for invocation-owned paths: $($cleanupFailures -join ', ')"
     }
+}
+
+function Remove-OwnedTemporaryFiles(
+    [string[]] $Paths,
+    [hashtable] $Hooks
+) {
+    $temporaryFiles = New-Object System.Collections.ArrayList
+    foreach ($path in $Paths) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) {
+            Add-OwnedFile $temporaryFiles $path
+        }
+    }
+    Remove-OwnedArtifacts $temporaryFiles (New-Object System.Collections.ArrayList) $Hooks
 }
 
 function Get-SigningPaths([string] $Backup, [string] $Handoff) {
@@ -690,6 +1043,8 @@ function Invoke-AndroidSigningBootstrap {
 
     $backup = ConvertTo-CanonicalPath $BackupDirectory
     $handoff = ConvertTo-CanonicalPath $HandoffDirectory
+    Assert-NoReparsePointPath $backup
+    Assert-NoReparsePointPath $handoff
     Assert-SeparateSigningPaths $backup $handoff
     $paths = Get-SigningPaths $backup $handoff
     $ownedFiles = New-Object System.Collections.ArrayList
@@ -712,8 +1067,10 @@ function Invoke-AndroidSigningBootstrap {
             $metadata = Read-RecoveryMetadata $paths.Recovery
             $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
             [IO.File]::WriteAllText($temporaryStorePasswordFile, $metadata.StorePassword)
+            Set-OwnedFileFingerprint $temporaryStorePasswordFile
             $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
             [IO.File]::WriteAllText($temporaryKeyPasswordFile, $metadata.KeyPassword)
+            Set-OwnedFileFingerprint $temporaryKeyPasswordFile
             $local = Assert-ArtifactSet $Hooks $handoff $temporaryStorePasswordFile $temporaryKeyPasswordFile
             $offline = Assert-ArtifactSet $Hooks $backup $temporaryStorePasswordFile $temporaryKeyPasswordFile
             Assert-ArtifactSetsEqual $handoff $backup
@@ -732,7 +1089,7 @@ function Invoke-AndroidSigningBootstrap {
             }
             throw "Provision failed before or during GitHub mutation; handoff and offline backup were preserved. Rerun -Mode Provision with the same paths. No secret values were printed."
         } finally {
-            Remove-OwnedArtifacts $ownedFiles $ownedDirectories
+            Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
         }
     }
 
@@ -778,24 +1135,25 @@ function Invoke-AndroidSigningBootstrap {
         }
         $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
         [IO.File]::WriteAllText($temporaryStorePasswordFile, $storePassword)
+        Set-OwnedFileFingerprint $temporaryStorePasswordFile
         $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
         [IO.File]::WriteAllText($temporaryKeyPasswordFile, $keyPassword)
+        Set-OwnedFileFingerprint $temporaryKeyPasswordFile
         $stagingDirectory = New-SecureEphemeralDirectory $Hooks $ownedDirectories
         Assert-NewPath $paths.Keystore
         $stagedKeystore = Join-Path $stagingDirectory "meet-release.jks"
         Assert-NewPath $stagedKeystore
         $generationPasswords = Get-PasswordArguments $Hooks $storePassword $keyPassword `
             $temporaryStorePasswordFile $temporaryKeyPasswordFile
-        Invoke-Keytool $Hooks (@(
+        Invoke-KeytoolWithOwnedOutput $Hooks (@(
             "-genkeypair", "-v", "-keystore", $stagedKeystore, "-storetype", "JKS"
         ) + $generationPasswords + @(
             "-alias", "meet-release", "-keyalg", "RSA", "-keysize", "4096",
             "-validity", "3650", "-dname", "CN=Meet Android Release, OU=Release, O=Meet"
-        )) @($storePassword, $storePassword, $keyPassword, $keyPassword) | Out-Null
+        )) $stagedKeystore $ownedFiles @($storePassword, $storePassword, $keyPassword, $keyPassword)
         if (-not (Test-Path -LiteralPath $stagedKeystore -PathType Leaf)) {
             throw "keytool did not create the staged keystore"
         }
-        Add-OwnedFile $ownedFiles $stagedKeystore
         Move-StagedArtifact $stagedKeystore $paths.Keystore $ownedFiles $ownedDirectories $Hooks
 
         Assert-NewPath $paths.Certificate
@@ -806,11 +1164,10 @@ function Invoke-AndroidSigningBootstrap {
             "-alias", "meet-release", "-file", $stagedCertificate
         )
         $exportArguments += @("-storepass:file", $temporaryStorePasswordFile)
-        Invoke-Keytool $Hooks $exportArguments | Out-Null
+        Invoke-KeytoolWithOwnedOutput $Hooks $exportArguments $stagedCertificate $ownedFiles
         if (-not (Test-Path -LiteralPath $stagedCertificate -PathType Leaf)) {
             throw "keytool did not create the staged certificate"
         }
-        Add-OwnedFile $ownedFiles $stagedCertificate
         Move-StagedArtifact $stagedCertificate $paths.Certificate $ownedFiles $ownedDirectories $Hooks
 
         Assert-NewPath $paths.Fingerprint
@@ -859,7 +1216,7 @@ function Invoke-AndroidSigningBootstrap {
         }
         if (-not $backupCommitted) {
             try {
-                Remove-OwnedArtifacts $ownedFiles $ownedDirectories
+                Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
             } catch {
                 throw "Signing bootstrap failed before backup commit and cleanup was incomplete. Inspect only the reported invocation-owned paths before retrying. No secret values were printed."
             }
@@ -867,18 +1224,36 @@ function Invoke-AndroidSigningBootstrap {
         }
         throw "GitHub provisioning failed after backup commit; handoff and offline backup were preserved. Rerun -Mode Provision with the same paths. No secret values were printed."
     } finally {
-        $temporaryCleanupFailures = New-Object System.Collections.ArrayList
-        foreach ($path in @($temporaryStorePasswordFile, $temporaryKeyPasswordFile)) {
-            if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path -LiteralPath $path -PathType Leaf)) {
-                try {
-                    Remove-Item -LiteralPath $path -Force -ErrorAction Stop
-                } catch {
-                    [void]$temporaryCleanupFailures.Add($path)
+        $stagingCleanupFailure = $null
+        if (-not [string]::IsNullOrWhiteSpace($stagingDirectory) -and
+            (Test-Path -LiteralPath $stagingDirectory -PathType Container)) {
+            try {
+                $stagingFiles = New-Object System.Collections.ArrayList
+                foreach ($path in @($ownedFiles | Where-Object { $_ -like ($stagingDirectory + "\*") })) {
+                    [void]$stagingFiles.Add($path)
                 }
+                $stagingDirectories = New-Object System.Collections.ArrayList
+                [void]$stagingDirectories.Add($stagingDirectory)
+                Remove-OwnedArtifacts $stagingFiles $stagingDirectories $Hooks
+                if ((Test-Path -LiteralPath $stagingDirectory -PathType Container) -and
+                    @(Get-ChildItem -LiteralPath $stagingDirectory -Force).Count -gt 0) {
+                    throw "Staging directory contains unowned residual paths"
+                }
+            } catch {
+                $stagingCleanupFailure = $_.Exception.Message
             }
+        }
+        $temporaryCleanupFailures = New-Object System.Collections.ArrayList
+        try {
+            Remove-OwnedTemporaryFiles @($temporaryStorePasswordFile, $temporaryKeyPasswordFile) $Hooks
+        } catch {
+            [void]$temporaryCleanupFailures.Add("temporary invocation-owned files")
         }
         if ($temporaryCleanupFailures.Count -gt 0) {
             throw "Cleanup failed for invocation-owned temporary paths: $($temporaryCleanupFailures -join ', ')"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($stagingCleanupFailure)) {
+            throw "Cleanup failed for invocation-owned staging directory: $stagingCleanupFailure"
         }
     }
 }
