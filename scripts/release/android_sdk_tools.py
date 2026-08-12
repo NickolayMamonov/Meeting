@@ -79,16 +79,26 @@ def _selected_build_tools(root: Path) -> tuple[tuple[int, ...], Path]:
     return selected[0]
 
 
-def _package_revision(directory: Path, package_name: str = "build-tools") -> tuple[int, ...]:
-    properties = directory / "source.properties"
-    canonical_directory = directory.resolve()
-    try:
-        properties = properties.resolve()
-        properties.relative_to(canonical_directory)
-    except ValueError as error:
-        raise AndroidSdkToolError(
-            f"Android SDK {package_name} package metadata escapes its package"
-        ) from error
+def _contained_path(path: Path, roots: tuple[Path, ...], label: str) -> Path:
+    canonical = path.resolve()
+    for root in roots:
+        try:
+            canonical.relative_to(root)
+        except ValueError as error:
+            raise AndroidSdkToolError(f"{label} escapes its SDK package") from error
+    return canonical
+
+
+def _package_revision(
+    directory: Path,
+    package_name: str = "build-tools",
+    containment_roots: tuple[Path, ...] = (),
+) -> tuple[int, ...]:
+    properties = _contained_path(
+        directory / "source.properties",
+        containment_roots + (directory.resolve(),),
+        f"Android SDK {package_name} package metadata",
+    )
     if not properties.is_file():
         raise AndroidSdkToolError(
             f"Android SDK {package_name} package metadata is not a regular file"
@@ -117,14 +127,16 @@ def _package_revision(directory: Path, package_name: str = "build-tools") -> tup
 
 
 def _validated_executable(
-    directory: Path, tool: str = "apksigner", relative_path: str | None = None
+    directory: Path,
+    tool: str = "apksigner",
+    relative_path: str | None = None,
+    containment_roots: tuple[Path, ...] = (),
 ) -> Path:
-    executable = (directory / (relative_path or tool)).resolve()
-    try:
-        executable.relative_to(directory.resolve())
-    except ValueError as error:
-        package_type = "build-tools" if tool == "apksigner" else "SDK"
-        raise AndroidSdkToolError(f"{tool} escapes its {package_type} package") from error
+    executable = _contained_path(
+        directory / (relative_path or tool),
+        containment_roots + (directory.resolve(),),
+        tool,
+    )
     if not executable.is_file() or not os.access(executable, os.X_OK):
         raise AndroidSdkToolError(f"{tool} is not a regular executable file")
     return executable
@@ -151,9 +163,9 @@ def _validate_tool_version(executable: Path) -> None:
 def resolve_apksigner(environment: Mapping[str, str] | None = None) -> Path:
     root = sdk_root(environment)
     revision, directory = _selected_build_tools(root)
-    if _package_revision(directory) != revision:
+    if _package_revision(directory, containment_roots=(root,)) != revision:
         raise AndroidSdkToolError("Android SDK build-tools package revision does not match directory")
-    executable = _validated_executable(directory)
+    executable = _validated_executable(directory, containment_roots=(root,))
     _validate_tool_version(executable)
     return executable
 
@@ -172,18 +184,25 @@ def _selected_cmdline_tools(root: Path) -> tuple[tuple[int, ...], Path]:
     candidates = []
     for child in packages_root.iterdir():
         if child.is_dir():
-            package = child.resolve()
-            try:
-                package.relative_to(canonical_root)
-            except ValueError as error:
-                raise AndroidSdkToolError(
-                    "Android SDK cmdline-tools package escapes its SDK directory"
-                ) from error
+            package = _contained_path(
+                child,
+                (canonical_root, root),
+                "Android SDK cmdline-tools package",
+            )
             if not package.is_dir():
                 raise AndroidSdkToolError(
                     "Android SDK cmdline-tools package is not a regular directory"
                 )
-            candidates.append((_package_revision(package, "cmdline-tools"), package))
+            candidates.append(
+                (
+                    _package_revision(
+                        package,
+                        "cmdline-tools",
+                        containment_roots=(canonical_root, root),
+                    ),
+                    package,
+                )
+            )
     if not candidates:
         raise AndroidSdkToolError("no Android SDK cmdline-tools package")
     highest = max(revision for revision, _ in candidates)
@@ -216,7 +235,12 @@ def resolve_apkanalyzer(environment: Mapping[str, str] | None = None) -> Path:
     try:
         root = sdk_root(environment)
         _, directory = _selected_cmdline_tools(root)
-        executable = _validated_executable(directory, "apkanalyzer", "bin/apkanalyzer")
+        executable = _validated_executable(
+            directory,
+            "apkanalyzer",
+            "bin/apkanalyzer",
+            containment_roots=((root / "cmdline-tools").resolve(), root),
+        )
         _probe_apkanalyzer(executable)
         return executable
     except (OSError, UnicodeError) as error:
