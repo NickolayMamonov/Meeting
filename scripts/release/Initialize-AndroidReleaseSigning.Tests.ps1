@@ -234,6 +234,105 @@ Invoke-TestCase "Execute creates and verifies four artifacts without GitHub befo
     } finally { Remove-Fixture $fixture }
 }
 
+Invoke-TestCase "partial keytool output is cleanup-owned after generation failure" {
+    $fixture = New-Fixture "partial-keytool"
+    $partialPath = $null
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.Keytool = {
+            param([string[]] $Arguments, [string[]] $PasswordInput)
+            if ($Arguments -contains "-genkeypair") {
+                $keystore = $Arguments[$Arguments.IndexOf("-keystore") + 1]
+                $partialPath = $keystore
+                [IO.File]::WriteAllText($keystore, "partial-keystore")
+                throw "injected keytool generation failure"
+            }
+        }.GetNewClosure()
+        Assert-Throws {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Execute -BackupDirectory $fixture.Backup `
+                -HandoffDirectory $fixture.Handoff -Provision $false -Repository "" -Hooks $hooks
+        } "partial keytool output failure was not reported"
+        Assert-True (-not (Test-Path -LiteralPath $fixture.Handoff)) `
+            "handoff survived partial keytool failure"
+        Assert-True ([string]::IsNullOrWhiteSpace($partialPath) -or
+            -not (Test-Path -LiteralPath $partialPath -PathType Leaf)) `
+            "partial keytool output survived cleanup"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "race-created partial keytool output is not cleanup-owned" {
+    $fixture = New-Fixture "partial-keytool-race"
+    $race = [pscustomobject]@{ Path = $null }
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.BeforeKeytool = {
+            param([string] $OutputPath)
+            $race.Path = $OutputPath
+            [IO.File]::WriteAllText($OutputPath, "race-created")
+        }.GetNewClosure()
+        $hooks.Keytool = {
+            param([string[]] $Arguments, [string[]] $PasswordInput)
+            throw "injected keytool generation failure"
+        }
+        Assert-Throws {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Execute -BackupDirectory $fixture.Backup `
+                -HandoffDirectory $fixture.Handoff -Provision $false -Repository "" -Hooks $hooks
+        } "race-created keytool output failure was not reported"
+        Assert-True (-not [string]::IsNullOrWhiteSpace($race.Path)) `
+            "race output path was not captured"
+        Assert-True (Test-Path -LiteralPath $race.Path -PathType Leaf) `
+            "race-created keytool output was deleted"
+        Assert-True (([IO.File]::ReadAllText($race.Path) -ceq "race-created")) `
+            "race-created keytool output was modified"
+    } finally {
+        if (-not [string]::IsNullOrWhiteSpace($race.Path) -and
+            (Test-Path -LiteralPath $race.Path -PathType Leaf)) {
+            Remove-Item -LiteralPath $race.Path -Force
+        }
+        Remove-Fixture $fixture
+    }
+}
+
+Invoke-TestCase "reparse-point artifact is rejected during Provision" {
+    $fixture = New-Fixture "artifact-reparse"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        New-Item -ItemType Directory -Path $fixture.Handoff | Out-Null
+        foreach ($directory in @($fixture.Handoff, $fixture.Backup)) {
+            foreach ($name in $script:AndroidSigningArtifactNames) {
+                [IO.File]::WriteAllText((Join-Path $directory $name), "fixture")
+            }
+        }
+        Remove-Item -LiteralPath (Join-Path $fixture.Handoff "meet-release.cer") -Force
+        $redirectTarget = Join-Path $fixture.Root "redirect-target"
+        New-Item -ItemType Directory -Path $redirectTarget | Out-Null
+        New-Item -ItemType Junction -Path (Join-Path $fixture.Handoff "meet-release.cer") `
+            -Target $redirectTarget | Out-Null
+        Assert-Throws {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Provision -BackupDirectory $fixture.Backup `
+                -HandoffDirectory $fixture.Handoff -Provision $false -Repository "" -Hooks $hooks
+        } "artifact reparse point was accepted"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "unexpected staging residue fails cleanup" {
+    $fixture = New-Fixture "staging-residue"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.BeforeDelete = {
+            param([string] $Path)
+            if ($Path -like "*meet-release.jks") {
+                $staging = Split-Path -Parent $Path
+                [IO.File]::WriteAllText((Join-Path $staging "unowned.tmp"), "residue")
+            }
+        }.GetNewClosure()
+        Assert-Throws {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Execute -BackupDirectory $fixture.Backup `
+                -HandoffDirectory $fixture.Handoff -Provision $false -Repository "" -Hooks $hooks
+        } "staging residue was silently accepted"
+    } finally { Remove-Fixture $fixture }
+}
+
 Invoke-TestCase "pre-commit failure removes invocation-owned artifacts" {
     $fixture = New-Fixture "cleanup"
     try {
@@ -283,6 +382,31 @@ Invoke-TestCase "staged deletion failure remains cleanup-owned and is retried" {
     } finally { Remove-Fixture $fixture }
 }
 
+Invoke-TestCase "destination replacement is preserved after staged deletion failure" {
+    $fixture = New-Fixture "destination-replacement"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.BeforeDelete = {
+            param([string] $Path)
+            $destination = Join-Path $fixture.Handoff "final-secret.tmp"
+            [IO.File]::WriteAllText($destination, "replacement")
+            throw "injected staged deletion failure"
+        }.GetNewClosure()
+        $source = Join-Path $fixture.Root "staged-secret.tmp"
+        $destination = Join-Path $fixture.Handoff "final-secret.tmp"
+        New-Item -ItemType Directory -Path $fixture.Handoff | Out-Null
+        [IO.File]::WriteAllText($source, "secret")
+        $ownedFiles = New-Object System.Collections.ArrayList
+        $ownedDirectories = New-Object System.Collections.ArrayList
+        [void]$ownedFiles.Add($source)
+        Assert-Throws {
+            Move-StagedArtifact $source $destination $ownedFiles $ownedDirectories $hooks
+        } "destination replacement failure was not reported"
+        Assert-True (([IO.File]::ReadAllText($destination) -ceq "replacement")) `
+            "destination replacement was deleted during cleanup"
+    } finally { Remove-Fixture $fixture }
+}
+
 Invoke-TestCase "replacement of an owned file is preserved during cleanup" {
     $fixture = New-Fixture "replacement"
     try {
@@ -298,6 +422,93 @@ Invoke-TestCase "replacement of an owned file is preserved during cleanup" {
         } "replacement file was treated as invocation-owned"
         Assert-True (([IO.File]::ReadAllText($path) -ceq "replacement")) `
             "replacement file was deleted during cleanup"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "replacement of a copied backup is preserved during cleanup" {
+    $fixture = New-Fixture "copy-replacement"
+    try {
+        $source = Join-Path $fixture.Root "source.tmp"
+        $destination = Join-Path $fixture.Root "destination.tmp"
+        [IO.File]::WriteAllText($source, "original")
+        $ownedFiles = New-Object System.Collections.ArrayList
+        $ownedDirectories = New-Object System.Collections.ArrayList
+        Copy-SigningArtifact @{} $source $destination $ownedFiles $ownedDirectories
+        [IO.File]::WriteAllText($destination, "replacement")
+        Assert-Throws {
+            Remove-OwnedArtifacts $ownedFiles $ownedDirectories @{}
+        } "copied replacement was treated as invocation-owned"
+        Assert-True (([IO.File]::ReadAllText($destination) -ceq "replacement")) `
+            "copied replacement was deleted during cleanup"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "CSR collision is preserved" {
+    $fixture = New-Fixture "csr-collision"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.Keytool = {
+            param([string[]] $Arguments, [string[]] $PasswordInput)
+            if ($Arguments -contains "-certreq") {
+                $path = $Arguments[$Arguments.IndexOf("-file") + 1]
+                [IO.File]::WriteAllText($path, "csr")
+                throw "injected certreq failure"
+            }
+        }.GetNewClosure()
+        New-Item -ItemType Directory -Path $fixture.Handoff | Out-Null
+        Assert-Throws {
+            Assert-KeystoreIdentity $hooks "missing.jks" "missing.cer" `
+                ([pscustomobject]@{ Alias = "meet-release"; StorePassword = "store"; KeyPassword = "key" }) $null $null
+        } "CSR failure was not reported"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "CSR replacement after reservation is preserved" {
+    $fixture = New-Fixture "csr-replacement"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.BeforeKeytool = {
+            param([string] $OutputPath)
+            if ($OutputPath -like "*.csr") {
+                Remove-Item -LiteralPath $OutputPath -Force
+                [IO.File]::WriteAllText($OutputPath, "replacement-csr")
+            }
+        }.GetNewClosure()
+        $hooks.Keytool = {
+            param([string[]] $Arguments, [string[]] $PasswordInput)
+            if ($Arguments -contains "-certreq") {
+                throw "injected certreq replacement failure"
+            }
+        }
+        New-Item -ItemType Directory -Path $fixture.Handoff | Out-Null
+        Assert-Throws {
+            Assert-KeystoreIdentity $hooks "missing.jks" "missing.cer" `
+                ([pscustomobject]@{ Alias = "meet-release"; StorePassword = "store"; KeyPassword = "key" }) $null $null
+        } "CSR replacement failure was not reported"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "staged source replacement is preserved before deletion" {
+    $fixture = New-Fixture "source-replacement"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        $hooks.BeforeDelete = {
+            param([string] $Path)
+            Remove-Item -LiteralPath $Path -Force
+            [IO.File]::WriteAllText($Path, "replacement")
+        }
+        $source = Join-Path $fixture.Root "staged-secret.tmp"
+        $destination = Join-Path $fixture.Root "final-secret.tmp"
+        [IO.File]::WriteAllText($source, "secret")
+        $ownedFiles = New-Object System.Collections.ArrayList
+        $ownedDirectories = New-Object System.Collections.ArrayList
+        Add-OwnedFile $ownedFiles $source
+        Set-OwnedFileFingerprint $source
+        Assert-Throws {
+            Move-StagedArtifact $source $destination $ownedFiles $ownedDirectories $hooks
+        } "staged source replacement was not reported"
+        Assert-True (([IO.File]::ReadAllText($source) -ceq "replacement")) `
+            "staged source replacement was deleted"
     } finally { Remove-Fixture $fixture }
 }
 
