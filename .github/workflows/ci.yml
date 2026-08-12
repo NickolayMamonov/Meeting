@@ -223,6 +223,97 @@ jobs:
         with:
           name: android-snapshot-unsigned-${{ github.run_number }}-${{ github.run_attempt }}
           path: unsigned
+      - name: Resolve snapshot apksigner
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          revision_pattern = re.compile(r"^[0-9]+(?:\.[0-9]+)*$")
+
+          def revision(value):
+              if revision_pattern.fullmatch(value) is None:
+                  raise ValueError("version is not numeric and dotted")
+              parts = [int(item, 10) for item in value.split(".")]
+              while len(parts) > 1 and parts[-1] == 0:
+                  parts.pop()
+              return tuple(parts)
+
+          def directory(value, label):
+              if not value:
+                  raise ValueError(label + " is empty")
+              path = Path(value).resolve()
+              if not path.is_dir():
+                  raise ValueError(label + " is not a directory")
+              return path
+
+          try:
+              configured = [
+                  (name, os.environ.get(name))
+                  for name in ("ANDROID_SDK_ROOT", "ANDROID_HOME")
+                  if os.environ.get(name) is not None
+              ]
+              if not configured:
+                  raise ValueError("Android SDK root is not configured")
+              roots = [directory(value or "", name) for name, value in configured]
+              if len(roots) == 2 and roots[0] != roots[1]:
+                  raise ValueError("Android SDK roots conflict")
+              root = roots[0]
+              build_tools = root / "build-tools"
+              if not build_tools.is_dir():
+                  raise ValueError("Android SDK build-tools directory is missing")
+              candidates = [
+                  (revision(child.name), child)
+                  for child in build_tools.iterdir()
+                  if child.is_dir() and revision_pattern.fullmatch(child.name)
+              ]
+              if not candidates:
+                  raise ValueError("no stable numeric Android SDK build-tools version")
+              highest = max(item[0] for item in candidates)
+              selected = [item for item in candidates if item[0] == highest]
+              if len(selected) != 1:
+                  raise ValueError("highest Android SDK build-tools version is ambiguous")
+              selected_revision, package = selected[0]
+              properties = package / "source.properties"
+              lines = properties.read_text(encoding="utf-8").splitlines()
+              package_revisions = []
+              for line in lines:
+                  line = line.strip()
+                  if line.startswith("Pkg.Revision"):
+                      match = re.fullmatch(r"Pkg\.Revision\s*=\s*([^\s]+)", line)
+                      if match is None:
+                          raise ValueError("Android SDK build-tools package revision is malformed")
+                      package_revisions.append(revision(match.group(1)))
+              if len(package_revisions) != 1 or package_revisions[0] != selected_revision:
+                  raise ValueError("Android SDK build-tools package revision is invalid")
+              executable = (package / "apksigner").resolve()
+              try:
+                  executable.relative_to(package.resolve())
+              except ValueError as error:
+                  raise ValueError("apksigner escapes its build-tools package") from error
+              if not executable.is_file() or not os.access(executable, os.X_OK):
+                  raise ValueError("apksigner is not a regular executable file")
+              result = subprocess.run(
+                  [str(executable), "version"],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+              )
+              if result.returncode != 0 or result.stderr:
+                  raise ValueError("apksigner version check failed")
+              output = result.stdout[:-1] if result.stdout.endswith("\n") else result.stdout
+              if revision_pattern.fullmatch(output) is None:
+                  raise ValueError("apksigner version output is invalid")
+              with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as environment:
+                  environment.write(f"APKSIGNER_PATH={executable}\n")
+          except (OSError, UnicodeError, ValueError) as error:
+              print(f"Android SDK apksigner resolution failed: {error}", file=sys.stderr)
+              raise SystemExit(1)
+          PY
       - name: Decode snapshot keystore
         env:
           KEYSTORE_B64: ${{ secrets.SNAPSHOT_RELEASE_KEYSTORE_BASE64 }}
@@ -239,13 +330,14 @@ jobs:
           set -euo pipefail
           apk="$(find unsigned -name '*.apk' -print -quit)"
           test -n "$apk"
+          apksigner="$APKSIGNER_PATH"
           umask 077
           printf '%s' "$STORE_PASSWORD" > "$RUNNER_TEMP/snapshot-store-password"
           printf '%s' "$KEY_PASSWORD" > "$RUNNER_TEMP/snapshot-key-password"
-          apksigner sign --ks "$RUNNER_TEMP/snapshot-release.jks" --ks-key-alias meet-release \
+          "$apksigner" sign --ks "$RUNNER_TEMP/snapshot-release.jks" --ks-key-alias meet-release \
             --ks-pass "file:$RUNNER_TEMP/snapshot-store-password" \
             --key-pass "file:$RUNNER_TEMP/snapshot-key-password" "$apk"
-          apksigner verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/snapshot-signer.txt"
+          "$apksigner" verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/snapshot-signer.txt"
           grep -Eiq 'key algorithm: RSA' "$RUNNER_TEMP/snapshot-signer.txt"
           grep -Eiq 'key size( \(bits\))?: 4096' "$RUNNER_TEMP/snapshot-signer.txt"
           actual="$(sed -n 's/.*SHA-256 digest: //p' "$RUNNER_TEMP/snapshot-signer.txt" | head -n1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
@@ -281,6 +373,12 @@ jobs:
         with:
           name: android-snapshot-signed-${{ github.run_number }}-${{ github.run_attempt }}
           path: signed
+      - name: Resolve snapshot apksigner
+        run: |
+          set -euo pipefail
+          apksigner="$(python scripts/release/android_sdk_tools.py)"
+          test -n "$apksigner"
+          printf 'APKSIGNER_PATH=%s\n' "$apksigner" >> "$GITHUB_ENV"
       - name: Verify snapshot identity and package evidence
         env:
           ORG_GRADLE_PROJECT_ANDROID_SNAPSHOT_CERT_SHA256: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
@@ -291,7 +389,8 @@ jobs:
           test -n "$metadata"
           python scripts/release/verify_android_artifacts.py \
             --metadata "$metadata" \
-            --apk "$apk"
+            --apk "$apk" \
+            --apksigner "$APKSIGNER_PATH"
       - name: Prepare snapshot evidence
         run: |
           set -euo pipefail

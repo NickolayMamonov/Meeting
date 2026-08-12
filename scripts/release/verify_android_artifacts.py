@@ -71,8 +71,8 @@ def verify_rsa4096_signer(output: str) -> None:
     raise ArtifactError("release signer RSA-4096 identity is missing")
 
 
-def verify_apk(apk: Path, metadata: dict) -> None:
-    output = run(["apksigner", "verify", "--verbose", "--print-certs", str(apk)])
+def verify_apk(apk: Path, metadata: dict, apksigner: Path) -> None:
+    output = run([str(apksigner), "verify", "--verbose", "--print-certs", str(apk)])
     verify_rsa4096_signer(output)
     digests = re.findall(r"SHA-256 digest:\s*([0-9a-f: ]+)", output, flags=re.IGNORECASE)
     if not digests:
@@ -132,15 +132,18 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--apk", type=Path, required=True)
+    parser.add_argument("--apksigner", required=True)
     parser.add_argument("--aab", type=Path)
     parser.add_argument("--bundletool-jar", type=Path)
     parser.add_argument("--bundletool-sha256")
     try:
         args = parser.parse_args()
+        if args.apksigner == "":
+            raise ArtifactError("--apksigner must not be empty")
         metadata = json.loads(args.metadata.read_text(encoding="utf-8"))
         if not isinstance(metadata, dict):
             raise ArtifactError("metadata must be an object")
-        verify_apk(args.apk, metadata)
+        verify_apk(args.apk, metadata, Path(args.apksigner))
         if args.aab is not None:
             if args.bundletool_jar is None:
                 raise ArtifactError("bundletool JAR is required for AAB verification")
