@@ -471,6 +471,16 @@ function Copy-FileExclusively(
             $sourceStream.Dispose()
         }
     }
+    try {
+        # Normal production copies become cleanup-owned only after the complete
+        # exclusive copy has closed its stream and its identity is recorded.
+        Set-OwnedFileFingerprint $Destination
+    } catch {
+        # A destination that cannot be fingerprinted is deliberately retained
+        # as an unowned/partial artifact for operator review.
+        Remove-OwnedFile $OwnedFiles $Destination
+        throw
+    }
 }
 
 function Write-ExclusiveText(
@@ -907,6 +917,9 @@ function Remove-OwnedArtifacts(
     [System.Collections.ArrayList] $OwnedDirectories,
     [hashtable] $Hooks
 ) {
+    if ($null -ne $Hooks -and $Hooks.ContainsKey("Cleanup")) {
+        & $Hooks["Cleanup"]
+    }
     $cleanupFailures = New-Object System.Collections.ArrayList
     $retryFiles = New-Object System.Collections.ArrayList
     foreach ($path in @($OwnedFiles | Sort-Object Length -Descending)) {
@@ -1052,6 +1065,9 @@ function Invoke-AndroidSigningBootstrapCore {
         } catch {
             throw (Format-SigningFailure "preflight" (Get-SigningFailureCategory $_) $true $true)
         }
+        $provisionFailure = $null
+        $provisionFailureStage = "unknown"
+        $provisionFailureCategory = "unknown"
         try {
             if (-not (Test-Path -LiteralPath $backup -PathType Container) -or
                 -not (Test-Path -LiteralPath $handoff -PathType Container)) {
@@ -1078,17 +1094,30 @@ function Invoke-AndroidSigningBootstrapCore {
             }
             Set-SigningStage $context "github-environment-write"
             Invoke-AllGitHubProvisioning $Hooks $paths.Keystore $local.Metadata $local.Fingerprint $Repository
-            Write-Host "Provisioned the verified meet-release identity to android-release and android-snapshot-signing."
-            return
         } catch {
-            $failureStage = Get-SigningFailureStage $_ $context
-            $failureCategory = Get-SigningFailureCategory $_
-            throw (Format-SigningFailure $failureStage $failureCategory $true $true)
+            $provisionFailureStage = Get-SigningFailureStage $_ $context
+            $provisionFailureCategory = Get-SigningFailureCategory $_
+            $provisionFailure = $true
         } finally {
-            Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
+            try {
+                Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
+            } catch {
+                $context.CleanupComplete = $false
+            }
         }
+        if ($null -ne $provisionFailure) {
+            throw (Format-SigningFailure $provisionFailureStage $provisionFailureCategory $true $context.CleanupComplete)
+        }
+        if (-not $context.CleanupComplete) {
+            throw (Format-SigningFailure "github-environment-write" "cleanup" $true $false)
+        }
+        Write-Host "Provisioned the verified meet-release identity to android-release and android-snapshot-signing."
+        return
     }
 
+    $failureOccurred = $false
+    $failureStage = "unknown"
+    $failureCategory = "unknown"
     try {
         if (-not (Test-Path -LiteralPath $backup -PathType Container)) {
             throw (New-SigningFailure "preflight" "path-conflict")
@@ -1236,17 +1265,15 @@ function Invoke-AndroidSigningBootstrapCore {
     } catch {
         $failureStage = Get-SigningFailureStage $_ $context
         $failureCategory = Get-SigningFailureCategory $_
+        $failureOccurred = $true
         if (-not $backupCommitted) {
             try {
                 Set-SigningStage $context "cleanup"
                 Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
             } catch {
                 $context.CleanupComplete = $false
-                throw (Format-SigningFailure $failureStage $failureCategory $false $false)
             }
-            throw (Format-SigningFailure $failureStage $failureCategory $false $true)
         }
-        throw (Format-SigningFailure $failureStage $failureCategory $true $true)
     } finally {
         $temporaryCleanupFailures = New-Object System.Collections.ArrayList
         try {
@@ -1254,9 +1281,13 @@ function Invoke-AndroidSigningBootstrapCore {
             Remove-OwnedTemporaryFiles @($temporaryStorePasswordFile, $temporaryKeyPasswordFile) $Hooks
         } catch {
             [void]$temporaryCleanupFailures.Add("temporary invocation-owned files")
+            $context.CleanupComplete = $false
+        }
+        if ($failureOccurred) {
+            throw (Format-SigningFailure $failureStage $failureCategory $backupCommitted $context.CleanupComplete)
         }
         if ($temporaryCleanupFailures.Count -gt 0) {
-            throw (Format-SigningFailure (Get-SigningFailureStage $_ $context) "cleanup" $backupCommitted $false)
+            throw (Format-SigningFailure "cleanup" "cleanup" $backupCommitted $false)
         }
     }
 }

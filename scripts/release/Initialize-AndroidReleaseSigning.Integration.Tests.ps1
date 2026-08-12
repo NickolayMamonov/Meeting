@@ -78,8 +78,8 @@ try {
     [IO.File]::WriteAllText($aclProbe, "probe")
     Set-OwnerOnlyAcl $aclProbe $false @{} "local-artifact-materialize"
 } catch {
-    Write-Warning "Disposable integration is environment-blocked: owner-only ACL probe unavailable."
-    exit 0
+    Write-Error "Disposable integration is environment-blocked: owner-only ACL probe unavailable."
+    exit 1
 } finally {
     if (Test-Path -LiteralPath $aclProbe) {
         Remove-Item -LiteralPath $aclProbe -Force -ErrorAction SilentlyContinue

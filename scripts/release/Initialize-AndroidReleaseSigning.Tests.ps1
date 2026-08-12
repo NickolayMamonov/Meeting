@@ -404,6 +404,52 @@ Invoke-TestCase "pre-commit failure removes invocation-owned artifacts" {
     } finally { Remove-Fixture $fixture }
 }
 
+Invoke-TestCase "normal exclusive backup ownership fingerprints before cleanup" {
+    $fixture = New-Fixture "normal-copy-fingerprint"
+    try {
+        $source = Join-Path $fixture.Root "source.bin"
+        $destination = Join-Path $fixture.Root "destination.bin"
+        [IO.File]::WriteAllText($source, "original-copy")
+        $ownedFiles = New-Object System.Collections.ArrayList
+        Copy-FileExclusively $source $destination $ownedFiles @{} "backup-copy"
+        Assert-True ($ownedFiles.Contains($destination)) `
+            "normal exclusive copy did not retain destination ownership"
+        Assert-True ($script:OwnedFileFingerprints.ContainsKey($destination)) `
+            "normal exclusive copy did not record destination fingerprint"
+        [IO.File]::WriteAllText($destination, "race-replacement")
+        Assert-Throws {
+            Remove-OwnedArtifacts $ownedFiles (New-Object System.Collections.ArrayList) @{}
+        } "modified normal-copy destination was deleted"
+        Assert-True (([IO.File]::ReadAllText($destination) -ceq "race-replacement")) `
+            "modified normal-copy destination was not preserved"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "Execute retains initiating stage when artifact cleanup fails" {
+    $fixture = New-Fixture "cleanup-diagnostic"
+    try {
+        $ghCalls = New-Object System.Collections.ArrayList
+        $hooks = New-TestHooks $ghCalls
+        $hooks.BeforeCopy = {
+            param([string] $Source, [string] $Destination)
+            throw "primary copy failure"
+        }.GetNewClosure()
+        $hooks.Cleanup = { throw "cleanup delete failure" }
+        $output = try {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                -Provision $false -Repository "" -Hooks $hooks
+            "UNEXPECTED_SUCCESS"
+        } catch {
+            $_.Exception.Message
+        }
+        Assert-True ($output -match "stage=backup-copy category=unknown cleanup=False") `
+            "Execute cleanup failure replaced the initiating diagnostic: $output"
+        Assert-True ($output -notmatch "cleanup delete failure|primary copy failure|invocation-owned paths") `
+            "Execute cleanup exposed raw exception text"
+    } finally { Remove-Fixture $fixture }
+}
+
 Invoke-TestCase "staged deletion failure remains cleanup-owned and is retried" {
     $fixture = New-Fixture "delete-retry"
     try {
@@ -649,6 +695,34 @@ Invoke-TestCase "Provision retries same committed identity with exact stdin comm
             -CredentialHandoffDirectory $fixture.Handoff -Library 2>&1 | Out-String
         Assert-True ($output -notmatch "store-password-fixture|key-password-fixture|fixture-keystore") `
             "output leaked a secret or key material"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "Provision bounds cleanup failure without replacing primary failure" {
+    $fixture = New-Fixture "provision-cleanup-diagnostic"
+    try {
+        $ghCalls = New-Object System.Collections.ArrayList
+        $hooks = New-TestHooks $ghCalls
+        Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+            -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+            -Provision $false -Repository "" -Hooks $hooks
+        $hooks.Gh = {
+            param([string[]] $Arguments, [string] $InputValue)
+            throw "primary GitHub failure"
+        }
+        $hooks.Cleanup = { throw "cleanup delete failure" }
+        $output = try {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Provision `
+                -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                -Provision $true -Repository "owner/repo" -Hooks $hooks
+            "UNEXPECTED_SUCCESS"
+        } catch {
+            $_.Exception.Message
+        }
+        Assert-True ($output -match "stage=github-environment-write category=unknown cleanup=False") `
+            "Provision cleanup failure replaced the initiating diagnostic: $output"
+        Assert-True ($output -notmatch "cleanup delete failure|primary GitHub failure|invocation-owned paths") `
+            "Provision cleanup exposed raw exception text"
     } finally { Remove-Fixture $fixture }
 }
 
