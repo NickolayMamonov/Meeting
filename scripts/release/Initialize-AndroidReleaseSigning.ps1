@@ -13,6 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $script:LibraryMode = $Library.IsPresent
+$script:DeterministicTestAuthorityEnabled = $false
 $script:SigningStages = @(
     "input-validation", "preflight", "handoff-create", "handoff-acl",
     "secret-temp-create", "key-generate", "certificate-export",
@@ -40,6 +41,14 @@ function New-SigningContext {
         BackupCommitted = $false
         CleanupComplete = $true
     }
+}
+
+function Enable-DeterministicTestAuthority([string] $Authority) {
+    if (-not $script:LibraryMode -or
+        $Authority -cne "MEE3-38-DETERMINISTIC-TEST-V1") {
+        throw (New-SigningFailure "input-validation" "validation")
+    }
+    $script:DeterministicTestAuthorityEnabled = $true
 }
 
 function Set-SigningStage([pscustomobject] $Context, [string] $Stage) {
@@ -89,10 +98,16 @@ function Format-SigningFailure(
 ) {
     if ($script:SigningStages -notcontains $Stage) { $Stage = "unknown" }
     if ($script:SigningCategories -notcontains $Category) { $Category = "unknown" }
-    if ($BackupCommitted) {
-        return "Signing bootstrap failed after backup commit; stage=$Stage category=$Category cleanup=$([bool]$CleanupComplete). Rerun -Mode Provision with the same paths. No secret values were printed."
+    $message = if ($BackupCommitted) {
+        "Signing bootstrap failed after backup commit; stage=$Stage category=$Category cleanup=$([bool]$CleanupComplete). Rerun -Mode Provision with the same paths. No secret values were printed."
+    } else {
+        "Signing bootstrap failed before backup commit; stage=$Stage category=$Category cleanup=$([bool]$CleanupComplete). Invocation-owned partial artifacts were removed when cleanup completed. No secret values were printed."
     }
-    return "Signing bootstrap failed before backup commit; stage=$Stage category=$Category cleanup=$([bool]$CleanupComplete). Invocation-owned partial artifacts were removed when cleanup completed. No secret values were printed."
+    $failure = New-Object System.Exception($message)
+    $failure.Data["SigningFormatted"] = $true
+    $failure.Data["SigningStage"] = $Stage
+    $failure.Data["SigningCategory"] = $Category
+    return $failure
 }
 
 function Test-OrdinalKeySet(
@@ -127,7 +142,10 @@ function Assert-IntegrationTestContract(
     $authoritySupplied = -not [string]::IsNullOrWhiteSpace($IntegrationTestAuthority)
     $identitySupplied = $null -ne $IntegrationTestIdentity
     if (-not $authoritySupplied -and -not $identitySupplied) {
-        return $null
+        if ($null -eq $Hooks -or $script:DeterministicTestAuthorityEnabled) {
+            return $null
+        }
+        throw (New-SigningFailure "input-validation" "validation")
     }
     if (-not $script:LibraryMode -or $IntegrationTestAuthority -cne "MEE3-38-DISPOSABLE-NONRELEASE-V1" -or
         $BootstrapMode -cne "Execute" -or $Provision -or $null -eq $IntegrationTestIdentity) {
@@ -178,11 +196,6 @@ function Assert-IntegrationTestContract(
     }
 }
 
-if (-not $Library -and ([string]::IsNullOrWhiteSpace($OfflineBackupDirectory) -or
-    [string]::IsNullOrWhiteSpace($CredentialHandoffDirectory))) {
-    throw "OfflineBackupDirectory and CredentialHandoffDirectory are required"
-}
-
 function ConvertTo-CanonicalPath([string] $Path) {
     $canonical = [IO.Path]::GetFullPath($Path).Replace("/", "\")
     $root = [IO.Path]::GetPathRoot($canonical)
@@ -224,7 +237,7 @@ function Test-PathEqualOrNested([string] $First, [string] $Second) {
 
 function Assert-SeparateSigningPaths([string] $Backup, [string] $Handoff) {
     if (Test-PathEqualOrNested $Backup $Handoff) {
-        throw "Offline backup and credential handoff directories must be separate, non-nested paths"
+        throw (New-SigningFailure "input-validation" "path-conflict")
     }
 }
 
@@ -238,15 +251,25 @@ function Assert-NoReparsePointPath([string] $Path) {
         if (Test-Path -LiteralPath $current) {
             $item = Get-Item -LiteralPath $current -Force
             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-                throw "Signing paths must not contain reparse-point components"
+                throw (New-SigningFailure "input-validation" "path-conflict")
             }
         }
     }
 }
 
-function Assert-NewPath([string] $Path) {
+function Assert-RequiredSigningInputs(
+    [string] $BackupDirectory,
+    [string] $HandoffDirectory
+) {
+    if ([string]::IsNullOrWhiteSpace($BackupDirectory) -or
+        [string]::IsNullOrWhiteSpace($HandoffDirectory)) {
+        throw (New-SigningFailure "input-validation" "validation")
+    }
+}
+
+function Assert-NewPath([string] $Path, [string] $Stage = "input-validation") {
     if (Test-Path -LiteralPath $Path) {
-        throw "Refusing to overwrite existing path"
+        throw (New-SigningFailure $Stage "path-conflict")
     }
 }
 
@@ -301,7 +324,8 @@ function Test-IsAclSupportedPath([string] $Path) {
 
 function New-SecureEphemeralFile(
     [hashtable] $Hooks,
-    [System.Collections.ArrayList] $OwnedFiles
+    [System.Collections.ArrayList] $OwnedFiles,
+    [string] $Stage = "secret-temp-create"
 ) {
     for ($attempt = 1; $attempt -le 10; $attempt++) {
         $path = Get-InvocationTempPath ".tmp"
@@ -317,21 +341,22 @@ function New-SecureEphemeralFile(
         } catch [IO.IOException] {
             if (Test-Path -LiteralPath $path) {
                 if ($attempt -eq 10) {
-                    throw "Unable to create secure temporary file after repeated name collisions"
+                    throw (New-SigningFailure $Stage "path-conflict")
                 }
                 continue
             }
-            throw "Unable to create secure temporary file"
+            throw (New-SigningFailure $Stage "path-conflict")
         }
     }
     Add-OwnedFile $OwnedFiles $path
-    Set-OwnerOnlyAcl $path $false $Hooks
+    Set-OwnerOnlyAcl $path $false $Hooks $Stage
     return $path
 }
 
 function New-SecureEphemeralDirectory(
     [hashtable] $Hooks,
-    [System.Collections.ArrayList] $OwnedRecursiveDirectories
+    [System.Collections.ArrayList] $OwnedRecursiveDirectories,
+    [string] $Stage = "local-artifact-materialize"
 ) {
     for ($attempt = 1; $attempt -le 10; $attempt++) {
         $path = Get-InvocationTempPath ""
@@ -341,15 +366,15 @@ function New-SecureEphemeralDirectory(
         } catch [IO.IOException] {
             if (Test-Path -LiteralPath $path) {
                 if ($attempt -eq 10) {
-                    throw "Unable to create secure temporary directory after repeated name collisions"
+                    throw (New-SigningFailure $Stage "path-conflict")
                 }
                 continue
             }
-            throw "Unable to create secure temporary directory"
+            throw (New-SigningFailure $Stage "path-conflict")
         }
     }
     [void]$OwnedRecursiveDirectories.Add($path)
-    Set-OwnerOnlyAcl $path $true $Hooks
+    Set-OwnerOnlyAcl $path $true $Hooks $Stage
     return $path
 }
 
@@ -385,7 +410,7 @@ function Move-StagedArtifact(
     } catch {
         if ((Test-Path -LiteralPath $Destination -PathType Leaf) -and
             -not $OwnedFiles.Contains($Destination)) {
-            throw "Refusing to overwrite a path created concurrently"
+            throw (New-SigningFailure "local-artifact-materialize" "path-conflict")
         }
         throw
     }
@@ -398,7 +423,7 @@ function Move-StagedArtifact(
         Set-OwnedFileFingerprint $Destination
     }
     if (Test-IsAclSupportedPath $Destination) {
-        Set-OwnerOnlyAcl $Destination $false $Hooks
+        Set-OwnerOnlyAcl $Destination $false $Hooks "local-artifact-materialize"
     }
 }
 
@@ -406,7 +431,8 @@ function Copy-FileExclusively(
     [string] $Source,
     [string] $Destination,
     [System.Collections.ArrayList] $OwnedFiles,
-    [hashtable] $Hooks
+    [hashtable] $Hooks,
+    [string] $Stage = "backup-copy"
 ) {
     if ($null -ne $Hooks -and $Hooks.ContainsKey("BeforeCopy")) {
         & $Hooks["BeforeCopy"] $Source $Destination
@@ -434,7 +460,7 @@ function Copy-FileExclusively(
         if ($destinationCreated) {
             Remove-OwnedFile $OwnedFiles $Destination
         } elseif (Test-Path -LiteralPath $Destination -PathType Leaf) {
-            throw "Refusing to overwrite a path created concurrently"
+            throw (New-SigningFailure $Stage "path-conflict")
         }
         throw
     } finally {
@@ -494,38 +520,47 @@ function Get-OwnerOnlyAclRule([bool] $IsDirectory) {
     )
 }
 
-function Set-OwnerOnlyAcl([string] $Path, [bool] $IsDirectory, [hashtable] $Hooks) {
+function Set-OwnerOnlyAcl(
+    [string] $Path,
+    [bool] $IsDirectory,
+    [hashtable] $Hooks,
+    [string] $Stage = "local-artifact-materialize"
+) {
     if ($null -ne $Hooks -and $Hooks.ContainsKey("Acl")) {
         & $Hooks["Acl"] $Path $IsDirectory
         return
     }
-    $acl = Get-Acl -LiteralPath $Path
-    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $existingRules = @($acl.Access)
-    $expectedInheritance = if ($IsDirectory) {
-        [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor `
-            [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
-    } else {
-        [System.Security.AccessControl.InheritanceFlags]::None
-    }
-    if ($acl.AreAccessRulesProtected -and $existingRules.Count -eq 1) {
-        $existing = $existingRules[0]
-        if ($existing.IdentityReference.Value -ceq $identity -and
-            (($existing.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq
-                [System.Security.AccessControl.FileSystemRights]::FullControl) -and
-            $existing.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow -and
-            -not $existing.IsInherited -and $existing.InheritanceFlags -eq $expectedInheritance) {
-            return
-        }
-    }
-    $acl.SetAccessRuleProtection($true, $false)
-    $acl.SetAccessRule((Get-OwnerOnlyAclRule $IsDirectory))
     try {
+        $acl = Get-Acl -LiteralPath $Path
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $existingRules = @($acl.Access)
+        $expectedInheritance = if ($IsDirectory) {
+            [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor `
+                [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+        } else {
+            [System.Security.AccessControl.InheritanceFlags]::None
+        }
+        if ($acl.AreAccessRulesProtected -and $existingRules.Count -eq 1) {
+            $existing = $existingRules[0]
+            if ($existing.IdentityReference.Value -ceq $identity -and
+                (($existing.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq
+                    [System.Security.AccessControl.FileSystemRights]::FullControl) -and
+                $existing.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow -and
+                -not $existing.IsInherited -and $existing.InheritanceFlags -eq $expectedInheritance) {
+                return
+            }
+        }
+        $acl.SetAccessRuleProtection($true, $false)
+        $acl.SetAccessRule((Get-OwnerOnlyAclRule $IsDirectory))
         Set-Acl -LiteralPath $Path -AclObject $acl
     } catch [System.Security.AccessControl.PrivilegeNotHeldException] {
-        throw (New-SigningFailure "local-artifact-materialize" "access-denied")
+        throw (New-SigningFailure $Stage "access-denied")
     } catch [System.UnauthorizedAccessException] {
-        throw (New-SigningFailure "local-artifact-materialize" "access-denied")
+        throw (New-SigningFailure $Stage "access-denied")
+    } catch [System.IO.IOException] {
+        throw (New-SigningFailure $Stage "path-conflict")
+    } catch {
+        throw (New-SigningFailure $Stage "unknown")
     }
 }
 
@@ -784,7 +819,8 @@ function Copy-SigningArtifact(
     [string] $Source,
     [string] $Destination,
     [System.Collections.ArrayList] $OwnedFiles,
-    [System.Collections.ArrayList] $OwnedDirectories
+    [System.Collections.ArrayList] $OwnedDirectories,
+    [string] $Stage = "backup-copy"
 ) {
     if ($null -ne $Hooks -and $Hooks.ContainsKey("Copy")) {
         if ($Hooks.ContainsKey("BeforeCopy")) {
@@ -808,13 +844,13 @@ function Copy-SigningArtifact(
         }
         Set-OwnedFileFingerprint $Destination
         if (Test-IsAclSupportedPath $Destination) {
-            Set-OwnerOnlyAcl $Destination $false $Hooks
+            Set-OwnerOnlyAcl $Destination $false $Hooks $Stage
         }
         return
     }
-    Copy-FileExclusively $Source $Destination $OwnedFiles $Hooks
+    Copy-FileExclusively $Source $Destination $OwnedFiles $Hooks $Stage
     if (Test-IsAclSupportedPath $Destination) {
-        Set-OwnerOnlyAcl $Destination $false $Hooks
+        Set-OwnerOnlyAcl $Destination $false $Hooks $Stage
     }
 }
 
@@ -833,13 +869,13 @@ function Invoke-GitHubWrite(
     if ($null -ne $Hooks -and $Hooks.ContainsKey("Gh")) {
         $result = & $Hooks["Gh"] $arguments $InputValue
         if ($null -ne $result -and $result.PSObject.Properties["ExitCode"] -and [int]$result.ExitCode -ne 0) {
-            throw "GitHub provisioning command failed"
+            throw (New-SigningFailure "github-environment-write" "github-write")
         }
         return
     }
     $InputValue | & gh @arguments 2>$null
     if ($LASTEXITCODE -ne 0) {
-        throw "GitHub provisioning command failed"
+        throw (New-SigningFailure "github-environment-write" "github-write")
     }
 }
 
@@ -961,15 +997,15 @@ function Get-SigningPaths([string] $Backup, [string] $Handoff) {
 function Assert-RequiredCommands([hashtable] $Hooks, [bool] $NeedGh) {
     if (($null -eq $Hooks -or -not $Hooks.ContainsKey("Keytool")) -and
         -not (Get-Command keytool -ErrorAction SilentlyContinue)) {
-        throw "keytool is required"
+        throw (New-SigningFailure "preflight" "missing-tool")
     }
     if ($NeedGh -and ($null -eq $Hooks -or -not $Hooks.ContainsKey("Gh")) -and
         -not (Get-Command gh -ErrorAction SilentlyContinue)) {
-        throw "gh is required"
+        throw (New-SigningFailure "preflight" "missing-tool")
     }
 }
 
-function Invoke-AndroidSigningBootstrap {
+function Invoke-AndroidSigningBootstrapCore {
     param(
         [ValidateSet("Preflight", "Execute", "Provision")]
         [string] $BootstrapMode,
@@ -983,41 +1019,55 @@ function Invoke-AndroidSigningBootstrap {
     )
 
     $context = New-SigningContext
-    $testIdentity = Assert-IntegrationTestContract $BootstrapMode $Provision $Hooks `
-        $IntegrationTestAuthority $IntegrationTestIdentity
-    Set-SigningStage $context "input-validation"
-    $backup = ConvertTo-CanonicalPath $BackupDirectory
-    $handoff = ConvertTo-CanonicalPath $HandoffDirectory
-    Assert-NoReparsePointPath $backup
-    Assert-NoReparsePointPath $handoff
-    Assert-SeparateSigningPaths $backup $handoff
-    $paths = Get-SigningPaths $backup $handoff
+    $backupCommitted = $false
+    $preflightFailure = $false
+    try {
+        Assert-RequiredSigningInputs $BackupDirectory $HandoffDirectory
+        $testIdentity = Assert-IntegrationTestContract $BootstrapMode $Provision $Hooks `
+            $IntegrationTestAuthority $IntegrationTestIdentity
+        Set-SigningStage $context "input-validation"
+        $backup = ConvertTo-CanonicalPath $BackupDirectory
+        $handoff = ConvertTo-CanonicalPath $HandoffDirectory
+        Assert-NoReparsePointPath $backup
+        Assert-NoReparsePointPath $handoff
+        Assert-SeparateSigningPaths $backup $handoff
+        $paths = Get-SigningPaths $backup $handoff
+    } catch {
+        $stage = Get-SigningFailureStage $_ $context
+        $category = Get-SigningFailureCategory $_
+        if ($script:LibraryMode) {
+            throw
+        }
+        throw (Format-SigningFailure $stage $category $false $true)
+    }
     $ownedFiles = New-Object System.Collections.ArrayList
     $ownedDirectories = New-Object System.Collections.ArrayList
-    $backupCommitted = $false
     $temporaryStorePasswordFile = $null
     $temporaryKeyPasswordFile = $null
     $stagingDirectory = $null
-    Write-Host "Offline backup directory: $backup"
-    Write-Host "Credential handoff directory: $handoff"
-    Write-Host "Signing artifacts: meet-release.jks, meet-release.cer, meet-release.sha256, meet-release-passwords.txt"
-
     if ($BootstrapMode -eq "Provision") {
         Set-SigningStage $context "preflight"
-        Assert-RequiredCommands $Hooks $true
-        if (-not (Test-Path -LiteralPath $backup -PathType Container) -or
-            -not (Test-Path -LiteralPath $handoff -PathType Container)) {
-            throw "Provision requires populated handoff and offline backup directories"
+        try {
+            Assert-RequiredCommands $Hooks $true
+        } catch {
+            throw (Format-SigningFailure "preflight" (Get-SigningFailureCategory $_) $true $true)
         }
         try {
+            if (-not (Test-Path -LiteralPath $backup -PathType Container) -or
+                -not (Test-Path -LiteralPath $handoff -PathType Container)) {
+                throw (New-SigningFailure "preflight" "path-conflict")
+            }
             $metadata = Read-RecoveryMetadata $paths.Recovery
-            $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
+            Set-SigningStage $context "secret-temp-create"
+            $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles "secret-temp-create"
             [IO.File]::WriteAllText($temporaryStorePasswordFile, $metadata.StorePassword)
             Set-OwnedFileFingerprint $temporaryStorePasswordFile
-            $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
+            $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles "secret-temp-create"
             [IO.File]::WriteAllText($temporaryKeyPasswordFile, $metadata.KeyPassword)
             Set-OwnedFileFingerprint $temporaryKeyPasswordFile
+            Set-SigningStage $context "local-identity-verify"
             $local = Assert-ArtifactSet $Hooks $handoff $temporaryStorePasswordFile $temporaryKeyPasswordFile
+            Set-SigningStage $context "backup-identity-verify"
             $offline = Assert-ArtifactSet $Hooks $backup $temporaryStorePasswordFile $temporaryKeyPasswordFile
             Assert-ArtifactSetsEqual $handoff $backup
             if ($local.Fingerprint -cne $offline.Fingerprint -or
@@ -1026,29 +1076,33 @@ function Invoke-AndroidSigningBootstrap {
                 $local.Metadata.KeyPassword -cne $offline.Metadata.KeyPassword) {
                 throw "Preserved signing identities are inconsistent"
             }
+            Set-SigningStage $context "github-environment-write"
             Invoke-AllGitHubProvisioning $Hooks $paths.Keystore $local.Metadata $local.Fingerprint $Repository
             Write-Host "Provisioned the verified meet-release identity to android-release and android-snapshot-signing."
             return
         } catch {
-            if ($null -ne $Hooks -and $Hooks.ContainsKey("Error")) {
-                & $Hooks["Error"] $_.Exception.Message
-            }
-            throw "Provision failed before or during GitHub mutation; handoff and offline backup were preserved. Rerun -Mode Provision with the same paths. No secret values were printed."
+            $failureStage = Get-SigningFailureStage $_ $context
+            $failureCategory = Get-SigningFailureCategory $_
+            throw (Format-SigningFailure $failureStage $failureCategory $true $true)
         } finally {
             Remove-OwnedArtifacts $ownedFiles $ownedDirectories $Hooks
         }
     }
 
-    if (-not (Test-Path -LiteralPath $backup -PathType Container)) {
-        throw "Offline backup directory must already exist"
+    try {
+        if (-not (Test-Path -LiteralPath $backup -PathType Container)) {
+            throw (New-SigningFailure "preflight" "path-conflict")
+        }
+        if (@(Get-ChildItem -LiteralPath $backup -Force).Count -ne 0) {
+            throw (New-SigningFailure "preflight" "path-conflict")
+        }
+        if (Test-Path -LiteralPath $handoff) {
+            throw (New-SigningFailure "preflight" "path-conflict")
+        }
+        Assert-RequiredCommands $Hooks ($Provision -or $false)
+    } catch {
+        throw (Format-SigningFailure "preflight" (Get-SigningFailureCategory $_) $false $true)
     }
-    if (@(Get-ChildItem -LiteralPath $backup -Force).Count -ne 0) {
-        throw "Offline backup directory must be empty for Execute"
-    }
-    if (Test-Path -LiteralPath $handoff) {
-        throw "Credential handoff directory must not already exist for Execute"
-    }
-    Assert-RequiredCommands $Hooks ($Provision -or $false)
 
     if ($BootstrapMode -eq "Preflight") {
         Set-SigningStage $context "preflight"
@@ -1056,13 +1110,17 @@ function Invoke-AndroidSigningBootstrap {
         return
     }
 
-    $confirmation = if ($null -ne $Hooks -and $Hooks.ContainsKey("Confirm")) {
-        [string](& $Hooks["Confirm"])
-    } else {
-        Read-Host "Type CREATE-ANDROID-RELEASE-KEY to continue"
-    }
-    if ($confirmation -cne "CREATE-ANDROID-RELEASE-KEY") {
-        throw "Explicit confirmation was not provided"
+    try {
+        $confirmation = if ($null -ne $Hooks -and $Hooks.ContainsKey("Confirm")) {
+            [string](& $Hooks["Confirm"])
+        } else {
+            Read-Host "Type CREATE-ANDROID-RELEASE-KEY to continue"
+        }
+        if ($confirmation -cne "CREATE-ANDROID-RELEASE-KEY") {
+            throw (New-SigningFailure "input-validation" "validation")
+        }
+    } catch {
+        throw (Format-SigningFailure "input-validation" (Get-SigningFailureCategory $_) $false $true)
     }
 
     try {
@@ -1070,7 +1128,7 @@ function Invoke-AndroidSigningBootstrap {
         New-Item -ItemType Directory -Path $handoff -ErrorAction Stop | Out-Null
         [void]$ownedDirectories.Add($handoff)
         Set-SigningStage $context "handoff-acl"
-        Set-OwnerOnlyAcl $handoff $true $Hooks
+        Set-OwnerOnlyAcl $handoff $true $Hooks "handoff-acl"
 
         $storePassword = if ($null -ne $Hooks -and $Hooks.ContainsKey("Secret")) {
             [string](& $Hooks["Secret"] "STORE_PASSWORD")
@@ -1083,16 +1141,16 @@ function Invoke-AndroidSigningBootstrap {
             New-RandomSecret
         }
         Set-SigningStage $context "secret-temp-create"
-        $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
+        $temporaryStorePasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles "secret-temp-create"
         [IO.File]::WriteAllText($temporaryStorePasswordFile, $storePassword)
         Set-OwnedFileFingerprint $temporaryStorePasswordFile
-        $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles
+        $temporaryKeyPasswordFile = New-SecureEphemeralFile $Hooks $ownedFiles "secret-temp-create"
         [IO.File]::WriteAllText($temporaryKeyPasswordFile, $keyPassword)
         Set-OwnedFileFingerprint $temporaryKeyPasswordFile
-        $stagingDirectory = New-SecureEphemeralDirectory $Hooks $ownedDirectories
-        Assert-NewPath $paths.Keystore
+        $stagingDirectory = New-SecureEphemeralDirectory $Hooks $ownedDirectories "local-artifact-materialize"
+        Assert-NewPath $paths.Keystore "local-artifact-materialize"
         $stagedKeystore = Join-Path $stagingDirectory "meet-release.jks"
-        Assert-NewPath $stagedKeystore
+        Assert-NewPath $stagedKeystore "key-generate"
         Set-SigningStage $context "key-generate"
         $generationPasswords = Get-PasswordArguments $Hooks $storePassword $keyPassword `
             $temporaryStorePasswordFile $temporaryKeyPasswordFile
@@ -1116,9 +1174,9 @@ function Invoke-AndroidSigningBootstrap {
         Move-StagedArtifact $stagedKeystore $paths.Keystore $ownedFiles $ownedDirectories $Hooks
 
         Set-SigningStage $context "certificate-export"
-        Assert-NewPath $paths.Certificate
+        Assert-NewPath $paths.Certificate "local-artifact-materialize"
         $stagedCertificate = Join-Path $stagingDirectory "meet-release.cer"
-        Assert-NewPath $stagedCertificate
+        Assert-NewPath $stagedCertificate "certificate-export"
         $exportArguments = @(
             "-exportcert", "-keystore", $paths.Keystore,
             "-alias", "meet-release", "-file", $stagedCertificate
@@ -1133,16 +1191,16 @@ function Invoke-AndroidSigningBootstrap {
         Move-StagedArtifact $stagedCertificate $paths.Certificate $ownedFiles $ownedDirectories $Hooks
 
         Set-SigningStage $context "local-artifact-materialize"
-        Assert-NewPath $paths.Fingerprint
+        Assert-NewPath $paths.Fingerprint "local-artifact-materialize"
         $stagedFingerprint = Join-Path $stagingDirectory "meet-release.sha256"
-        Assert-NewPath $stagedFingerprint
+        Assert-NewPath $stagedFingerprint "local-artifact-materialize"
         $fingerprint = Get-ArtifactHash $Hooks $paths.Certificate
         Write-ExclusiveText $stagedFingerprint @($fingerprint) $ownedFiles
         Move-StagedArtifact $stagedFingerprint $paths.Fingerprint $ownedFiles $ownedDirectories $Hooks
 
-        Assert-NewPath $paths.Recovery
+        Assert-NewPath $paths.Recovery "local-artifact-materialize"
         $stagedRecovery = Join-Path $stagingDirectory "meet-release-passwords.txt"
-        Assert-NewPath $stagedRecovery
+        Assert-NewPath $stagedRecovery "local-artifact-materialize"
         Write-ExclusiveText $stagedRecovery @(
             "STORE_PASSWORD=$storePassword",
             "KEY_PASSWORD=$keyPassword",
@@ -1155,7 +1213,7 @@ function Invoke-AndroidSigningBootstrap {
         foreach ($name in $script:AndroidSigningArtifactNames) {
             Set-SigningStage $context "backup-copy"
             Copy-SigningArtifact $Hooks (Join-Path $handoff $name) (Join-Path $backup $name) `
-                $ownedFiles $ownedDirectories
+                $ownedFiles $ownedDirectories "backup-copy"
         }
         Set-SigningStage $context "backup-identity-verify"
         $offline = Assert-ArtifactSet $Hooks $backup $temporaryStorePasswordFile $temporaryKeyPasswordFile
@@ -1200,6 +1258,33 @@ function Invoke-AndroidSigningBootstrap {
         if ($temporaryCleanupFailures.Count -gt 0) {
             throw (Format-SigningFailure (Get-SigningFailureStage $_ $context) "cleanup" $backupCommitted $false)
         }
+    }
+}
+
+function Invoke-AndroidSigningBootstrap {
+    param(
+        [ValidateSet("Preflight", "Execute", "Provision")]
+        [string] $BootstrapMode,
+        [string] $BackupDirectory,
+        [string] $HandoffDirectory,
+        [bool] $Provision,
+        [string] $Repository,
+        [hashtable] $Hooks,
+        [string] $IntegrationTestAuthority,
+        [hashtable] $IntegrationTestIdentity
+    )
+    try {
+        Invoke-AndroidSigningBootstrapCore @PSBoundParameters
+    } catch {
+        if ($_.Exception.Data["SigningFormatted"] -eq $true) {
+            throw $_.Exception
+        }
+        $stage = Get-SigningFailureStage $_ $null
+        if ($stage -eq "unknown") {
+            $stage = if ($BootstrapMode -eq "Execute") { "input-validation" } else { "preflight" }
+        }
+        $category = Get-SigningFailureCategory $_
+        throw (Format-SigningFailure $stage $category $false $true)
     }
 }
 

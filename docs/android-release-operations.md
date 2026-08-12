@@ -145,6 +145,22 @@ pre-commit failure until the bounded evidence and retained paths have been
 reviewed. After backup commit, preserve both complete identity sets and recover
 only with `-Mode Provision` using the same paths.
 
+The live failure corrected by this bootstrap was a Windows PowerShell 5.1
+native-process boundary: Temurin 21 `keytool` writes ordinary progress and
+warning text to stderr while returning success, and the baseline adapter let
+PowerShell promote that stderr to a terminating native-command error. The
+corrected adapter suppresses native stderr and uses the process exit status as
+the success signal. The disposable integration suite proves this mechanism
+fails on the exact approved baseline
+`7aec34b8dd27c4bf2de68bcbee86ebfdf48cb059` and passes with the corrected
+adapter under the same PowerShell 5.1/JDK 21 invocation.
+
+Validation, Preflight, Execute, Provision, ACL, child-process, and cleanup
+failures pass through the same bounded stage/category formatter. The
+`Error` test hook is not an operator-visible diagnostic channel and is
+rejected by the disposable identity authority; raw exception messages are
+never forwarded to hooks or emitted by the script.
+
 ### Disposable Windows integration
 
 The `Android signing bootstrap (Windows PowerShell 5.1)` CI check is the

@@ -3,6 +3,7 @@ Set-StrictMode -Version Latest
 
 $scriptPath = Join-Path $PSScriptRoot "Initialize-AndroidReleaseSigning.ps1"
 . $scriptPath -Library
+Enable-DeterministicTestAuthority "MEE3-38-DETERMINISTIC-TEST-V1"
 
 function Assert-True([bool] $Condition, [string] $Message) {
     if (-not $Condition) {
@@ -192,6 +193,71 @@ Invoke-TestCase "preflight is fresh, empty, and artifact-free" {
             -HandoffDirectory $fixture.Handoff -Provision $false -Repository "" -Hooks $hooks
         Assert-True (-not (Test-Path -LiteralPath $fixture.Handoff)) "preflight created handoff"
         Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup).Count -eq 0) "preflight changed backup"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "CLI hooks fail closed before path access with bounded diagnostics" {
+    $fixture = New-Fixture "cli-hook-authority"
+    $child = Join-Path $fixture.Root "invoke-cli-hooks.ps1"
+    try {
+        $childText = @"
+`$hooks = @{ Gh = { param(`$Arguments, `$InputValue) } }
+& $(($scriptPath.Replace("'", "''"))) -Mode Preflight `
+    -OfflineBackupDirectory '$(($fixture.Backup.Replace("'", "''")))' `
+    -CredentialHandoffDirectory '$(($fixture.Handoff.Replace("'", "''")))' `
+    -TestHooks `$hooks
+"@
+        [IO.File]::WriteAllText($child, $childText)
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass `
+            -File $child 2>&1 | Out-String
+        $ErrorActionPreference = $previousErrorActionPreference
+        Assert-True ($LASTEXITCODE -ne 0) "CLI hook authority was accepted"
+        Assert-True ($output -like "*stage=input-validation*category=*") `
+            "CLI hook rejection was not bounded at input-validation"
+        Assert-True (-not (Test-Path -LiteralPath $fixture.Handoff)) `
+            "CLI hook rejection created the handoff"
+        Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup -Force).Count -eq 0) `
+            "CLI hook rejection changed the backup"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "ACL and Provision failures retain causal bounded stages" {
+    $missingAclPath = Join-Path ([IO.Path]::GetTempPath()) `
+        ("missing-signing-acl-" + [guid]::NewGuid().ToString("N"))
+    try {
+        try {
+            Set-OwnerOnlyAcl $missingAclPath $false @{} "handoff-acl"
+            throw "missing ACL path was accepted"
+        } catch {
+            Assert-True ($_.Exception.Data["SigningStage"] -ceq "handoff-acl") `
+                "ACL failure lost its handoff-acl stage"
+            Assert-True ($script:SigningCategories -contains [string]$_.Exception.Data["SigningCategory"]) `
+                "ACL failure category was not bounded"
+        }
+    } finally {
+        if (Test-Path -LiteralPath $missingAclPath) {
+            Remove-Item -LiteralPath $missingAclPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $fixture = New-Fixture "provision-diagnostic"
+    try {
+        $hooks = New-TestHooks (New-Object System.Collections.ArrayList)
+        New-Item -ItemType Directory -Path $fixture.Handoff | Out-Null
+        $output = try {
+            Invoke-AndroidSigningBootstrap -BootstrapMode Provision `
+                -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                -Provision $true -Repository "owner/repo" -Hooks $hooks
+            "UNEXPECTED_SUCCESS"
+        } catch {
+            $_.Exception.Message
+        }
+        Assert-True ($output -match "stage=preflight category=(path-conflict|unknown)") `
+            "Provision precondition was not bounded"
+        Assert-True ($output -notmatch "Provision requires populated|Exception|Path:|owner/repo") `
+            "Provision exposed raw diagnostic text"
     } finally { Remove-Fixture $fixture }
 }
 
