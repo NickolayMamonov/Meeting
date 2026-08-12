@@ -84,6 +84,92 @@ jobs:
       - name: Assemble debug
         run: ./gradlew assembleDebug
 
+  android-signing-bootstrap-windows:
+    name: Android signing bootstrap (Windows PowerShell 5.1)
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Assert exact source revision
+        shell: powershell
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $actualSha = (git rev-parse HEAD).Trim()
+          if ($actualSha -cne $env:EXPECTED_SHA) {
+              throw "Checked-out revision does not match the event source revision"
+          }
+      - name: Assert credential isolation
+        shell: powershell
+        run: |
+          $credentialVariables = @(
+              "GH_TOKEN",
+              "GITHUB_TOKEN",
+              "GH_ENTERPRISE_TOKEN",
+              "GITHUB_ENTERPRISE_TOKEN"
+          )
+          foreach ($name in $credentialVariables) {
+              if (-not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($name))) {
+                  throw "Credential variable is present: $name"
+              }
+          }
+
+          $localConfigKeys = @(git config --local --name-only --list)
+          if ($LASTEXITCODE -ne 0) {
+              throw "Unable to inspect repository-local Git credential configuration"
+          }
+          $credentialConfigKeys = @(
+              $localConfigKeys | Where-Object {
+                  $_ -match '^http\..*\.(authorization|extraheader)$'
+              }
+          )
+          if ($credentialConfigKeys.Count -ne 0) {
+              throw "Repository-local Git credential configuration is present: $($credentialConfigKeys -join ', ')"
+          }
+      - name: Parse Android signing bootstrap scripts
+        shell: powershell
+        run: |
+          $files = @(
+              "scripts/release/Initialize-AndroidReleaseSigning.ps1",
+              "scripts/release/Initialize-AndroidReleaseSigning.Tests.ps1",
+              "scripts/release/Initialize-AndroidReleaseSigning.Integration.Tests.ps1"
+          )
+          foreach ($file in $files) {
+              $tokens = $null
+              $errors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile(
+                  (Resolve-Path $file),
+                  [ref]$tokens,
+                  [ref]$errors
+              ) | Out-Null
+              if ($errors.Count -ne 0) {
+                  $errors | ForEach-Object { Write-Error $_ }
+                  throw "PowerShell parser rejected $file"
+              }
+          }
+      - name: Run deterministic Android signing bootstrap tests
+        shell: powershell
+        run: |
+          & ./scripts/release/Initialize-AndroidReleaseSigning.Tests.ps1
+          if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+          }
+      - name: Run disposable Android signing bootstrap integration tests
+        shell: powershell
+        run: |
+          & ./scripts/release/Initialize-AndroidReleaseSigning.Integration.Tests.ps1
+          if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+          }
+
   snapshot-build:
     name: Build unsigned dev snapshot
     needs: [static-analysis, unit-tests, assemble]

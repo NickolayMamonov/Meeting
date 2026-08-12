@@ -20,6 +20,19 @@ function Assert-Throws([scriptblock] $Action, [string] $Message) {
     Assert-True $thrown $Message
 }
 
+function Assert-InputValidationOnly([scriptblock] $Action, [string] $Message) {
+    try {
+        & $Action
+    } catch {
+        Assert-True ($_.Exception.Data["SigningStage"] -ceq "input-validation") `
+            "$Message did not fail at input-validation"
+        Assert-True ($_.Exception.Data["SigningCategory"] -ceq "validation") `
+            "$Message did not fail with validation category"
+        return
+    }
+    throw "ASSERTION FAILED: $Message was accepted"
+}
+
 function New-Fixture([string] $Name) {
     $root = Join-Path ([IO.Path]::GetTempPath()) ("android-signing-" + $Name + "-" + [guid]::NewGuid().ToString("N"))
     $backup = Join-Path $root "backup"
@@ -179,6 +192,73 @@ Invoke-TestCase "preflight is fresh, empty, and artifact-free" {
             -HandoffDirectory $fixture.Handoff -Provision $false -Repository "" -Hooks $hooks
         Assert-True (-not (Test-Path -LiteralPath $fixture.Handoff)) "preflight created handoff"
         Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup).Count -eq 0) "preflight changed backup"
+    } finally { Remove-Fixture $fixture }
+}
+
+Invoke-TestCase "disposable seam requires exact ordinal Confirm and Secret hooks" {
+    $fixture = New-Fixture "hook-authority"
+    try {
+        $identity = @{
+            ValidityDays = 1
+            DistinguishedName = "CN=MEE3-38 Disposable Integration Test, OU=NON-RELEASE, O=Meeting Tests"
+        }
+        $allowed = @{
+            Confirm = { "CREATE-ANDROID-RELEASE-KEY" }
+            Secret = { param([string] $Name) "disposable-$Name" }
+        }
+        $forbidden = @(
+            "Keytool", "CertificateBytes", "Hash", "Acl", "BeforeMove",
+            "BeforeCopy", "Copy", "BeforeDelete", "Gh", "Error", "Future"
+        )
+        foreach ($key in $forbidden) {
+            $hooks = @{} + $allowed
+            $hooks[$key] = { }
+            Assert-InputValidationOnly {
+                Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                    -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                    -Provision $false -Repository "" -Hooks $hooks `
+                    -IntegrationTestAuthority "MEE3-38-DISPOSABLE-NONRELEASE-V1" `
+                    -IntegrationTestIdentity $identity
+            } "forbidden hook $key"
+        }
+        foreach ($hooks in @(
+            $null,
+            @{ Confirm = $allowed.Confirm },
+            @{ Secret = $allowed.Secret },
+            @{ confirm = $allowed.Confirm; Secret = $allowed.Secret },
+            @{ Confirm = $allowed.Confirm; SECRET = $allowed.Secret },
+            @{ Confirm = $null; Secret = $allowed.Secret },
+            @{ Confirm = "not-a-script"; Secret = $allowed.Secret }
+        )) {
+            Assert-InputValidationOnly {
+                Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                    -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                    -Provision $false -Repository "" -Hooks $hooks `
+                    -IntegrationTestAuthority "MEE3-38-DISPOSABLE-NONRELEASE-V1" `
+                    -IntegrationTestIdentity $identity
+            } "invalid exact hook set"
+        }
+        foreach ($invalidIdentity in @(
+            @{ ValidityDays = 1 },
+            @{ DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = "1"; DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = 2; DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = 1; DistinguishedName = "CN=Meet Android Release, OU=Release, O=Meet" },
+            @{ validityDays = 1; DistinguishedName = $identity.DistinguishedName },
+            @{ ValidityDays = 1; DistinguishedName = $identity.DistinguishedName; Extra = $true }
+        )) {
+            Assert-InputValidationOnly {
+                Invoke-AndroidSigningBootstrap -BootstrapMode Execute `
+                    -BackupDirectory $fixture.Backup -HandoffDirectory $fixture.Handoff `
+                    -Provision $false -Repository "" -Hooks $allowed `
+                    -IntegrationTestAuthority "MEE3-38-DISPOSABLE-NONRELEASE-V1" `
+                    -IntegrationTestIdentity $invalidIdentity
+            } "invalid disposable identity"
+        }
+        Assert-True (@(Get-ChildItem -LiteralPath $fixture.Backup -Force).Count -eq 0) `
+            "input-validation negatives mutated backup sentinel"
+        Assert-True (-not (Test-Path -LiteralPath $fixture.Handoff)) `
+            "input-validation negatives created handoff"
     } finally { Remove-Fixture $fixture }
 }
 
