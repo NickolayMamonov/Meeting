@@ -54,10 +54,48 @@ function ConvertTo-PowerShellLiteral([string] $Value) {
     return "'" + $Value.Replace("'", "''") + "'"
 }
 
-function Invoke-GitText([string] $Arguments) {
+function ConvertTo-WindowsProcessArgument([string] $Value) {
+    if ($null -eq $Value -or $Value.Length -eq 0) {
+        return '""'
+    }
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+
+    $builder = New-Object Text.StringBuilder
+    [void]$builder.Append('"')
+    $backslashes = 0
+    for ($index = 0; $index -lt $Value.Length; $index++) {
+        $character = $Value[$index]
+        if ($character -ceq '\') {
+            $backslashes++
+            continue
+        }
+        if ($character -ceq '"') {
+            [void]$builder.Append(('\' * (2 * $backslashes + 1) -join ''))
+            [void]$builder.Append('"')
+            $backslashes = 0
+            continue
+        }
+        if ($backslashes -gt 0) {
+            [void]$builder.Append(('\' * $backslashes -join ''))
+            $backslashes = 0
+        }
+        [void]$builder.Append($character)
+    }
+    if ($backslashes -gt 0) {
+        [void]$builder.Append(('\' * (2 * $backslashes) -join ''))
+    }
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
+function Invoke-GitText([string[]] $Arguments) {
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName = "git"
-    $startInfo.Arguments = $Arguments
+    $startInfo.Arguments = (($Arguments | ForEach-Object {
+        ConvertTo-WindowsProcessArgument $_
+    }) -join " ")
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
@@ -87,27 +125,28 @@ function Get-VerifiedBaselineScript {
         [string] $OutputPath
     )
 
-    $resolvedCommit = (Invoke-GitText "rev-parse --verify ${Commit}^{commit}").Output.Trim()
-    $commitResult = Invoke-GitText "rev-parse --verify ${Commit}^{commit}"
+    $commitResult = Invoke-GitText @("rev-parse", "--verify", "${Commit}^{commit}")
+    $resolvedCommit = $commitResult.Output.Trim()
     Assert-True ($commitResult.ExitCode -eq 0 -and $resolvedCommit -ceq $Commit) `
         "baseline commit is unavailable or did not resolve to the requested exact SHA"
 
-    $commitObjectResult = Invoke-GitText "cat-file -e ${Commit}^{commit}"
+    $commitObjectResult = Invoke-GitText @("cat-file", "-e", "${Commit}^{commit}")
     Assert-True ($commitObjectResult.ExitCode -eq 0) `
         "baseline commit object is unavailable"
 
-    $pathObjectResult = Invoke-GitText "cat-file -e ${Commit}:${Path}"
+    $pathObjectResult = Invoke-GitText @("cat-file", "-e", "${Commit}:${Path}")
     Assert-True ($pathObjectResult.ExitCode -eq 0) `
         "baseline script path is unavailable at the requested commit"
 
-    $expectedBlobResult = Invoke-GitText "rev-parse ${Commit}:${Path}"
+    $expectedBlobResult = Invoke-GitText @("rev-parse", "${Commit}:${Path}")
     $expectedBlob = $expectedBlobResult.Output.Trim()
     Assert-True ($expectedBlobResult.ExitCode -eq 0 -and
         $expectedBlob -match '^[0-9a-f]{40}$') `
         "baseline script provenance could not be resolved"
 
-    $showResult = Invoke-GitText `
-        "show --format= --no-ext-diff --no-textconv ${Commit}:${Path}"
+    $showResult = Invoke-GitText @(
+        "show", "--format=", "--no-ext-diff", "--no-textconv", "${Commit}:${Path}"
+    )
     Assert-True ($showResult.ExitCode -eq 0) `
         "baseline script extraction failed"
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$showResult.Output)) `
@@ -121,7 +160,7 @@ function Get-VerifiedBaselineScript {
     Assert-True (Test-Path -LiteralPath $OutputPath -PathType Leaf) `
         "baseline script extraction produced no file"
 
-    $actualBlobResult = Invoke-GitText "hash-object $OutputPath"
+    $actualBlobResult = Invoke-GitText @("hash-object", $OutputPath)
     $actualBlob = $actualBlobResult.Output.Trim()
     Assert-True ($actualBlobResult.ExitCode -eq 0 -and
         $actualBlob -ceq $expectedBlob) `
@@ -132,6 +171,23 @@ function Get-VerifiedBaselineScript {
         Path = $Path
         Blob = $expectedBlob
         OutputPath = $OutputPath
+    }
+}
+
+function Invoke-VerifiedBaselineChild {
+    param(
+        [string] $Commit,
+        [string] $Path,
+        [string] $OutputPath,
+        [scriptblock] $Child
+    )
+
+    $evidence = Get-VerifiedBaselineScript -Commit $Commit -Path $Path `
+        -OutputPath $OutputPath
+    $childResult = & $Child $evidence.OutputPath
+    return [pscustomobject]@{
+        Evidence = $evidence
+        ChildResult = $childResult
     }
 }
 
@@ -207,9 +263,11 @@ try {
             ($case.Name.Replace(" ", "-") + "-child-invoked")
         $threw = $false
         try {
-            Get-VerifiedBaselineScript -Commit $case.Commit -Path $case.Path `
-                -OutputPath $case.OutputPath | Out-Null
-            [IO.File]::WriteAllText($childMarker, "child-invoked")
+            Invoke-VerifiedBaselineChild -Commit $case.Commit -Path $case.Path `
+                -OutputPath $case.OutputPath -Child {
+                    param([string] $VerifiedScriptPath)
+                    [IO.File]::WriteAllText($childMarker, $VerifiedScriptPath)
+                } | Out-Null
         } catch {
             $threw = $true
         }
@@ -218,11 +276,20 @@ try {
             "$($case.Name) launched the baseline child before verification"
     }
 
-    $baselineEvidence = Get-VerifiedBaselineScript -Commit $baselineSha `
-        -Path $baselineScriptPath -OutputPath $baselineScript
-    Assert-True ($baselineEvidence.Commit -ceq $baselineSha) `
-        "approved baseline did not resolve to the requested exact SHA"
-    $expectedBaselineBlob = $baselineEvidence.Blob
+    $spacedRoot = Join-Path ([IO.Path]::GetTempPath()) `
+        ("meeting signing baseline " + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $spacedRoot | Out-Null
+    try {
+        $spacedScript = Join-Path $spacedRoot "baseline script.ps1"
+        $spacedEvidence = Get-VerifiedBaselineScript -Commit $baselineSha `
+            -Path $baselineScriptPath -OutputPath $spacedScript
+        Assert-True ($spacedEvidence.Commit -ceq $baselineSha) `
+            "baseline extraction failed for a path containing spaces"
+    } finally {
+        Remove-Item -LiteralPath $spacedRoot -Recurse -Force `
+            -ErrorAction SilentlyContinue
+    }
+
     $baselineStore = Join-Path $baselineRoot "store-password"
     $baselineKey = Join-Path $baselineRoot "key-password"
     $baselineKeystore = Join-Path $baselineRoot "baseline.jks"
@@ -235,21 +302,35 @@ try {
         "-validity", "1",
         "-dname", "CN=MEE3-38 Disposable Baseline Probe, OU=NON-RELEASE, O=Meeting Tests"
     )
-    $probe = Join-Path $baselineRoot "baseline-probe.ps1"
-    $probeText = @"
+    $baselineInvocation = Invoke-VerifiedBaselineChild -Commit $baselineSha `
+        -Path $baselineScriptPath -OutputPath $baselineScript -Child {
+            param([string] $VerifiedScriptPath)
+            $probe = Join-Path $baselineRoot "baseline-probe.ps1"
+            $probeText = @"
 `$ErrorActionPreference = "Stop"
-. $(ConvertTo-PowerShellLiteral $baselineScript) -Library
+. $(ConvertTo-PowerShellLiteral $VerifiedScriptPath) -Library
 Invoke-Keytool @{} @($(($sameMechanismArguments | ForEach-Object {
     ConvertTo-PowerShellLiteral $_
 }) -join ", ")) @() | Out-Null
 "@
-    [IO.File]::WriteAllText($probe, $probeText)
-    $previousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    $baselineOutput = (& powershell.exe -NoProfile -ExecutionPolicy Bypass `
-        -File $probe 2>&1 | Out-String)
-    $baselineExitCode = $LASTEXITCODE
-    $ErrorActionPreference = $previousErrorActionPreference
+            [IO.File]::WriteAllText($probe, $probeText)
+            $previous = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            $output = (& powershell.exe -NoProfile -ExecutionPolicy Bypass `
+                -File $probe 2>&1 | Out-String)
+            $exitCode = $LASTEXITCODE
+            $ErrorActionPreference = $previous
+            [pscustomobject]@{
+                Output = $output
+                ExitCode = $exitCode
+            }
+        }
+    $baselineEvidence = $baselineInvocation.Evidence
+    Assert-True ($baselineEvidence.Commit -ceq $baselineSha) `
+        "approved baseline did not resolve to the requested exact SHA"
+    $expectedBaselineBlob = $baselineEvidence.Blob
+    $baselineOutput = $baselineInvocation.ChildResult.Output
+    $baselineExitCode = $baselineInvocation.ChildResult.ExitCode
     Start-Sleep -Seconds 2
     Assert-True ($baselineExitCode -ne 0) `
         "approved baseline did not fail for the native-stderr mechanism"
