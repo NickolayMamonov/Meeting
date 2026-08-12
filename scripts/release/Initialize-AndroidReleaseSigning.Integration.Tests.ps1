@@ -261,6 +261,7 @@ Invoke-Keytool @{} @($(($sameMechanismArguments | ForEach-Object {
             "invocation-owned temporary artifact survived cleanup: $path"
     }
 
+    $global:LASTEXITCODE = 0
     Write-Host "Disposable Windows signing integration tests passed."
 } finally {
     Remove-Fixture $failureFixture

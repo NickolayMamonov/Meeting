@@ -652,4 +652,6 @@ Invoke-TestCase "Provision retries same committed identity with exact stdin comm
     } finally { Remove-Fixture $fixture }
 }
 
+$global:LASTEXITCODE = 0
 Write-Host "All deterministic Android signing bootstrap tests passed."
+exit 0
