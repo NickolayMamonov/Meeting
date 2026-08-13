@@ -260,7 +260,8 @@ def _is_direct_bundle(value: Any) -> bool:
         return False
     if "verificationMaterial" not in value or "verification_material" in value:
         return False
-    if value.get("mediaType") != "application/vnd.dev.sigstore.bundle.v0.3+json":
+    media_type = _aliased_value(value, ("mediaType", "media_type"), "bundle media type")
+    if media_type != "application/vnd.dev.sigstore.bundle.v0.3+json":
         return False
     if "statement" in value or "signature" in value or "certificate" in value:
         return False
@@ -321,7 +322,13 @@ def _record(
     run_attempt: int,
 ) -> dict[str, Any]:
     bundle_raw = _bundle_from_verified_record(verified)
-    result = verified.get("verificationResult", verified.get("verification_result", {}))
+    result = _aliased_value(
+        verified,
+        ("verificationResult", "verification_result"),
+        "verification result",
+    )
+    if result is None:
+        result = {}
     authoritative_raw = verified.get("authoritative")
     if authoritative_raw is None and isinstance(result, Mapping):
         authoritative_raw = result.get("authoritativeBundle", result.get("authoritative"))

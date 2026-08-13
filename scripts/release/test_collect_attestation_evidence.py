@@ -160,6 +160,22 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
                 with self.assertRaises(CollectionError):
                     self.record(verified)
 
+    def test_conflicting_verification_result_aliases_fail_closed(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        conflicting = copy.deepcopy(verified["verificationResult"])
+        conflicting["statement"] = {"subject": [{"name": "different.apk"}]}
+        verified["verification_result"] = conflicting
+
+        with self.assertRaisesRegex(CollectionError, "verification result"):
+            self.record(verified)
+
+    def test_conflicting_media_type_aliases_fail_closed(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        verified["attestation"]["bundle"]["media_type"] = "conflicting-media-type"
+
+        with self.assertRaisesRegex(CollectionError, "media type"):
+            self.record(verified)
+
     def test_malformed_rekor_conversion_is_collection_error(self):
         verified = copy.deepcopy(self.verified_fixture)
         verified["attestation"]["bundle"]["verificationMaterial"]["tlogEntries"][0][
