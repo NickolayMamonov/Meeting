@@ -104,7 +104,7 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
                 separators=(",", ":"),
             ).encode()
         ).decode()
-        with self.assertRaisesRegex(CollectionError, "statements differ"):
+        with self.assertRaisesRegex(CollectionError, "DSSE envelopes differ"):
             self.record(conflicting_statement)
 
         conflicting_certificate = copy.deepcopy(verified)
@@ -120,6 +120,29 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
         ]["tlogEntries"][0]["logIndex"] = 8
         with self.assertRaisesRegex(CollectionError, "Rekor"):
             self.record(conflicting_rekor)
+
+    def test_explicit_authoritative_dsse_must_match_byte_payload_and_fields(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+        verified["verificationResult"]["authoritativeBundle"] = authoritative
+
+        same_statement_different_payload = copy.deepcopy(verified)
+        statement, _ = _payload_from_bundle(authoritative)
+        reformatted_payload = json.dumps(statement, indent=2).encode("utf-8")
+        same_statement_different_payload["verificationResult"][
+            "authoritativeBundle"
+        ]["dsseEnvelope"]["payload"] = base64.b64encode(
+            reformatted_payload
+        ).decode("ascii")
+        with self.assertRaisesRegex(CollectionError, "DSSE envelopes differ"):
+            self.record(same_statement_different_payload)
+
+        extra_envelope_field = copy.deepcopy(verified)
+        extra_envelope_field["verificationResult"]["authoritativeBundle"][
+            "dsseEnvelope"
+        ]["extraField"] = "conflicting authoritative data"
+        with self.assertRaisesRegex(CollectionError, "DSSE envelopes differ"):
+            self.record(extra_envelope_field)
 
     def test_conflicting_authoritative_locations_fail_closed(self):
         verified = copy.deepcopy(self.verified_fixture)

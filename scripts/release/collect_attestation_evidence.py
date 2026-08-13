@@ -175,6 +175,27 @@ def _payload_from_bundle(bundle: Mapping[str, Any]) -> tuple[dict[str, Any], byt
     raise CollectionError("attestation DSSE envelope is missing")
 
 
+def _canonical_dsse_envelope(bundle: Mapping[str, Any]) -> bytes:
+    """Return the defined canonical representation of a bundle's DSSE envelope.
+
+    The parsed envelope is serialized with sorted keys and compact JSON.  The
+    payload's encoded string is therefore compared exactly, while any extra or
+    changed envelope fields remain visible to the comparison.
+    """
+    envelope = _aliased_value(
+        bundle,
+        ("dsseEnvelope", "dsse_envelope"),
+        "DSSE envelope",
+    )
+    if not isinstance(envelope, Mapping):
+        raise CollectionError("attestation DSSE envelope is malformed")
+    return json.dumps(
+        envelope,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
 def _log_id(value: Any) -> str:
     if isinstance(value, dict):
         value = _aliased_value(value, ("keyId", "key_id"), "transparency log ID")
@@ -351,11 +372,7 @@ def _authoritative_bundle_from_verified_record(
         identity = (
             media_type,
             payload,
-            json.dumps(
-                bundle["dsseEnvelope"],
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
+            _canonical_dsse_envelope(bundle),
             json.dumps(statement, sort_keys=True, separators=(",", ":")),
             certificate,
             json.dumps(rekor, sort_keys=True, separators=(",", ":")),
@@ -447,6 +464,12 @@ def _record(
     authoritative_statement, _ = _payload_from_bundle(authoritative_raw)
     if not isinstance(authoritative_statement, Mapping):
         raise CollectionError(f"authoritative statement is missing for {path.name}")
+    if has_explicit_authoritative and _canonical_dsse_envelope(
+        bundle_raw
+    ) != _canonical_dsse_envelope(authoritative_raw):
+        raise CollectionError(
+            f"producer and authoritative DSSE envelopes differ for {path.name}"
+        )
     if has_explicit_authoritative and dict(authoritative_statement) != statement_raw:
         raise CollectionError(f"producer and authoritative statements differ for {path.name}")
     if authoritative_statement.get("subject") != statement_raw.get("subject"):
