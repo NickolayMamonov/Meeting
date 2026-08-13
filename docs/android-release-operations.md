@@ -60,6 +60,47 @@ Configure these as environment variables/secrets without committing values:
   variables. Stable publication downloads exactly that Bundletool version and
   verifies the SHA-256 before inspecting the AAB.
 
+## Release Please updater authority and bootstrap
+
+Release Please remains pinned to `googleapis/release-please-action` v4.2.0
+and runs in manifest mode for the `dev` branch. The Android/Gradle authority
+is the strict root `version.json`, which contains exactly one string field:
+`version`. Because the pinned Simple strategy writes its `version-file`
+wholesale, its transport file is the plain-text root `version.txt`; it is not
+an Android build input or a second release decision source. The sole writer of
+`version.json` is the typed extra-file updater at `$.version`. Do not add a
+second updater path, use a string extra-file entry, or point Simple's
+`version-file` at `version.json`.
+
+The configured bootstrap boundary is the exact source SHA
+`a4defd547446ea83fae3e6d87a906818ecac4630`. Its first-release semantics are
+exclusive: the boundary commit and all earlier history are excluded, while
+commits after it may contribute to the generated release PR. This boundary is
+temporary lifecycle state and should be removed only through the normal
+Release Please bootstrap lifecycle after the generated release PR is merged.
+Persistent config tests deliberately avoid Git-history or `HEAD` assertions so
+they pass in shallow synthetic implementation PR checkouts and in generated
+release PR checkouts.
+
+Only these repository states are valid for the persistent contract:
+
+- bootstrap/source state: an empty `.release-please-manifest.json`, with
+  `version.txt` synchronized to `version.json`;
+- generated release-PR state: exactly one root manifest entry synchronized to
+  both version transports.
+
+Before accepting a generated PR, inspect one coherent PR against `dev`,
+including its title, head/base, changed files, proposed version, changelog,
+and passing hosted CI. Capture the fresh normal release workflow's immutable
+`SOURCE_SHA`, then use a separate fetch-depth-0 checkout at exactly that SHA
+to prove the bootstrap SHA is an ancestor and compare the exclusive
+`bootstrap-sha..SOURCE_SHA` range with generated changelog/PR contents. Never
+use generated PR `HEAD` or a synthetic merge SHA as provenance evidence.
+Never read, print, copy, or include the `RELEASE_PLEASE_TOKEN` value in logs,
+comments, or evidence. This correction does not authorize merging the
+generated release PR, creating tags or GitHub Releases, starting stable jobs,
+or producing stable APK/AAB artifacts.
+
 Snapshot and stable key material must verify to the same `meet-release`
 certificate. CI never generates, rotates, or prints the key. Build jobs only
 produce unsigned artifacts; isolated signing jobs receive the keystore and

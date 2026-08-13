@@ -4,15 +4,20 @@
   "bump-minor-pre-major": true,
   "include-v-in-tag": true,
   "initial-version": "1.0.0",
+  "bootstrap-sha": "a4defd547446ea83fae3e6d87a906818ecac4630",
   "draft": true,
   "target-branch": "dev",
   "changelog-path": "CHANGELOG.md",
   "packages": {
     ".": {
       "release-type": "simple",
-      "version-file": "version.json",
+      "version-file": "version.txt",
       "extra-files": [
-        "version.json"
+        {
+          "type": "json",
+          "path": "version.json",
+          "jsonpath": "$.version"
+        }
       ]
     }
   }
