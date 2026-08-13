@@ -64,10 +64,15 @@ class ApksignerInjectionTest(unittest.TestCase):
             return "false\n"
 
         injected = Path("/sdk/build-tools/36.1.0/apksigner")
+        analyzer = Path("/sdk/cmdline-tools/14.0/bin/apkanalyzer")
         with patch.object(verify_android_artifacts, "run", side_effect=fake_run):
-            verify_android_artifacts.verify_apk(Path("app.apk"), metadata, injected)
+            verify_android_artifacts.verify_apk(
+                Path("app.apk"), metadata, injected, analyzer
+            )
         self.assertEqual(calls[0][0], str(injected))
         self.assertNotEqual(calls[0][0], "apksigner")
+        self.assertEqual([call[0] for call in calls[1:]], [str(analyzer)] * 4)
+        self.assertEqual(len(calls), 5)
 
     def test_empty_apksigner_is_rejected_before_path_normalization(self):
         with tempfile.TemporaryDirectory() as root:
@@ -84,12 +89,39 @@ class ApksignerInjectionTest(unittest.TestCase):
                     str(root_path / "app.apk"),
                     "--apksigner",
                     "",
+                    "--apkanalyzer",
+                    "apkanalyzer",
                 ],
             ):
                 with patch("builtins.print") as output:
                     self.assertEqual(verify_android_artifacts.main(), 1)
                     self.assertIn(
                         "--apksigner must not be empty", output.call_args.args[0]
+                    )
+
+    def test_empty_apkanalyzer_is_rejected_before_path_normalization(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            metadata = root_path / "metadata.json"
+            metadata.write_text(json.dumps({}), encoding="utf-8")
+            with patch(
+                "sys.argv",
+                [
+                    "verify_android_artifacts.py",
+                    "--metadata",
+                    str(metadata),
+                    "--apk",
+                    str(root_path / "app.apk"),
+                    "--apksigner",
+                    "apksigner",
+                    "--apkanalyzer",
+                    "",
+                ],
+            ):
+                with patch("builtins.print") as output:
+                    self.assertEqual(verify_android_artifacts.main(), 1)
+                    self.assertIn(
+                        "--apkanalyzer must not be empty", output.call_args.args[0]
                     )
 
 

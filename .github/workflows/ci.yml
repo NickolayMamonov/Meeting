@@ -373,12 +373,15 @@ jobs:
         with:
           name: android-snapshot-signed-${{ github.run_number }}-${{ github.run_attempt }}
           path: signed
-      - name: Resolve snapshot apksigner
+      - name: Resolve snapshot Android SDK tools
         run: |
           set -euo pipefail
-          apksigner="$(python scripts/release/android_sdk_tools.py)"
+          apksigner="$(python scripts/release/android_sdk_tools.py apksigner)"
+          apkanalyzer="$(python scripts/release/android_sdk_tools.py apkanalyzer)"
           test -n "$apksigner"
+          test -n "$apkanalyzer"
           printf 'APKSIGNER_PATH=%s\n' "$apksigner" >> "$GITHUB_ENV"
+          printf 'APKANALYZER_PATH=%s\n' "$apkanalyzer" >> "$GITHUB_ENV"
       - name: Verify snapshot identity and package evidence
         env:
           ORG_GRADLE_PROJECT_ANDROID_SNAPSHOT_CERT_SHA256: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
@@ -390,7 +393,8 @@ jobs:
           python scripts/release/verify_android_artifacts.py \
             --metadata "$metadata" \
             --apk "$apk" \
-            --apksigner "$APKSIGNER_PATH"
+            --apksigner "$APKSIGNER_PATH" \
+            --apkanalyzer "$APKANALYZER_PATH"
       - name: Prepare snapshot evidence
         run: |
           set -euo pipefail

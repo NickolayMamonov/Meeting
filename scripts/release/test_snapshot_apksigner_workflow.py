@@ -43,12 +43,17 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertEqual(self.snapshot_sign.count('"$apksigner"'), 2)
 
     def test_snapshot_evidence_uses_checked_out_python_resolver_and_injects_output(self):
-        self.assertIn("python scripts/release/android_sdk_tools.py", self.snapshot_evidence)
+        self.assertIn("name: Resolve snapshot Android SDK tools", self.snapshot_evidence)
+        self.assertIn("python scripts/release/android_sdk_tools.py apksigner", self.snapshot_evidence)
+        self.assertIn("python scripts/release/android_sdk_tools.py apkanalyzer", self.snapshot_evidence)
         self.assertIn('printf \'APKSIGNER_PATH=%s\\n\' "$apksigner"', self.snapshot_evidence)
+        self.assertIn('printf \'APKANALYZER_PATH=%s\\n\' "$apkanalyzer"', self.snapshot_evidence)
         verifier_call = self.snapshot_evidence[
             self.snapshot_evidence.index("python scripts/release/verify_android_artifacts.py") :
         ]
         self.assertIn('--apksigner "$APKSIGNER_PATH"', verifier_call)
+        self.assertIn('--apkanalyzer "$APKANALYZER_PATH"', verifier_call)
+        self.assertNotIn('--apkanalyzer apkanalyzer', verifier_call)
 
     def test_stable_call_site_keeps_bare_path_compatibility(self):
         calls = re.findall(
@@ -57,6 +62,7 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             self.release_workflow,
         )
         self.assertEqual(calls, ["apksigner"])
+        self.assertIn("--apkanalyzer apkanalyzer", self.release_workflow)
 
 
 if __name__ == "__main__":

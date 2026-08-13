@@ -71,7 +71,7 @@ def verify_rsa4096_signer(output: str) -> None:
     raise ArtifactError("release signer RSA-4096 identity is missing")
 
 
-def verify_apk(apk: Path, metadata: dict, apksigner: Path) -> None:
+def verify_apk(apk: Path, metadata: dict, apksigner: Path, apkanalyzer: Path) -> None:
     output = run([str(apksigner), "verify", "--verbose", "--print-certs", str(apk)])
     verify_rsa4096_signer(output)
     digests = re.findall(r"SHA-256 digest:\s*([0-9a-f: ]+)", output, flags=re.IGNORECASE)
@@ -81,16 +81,17 @@ def verify_apk(apk: Path, metadata: dict, apksigner: Path) -> None:
     if normalized_digest(digests[0]) != expected:
         raise ArtifactError("APK certificate does not match canonical metadata")
 
-    application_id = run(["apkanalyzer", "manifest", "application-id", str(apk)]).strip()
-    version_name = run(["apkanalyzer", "manifest", "version-name", str(apk)]).strip()
-    version_code = run(["apkanalyzer", "manifest", "version-code", str(apk)]).strip()
+    analyzer = str(apkanalyzer)
+    application_id = run([analyzer, "manifest", "application-id", str(apk)]).strip()
+    version_name = run([analyzer, "manifest", "version-name", str(apk)]).strip()
+    version_code = run([analyzer, "manifest", "version-code", str(apk)]).strip()
     if application_id != metadata_value(metadata, "applicationId", "application_id"):
         raise ArtifactError("APK application ID does not match canonical metadata")
     if version_name != metadata_value(metadata, "versionName", "version_name"):
         raise ArtifactError("APK version name does not match canonical metadata")
     if version_code != metadata_value(metadata, "versionCode", "version_code"):
         raise ArtifactError("APK version code does not match canonical metadata")
-    debuggable = run(["apkanalyzer", "manifest", "debuggable", str(apk)]).strip().lower()
+    debuggable = run([analyzer, "manifest", "debuggable", str(apk)]).strip().lower()
     if debuggable == "true":
         raise ArtifactError("APK is debuggable")
 
@@ -133,6 +134,7 @@ def main() -> int:
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--apk", type=Path, required=True)
     parser.add_argument("--apksigner", required=True)
+    parser.add_argument("--apkanalyzer", required=True)
     parser.add_argument("--aab", type=Path)
     parser.add_argument("--bundletool-jar", type=Path)
     parser.add_argument("--bundletool-sha256")
@@ -140,10 +142,12 @@ def main() -> int:
         args = parser.parse_args()
         if args.apksigner == "":
             raise ArtifactError("--apksigner must not be empty")
+        if args.apkanalyzer == "":
+            raise ArtifactError("--apkanalyzer must not be empty")
         metadata = json.loads(args.metadata.read_text(encoding="utf-8"))
         if not isinstance(metadata, dict):
             raise ArtifactError("metadata must be an object")
-        verify_apk(args.apk, metadata, Path(args.apksigner))
+        verify_apk(args.apk, metadata, Path(args.apksigner), Path(args.apkanalyzer))
         if args.aab is not None:
             if args.bundletool_jar is None:
                 raise ArtifactError("bundletool JAR is required for AAB verification")

@@ -2,10 +2,16 @@ import os
 import stat
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from android_sdk_tools import AndroidSdkToolError, resolve_apksigner
+from android_sdk_tools import (
+    AndroidSdkToolError,
+    resolve_apkanalyzer,
+    resolve_apksigner,
+)
 
 
 class AndroidSdkToolsTest(unittest.TestCase):
@@ -152,6 +158,235 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_missing_root_is_rejected(self):
         with self.assertRaises(AndroidSdkToolError):
             resolve_apksigner({})
+
+    @staticmethod
+    def make_analyzer_sdk(root, packages):
+        command_line_tools = root / "cmdline-tools"
+        command_line_tools.mkdir()
+        for name, revision, valid in packages:
+            package = command_line_tools / name
+            (package / "bin").mkdir(parents=True)
+            (package / "source.properties").write_text(
+                f"Pkg.Revision = {revision}\n", encoding="utf-8"
+            )
+            if valid:
+                tool = package / "bin" / "apkanalyzer"
+                tool.write_text("#!/bin/sh\n", encoding="utf-8")
+                tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
+
+    @staticmethod
+    def successful_probe(*_args, **_kwargs):
+        return type(
+            "Completed",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "",
+                "stderr": "Usage:\napkanalyzer [global options] <subject> <verb> [options] <apk> [<apk2>]\n",
+            },
+        )()
+
+    def test_apkanalyzer_uses_unique_highest_metadata_revision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", True), ("12.0.0", "12.0.0", True)]
+            )
+            with patch("android_sdk_tools.subprocess.run", self.successful_probe):
+                self.assertEqual(
+                    resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}),
+                    (root / "cmdline-tools/latest/bin/apkanalyzer").resolve(),
+                )
+
+    def test_apkanalyzer_accepts_crlf_identity_probe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            result = type(
+                "Completed",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": "",
+                    "stderr": "Usage:\r\napkanalyzer [global options] <subject> <verb> [options] <apk> [<apk2>]\r\n",
+                },
+            )()
+            with patch("android_sdk_tools.subprocess.run", return_value=result):
+                self.assertTrue(resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}).is_absolute())
+
+    def test_apkanalyzer_failures_are_rejected_without_downgrade(self):
+        for result in (
+            type("Completed", (), {"returncode": 1, "stdout": "", "stderr": ""})(),
+            type("Completed", (), {"returncode": 0, "stdout": "unexpected", "stderr": ""})(),
+            type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+            type("Completed", (), {"returncode": 0, "stdout": "", "stderr": "wrong"})(),
+        ):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.make_analyzer_sdk(
+                    root, [("old", "13.0.0", True), ("latest", "14.0.0", True)]
+                )
+                with patch("android_sdk_tools.subprocess.run", return_value=result):
+                    with self.assertRaises(AndroidSdkToolError):
+                        resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_probe_timeout_and_launch_errors_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            for error in (OSError("launch"), UnicodeError("decode")):
+                with patch(
+                    "android_sdk_tools.subprocess.run", side_effect=error
+                ):
+                    with self.assertRaises(AndroidSdkToolError):
+                        resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+            with patch(
+                "android_sdk_tools.subprocess.run",
+                side_effect=__import__("subprocess").TimeoutExpired(["apkanalyzer"], 10),
+            ):
+                with self.assertRaises(AndroidSdkToolError):
+                    resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_probe_uses_exact_bounded_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            with patch(
+                "android_sdk_tools.subprocess.run", side_effect=self.successful_probe
+            ) as probe:
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+            probe.assert_called_once_with(
+                [str((root / "cmdline-tools/latest/bin/apkanalyzer").resolve())],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=10,
+            )
+
+    def test_apkanalyzer_selected_package_tool_failures_are_rejected(self):
+        for valid, executable_mode in ((False, None), (True, 0)):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.make_analyzer_sdk(root, [("latest", "14.0.0", valid)])
+                if executable_mode == 0:
+                    tool = root / "cmdline-tools/latest/bin/apkanalyzer"
+                    tool.chmod(tool.stat().st_mode & ~stat.S_IXUSR)
+                with self.assertRaises(AndroidSdkToolError):
+                    resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_equal_highest_or_invalid_selected_package_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(
+                root, [("one", "14.0.0", True), ("two", "14.0.0", True)]
+            )
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+            (root / "cmdline-tools/two/source.properties").write_text(
+                "Pkg.Revision = broken\n", encoding="utf-8"
+            )
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_package_symlink_escape_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            outside_root = Path(outside)
+            self.make_analyzer_sdk(root, [("valid", "14.0.0", True)])
+            escaped = outside_root / "escaped"
+            (escaped / "bin").mkdir(parents=True)
+            (escaped / "source.properties").write_text(
+                "Pkg.Revision = 15.0.0\n", encoding="utf-8"
+            )
+            tool = escaped / "bin" / "apkanalyzer"
+            tool.write_text("#!/bin/sh\n", encoding="utf-8")
+            tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
+            package_link = root / "cmdline-tools/escaped"
+            try:
+                package_link.symlink_to(escaped, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable in this environment")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_cmdline_tools_symlink_escape_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            outside_root = Path(outside)
+            self.make_analyzer_sdk(outside_root, [("latest", "14.0.0", True)])
+            command_line_tools = root / "cmdline-tools"
+            try:
+                command_line_tools.symlink_to(
+                    outside_root / "cmdline-tools", target_is_directory=True
+                )
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable in this environment")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_source_properties_symlink_escape_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            outside_root = Path(outside)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            external_metadata = outside_root / "source.properties"
+            external_metadata.write_text("Pkg.Revision = 15.0.0\n", encoding="utf-8")
+            metadata = root / "cmdline-tools/latest/source.properties"
+            metadata.unlink()
+            try:
+                metadata.symlink_to(external_metadata)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable in this environment")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_source_properties_symlink_loop_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            metadata = root / "cmdline-tools/latest/source.properties"
+            metadata.unlink()
+            try:
+                metadata.symlink_to(metadata)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable in this environment")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_cli_default_and_explicit_success_contract(self):
+        expected = Path("/sdk/build-tools/36.1.0/apksigner")
+        for argv in (["android_sdk_tools.py"], ["android_sdk_tools.py", "apksigner"]):
+            with patch("android_sdk_tools.resolve_apksigner", return_value=expected):
+                with patch("sys.argv", argv), redirect_stdout(StringIO()) as stdout, redirect_stderr(
+                    StringIO()
+                ) as stderr:
+                    self.assertEqual(__import__("android_sdk_tools").main(), 0)
+            self.assertEqual(stdout.getvalue(), f"{expected}\n")
+            self.assertEqual(stderr.getvalue(), "")
+
+    def test_cli_analyzer_failure_contract(self):
+        with patch(
+            "android_sdk_tools.resolve_apkanalyzer",
+            side_effect=AndroidSdkToolError("identity probe failed"),
+        ):
+            with patch("sys.argv", ["android_sdk_tools.py", "apkanalyzer"]):
+                with redirect_stdout(StringIO()) as stdout, redirect_stderr(StringIO()) as stderr:
+                    self.assertEqual(__import__("android_sdk_tools").main(), 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(
+            stderr.getvalue(),
+            "Android SDK apkanalyzer resolution failed: identity probe failed\n",
+        )
+
+    def test_cli_unknown_or_extra_arguments_use_argparse_exit_two(self):
+        for argv in (
+            ["android_sdk_tools.py", "other"],
+            ["android_sdk_tools.py", "apksigner", "extra"],
+        ):
+            with patch("sys.argv", argv):
+                with self.assertRaises(SystemExit) as error:
+                    __import__("android_sdk_tools").main()
+            self.assertEqual(error.exception.code, 2)
 
 
 if __name__ == "__main__":
