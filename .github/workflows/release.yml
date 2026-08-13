@@ -223,6 +223,7 @@ jobs:
             --metadata "$metadata" --apk "$apk" --aab "$aab" \
             --apksigner apksigner \
             --apkanalyzer apkanalyzer \
+            --expected-debuggable false \
             --bundletool-jar "$RUNNER_TEMP/bundletool.jar" \
             --bundletool-sha256 "$BUNDLETOOL_SHA256"
       - name: Prepare deterministic release evidence

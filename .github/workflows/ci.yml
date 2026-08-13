@@ -61,6 +61,8 @@ jobs:
         run: cp app/google-services-ci.json app/google-services.json
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
+      - name: Run release tooling tests
+        run: python -m unittest discover -s scripts/release -p "test_*.py"
       - name: Upload test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -394,7 +396,8 @@ jobs:
             --metadata "$metadata" \
             --apk "$apk" \
             --apksigner "$APKSIGNER_PATH" \
-            --apkanalyzer "$APKANALYZER_PATH"
+            --apkanalyzer "$APKANALYZER_PATH" \
+            --expected-debuggable true
       - name: Prepare snapshot evidence
         run: |
           set -euo pipefail
