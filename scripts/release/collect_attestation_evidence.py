@@ -116,7 +116,6 @@ def _certificate_base64(value: Any) -> str:
 
 def _certificate_from_bundle(
     bundle: Mapping[str, Any],
-    fallback: Mapping[str, Any] | None = None,
 ) -> str:
     certificate = bundle.get("certificate")
     material = _aliased_value(
@@ -137,9 +136,6 @@ def _certificate_from_bundle(
         return certificate_bytes
     if certificate is None:
         certificate = material_certificate
-    if certificate is None and isinstance(fallback, Mapping):
-        signature = fallback.get("signature", {})
-        certificate = signature.get("certificate") if isinstance(signature, Mapping) else None
     if isinstance(certificate, Mapping):
         return _certificate_base64(certificate)
     raise CollectionError("canonical attestation bundle has no certificate")
@@ -332,20 +328,14 @@ def _record(
     authoritative_raw = verified.get("authoritative")
     if authoritative_raw is None and isinstance(result, Mapping):
         authoritative_raw = result.get("authoritativeBundle", result.get("authoritative"))
-    if authoritative_raw is None and isinstance(result, Mapping):
-        authoritative_raw = {
-            "media_type": bundle_raw.get("media_type") if isinstance(bundle_raw, Mapping) else None,
-            "statement": result.get("statement"),
-            "certificate": (
-                result.get("signature", {}).get("certificate")
-                if isinstance(result.get("signature"), Mapping)
-                else None
-            ),
-            "verificationMaterial": bundle_raw.get("verificationMaterial")
-            if isinstance(bundle_raw, Mapping)
-            else None,
-            "signature": result.get("signature", {}),
-        }
+    has_explicit_authoritative = authoritative_raw is not None
+    if authoritative_raw is None:
+        # GitHub CLI 2.93 emits the signed bundle and parsed verification
+        # result as separate representations.  The latter contains certificate
+        # identity metadata, never cryptographic DER.  In the absence of an
+        # explicit authoritative bundle, the validated signed bundle remains
+        # the sole authority for certificate and Rekor evidence.
+        authoritative_raw = bundle_raw
     if not isinstance(bundle_raw, dict) or not isinstance(authoritative_raw, dict) or not isinstance(result, dict):
         raise CollectionError(f"malformed verified attestation for {path.name}")
     statement_raw, payload_bytes = _payload_from_bundle(bundle_raw)
@@ -372,14 +362,10 @@ def _record(
     signature = result.get("signature", {})
     if not isinstance(signature, Mapping):
         raise CollectionError(f"verified X.509 signature is missing for {path.name}")
-    certificate_bytes = _certificate_from_bundle(
-        {"certificate": signature.get("certificate")},
-        result,
-    )
-    bundle_certificate_bytes = _certificate_from_bundle(bundle_raw, result)
-    if bundle_certificate_bytes != certificate_bytes:
-        raise CollectionError(f"bundle and X.509 certificate evidence differ for {path.name}")
-    authoritative_certificate_bytes = _certificate_from_bundle(authoritative_raw, result)
+    if not isinstance(signature.get("certificate"), Mapping):
+        raise CollectionError(f"parsed verified X.509 certificate is missing for {path.name}")
+    certificate_bytes = _certificate_from_bundle(bundle_raw)
+    authoritative_certificate_bytes = _certificate_from_bundle(authoritative_raw)
     if certificate_bytes != authoritative_certificate_bytes:
         raise CollectionError(f"producer and authoritative certificates differ for {path.name}")
     certificate = {"der_base64": certificate_bytes}
@@ -388,8 +374,12 @@ def _record(
     if rekor != authoritative_rekor:
         raise CollectionError(f"producer and authoritative Rekor entries differ for {path.name}")
     authoritative_statement = authoritative_raw.get("statement")
-    if not isinstance(authoritative_statement, dict):
+    if not has_explicit_authoritative:
+        authoritative_statement = statement_raw
+    if not isinstance(authoritative_statement, Mapping):
         raise CollectionError(f"authoritative statement is missing for {path.name}")
+    if has_explicit_authoritative and dict(authoritative_statement) != statement_raw:
+        raise CollectionError(f"producer and authoritative statements differ for {path.name}")
     if authoritative_statement.get("subject") != statement_raw.get("subject"):
         raise CollectionError(f"producer and authoritative subjects differ for {path.name}")
     statement = {
