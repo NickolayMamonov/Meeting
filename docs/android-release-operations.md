@@ -81,9 +81,11 @@ IDs are informational and are never used as uniqueness keys.
 
 Attestation collection requests a bounded complete result set, rejects
 multiple verified results, decodes and hashes the signed DSSE payload, parses
-the exact `verificationResult.signature.certificate` as X.509, checks the
-bundle's verification material and Rekor entry against that certificate, and
-requires the parsed authoritative statement to match the local payload.
+X.509 DER only from the signed bundle or an explicitly supplied authoritative
+bundle, checks the bundle verification material and Rekor entry, and requires
+the parsed verification statement to match the local payload. The
+`verificationResult.signature.certificate` object is parsed identity metadata,
+not a source of certificate bytes.
 
 Stable publication is the final draft-to-published mutation. A failed run is
 recovered by rerunning the same stable job and re-verifying the same

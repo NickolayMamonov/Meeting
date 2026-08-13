@@ -190,7 +190,12 @@ def _log_id(value: Any) -> str:
     return sha256_bytes(decoded)
 
 
-def _rekor(bundle: Mapping[str, Any], verification: Mapping[str, Any]) -> dict[str, Any]:
+def _rekor(
+    bundle: Mapping[str, Any],
+    verification: Mapping[str, Any],
+    *,
+    allow_verification_fallback: bool = True,
+) -> dict[str, Any]:
     material = _aliased_value(
         bundle,
         ("verificationMaterial", "verification_material"),
@@ -203,7 +208,7 @@ def _rekor(bundle: Mapping[str, Any], verification: Mapping[str, Any]) -> dict[s
     entries = _aliased_value(material, ("tlogEntries", "tlog_entries"), "Rekor entries")
     if entries is None:
         entries = []
-    if not entries:
+    if not entries and allow_verification_fallback:
         timestamps = _aliased_value(
             verification,
             ("verifiedTimestamps", "verified_timestamps"),
@@ -336,8 +341,18 @@ def _record(
         # explicit authoritative bundle, the validated signed bundle remains
         # the sole authority for certificate and Rekor evidence.
         authoritative_raw = bundle_raw
-    if not isinstance(bundle_raw, dict) or not isinstance(authoritative_raw, dict) or not isinstance(result, dict):
+    if not isinstance(bundle_raw, dict) or not isinstance(result, dict):
         raise CollectionError(f"malformed verified attestation for {path.name}")
+    if not isinstance(authoritative_raw, Mapping):
+        raise CollectionError(f"authoritative attestation bundle is malformed for {path.name}")
+    if has_explicit_authoritative:
+        if not _is_direct_bundle(authoritative_raw):
+            raise CollectionError(
+                f"authoritative attestation bundle is missing or malformed for {path.name}"
+            )
+        authoritative_raw = dict(authoritative_raw)
+    else:
+        authoritative_raw = bundle_raw
     statement_raw, payload_bytes = _payload_from_bundle(bundle_raw)
     if not isinstance(statement_raw, dict):
         raise CollectionError(f"verified statement is missing for {path.name}")
@@ -369,13 +384,19 @@ def _record(
     if certificate_bytes != authoritative_certificate_bytes:
         raise CollectionError(f"producer and authoritative certificates differ for {path.name}")
     certificate = {"der_base64": certificate_bytes}
-    rekor = _rekor(bundle_raw, result)
-    authoritative_rekor = _rekor(authoritative_raw, result)
+    rekor = _rekor(
+        bundle_raw,
+        result,
+        allow_verification_fallback=not has_explicit_authoritative,
+    )
+    authoritative_rekor = _rekor(
+        authoritative_raw,
+        result,
+        allow_verification_fallback=not has_explicit_authoritative,
+    )
     if rekor != authoritative_rekor:
         raise CollectionError(f"producer and authoritative Rekor entries differ for {path.name}")
-    authoritative_statement = authoritative_raw.get("statement")
-    if not has_explicit_authoritative:
-        authoritative_statement = statement_raw
+    authoritative_statement, _ = _payload_from_bundle(authoritative_raw)
     if not isinstance(authoritative_statement, Mapping):
         raise CollectionError(f"authoritative statement is missing for {path.name}")
     if has_explicit_authoritative and dict(authoritative_statement) != statement_raw:

@@ -86,7 +86,6 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
     def test_explicit_authoritative_bundle_must_match_signed_bundle(self):
         verified = copy.deepcopy(self.verified_fixture)
         authoritative = copy.deepcopy(verified["attestation"]["bundle"])
-        authoritative["statement"] = copy.deepcopy(verified["verificationResult"]["statement"])
         verified["verificationResult"]["authoritativeBundle"] = authoritative
 
         record = self.record(verified)
@@ -94,9 +93,17 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
         self.assertEqual(record["producer"]["rekor"], record["authoritative"]["rekor"])
 
         conflicting_statement = copy.deepcopy(verified)
-        conflicting_statement["verificationResult"]["authoritativeBundle"]["statement"][
-            "subject"
-        ][0]["name"] = "different.apk"
+        conflicting_statement["verificationResult"]["authoritativeBundle"]["dsseEnvelope"][
+            "payload"
+        ] = base64.b64encode(
+            json.dumps(
+                {
+                    "predicate": {"buildType": "sanitized"},
+                    "subject": [{"digest": {"sha256": "different"}, "name": "artifact.apk"}],
+                },
+                separators=(",", ":"),
+            ).encode()
+        ).decode()
         with self.assertRaisesRegex(CollectionError, "statements differ"):
             self.record(conflicting_statement)
 
@@ -113,6 +120,22 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
         ]["tlogEntries"][0]["logIndex"] = 8
         with self.assertRaisesRegex(CollectionError, "Rekor"):
             self.record(conflicting_rekor)
+
+    def test_explicit_authoritative_bundle_requires_strict_shape_and_own_rekor(self):
+        mutations = (
+            lambda bundle: bundle.pop("mediaType"),
+            lambda bundle: bundle.pop("dsseEnvelope"),
+            lambda bundle: bundle["verificationMaterial"].pop("tlogEntries"),
+            lambda bundle: bundle["verificationMaterial"].update({"tlogEntries": []}),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                verified = copy.deepcopy(self.verified_fixture)
+                authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+                mutation(authoritative)
+                verified["verificationResult"]["authoritativeBundle"] = authoritative
+                with self.assertRaises(CollectionError):
+                    self.record(verified)
 
     def test_certificate_der_validation_fails_closed(self):
         direct = copy.deepcopy(self.verified_fixture["attestation"]["bundle"])
