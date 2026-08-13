@@ -340,6 +340,19 @@ class AndroidSdkToolsTest(unittest.TestCase):
             with self.assertRaises(AndroidSdkToolError):
                 resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
 
+    def test_apkanalyzer_source_properties_symlink_loop_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            metadata = root / "cmdline-tools/latest/source.properties"
+            metadata.unlink()
+            try:
+                metadata.symlink_to(metadata)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable in this environment")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
     def test_cli_default_and_explicit_success_contract(self):
         expected = Path("/sdk/build-tools/36.1.0/apksigner")
         for argv in (["android_sdk_tools.py"], ["android_sdk_tools.py", "apksigner"]):

@@ -37,7 +37,10 @@ def parse_revision(value: str) -> tuple[int, ...]:
 def _canonical_directory(value: str, label: str) -> Path:
     if not value:
         raise AndroidSdkToolError(f"{label} is empty")
-    path = Path(value).resolve()
+    try:
+        path = Path(value).resolve()
+    except (OSError, RuntimeError) as error:
+        raise AndroidSdkToolError(f"{label} cannot be canonicalized") from error
     if not path.is_dir():
         raise AndroidSdkToolError(f"{label} is not a directory")
     return path
@@ -80,7 +83,10 @@ def _selected_build_tools(root: Path) -> tuple[tuple[int, ...], Path]:
 
 
 def _contained_path(path: Path, roots: tuple[Path, ...], label: str) -> Path:
-    canonical = path.resolve()
+    try:
+        canonical = path.resolve()
+    except (OSError, RuntimeError) as error:
+        raise AndroidSdkToolError(f"{label} cannot be canonicalized") from error
     for root in roots:
         try:
             canonical.relative_to(root)
@@ -174,7 +180,12 @@ def _selected_cmdline_tools(root: Path) -> tuple[tuple[int, ...], Path]:
     packages_root = root / "cmdline-tools"
     if not packages_root.is_dir():
         raise AndroidSdkToolError("Android SDK cmdline-tools directory is missing")
-    canonical_root = packages_root.resolve()
+    try:
+        canonical_root = packages_root.resolve()
+    except (OSError, RuntimeError) as error:
+        raise AndroidSdkToolError(
+            "Android SDK cmdline-tools directory cannot be canonicalized"
+        ) from error
     try:
         canonical_root.relative_to(root.resolve())
     except ValueError as error:
@@ -239,7 +250,14 @@ def resolve_apkanalyzer(environment: Mapping[str, str] | None = None) -> Path:
             directory,
             "apkanalyzer",
             "bin/apkanalyzer",
-            containment_roots=((root / "cmdline-tools").resolve(), root),
+            containment_roots=(
+                _contained_path(
+                    root / "cmdline-tools",
+                    (root,),
+                    "Android SDK cmdline-tools directory",
+                ),
+                root,
+            ),
         )
         _probe_apkanalyzer(executable)
         return executable
