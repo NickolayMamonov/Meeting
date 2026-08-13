@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from android_sdk_tools import (
     AndroidSdkToolError,
+    _APKANALYZER_PROBE_TIMEOUT_SECONDS,
     resolve_apkanalyzer,
     resolve_apksigner,
 )
@@ -230,6 +231,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
                     with self.assertRaises(AndroidSdkToolError):
                         resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
 
+    def test_apkanalyzer_probe_timeout_is_30_seconds(self):
+        self.assertEqual(_APKANALYZER_PROBE_TIMEOUT_SECONDS, 30)
+
     def test_apkanalyzer_probe_timeout_and_launch_errors_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -242,7 +246,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
                         resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
             with patch(
                 "android_sdk_tools.subprocess.run",
-                side_effect=__import__("subprocess").TimeoutExpired(["apkanalyzer"], 10),
+                side_effect=__import__("subprocess").TimeoutExpired(
+                    ["apkanalyzer"], _APKANALYZER_PROBE_TIMEOUT_SECONDS
+                ),
             ):
                 with self.assertRaises(AndroidSdkToolError):
                     resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
@@ -260,7 +266,7 @@ class AndroidSdkToolsTest(unittest.TestCase):
                 capture_output=True,
                 check=False,
                 text=True,
-                timeout=10,
+                timeout=_APKANALYZER_PROBE_TIMEOUT_SECONDS,
             )
 
     def test_apkanalyzer_selected_package_tool_failures_are_rejected(self):

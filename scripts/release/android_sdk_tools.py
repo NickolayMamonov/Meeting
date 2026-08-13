@@ -18,6 +18,7 @@ class AndroidSdkToolError(ValueError):
 
 _REVISION = re.compile(r"[0-9]+(?:\.[0-9]+)*\Z")
 _PACKAGE_REVISION = re.compile(r"Pkg\.Revision\s*=\s*([^\s]+)\Z")
+_APKANALYZER_PROBE_TIMEOUT_SECONDS = 30
 _APKANALYZER_USAGE = re.compile(
     r"(?m)^Usage:\r?\n"
     r"^apkanalyzer \[global options\] <subject> <verb> \[options\] <apk> \[<apk2>\]\r?$"
@@ -230,7 +231,7 @@ def _probe_apkanalyzer(executable: Path) -> None:
             check=False,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=_APKANALYZER_PROBE_TIMEOUT_SECONDS,
         )
     except (OSError, UnicodeError, subprocess.TimeoutExpired) as error:
         raise AndroidSdkToolError("apkanalyzer identity probe could not run") from error
