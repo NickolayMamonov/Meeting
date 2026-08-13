@@ -320,6 +320,27 @@ class PackageArtifactsTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 package(arguments)
 
+    def test_outer_subject_swap_fails_package_boundary(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            output = self.package_five_subject_group_release(root_path)
+            evidence_path = root_path / "attestation-evidence.json"
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            evidence["records"][0]["subject"], evidence["records"][1]["subject"] = (
+                evidence["records"][1]["subject"],
+                evidence["records"][0]["subject"],
+            )
+            evidence_path.write_bytes(canonical_json(evidence))
+            arguments = Namespace(
+                metadata=str(root_path / "metadata.json"), output=str(output),
+                apk=str(root_path / "app.apk"), aab=None,
+                mapping=None, symbols=None, tag=None, commit="a" * 40,
+                source_branch="dev", workflow="test",
+                attestation_evidence=str(evidence_path), prepare_only=False,
+            )
+            with self.assertRaises(SystemExit):
+                package(arguments)
+
     def test_shared_rekor_group_boundaries_fail_closed_in_chain(self):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_five_subject_group_release(Path(root))

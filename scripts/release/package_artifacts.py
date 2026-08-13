@@ -221,6 +221,18 @@ def package(args: argparse.Namespace) -> None:
         subject = {"name": item["name"], "sha256": item["sha256"]}
         if record["subject"] != subject:
             raise SystemExit(f"attestation evidence subject mismatch for {item['name']}")
+        for source_name in ("producer", "authoritative"):
+            source = record.get(source_name)
+            if not isinstance(source, dict):
+                raise SystemExit(
+                    f"invalid canonical attestation evidence for {item['name']}: "
+                    f"{source_name} evidence is malformed"
+                )
+            statement = source.get("statement")
+            if not isinstance(statement, dict) or statement.get("subject") != subject:
+                raise SystemExit(
+                    f"{source_name} attestation subject mismatch for {item['name']}"
+                )
         try:
             identities = verify_attestation_link(
                 record["producer"],
