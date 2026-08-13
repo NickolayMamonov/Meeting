@@ -37,7 +37,19 @@
     },
     "signature": {
       "certificate": {
-        "rawBytes": "MIICLDCCAZWgAwIBAgIUU7DujBEmLxJMH6CtgUXoTSJ8FEEwDQYJKoZIhvcNAQELBQAwKDEmMCQGA1UEAwwdc2FuaXRpemVkLWF0dGVzdGF0aW9uLWZpeHR1cmUwHhcNMjYwODEzMDE1NTQwWhcNMzYwODEwMDE1NTQwWjAoMSYwJAYDVQQDDB1zYW5pdGl6ZWQtYXR0ZXN0YXRpb24tZml4dHVyZTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAxss6FGuWGWsl082YItftYU5CdAd9ubvy+hPwLoehV77qUkQRv7Ca4Dd1YDoc3eJX62lqqvo5kWRm6xGyvTeuHV7CDOOYuz6uuqdPcKAVpbi9b9j0kNBU85VUSkjeS7r9FyzYgbUey4yD8PaVvHT+ITlOj2+CJM1GLrYrGCbIS8MCAwEAAaNTMFEwHQYDVR0OBBYEFMMcs/1y2hSVdmuILRAUe3yKGl+TMB8GA1UdIwQYMBaAFMMcs/1y2hSVdmuILRAUe3yKGl+TMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADgYEAhtnm+fxcVI5IGSFcZn1IQVL2DKIhB09o4QpwHKb0dcFzLVKeVam1/aRKwbgX5swVwX32IxrKkiMTHzdPuXBmWG6Jn6136ubadR5f7yPtTYAWJa5k/TOD5zkEwMZb3BgBEu5e249faO23GQ86iTift/+WqNlGmN56mFqj5oaskEw="
+        "certificateIssuer": "https://token.actions.githubusercontent.com",
+        "subjectAlternativeName": "https://github.com/NickolayMamonov/Meeting/.github/workflows/ci.yml@refs/heads/dev",
+        "issuer": "https://token.actions.githubusercontent.com",
+        "sourceRepositoryOwnerURI": "https://github.com/NickolayMamonov",
+        "sourceRepositoryURI": "https://github.com/NickolayMamonov/Meeting",
+        "sourceRepositoryRef": "refs/heads/dev",
+        "sourceRepositoryDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "buildConfigURI": "https://github.com/NickolayMamonov/Meeting/.github/workflows/ci.yml",
+        "buildSignerURI": "https://github.com/NickolayMamonov/Meeting/.github/workflows/ci.yml@refs/heads/dev",
+        "buildTrigger": "push",
+        "runnerEnvironment": "github-hosted",
+        "runInvocationURI": "https://github.com/NickolayMamonov/Meeting/actions/runs/123/attempts/1",
+        "sourceRepositoryVisibilityAtSigning": "public"
       }
     },
     "verifiedTimestamps": [

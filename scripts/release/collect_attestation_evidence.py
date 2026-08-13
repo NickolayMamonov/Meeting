@@ -116,7 +116,6 @@ def _certificate_base64(value: Any) -> str:
 
 def _certificate_from_bundle(
     bundle: Mapping[str, Any],
-    fallback: Mapping[str, Any] | None = None,
 ) -> str:
     certificate = bundle.get("certificate")
     material = _aliased_value(
@@ -137,9 +136,6 @@ def _certificate_from_bundle(
         return certificate_bytes
     if certificate is None:
         certificate = material_certificate
-    if certificate is None and isinstance(fallback, Mapping):
-        signature = fallback.get("signature", {})
-        certificate = signature.get("certificate") if isinstance(signature, Mapping) else None
     if isinstance(certificate, Mapping):
         return _certificate_base64(certificate)
     raise CollectionError("canonical attestation bundle has no certificate")
@@ -179,6 +175,27 @@ def _payload_from_bundle(bundle: Mapping[str, Any]) -> tuple[dict[str, Any], byt
     raise CollectionError("attestation DSSE envelope is missing")
 
 
+def _canonical_dsse_envelope(bundle: Mapping[str, Any]) -> bytes:
+    """Return the defined canonical representation of a bundle's DSSE envelope.
+
+    The parsed envelope is serialized with sorted keys and compact JSON.  The
+    payload's encoded string is therefore compared exactly, while any extra or
+    changed envelope fields remain visible to the comparison.
+    """
+    envelope = _aliased_value(
+        bundle,
+        ("dsseEnvelope", "dsse_envelope"),
+        "DSSE envelope",
+    )
+    if not isinstance(envelope, Mapping):
+        raise CollectionError("attestation DSSE envelope is malformed")
+    return json.dumps(
+        envelope,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
 def _log_id(value: Any) -> str:
     if isinstance(value, dict):
         value = _aliased_value(value, ("keyId", "key_id"), "transparency log ID")
@@ -194,7 +211,12 @@ def _log_id(value: Any) -> str:
     return sha256_bytes(decoded)
 
 
-def _rekor(bundle: Mapping[str, Any], verification: Mapping[str, Any]) -> dict[str, Any]:
+def _rekor(
+    bundle: Mapping[str, Any],
+    verification: Mapping[str, Any],
+    *,
+    allow_verification_fallback: bool = True,
+) -> dict[str, Any]:
     material = _aliased_value(
         bundle,
         ("verificationMaterial", "verification_material"),
@@ -207,7 +229,7 @@ def _rekor(bundle: Mapping[str, Any], verification: Mapping[str, Any]) -> dict[s
     entries = _aliased_value(material, ("tlogEntries", "tlog_entries"), "Rekor entries")
     if entries is None:
         entries = []
-    if not entries:
+    if not entries and allow_verification_fallback:
         timestamps = _aliased_value(
             verification,
             ("verifiedTimestamps", "verified_timestamps"),
@@ -311,6 +333,62 @@ def _bundle_from_verified_record(verified: Mapping[str, Any]) -> dict[str, Any]:
     raise CollectionError("verified attestation.bundle is missing or malformed")
 
 
+def _authoritative_bundle_from_verified_record(
+    verified: Mapping[str, Any],
+    result: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Normalize every supported authoritative representation before fallback.
+
+    GitHub CLI responses and older callers can expose authoritative evidence in
+    more than one location.  Presence is intentionally tested with ``in``:
+    an explicit null is a supplied, malformed representation, not an absent
+    one that may re-enter the split-response fallback.
+    """
+    sources: list[tuple[str, Any]] = []
+    if "authoritative" in verified:
+        sources.append(("top-level authoritative", verified["authoritative"]))
+    if "authoritativeBundle" in result:
+        sources.append(
+            ("verificationResult.authoritativeBundle", result["authoritativeBundle"])
+        )
+    if "authoritative" in result:
+        sources.append(("verificationResult.authoritative", result["authoritative"]))
+    if not sources:
+        return None
+
+    normalized: list[tuple[str, dict[str, Any], tuple[Any, ...]]] = []
+    for name, candidate in sources:
+        if not isinstance(candidate, Mapping) or not _is_direct_bundle(candidate):
+            raise CollectionError(f"{name} is missing or malformed")
+        bundle = dict(candidate)
+        statement, payload = _payload_from_bundle(bundle)
+        certificate = _certificate_from_bundle(bundle)
+        rekor = _rekor(bundle, {}, allow_verification_fallback=False)
+        media_type = _aliased_value(
+            bundle,
+            ("mediaType", "media_type"),
+            "bundle media type",
+        )
+        identity = (
+            media_type,
+            payload,
+            _canonical_dsse_envelope(bundle),
+            json.dumps(statement, sort_keys=True, separators=(",", ":")),
+            certificate,
+            json.dumps(rekor, sort_keys=True, separators=(",", ":")),
+        )
+        normalized.append((name, bundle, identity))
+
+    first_name, first_bundle, first_identity = normalized[0]
+    for name, _, identity in normalized[1:]:
+        if identity != first_identity:
+            raise CollectionError(
+                f"conflicting authoritative attestation representations: "
+                f"{first_name} and {name}"
+            )
+    return first_bundle
+
+
 def _record(
     path: Path,
     verified: dict[str, Any],
@@ -329,25 +407,17 @@ def _record(
     )
     if result is None:
         result = {}
-    authoritative_raw = verified.get("authoritative")
-    if authoritative_raw is None and isinstance(result, Mapping):
-        authoritative_raw = result.get("authoritativeBundle", result.get("authoritative"))
-    if authoritative_raw is None and isinstance(result, Mapping):
-        authoritative_raw = {
-            "media_type": bundle_raw.get("media_type") if isinstance(bundle_raw, Mapping) else None,
-            "statement": result.get("statement"),
-            "certificate": (
-                result.get("signature", {}).get("certificate")
-                if isinstance(result.get("signature"), Mapping)
-                else None
-            ),
-            "verificationMaterial": bundle_raw.get("verificationMaterial")
-            if isinstance(bundle_raw, Mapping)
-            else None,
-            "signature": result.get("signature", {}),
-        }
-    if not isinstance(bundle_raw, dict) or not isinstance(authoritative_raw, dict) or not isinstance(result, dict):
+    if not isinstance(bundle_raw, dict) or not isinstance(result, dict):
         raise CollectionError(f"malformed verified attestation for {path.name}")
+    authoritative_raw = _authoritative_bundle_from_verified_record(verified, result)
+    has_explicit_authoritative = authoritative_raw is not None
+    if authoritative_raw is None:
+        # GitHub CLI 2.93 emits the signed bundle and parsed verification
+        # result as separate representations.  The latter contains certificate
+        # identity metadata, never cryptographic DER.  In the absence of an
+        # explicit authoritative bundle, the validated signed bundle remains
+        # the sole authority for certificate and Rekor evidence.
+        authoritative_raw = bundle_raw
     statement_raw, payload_bytes = _payload_from_bundle(bundle_raw)
     if not isinstance(statement_raw, dict):
         raise CollectionError(f"verified statement is missing for {path.name}")
@@ -372,24 +442,36 @@ def _record(
     signature = result.get("signature", {})
     if not isinstance(signature, Mapping):
         raise CollectionError(f"verified X.509 signature is missing for {path.name}")
-    certificate_bytes = _certificate_from_bundle(
-        {"certificate": signature.get("certificate")},
-        result,
-    )
-    bundle_certificate_bytes = _certificate_from_bundle(bundle_raw, result)
-    if bundle_certificate_bytes != certificate_bytes:
-        raise CollectionError(f"bundle and X.509 certificate evidence differ for {path.name}")
-    authoritative_certificate_bytes = _certificate_from_bundle(authoritative_raw, result)
+    if not isinstance(signature.get("certificate"), Mapping):
+        raise CollectionError(f"parsed verified X.509 certificate is missing for {path.name}")
+    certificate_bytes = _certificate_from_bundle(bundle_raw)
+    authoritative_certificate_bytes = _certificate_from_bundle(authoritative_raw)
     if certificate_bytes != authoritative_certificate_bytes:
         raise CollectionError(f"producer and authoritative certificates differ for {path.name}")
     certificate = {"der_base64": certificate_bytes}
-    rekor = _rekor(bundle_raw, result)
-    authoritative_rekor = _rekor(authoritative_raw, result)
+    rekor = _rekor(
+        bundle_raw,
+        result,
+        allow_verification_fallback=not has_explicit_authoritative,
+    )
+    authoritative_rekor = _rekor(
+        authoritative_raw,
+        result,
+        allow_verification_fallback=not has_explicit_authoritative,
+    )
     if rekor != authoritative_rekor:
         raise CollectionError(f"producer and authoritative Rekor entries differ for {path.name}")
-    authoritative_statement = authoritative_raw.get("statement")
-    if not isinstance(authoritative_statement, dict):
+    authoritative_statement, _ = _payload_from_bundle(authoritative_raw)
+    if not isinstance(authoritative_statement, Mapping):
         raise CollectionError(f"authoritative statement is missing for {path.name}")
+    if has_explicit_authoritative and _canonical_dsse_envelope(
+        bundle_raw
+    ) != _canonical_dsse_envelope(authoritative_raw):
+        raise CollectionError(
+            f"producer and authoritative DSSE envelopes differ for {path.name}"
+        )
+    if has_explicit_authoritative and dict(authoritative_statement) != statement_raw:
+        raise CollectionError(f"producer and authoritative statements differ for {path.name}")
     if authoritative_statement.get("subject") != statement_raw.get("subject"):
         raise CollectionError(f"producer and authoritative subjects differ for {path.name}")
     statement = {

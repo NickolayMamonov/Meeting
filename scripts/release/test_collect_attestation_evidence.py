@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 from collect_attestation_evidence import (
     CollectionError,
+    _certificate_from_bundle,
     _payload_from_bundle,
     _record,
     _rekor,
@@ -45,6 +46,11 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
                 )
 
     def test_current_github_cli_wrapper_is_collected_end_to_end(self):
+        signature_certificate = self.verified_fixture["verificationResult"]["signature"]["certificate"]
+        self.assertNotIn("rawBytes", signature_certificate)
+        self.assertEqual(signature_certificate["certificateIssuer"], "https://token.actions.githubusercontent.com")
+        self.assertNotIn("authoritativeBundle", self.verified_fixture["verificationResult"])
+
         record = self.record(copy.deepcopy(self.verified_fixture))
 
         self.assertEqual(record["subject"]["name"], "artifact.apk")
@@ -62,6 +68,206 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
             record["authoritative"]["statement"]["source_sha"],
             "a" * 40,
         )
+        self.assertNotIn("certificateIssuer", record["producer"]["certificate"])
+        self.assertNotIn("subjectAlternativeName", record["producer"]["certificate"])
+
+    def test_parsed_certificate_metadata_cannot_replace_bundle_der(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        bundle_certificate = verified["attestation"]["bundle"]["verificationMaterial"]["certificate"]
+        bundle_certificate.pop("rawBytes")
+        verified["verificationResult"]["signature"]["certificate"]["rawBytes"] = "not-DER"
+        verified["verificationResult"]["signature"]["certificate"]["certificateLikeMetadata"] = {
+            "der_base64": "also-not-DER"
+        }
+
+        with self.assertRaises(CollectionError):
+            self.record(verified)
+
+    def test_explicit_authoritative_bundle_must_match_signed_bundle(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+        verified["verificationResult"]["authoritativeBundle"] = authoritative
+
+        record = self.record(verified)
+        self.assertEqual(record["producer"]["certificate"], record["authoritative"]["certificate"])
+        self.assertEqual(record["producer"]["rekor"], record["authoritative"]["rekor"])
+
+        conflicting_statement = copy.deepcopy(verified)
+        conflicting_statement["verificationResult"]["authoritativeBundle"]["dsseEnvelope"][
+            "payload"
+        ] = base64.b64encode(
+            json.dumps(
+                {
+                    "predicate": {"buildType": "sanitized"},
+                    "subject": [{"digest": {"sha256": "different"}, "name": "artifact.apk"}],
+                },
+                separators=(",", ":"),
+            ).encode()
+        ).decode()
+        with self.assertRaisesRegex(CollectionError, "DSSE envelopes differ"):
+            self.record(conflicting_statement)
+
+        conflicting_certificate = copy.deepcopy(verified)
+        conflicting_certificate["verificationResult"]["authoritativeBundle"][
+            "verificationMaterial"
+        ].pop("certificate")
+        with self.assertRaises(CollectionError):
+            self.record(conflicting_certificate)
+
+        conflicting_rekor = copy.deepcopy(verified)
+        conflicting_rekor["verificationResult"]["authoritativeBundle"][
+            "verificationMaterial"
+        ]["tlogEntries"][0]["logIndex"] = 8
+        with self.assertRaisesRegex(CollectionError, "Rekor"):
+            self.record(conflicting_rekor)
+
+    def test_explicit_authoritative_dsse_must_match_byte_payload_and_fields(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+        verified["verificationResult"]["authoritativeBundle"] = authoritative
+
+        same_statement_different_payload = copy.deepcopy(verified)
+        statement, _ = _payload_from_bundle(authoritative)
+        reformatted_payload = json.dumps(statement, indent=2).encode("utf-8")
+        same_statement_different_payload["verificationResult"][
+            "authoritativeBundle"
+        ]["dsseEnvelope"]["payload"] = base64.b64encode(
+            reformatted_payload
+        ).decode("ascii")
+        with self.assertRaisesRegex(CollectionError, "DSSE envelopes differ"):
+            self.record(same_statement_different_payload)
+
+        extra_envelope_field = copy.deepcopy(verified)
+        extra_envelope_field["verificationResult"]["authoritativeBundle"][
+            "dsseEnvelope"
+        ]["extraField"] = "conflicting authoritative data"
+        with self.assertRaisesRegex(CollectionError, "DSSE envelopes differ"):
+            self.record(extra_envelope_field)
+
+    def test_conflicting_authoritative_locations_fail_closed(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+        verified["authoritative"] = authoritative
+        conflicting = copy.deepcopy(authoritative)
+        conflicting["verificationMaterial"]["tlogEntries"][0]["logIndex"] = 8
+        verified["verificationResult"]["authoritativeBundle"] = conflicting
+
+        with self.assertRaisesRegex(CollectionError, "conflicting authoritative"):
+            self.record(verified)
+
+        verified = copy.deepcopy(self.verified_fixture)
+        verified["verificationResult"]["authoritativeBundle"] = copy.deepcopy(authoritative)
+        conflicting = copy.deepcopy(authoritative)
+        conflicting["dsseEnvelope"]["payload"] = base64.b64encode(
+            b'{"predicate":{"buildType":"different"},"subject":[]}'
+        ).decode()
+        verified["verificationResult"]["authoritative"] = conflicting
+
+        with self.assertRaisesRegex(CollectionError, "conflicting authoritative"):
+            self.record(verified)
+
+    def test_explicit_null_or_malformed_authoritative_locations_do_not_fallback(self):
+        cases = (
+            lambda verified: verified.update({"authoritative": None}),
+            lambda verified: verified["verificationResult"].update(
+                {"authoritativeBundle": None}
+            ),
+            lambda verified: verified["verificationResult"].update(
+                {"authoritative": None}
+            ),
+            lambda verified: verified.update({"authoritative": "malformed"}),
+            lambda verified: verified["verificationResult"].update(
+                {"authoritativeBundle": "malformed"}
+            ),
+        )
+        for mutate in cases:
+            with self.subTest(mutate=mutate):
+                verified = copy.deepcopy(self.verified_fixture)
+                mutate(verified)
+                with self.assertRaises(CollectionError):
+                    self.record(verified)
+
+    def test_matching_authoritative_locations_are_normalized_once(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+        verified["authoritative"] = copy.deepcopy(authoritative)
+        verified["verificationResult"]["authoritativeBundle"] = copy.deepcopy(authoritative)
+        verified["verificationResult"]["authoritative"] = copy.deepcopy(authoritative)
+
+        record = self.record(verified)
+        self.assertEqual(record["producer"]["certificate"], record["authoritative"]["certificate"])
+
+    def test_explicit_authoritative_bundle_requires_strict_shape_and_own_rekor(self):
+        mutations = (
+            lambda bundle: bundle.pop("mediaType"),
+            lambda bundle: bundle.pop("dsseEnvelope"),
+            lambda bundle: bundle["verificationMaterial"].pop("tlogEntries"),
+            lambda bundle: bundle["verificationMaterial"].update({"tlogEntries": []}),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                verified = copy.deepcopy(self.verified_fixture)
+                authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+                mutation(authoritative)
+                verified["verificationResult"]["authoritativeBundle"] = authoritative
+                with self.assertRaises(CollectionError):
+                    self.record(verified)
+
+    def test_certificate_der_validation_fails_closed(self):
+        direct = copy.deepcopy(self.verified_fixture["attestation"]["bundle"])
+        certificate = direct["verificationMaterial"]["certificate"]
+        cases = {
+            "missing": {},
+            "non_string": {"rawBytes": 123},
+            "empty": {"rawBytes": ""},
+            "malformed_base64": {"rawBytes": "not base64"},
+            "empty_der": {"rawBytes": ""},
+            "unparseable_der": {"rawBytes": base64.b64encode(b"not an x509 certificate").decode()},
+        }
+        for name, replacement in cases.items():
+            with self.subTest(name=name):
+                candidate = copy.deepcopy(direct)
+                candidate["verificationMaterial"]["certificate"] = replacement
+                with self.assertRaises(CollectionError):
+                    _certificate_from_bundle(candidate)
+
+    def test_certificate_locations_and_aliases_fail_closed(self):
+        direct = copy.deepcopy(self.verified_fixture["attestation"]["bundle"])
+        material_certificate = direct["verificationMaterial"]["certificate"]
+
+        with patch(
+            "collect_attestation_evidence.subprocess.run",
+            side_effect=self._openssl_success,
+        ):
+            conflicting_locations = copy.deepcopy(direct)
+            conflicting_locations["certificate"] = {
+                "rawBytes": base64.b64encode(b"different").decode(),
+            }
+            with self.assertRaises(CollectionError):
+                _certificate_from_bundle(conflicting_locations)
+
+            matching_direct_location = copy.deepcopy(direct)
+            matching_direct_location["certificate"] = copy.deepcopy(material_certificate)
+            self.assertEqual(
+                _certificate_from_bundle(matching_direct_location),
+                material_certificate["rawBytes"],
+            )
+
+            conflicting_aliases = copy.deepcopy(direct)
+            conflicting_aliases["verificationMaterial"]["certificate"]["der_base64"] = (
+                base64.b64encode(b"different").decode()
+            )
+            with self.assertRaises(CollectionError):
+                _certificate_from_bundle(conflicting_aliases)
+
+            alternate_encoding = copy.deepcopy(direct)
+            alternate_encoding["verificationMaterial"]["certificate"] = {
+                "der_base64": material_certificate["rawBytes"],
+            }
+            self.assertEqual(
+                _certificate_from_bundle(alternate_encoding),
+                material_certificate["rawBytes"],
+            )
 
     def test_top_level_verified_bundle_compatibility_is_collected_end_to_end(self):
         verified = copy.deepcopy(self.verified_fixture)
