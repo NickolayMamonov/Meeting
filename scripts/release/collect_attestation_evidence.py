@@ -13,6 +13,13 @@ import subprocess
 from pathlib import Path
 from typing import Any, Mapping
 
+from release_evidence import (
+    AttestedSubject,
+    EvidenceError,
+    attestation_group_identity,
+    verify_attestation_groups,
+)
+
 
 class CollectionError(ValueError):
     pass
@@ -389,10 +396,11 @@ def _authoritative_bundle_from_verified_record(
     return first_bundle
 
 
-def _record(
+def _record_unwrapped(
     path: Path,
     verified: dict[str, Any],
     *,
+    source_repository: str,
     source_ref: str,
     source_sha: str,
     signer_workflow: str,
@@ -432,12 +440,21 @@ def _record(
     if not isinstance(subjects, list):
         raise CollectionError(f"verified statement subjects are malformed for {path.name}")
     expected_digest = sha256_bytes(path.read_bytes())
-    if not any(
-        isinstance(subject, dict)
-        and isinstance(subject.get("digest"), dict)
-        and subject["digest"].get("sha256") == expected_digest
-        for subject in subjects
-    ):
+    expected_subject = {"name": path.name, "sha256": expected_digest}
+    signed_members: list[dict[str, str]] = []
+    for subject in subjects:
+        if not isinstance(subject, Mapping):
+            raise CollectionError(f"verified statement subject is malformed for {path.name}")
+        digest = subject.get("digest")
+        if not isinstance(digest, Mapping) or set(digest) != {"sha256"}:
+            raise CollectionError(f"verified statement subject digest is malformed for {path.name}")
+        try:
+            signed_members.append(
+                AttestedSubject(subject.get("name", ""), digest["sha256"]).to_mapping()
+            )
+        except EvidenceError as error:
+            raise CollectionError(f"verified statement subject is malformed for {path.name}") from error
+    if expected_subject not in signed_members:
         raise CollectionError(f"verified attestation does not cover {path.name}")
     signature = result.get("signature", {})
     if not isinstance(signature, Mapping):
@@ -478,6 +495,7 @@ def _record(
         "subject": {"name": path.name, "sha256": expected_digest},
         "predicate": statement_raw.get("predicate", {}),
         "signer": signer_workflow,
+        "source_repository": source_repository,
         "source_ref": source_ref,
         "source_sha": source_sha,
         "run_id": run_id,
@@ -514,11 +532,46 @@ def _record(
         "certificate": certificate,
         "rekor": authoritative_rekor,
     }
+    group = attestation_group_identity(
+        bundle,
+        statement,
+        certificate,
+        rekor,
+        source_repository=source_repository,
+    )
     return {
         "subject": statement["subject"],
+        "rekor_identity": group.rekor_identity,
+        "attestation_group": group.to_mapping(),
         "producer": producer,
         "authoritative": authoritative,
     }
+
+
+def _record(
+    path: Path,
+    verified: dict[str, Any],
+    *,
+    source_repository: str = "owner/repo",
+    source_ref: str,
+    source_sha: str,
+    signer_workflow: str,
+    run_id: int,
+    run_attempt: int,
+) -> dict[str, Any]:
+    try:
+        return _record_unwrapped(
+            path,
+            verified,
+            source_repository=source_repository,
+            source_ref=source_ref,
+            source_sha=source_sha,
+            signer_workflow=signer_workflow,
+            run_id=run_id,
+            run_attempt=run_attempt,
+        )
+    except EvidenceError as error:
+        raise CollectionError(f"invalid attestation evidence for {path.name}") from error
 
 
 def collect(args: argparse.Namespace) -> None:
@@ -530,6 +583,7 @@ def collect(args: argparse.Namespace) -> None:
             _record(
                 path,
                 verified,
+                source_repository=args.repo,
                 source_ref=args.source_ref,
                 source_sha=args.source_sha,
                 signer_workflow=args.signer_workflow,
@@ -540,6 +594,10 @@ def collect(args: argparse.Namespace) -> None:
     subjects = [record["subject"]["name"] for record in records]
     if len(subjects) != len(set(subjects)):
         raise CollectionError("attestation collection returned duplicate local subjects")
+    try:
+        verify_attestation_groups(records)
+    except EvidenceError as error:
+        raise CollectionError("attestation group verification failed") from error
     Path(args.output).write_text(json.dumps({"records": records}), encoding="utf-8")
 
 

@@ -14,6 +14,7 @@ import binascii
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 
@@ -82,6 +83,16 @@ def _sha256(value: Any, what: str) -> str:
         f"invalid {what} SHA-256",
     )
     return digest
+
+
+def _strict_sha256(value: Any, what: str) -> str:
+    _require(
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value),
+        f"invalid {what} SHA-256",
+    )
+    return value
 
 
 def pull_request_tuple(pr: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -407,9 +418,19 @@ def attest_identity(
     )
     subject = statement.get("subject")
     _require(isinstance(subject, Mapping), "attestation statement subject is missing")
+    _require(
+        set(subject) == {"name", "sha256"},
+        "attestation statement subject fields are not exact",
+    )
     _sha256(subject.get("sha256", ""), "attestation subject")
     for field in ("predicate", "signer", "source_ref", "source_sha", "run_id", "run_attempt"):
         _require(statement.get(field) not in (None, ""), f"attestation statement {field} is missing")
+    for field in ("run_id", "run_attempt"):
+        value = statement[field]
+        _require(
+            isinstance(value, int) and not isinstance(value, bool) and value > 0,
+            f"attestation statement {field} is invalid",
+        )
     identity_document = {
         "canonical_bundle_sha256": bundle_identity,
         "statement_sha256": statement_identity,
@@ -423,6 +444,13 @@ def attest_identity(
         "run_id": statement["run_id"],
         "run_attempt": statement["run_attempt"],
     }
+    if "source_repository" in statement:
+        _require(
+            isinstance(statement["source_repository"], str)
+            and bool(statement["source_repository"]),
+            "attestation statement source_repository is invalid",
+        )
+        identity_document["source_repository"] = statement["source_repository"]
     return {
         "canonical_bundle_sha256": bundle_identity,
         "statement_sha256": statement_identity,
@@ -430,6 +458,243 @@ def attest_identity(
         "rekor_identity": sha256_jcs(statement_rekor),
         "attestation_identity": sha256_jcs(identity_document),
     }
+
+
+@dataclass(frozen=True)
+class AttestedSubject:
+    """One exact local subject from the complete signed DSSE subject set."""
+
+    name: str
+    sha256: str
+
+    def __post_init__(self) -> None:
+        _require(isinstance(self.name, str) and self.name and self.name == self.name.strip(), "attested subject name is invalid")
+        _require(self.name == Path(self.name).name, "attested subject name is not local")
+        object.__setattr__(self, "sha256", _strict_sha256(self.sha256, "attested subject"))
+
+    def to_mapping(self) -> dict[str, str]:
+        return {"name": self.name, "sha256": self.sha256}
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "AttestedSubject":
+        _require(isinstance(value, Mapping), "attested subject is malformed")
+        _require(set(value) == {"name", "sha256"}, "attested subject fields are not exact")
+        return cls(value["name"], value["sha256"])
+
+
+def _signed_subjects(bundle: Mapping[str, Any]) -> tuple[bytes, tuple[AttestedSubject, ...], Any]:
+    signature = bundle.get("signature")
+    _require(isinstance(signature, Mapping), "attestation DSSE signature is missing")
+    encoded = signature.get("payload")
+    _require(isinstance(encoded, str) and encoded, "attestation DSSE payload is missing")
+    try:
+        payload = base64.b64decode(encoded, validate=True)
+        decoded = json.loads(payload)
+    except (binascii.Error, ValueError, json.JSONDecodeError) as error:
+        raise EvidenceError("attestation DSSE payload is invalid") from error
+    _require(isinstance(decoded, Mapping), "attestation DSSE payload is not an object")
+    raw_subjects = decoded.get("subject")
+    _require(isinstance(raw_subjects, list) and raw_subjects, "signed DSSE subjects are missing")
+    subjects: list[AttestedSubject] = []
+    names: set[str] = set()
+    for raw in raw_subjects:
+        _require(isinstance(raw, Mapping), "signed DSSE subject is malformed")
+        _require(set(raw) == {"name", "digest"}, "signed DSSE subject fields are not exact")
+        digest = raw.get("digest")
+        _require(isinstance(digest, Mapping) and set(digest) == {"sha256"}, "signed DSSE subject digest is malformed")
+        subject = AttestedSubject(raw.get("name", ""), digest["sha256"])
+        _require(subject.name not in names, "signed DSSE subjects contain duplicate names")
+        names.add(subject.name)
+        subjects.append(subject)
+    return payload, tuple(sorted(subjects, key=lambda item: (item.name, item.sha256))), decoded.get("predicate")
+
+
+@dataclass(frozen=True)
+class AttestationGroupIdentity:
+    """Canonical identity for one signed multi-subject attestation event."""
+
+    subjects: tuple[AttestedSubject, ...]
+    payload_sha256: str
+    rekor_identity: str
+    certificate_identity: str
+    predicate_identity: str
+    source_repository: str
+    signer: str
+    source_ref: str
+    source_sha: str
+    run_id: int
+    run_attempt: int
+    identity: str
+
+    def __post_init__(self) -> None:
+        normalized = tuple(sorted(self.subjects, key=lambda item: (item.name, item.sha256)))
+        _require(normalized == self.subjects and subjects_are_unique(normalized), "attestation group subjects are not canonical")
+        object.__setattr__(self, "payload_sha256", _strict_sha256(self.payload_sha256, "attestation payload"))
+        for field in ("rekor_identity", "certificate_identity", "predicate_identity"):
+            object.__setattr__(self, field, _strict_sha256(getattr(self, field), f"attestation group {field}"))
+        _require(
+            all(isinstance(value, str) and value for value in (
+                self.source_repository, self.signer, self.source_ref, self.source_sha,
+            )),
+            "attestation group binding is incomplete",
+        )
+        _require(
+            isinstance(self.run_id, int) and not isinstance(self.run_id, bool) and self.run_id > 0
+            and isinstance(self.run_attempt, int) and not isinstance(self.run_attempt, bool) and self.run_attempt > 0,
+            "attestation group execution identity is invalid",
+        )
+        expected = sha256_jcs(self._without_identity())
+        _require(self.identity == expected, "attestation group identity mismatch")
+
+    def _without_identity(self) -> dict[str, Any]:
+        return {
+            "payload_sha256": self.payload_sha256,
+            "subjects": [subject.to_mapping() for subject in self.subjects],
+            "rekor_identity": self.rekor_identity,
+            "certificate_identity": self.certificate_identity,
+            "predicate_identity": self.predicate_identity,
+            "source_repository": self.source_repository,
+            "signer": self.signer,
+            "source_ref": self.source_ref,
+            "source_sha": self.source_sha,
+            "run_id": self.run_id,
+            "run_attempt": self.run_attempt,
+        }
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {"identity": self.identity, **self._without_identity()}
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "AttestationGroupIdentity":
+        _require(isinstance(value, Mapping), "attestation group is malformed")
+        expected = {
+            "identity", "payload_sha256", "subjects", "rekor_identity",
+            "certificate_identity", "predicate_identity", "source_repository",
+            "signer", "source_ref", "source_sha", "run_id", "run_attempt",
+        }
+        _require(set(value) == expected, "attestation group fields are not exact")
+        subjects = tuple(AttestedSubject.from_mapping(item) for item in value["subjects"])
+        return cls(
+            subjects=subjects,
+            payload_sha256=value["payload_sha256"],
+            rekor_identity=value["rekor_identity"],
+            certificate_identity=value["certificate_identity"],
+            predicate_identity=value["predicate_identity"],
+            source_repository=value["source_repository"],
+            signer=value["signer"],
+            source_ref=value["source_ref"],
+            source_sha=value["source_sha"],
+            run_id=value["run_id"],
+            run_attempt=value["run_attempt"],
+            identity=value["identity"],
+        )
+
+
+def subjects_are_unique(subjects: Sequence[AttestedSubject]) -> bool:
+    return len(subjects) == len({(item.name, item.sha256) for item in subjects}) == len({item.name for item in subjects})
+
+
+def attestation_group_identity(
+    bundle: Mapping[str, Any],
+    statement: Mapping[str, Any],
+    certificate: Mapping[str, Any],
+    rekor: Mapping[str, Any],
+    *,
+    source_repository: str | None = None,
+) -> AttestationGroupIdentity:
+    """Recompute a group from retained DSSE bytes and canonical evidence."""
+
+    payload, subjects, signed_predicate = _signed_subjects(bundle)
+    _require(sha256_bytes(payload) == statement.get("payload_sha256"), "attestation payload digest mismatch")
+    _require(signed_predicate == statement.get("predicate"), "signed predicate differs from canonical statement")
+    local = AttestedSubject.from_mapping(statement.get("subject"))
+    _require(local in subjects, "canonical subject is not an exact signed subject member")
+    linked = attest_identity(bundle, statement, certificate, rekor)
+    repository = source_repository if source_repository is not None else statement.get("source_repository")
+    _require(isinstance(repository, str) and repository, "attestation group source repository is missing")
+    _require(
+        statement.get("source_repository") == repository,
+        "attestation group source repository mismatch",
+    )
+    group_without_identity = {
+        "payload_sha256": sha256_bytes(payload),
+        "subjects": [subject.to_mapping() for subject in subjects],
+        "rekor_identity": linked["rekor_identity"],
+        "certificate_identity": linked["certificate_identity"],
+        "predicate_identity": sha256_jcs(signed_predicate),
+        "source_repository": repository,
+        "signer": statement["signer"],
+        "source_ref": statement["source_ref"],
+        "source_sha": statement["source_sha"],
+        "run_id": statement["run_id"],
+        "run_attempt": statement["run_attempt"],
+    }
+    return AttestationGroupIdentity(
+        subjects=subjects,
+        payload_sha256=group_without_identity["payload_sha256"],
+        rekor_identity=group_without_identity["rekor_identity"],
+        certificate_identity=group_without_identity["certificate_identity"],
+        predicate_identity=group_without_identity["predicate_identity"],
+        source_repository=repository,
+        signer=statement["signer"],
+        source_ref=statement["source_ref"],
+        source_sha=statement["source_sha"],
+        run_id=statement["run_id"],
+        run_attempt=statement["run_attempt"],
+        identity=sha256_jcs(group_without_identity),
+    )
+
+
+def verify_attestation_group(
+    declared: Mapping[str, Any] | AttestationGroupIdentity,
+    bundle: Mapping[str, Any],
+    statement: Mapping[str, Any],
+    certificate: Mapping[str, Any],
+    rekor: Mapping[str, Any],
+) -> AttestationGroupIdentity:
+    expected = attestation_group_identity(bundle, statement, certificate, rekor)
+    actual = declared if isinstance(declared, AttestationGroupIdentity) else AttestationGroupIdentity.from_mapping(declared)
+    _require(actual == expected, "declared attestation group differs from recomputed evidence")
+    return expected
+
+
+def verify_attestation_groups(records: Iterable[Mapping[str, Any]]) -> None:
+    """Enforce Rekor cardinality after each record has been independently linked."""
+
+    buckets: dict[str, list[tuple[AttestedSubject, AttestationGroupIdentity | None]]] = {}
+    seen_subjects: set[tuple[str, str]] = set()
+    seen_names: set[str] = set()
+    for record in records:
+        _require(isinstance(record, Mapping), "attestation group record is malformed")
+        subject = AttestedSubject.from_mapping(record.get("subject"))
+        key = (subject.name, subject.sha256)
+        _require(key not in seen_subjects, "duplicate attestation group subject")
+        _require(subject.name not in seen_names, "duplicate attestation group subject name")
+        seen_subjects.add(key)
+        seen_names.add(subject.name)
+        rekor = record.get("rekor_identity")
+        _require(isinstance(rekor, str), "attestation group Rekor identity is missing")
+        declared = record.get("attestation_group")
+        group = None if declared is None else (
+            declared if isinstance(declared, AttestationGroupIdentity)
+            else AttestationGroupIdentity.from_mapping(declared)
+        )
+        if group is not None:
+            _require(group.rekor_identity == rekor, "attestation group Rekor identity mismatch")
+            _require(subject in group.subjects, "attestation group does not contain local subject")
+        buckets.setdefault(rekor, []).append((subject, group))
+    for bucket in buckets.values():
+        subjects = {item for item, _ in bucket}
+        groups = [group for _, group in bucket]
+        if len(bucket) == 1:
+            if groups[0] is not None:
+                _require(set(groups[0].subjects) == subjects, "singleton attestation group coverage is not exact")
+            continue
+        _require(all(group is not None for group in groups), "repeated Rekor has legacy or partial group evidence")
+        first = groups[0]
+        assert first is not None
+        _require(all(group == first for group in groups[1:]), "repeated Rekor has divergent attestation groups")
+        _require(set(first.subjects) == subjects, "attestation group coverage is not exact")
 
 
 def verify_attestation_link(

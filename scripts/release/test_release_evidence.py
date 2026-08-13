@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 import base64
+import json
 import unittest
 
 from release_evidence import (
+    AttestedSubject,
+    AttestationGroupIdentity,
     EvidenceError,
     attest_identity,
+    attestation_group_identity,
     effective_singleton_queue,
     map_merge_group_to_pr,
     pull_request_tuple,
@@ -14,6 +18,7 @@ from release_evidence import (
     sha256_jcs,
     stable_read,
     verify_attestation_link,
+    verify_attestation_groups,
     verify_merge_group_event,
     verify_pull_request_snapshot,
     verify_two_parent_merge_commit,
@@ -204,6 +209,107 @@ class EvidenceTest(unittest.TestCase):
         )
         self.assertEqual(linked["certificate_identity"], expected_certificate)
         self.assertFalse(sha256_jcs(bundle).endswith("\n"))
+
+    def test_five_subject_attestation_group_is_deterministic_and_complete(self):
+        certificate_bytes = b"group certificate"
+        certificate = {
+            "der_base64": base64.b64encode(certificate_bytes).decode("ascii")
+        }
+        rekor = {"log_id": "e" * 64, "log_index": 7, "integrated_time": 11}
+        signed_subjects = [
+            {"name": f"artifact-{index}.apk", "digest": {"sha256": f"{index:064x}"}}
+            for index in range(1, 6)
+        ]
+        signed_statement = {
+            "predicate": {"buildType": "https://slsa.dev/provenance/v1"},
+            "subject": signed_subjects,
+        }
+        payload = json.dumps(signed_statement, separators=(",", ":")).encode("utf-8")
+        groups = []
+        for subject in signed_subjects:
+            canonical_subject = {
+                "name": subject["name"],
+                "sha256": subject["digest"]["sha256"],
+            }
+            statement = {
+                "subject": canonical_subject,
+                "predicate": signed_statement["predicate"],
+                "source_repository": "owner/repo",
+                "signer": "owner/repo/.github/workflows/release.yml",
+                "source_ref": "refs/heads/dev",
+                "source_sha": "a" * 40,
+                "run_id": 42,
+                "run_attempt": 1,
+                "payload_sha256": sha256_bytes(payload),
+                "certificate_sha256": sha256_bytes(certificate_bytes),
+                "rekor": rekor,
+            }
+            bundle = {
+                "media_type": "application/vnd.dev.sigstore.bundle.v0.3+json",
+                "statement": statement,
+                "certificate": certificate,
+                "rekor": rekor,
+                "signature": {"payload": base64.b64encode(payload).decode("ascii")},
+            }
+            group = attestation_group_identity(bundle, statement, certificate, rekor)
+            groups.append(group)
+        self.assertEqual({group.identity for group in groups}, {groups[0].identity})
+        self.assertEqual(len(groups[0].subjects), 5)
+        self.assertEqual(
+            [subject.name for subject in groups[0].subjects],
+            [f"artifact-{index}.apk" for index in range(1, 6)],
+        )
+        verify_attestation_groups(
+            [
+                {
+                    "subject": subject.to_mapping(),
+                    "rekor_identity": groups[0].rekor_identity,
+                    "attestation_group": groups[0],
+                }
+                for subject in groups[0].subjects
+            ]
+        )
+
+    def test_attestation_group_rejects_tamper_partial_and_legacy_reuse(self):
+        bundle, statement, certificate, rekor = self.attestation_parts()
+        payload_statement = {
+            "predicate": statement["predicate"],
+            "subject": [{"name": "app.apk", "digest": {"sha256": "a" * 64}}],
+        }
+        payload = json.dumps(payload_statement, separators=(",", ":")).encode("utf-8")
+        statement = {
+            **statement,
+            "source_repository": "owner/repo",
+            "payload_sha256": sha256_bytes(payload),
+        }
+        bundle = {
+            **bundle,
+            "statement": statement,
+            "signature": {"payload": base64.b64encode(payload).decode("ascii")},
+        }
+        group = attestation_group_identity(bundle, statement, certificate, rekor)
+        with self.assertRaises(EvidenceError):
+            AttestationGroupIdentity.from_mapping({**group.to_mapping(), "identity": "0" * 64})
+        with self.assertRaises(EvidenceError):
+            verify_attestation_groups(
+                [
+                    {
+                        "subject": {"name": "app.apk", "sha256": "a" * 64},
+                        "rekor_identity": group.rekor_identity,
+                        "attestation_group": group.to_mapping(),
+                    },
+                    {
+                        "subject": {"name": "other.apk", "sha256": "b" * 64},
+                        "rekor_identity": group.rekor_identity,
+                    },
+                ]
+            )
+        verify_attestation_groups(
+            [{
+                "subject": {"name": "app.apk", "sha256": "a" * 64},
+                "rekor_identity": group.rekor_identity,
+            }]
+        )
 
     def test_attestation_rejects_component_and_authority_tamper(self):
         bundle, statement, certificate, rekor = self.attestation_parts()
