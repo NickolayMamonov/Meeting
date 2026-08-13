@@ -18,6 +18,22 @@ class CollectionError(ValueError):
     pass
 
 
+_DIRECT_BUNDLE_FIELDS = frozenset(
+    {
+        "certificate",
+        "dsseEnvelope",
+        "dsse_envelope",
+        "mediaType",
+        "media_type",
+        "rekor",
+        "signature",
+        "statement",
+        "verificationMaterial",
+        "verification_material",
+    }
+)
+
+
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -179,6 +195,56 @@ def _rekor(bundle: Mapping[str, Any], verification: Mapping[str, Any]) -> dict[s
     }
 
 
+def _is_direct_bundle(value: Any) -> bool:
+    """Recognize only an unmistakable, top-level Sigstore bundle."""
+    if not isinstance(value, Mapping) or not value:
+        return False
+    if "bundle" in value:
+        return False
+    payload = any(
+        isinstance(value.get(key), Mapping) and value[key]
+        for key in ("dsseEnvelope", "dsse_envelope", "statement")
+    )
+    material = any(
+        isinstance(value.get(key), Mapping) and value[key]
+        for key in ("certificate", "verificationMaterial", "verification_material")
+    )
+    return payload and material
+
+
+def _bundle_from_verified_record(verified: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize one verified GitHub CLI record without fallback or merging."""
+    if not isinstance(verified, Mapping):
+        raise CollectionError("verified attestation record is malformed")
+    has_attestation = "attestation" in verified
+    has_bundle = "bundle" in verified
+    if has_attestation and has_bundle:
+        raise CollectionError("verified attestation has conflicting bundle representations")
+
+    if has_bundle:
+        candidate = verified["bundle"]
+        if not _is_direct_bundle(candidate):
+            raise CollectionError("verified attestation bundle is missing or malformed")
+        return dict(candidate)
+
+    if not has_attestation:
+        raise CollectionError("verified attestation bundle is missing")
+    attestation = verified["attestation"]
+    if not isinstance(attestation, Mapping) or not attestation:
+        raise CollectionError("verified attestation is missing or malformed")
+
+    if "bundle" in attestation:
+        candidate = attestation["bundle"]
+        if not _is_direct_bundle(candidate):
+            raise CollectionError("verified attestation.bundle is missing or malformed")
+        # A wrapper must not also carry direct bundle material.
+        if _DIRECT_BUNDLE_FIELDS.intersection(attestation):
+            raise CollectionError("verified attestation wrapper is hybrid")
+        return dict(candidate)
+
+    raise CollectionError("verified attestation.bundle is missing or malformed")
+
+
 def _record(
     path: Path,
     verified: dict[str, Any],
@@ -189,7 +255,7 @@ def _record(
     run_id: int,
     run_attempt: int,
 ) -> dict[str, Any]:
-    bundle_raw = verified.get("attestation", verified.get("bundle"))
+    bundle_raw = _bundle_from_verified_record(verified)
     result = verified.get("verificationResult", verified.get("verification_result", {}))
     authoritative_raw = verified.get("authoritative")
     if authoritative_raw is None and isinstance(result, Mapping):

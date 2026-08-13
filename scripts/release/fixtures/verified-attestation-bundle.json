@@ -1,0 +1,53 @@
+{
+  "attestation": {
+    "bundle": {
+      "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "dsseEnvelope": {
+        "payload": "eyJwcmVkaWNhdGUiOnsiYnVpbGRUeXBlIjoic2FuaXRpemVkIn0sInN1YmplY3QiOlt7ImRpZ2VzdCI6eyJzaGEyNTYiOiI5MDYzZjQzZTEwNWJjYzljZDc4MzZlZjc0Nzc5NzBjYmZmMzg5ZTY5YWEyMjE5NTRjZTU1Zjg2MTZhNjE1YmYwIn0sIm5hbWUiOiJhcnRpZmFjdC5hcGsifV19"
+      },
+      "verificationMaterial": {
+        "certificate": {
+          "rawBytes": "MIICLDCCAZWgAwIBAgIUU7DujBEmLxJMH6CtgUXoTSJ8FEEwDQYJKoZIhvcNAQELBQAwKDEmMCQGA1UEAwwdc2FuaXRpemVkLWF0dGVzdGF0aW9uLWZpeHR1cmUwHhcNMjYwODEzMDE1NTQwWhcNMzYwODEwMDE1NTQwWjAoMSYwJAYDVQQDDB1zYW5pdGl6ZWQtYXR0ZXN0YXRpb24tZml4dHVyZTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAxss6FGuWGWsl082YItftYU5CdAd9ubvy+hPwLoehV77qUkQRv7Ca4Dd1YDoc3eJX62lqqvo5kWRm6xGyvTeuHV7CDOOYuz6uuqdPcKAVpbi9b9j0kNBU85VUSkjeS7r9FyzYgbUey4yD8PaVvHT+ITlOj2+CJM1GLrYrGCbIS8MCAwEAAaNTMFEwHQYDVR0OBBYEFMMcs/1y2hSVdmuILRAUe3yKGl+TMB8GA1UdIwQYMBaAFMMcs/1y2hSVdmuILRAUe3yKGl+TMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADgYEAhtnm+fxcVI5IGSFcZn1IQVL2DKIhB09o4QpwHKb0dcFzLVKeVam1/aRKwbgX5swVwX32IxrKkiMTHzdPuXBmWG6Jn6136ubadR5f7yPtTYAWJa5k/TOD5zkEwMZb3BgBEu5e249faO23GQ86iTift/+WqNlGmN56mFqj5oaskEw="
+        },
+        "tlogEntries": [
+          {
+            "logId": {
+              "keyId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "logIndex": 7,
+            "integratedTime": 1700000000
+          }
+        ]
+      }
+    }
+  },
+  "verificationResult": {
+    "statement": {
+      "predicate": {
+        "buildType": "sanitized"
+      },
+      "subject": [
+        {
+          "digest": {
+            "sha256": "9063f43e105bcc9cd7836ef7477970cbff389e69aa221954ce55f8616a615bf0"
+          },
+          "name": "artifact.apk"
+        }
+      ]
+    },
+    "signature": {
+      "certificate": {
+        "rawBytes": "MIICLDCCAZWgAwIBAgIUU7DujBEmLxJMH6CtgUXoTSJ8FEEwDQYJKoZIhvcNAQELBQAwKDEmMCQGA1UEAwwdc2FuaXRpemVkLWF0dGVzdGF0aW9uLWZpeHR1cmUwHhcNMjYwODEzMDE1NTQwWhcNMzYwODEwMDE1NTQwWjAoMSYwJAYDVQQDDB1zYW5pdGl6ZWQtYXR0ZXN0YXRpb24tZml4dHVyZTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAxss6FGuWGWsl082YItftYU5CdAd9ubvy+hPwLoehV77qUkQRv7Ca4Dd1YDoc3eJX62lqqvo5kWRm6xGyvTeuHV7CDOOYuz6uuqdPcKAVpbi9b9j0kNBU85VUSkjeS7r9FyzYgbUey4yD8PaVvHT+ITlOj2+CJM1GLrYrGCbIS8MCAwEAAaNTMFEwHQYDVR0OBBYEFMMcs/1y2hSVdmuILRAUe3yKGl+TMB8GA1UdIwQYMBaAFMMcs/1y2hSVdmuILRAUe3yKGl+TMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADgYEAhtnm+fxcVI5IGSFcZn1IQVL2DKIhB09o4QpwHKb0dcFzLVKeVam1/aRKwbgX5swVwX32IxrKkiMTHzdPuXBmWG6Jn6136ubadR5f7yPtTYAWJa5k/TOD5zkEwMZb3BgBEu5e249faO23GQ86iTift/+WqNlGmN56mFqj5oaskEw="
+      }
+    },
+    "verifiedTimestamps": [
+      {
+        "logId": {
+          "keyId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "logIndex": 7,
+        "integratedTime": 1700000000
+      }
+    ]
+  }
+}
