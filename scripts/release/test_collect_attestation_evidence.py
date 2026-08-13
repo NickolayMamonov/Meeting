@@ -1,5 +1,6 @@
 import base64
 import copy
+import hashlib
 import json
 import tempfile
 import unittest
@@ -12,6 +13,7 @@ from collect_attestation_evidence import (
     _payload_from_bundle,
     _record,
     _rekor,
+    collect,
 )
 
 
@@ -70,6 +72,104 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
         )
         self.assertNotIn("certificateIssuer", record["producer"]["certificate"])
         self.assertNotIn("subjectAlternativeName", record["producer"]["certificate"])
+
+    def test_five_subject_group_propagates_through_collection(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            directory = root_path / "artifacts"
+            directory.mkdir()
+            names = [f"artifact-{index}.apk" for index in range(1, 6)]
+            verified = copy.deepcopy(self.verified_fixture)
+            signed_statement = {
+                "predicate": {"buildType": "sanitized"},
+                "subject": [
+                    {
+                        "name": name,
+                        "digest": {"sha256": hashlib.sha256(name.encode()).hexdigest()},
+                    }
+                    for name in names
+                ],
+            }
+            payload = json.dumps(signed_statement, separators=(",", ":")).encode("utf-8")
+            verified["attestation"]["bundle"]["dsseEnvelope"]["payload"] = base64.b64encode(
+                payload
+            ).decode("ascii")
+            verified["verificationResult"]["statement"] = signed_statement
+            for name in names:
+                (directory / name).write_bytes(name.encode())
+            args = type(
+                "Args",
+                (),
+                {
+                    "directory": directory,
+                    "output": root_path / "evidence.json",
+                    "repo": "owner/repo",
+                    "signer_workflow": "owner/repo/.github/workflows/ci.yml",
+                    "source_ref": "refs/heads/dev",
+                    "source_sha": "a" * 40,
+                    "run_id": 123,
+                    "run_attempt": 1,
+                },
+            )()
+            with patch(
+                "collect_attestation_evidence.run_gh",
+                side_effect=lambda *unused: copy.deepcopy(verified),
+            ), patch(
+                "collect_attestation_evidence.subprocess.run",
+                side_effect=self._openssl_success,
+            ):
+                collect(args)
+            records = json.loads(args.output.read_text(encoding="utf-8"))["records"]
+            self.assertEqual(len(records), 5)
+            groups = {json.dumps(record["attestation_group"], sort_keys=True) for record in records}
+            self.assertEqual(len(groups), 1)
+            self.assertTrue(all(record["attestation_group"]["subjects"] for record in records))
+
+    def test_collection_rejects_partial_multi_subject_group(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            directory = root_path / "artifacts"
+            directory.mkdir()
+            names = [f"artifact-{index}.apk" for index in range(1, 6)]
+            verified = copy.deepcopy(self.verified_fixture)
+            signed_statement = {
+                "predicate": {"buildType": "sanitized"},
+                "subject": [
+                    {
+                        "name": name,
+                        "digest": {"sha256": hashlib.sha256(name.encode()).hexdigest()},
+                    }
+                    for name in names
+                ],
+            }
+            payload = json.dumps(signed_statement, separators=(",", ":")).encode("utf-8")
+            verified["attestation"]["bundle"]["dsseEnvelope"]["payload"] = base64.b64encode(
+                payload
+            ).decode("ascii")
+            verified["verificationResult"]["statement"] = signed_statement
+            (directory / names[0]).write_bytes(names[0].encode())
+            args = type(
+                "Args",
+                (),
+                {
+                    "directory": directory,
+                    "output": root_path / "evidence.json",
+                    "repo": "owner/repo",
+                    "signer_workflow": "owner/repo/.github/workflows/ci.yml",
+                    "source_ref": "refs/heads/dev",
+                    "source_sha": "a" * 40,
+                    "run_id": 123,
+                    "run_attempt": 1,
+                },
+            )()
+            with patch(
+                "collect_attestation_evidence.run_gh",
+                return_value=verified,
+            ), patch(
+                "collect_attestation_evidence.subprocess.run",
+                side_effect=self._openssl_success,
+            ), self.assertRaisesRegex(CollectionError, "group"):
+                collect(args)
 
     def test_parsed_certificate_metadata_cannot_replace_bundle_der(self):
         verified = copy.deepcopy(self.verified_fixture)

@@ -13,8 +13,8 @@ import base64
 import binascii
 import hashlib
 import json
+import unicodedata
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 
@@ -468,8 +468,20 @@ class AttestedSubject:
     sha256: str
 
     def __post_init__(self) -> None:
-        _require(isinstance(self.name, str) and self.name and self.name == self.name.strip(), "attested subject name is invalid")
-        _require(self.name == Path(self.name).name, "attested subject name is not local")
+        _require(
+            isinstance(self.name, str)
+            and self.name
+            and self.name == self.name.strip(),
+            "attested subject name is invalid",
+        )
+        _require(
+            self.name not in {".", ".."}
+            and "/" not in self.name
+            and "\\" not in self.name
+            and ":" not in self.name
+            and not any(unicodedata.category(character) == "Cc" for character in self.name),
+            "attested subject name is not a strict local name",
+        )
         object.__setattr__(self, "sha256", _strict_sha256(self.sha256, "attested subject"))
 
     def to_mapping(self) -> dict[str, str]:
@@ -573,7 +585,9 @@ class AttestationGroupIdentity:
             "signer", "source_ref", "source_sha", "run_id", "run_attempt",
         }
         _require(set(value) == expected, "attestation group fields are not exact")
-        subjects = tuple(AttestedSubject.from_mapping(item) for item in value["subjects"])
+        raw_subjects = value["subjects"]
+        _require(isinstance(raw_subjects, list), "attestation group subjects must be a list")
+        subjects = tuple(AttestedSubject.from_mapping(item) for item in raw_subjects)
         return cls(
             subjects=subjects,
             payload_sha256=value["payload_sha256"],

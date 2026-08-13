@@ -210,6 +210,38 @@ class EvidenceTest(unittest.TestCase):
         self.assertEqual(linked["certificate_identity"], expected_certificate)
         self.assertFalse(sha256_jcs(bundle).endswith("\n"))
 
+    def test_attested_subject_rejects_non_local_names_cross_platform(self):
+        for name in (".", "..", "nested/name.apk", r"nested\name.apk", r"C:artifact.apk", "line\nbreak.apk", "tab\t.apk", "nul\x00.apk"):
+            with self.subTest(name=repr(name)):
+                with self.assertRaises(EvidenceError):
+                    AttestedSubject(name, "a" * 64)
+
+    def test_attestation_group_subjects_require_a_list(self):
+        bundle, statement, certificate, rekor = self.attestation_parts()
+        payload_statement = {
+            "predicate": {"buildType": "sanitized"},
+            "subject": [{"name": "app.apk", "digest": {"sha256": "a" * 64}}],
+        }
+        payload = json.dumps(payload_statement, separators=(",", ":")).encode("utf-8")
+        statement = {
+            **statement,
+            "predicate": payload_statement["predicate"],
+            "source_repository": "owner/repo",
+            "payload_sha256": sha256_bytes(payload),
+        }
+        bundle = {
+            **bundle,
+            "statement": statement,
+            "signature": {"payload": base64.b64encode(payload).decode("ascii")},
+        }
+        group = attestation_group_identity(bundle, statement, certificate, rekor)
+        for subjects in (None, 1, {}, "app.apk"):
+            with self.subTest(subjects=subjects):
+                with self.assertRaises(EvidenceError):
+                    AttestationGroupIdentity.from_mapping(
+                        {**group.to_mapping(), "subjects": subjects}
+                    )
+
     def test_five_subject_attestation_group_is_deterministic_and_complete(self):
         certificate_bytes = b"group certificate"
         certificate = {
@@ -310,6 +342,81 @@ class EvidenceTest(unittest.TestCase):
                 "rekor_identity": group.rekor_identity,
             }]
         )
+
+    def test_attestation_group_rejects_partial_mixed_and_divergent_buckets(self):
+        certificate_bytes = b"group matrix certificate"
+        certificate = {
+            "der_base64": base64.b64encode(certificate_bytes).decode("ascii")
+        }
+        rekor = {"log_id": "c" * 64, "log_index": 8, "integrated_time": 12}
+        signed_subjects = [
+            {"name": f"subject-{index}.apk", "digest": {"sha256": f"{index:064x}"}}
+            for index in range(1, 4)
+        ]
+        signed_statement = {
+            "predicate": {"buildType": "matrix"},
+            "subject": signed_subjects,
+        }
+        payload = json.dumps(signed_statement, separators=(",", ":")).encode("utf-8")
+        groups = []
+        for subject in signed_subjects:
+            statement = {
+                "subject": {
+                    "name": subject["name"],
+                    "sha256": subject["digest"]["sha256"],
+                },
+                "predicate": signed_statement["predicate"],
+                "source_repository": "owner/repo",
+                "signer": "owner/repo/.github/workflows/release.yml",
+                "source_ref": "refs/heads/dev",
+                "source_sha": "b" * 40,
+                "run_id": 99,
+                "run_attempt": 1,
+                "payload_sha256": sha256_bytes(payload),
+                "certificate_sha256": sha256_bytes(certificate_bytes),
+                "rekor": rekor,
+            }
+            bundle = {
+                "media_type": "application/vnd.dev.sigstore.bundle.v0.3+json",
+                "statement": statement,
+                "certificate": certificate,
+                "rekor": rekor,
+                "signature": {"payload": base64.b64encode(payload).decode("ascii")},
+            }
+            groups.append(attestation_group_identity(bundle, statement, certificate, rekor))
+        records = [
+            {
+                "subject": group.subjects[index].to_mapping(),
+                "rekor_identity": group.rekor_identity,
+                "attestation_group": group,
+            }
+            for index, group in enumerate(groups)
+        ]
+        with self.assertRaises(EvidenceError):
+            verify_attestation_groups(records[:2])
+        with self.assertRaises(EvidenceError):
+            verify_attestation_groups(
+                [records[0], {
+                    "subject": records[1]["subject"],
+                    "rekor_identity": groups[1].rekor_identity,
+                }]
+            )
+        divergent_mapping = groups[1].to_mapping()
+        divergent_mapping["source_ref"] = "refs/heads/other"
+        divergent_without_identity = {
+            key: value for key, value in divergent_mapping.items() if key != "identity"
+        }
+        divergent_mapping["identity"] = sha256_jcs(divergent_without_identity)
+        divergent = AttestationGroupIdentity.from_mapping(divergent_mapping)
+        with self.assertRaises(EvidenceError):
+            verify_attestation_groups([
+                records[0],
+                {
+                    "subject": records[1]["subject"],
+                    "rekor_identity": divergent.rekor_identity,
+                    "attestation_group": divergent,
+                },
+            ])
 
     def test_attestation_rejects_component_and_authority_tamper(self):
         bundle, statement, certificate, rekor = self.attestation_parts()
