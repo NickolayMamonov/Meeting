@@ -1,4 +1,3 @@
-import re
 import unittest
 from pathlib import Path
 
@@ -19,6 +18,14 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         cls.snapshot_evidence = cls.workflow[
             cls.workflow.index("  snapshot-evidence:")
             : cls.workflow.index("  release-") if "  release-" in cls.workflow else len(cls.workflow)
+        ]
+        cls.unit_tests = cls.workflow[
+            cls.workflow.index("  unit-tests:")
+            : cls.workflow.index("  assemble:")
+        ]
+        cls.stable_evidence = cls.release_workflow[
+            cls.release_workflow.index("  stable-evidence:")
+            : cls.release_workflow.index("  stable-runtime-gate:")
         ]
 
     def test_snapshot_sign_is_checkout_free_and_resolves_before_secret_decode(self):
@@ -53,16 +60,83 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         ]
         self.assertIn('--apksigner "$APKSIGNER_PATH"', verifier_call)
         self.assertIn('--apkanalyzer "$APKANALYZER_PATH"', verifier_call)
+        self.assertEqual(verifier_call.count("--expected-debuggable true"), 1)
+        self.assertNotIn("--expected-debuggable false", verifier_call)
         self.assertNotIn('--apkanalyzer apkanalyzer', verifier_call)
 
-    def test_stable_call_site_keeps_bare_path_compatibility(self):
-        calls = re.findall(
-            r"python scripts/release/verify_android_artifacts\.py\s*\\\n"
-            r"(?:.*\\\n)*?.*--apksigner\s+([^\s\\]+)",
-            self.release_workflow,
+    def test_release_tooling_tests_run_in_unprivileged_unit_job(self):
+        self.assertIn(
+            'python -m unittest discover -s scripts/release -p "test_*.py"',
+            self.unit_tests,
         )
-        self.assertEqual(calls, ["apksigner"])
-        self.assertIn("--apkanalyzer apkanalyzer", self.release_workflow)
+        self.assertNotIn("environment:", self.unit_tests)
+        self.assertNotIn("secrets.", self.unit_tests)
+        self.assertNotIn("continue-on-error", self.unit_tests)
+
+    def test_stable_call_site_requires_false_and_keeps_aab_contract(self):
+        verifier_call = self.stable_evidence[
+            self.stable_evidence.index("python scripts/release/verify_android_artifacts.py") :
+        ]
+        self.assertEqual(verifier_call.count("--expected-debuggable false"), 1)
+        self.assertNotIn("--expected-debuggable true", verifier_call)
+        self.assertIn("--aab", verifier_call)
+        self.assertIn("--bundletool-jar", verifier_call)
+        self.assertIn("--bundletool-sha256", verifier_call)
+        self.assertIn("--apksigner apksigner", verifier_call)
+        self.assertIn("--apkanalyzer apkanalyzer", verifier_call)
+
+    def test_verifiers_fail_fast_before_evidence_production(self):
+        for workflow, verifier_call, downstream in (
+            (
+                self.snapshot_evidence,
+                self.snapshot_evidence[
+                    self.snapshot_evidence.index(
+                        "python scripts/release/verify_android_artifacts.py"
+                    ) :
+                ],
+                (
+                    "Prepare snapshot evidence",
+                    "Attest snapshot subjects",
+                    "Finalize snapshot evidence",
+                    "actions/upload-artifact",
+                ),
+            ),
+            (
+                self.stable_evidence,
+                self.stable_evidence[
+                    self.stable_evidence.index(
+                        "python scripts/release/verify_android_artifacts.py"
+                    ) :
+                ],
+                (
+                    "Prepare deterministic release evidence",
+                    "actions/attest-build-provenance",
+                    "Finalize and verify release evidence",
+                    "actions/upload-artifact",
+                ),
+            ),
+        ):
+            self.assertIn("set -euo pipefail", verifier_call)
+            verifier_position = workflow.index(
+                "python scripts/release/verify_android_artifacts.py"
+            )
+            for step in downstream:
+                self.assertGreater(workflow.index(step), verifier_position)
+            self.assertNotIn("continue-on-error", workflow)
+
+    def test_stable_downstream_jobs_require_successful_predecessors(self):
+        self.assertIn(
+            "if: ${{ needs.snapshot-sign.result == 'success' }}",
+            self.snapshot_evidence,
+        )
+        runtime_gate = self.release_workflow[
+            self.release_workflow.index("  stable-runtime-gate:")
+            : self.release_workflow.index("  stable-mutate:")
+        ]
+        mutation = self.release_workflow[self.release_workflow.index("  stable-mutate:") :]
+        self.assertIn("needs.stable-evidence.result == 'success'", runtime_gate)
+        self.assertIn("needs.stable-runtime-gate.result == 'success'", mutation)
+        self.assertNotIn("continue-on-error", runtime_gate + mutation)
 
 
 if __name__ == "__main__":
