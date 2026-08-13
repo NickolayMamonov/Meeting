@@ -18,6 +18,35 @@ class CollectionError(ValueError):
     pass
 
 
+_DIRECT_BUNDLE_FIELDS = frozenset(
+    {
+        "certificate",
+        "dsseEnvelope",
+        "dsse_envelope",
+        "mediaType",
+        "media_type",
+        "rekor",
+        "signature",
+        "statement",
+        "verificationMaterial",
+        "verification_material",
+    }
+)
+
+
+def _aliased_value(
+    value: Mapping[str, Any],
+    names: tuple[str, ...],
+    description: str,
+) -> Any:
+    present = [name for name in names if name in value]
+    if len(present) > 1:
+        first = value[present[0]]
+        if any(value[name] != first for name in present[1:]):
+            raise CollectionError(f"{description} has conflicting aliases")
+    return value[present[0]] if present else None
+
+
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -63,7 +92,7 @@ def run_gh(path: Path, repo: str, signer_workflow: str, source_ref: str, source_
 def _certificate_base64(value: Any) -> str:
     if not isinstance(value, Mapping):
         raise CollectionError("X.509 certificate object is missing")
-    candidate = value.get("rawBytes", value.get("der_base64"))
+    candidate = _aliased_value(value, ("rawBytes", "der_base64"), "X.509 certificate")
     if not isinstance(candidate, str) or not candidate:
         raise CollectionError("X.509 certificate rawBytes are missing")
     try:
@@ -90,9 +119,24 @@ def _certificate_from_bundle(
     fallback: Mapping[str, Any] | None = None,
 ) -> str:
     certificate = bundle.get("certificate")
-    material = bundle.get("verificationMaterial", bundle.get("verification_material", {}))
-    if certificate is None and isinstance(material, Mapping):
-        certificate = material.get("certificate")
+    material = _aliased_value(
+        bundle,
+        ("verificationMaterial", "verification_material"),
+        "verification material",
+    )
+    if material is None:
+        material = {}
+    if not isinstance(material, Mapping):
+        raise CollectionError("verification material is malformed")
+    material_certificate = material.get("certificate")
+    if certificate is not None and material_certificate is not None:
+        certificate_bytes = _certificate_base64(certificate)
+        material_certificate_bytes = _certificate_base64(material_certificate)
+        if certificate_bytes != material_certificate_bytes:
+            raise CollectionError("certificate has conflicting locations")
+        return certificate_bytes
+    if certificate is None:
+        certificate = material_certificate
     if certificate is None and isinstance(fallback, Mapping):
         signature = fallback.get("signature", {})
         certificate = signature.get("certificate") if isinstance(signature, Mapping) else None
@@ -103,7 +147,11 @@ def _certificate_from_bundle(
 
 def _payload_from_bundle(bundle: Mapping[str, Any]) -> tuple[dict[str, Any], bytes]:
     statement = bundle.get("statement")
-    envelope = bundle.get("dsseEnvelope", bundle.get("dsse_envelope"))
+    envelope = _aliased_value(
+        bundle,
+        ("dsseEnvelope", "dsse_envelope"),
+        "DSSE envelope",
+    )
 
     # The DSSE payload is signed evidence and therefore takes precedence
     # whenever an envelope is present.  A separately materialized statement
@@ -128,17 +176,12 @@ def _payload_from_bundle(bundle: Mapping[str, Any]) -> tuple[dict[str, Any], byt
                 raise CollectionError("top-level statement conflicts with DSSE payload")
         return decoded, payload
 
-    if not isinstance(statement, Mapping):
-        raise CollectionError("attestation statement is missing")
-    payload = json.dumps(
-        statement, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
-    return dict(statement), payload
+    raise CollectionError("attestation DSSE envelope is missing")
 
 
 def _log_id(value: Any) -> str:
     if isinstance(value, dict):
-        value = value.get("keyId", value.get("key_id"))
+        value = _aliased_value(value, ("keyId", "key_id"), "transparency log ID")
     if not isinstance(value, str) or not value:
         raise CollectionError("transparency log ID is missing")
     compact = value.removeprefix("0x").lower()
@@ -152,31 +195,120 @@ def _log_id(value: Any) -> str:
 
 
 def _rekor(bundle: Mapping[str, Any], verification: Mapping[str, Any]) -> dict[str, Any]:
-    material = bundle.get("verificationMaterial", bundle.get("verification_material", {}))
-    if not isinstance(material, Mapping):
+    material = _aliased_value(
+        bundle,
+        ("verificationMaterial", "verification_material"),
+        "verification material",
+    )
+    if material is None:
         material = {}
-    entries = material.get("tlogEntries", material.get("tlog_entries", []))
+    if not isinstance(material, Mapping):
+        raise CollectionError("verification material is malformed")
+    entries = _aliased_value(material, ("tlogEntries", "tlog_entries"), "Rekor entries")
+    if entries is None:
+        entries = []
     if not entries:
-        timestamps = verification.get("verifiedTimestamps", [])
+        timestamps = _aliased_value(
+            verification,
+            ("verifiedTimestamps", "verified_timestamps"),
+            "verified timestamps",
+        )
+        if timestamps is None:
+            timestamps = []
         entries = timestamps
     if not isinstance(entries, list) or not entries:
         raise CollectionError("verified attestation has no Rekor entry")
     if len(entries) != 1:
         raise CollectionError("verified attestation has ambiguous Rekor entries")
     entry = entries[0]
-    log_index = entry.get("logIndex", entry.get("log_index"))
-    integrated_time = entry.get("integratedTime", entry.get("integrated_time"))
-    if isinstance(log_index, str):
-        log_index = int(log_index)
-    if isinstance(integrated_time, str):
-        integrated_time = int(integrated_time)
-    if not isinstance(log_index, int) or not isinstance(integrated_time, int):
+    if not isinstance(entry, Mapping):
+        raise CollectionError("Rekor entry is malformed")
+    log_index = _aliased_value(entry, ("logIndex", "log_index"), "Rekor log index")
+    integrated_time = _aliased_value(
+        entry,
+        ("integratedTime", "integrated_time"),
+        "Rekor integrated time",
+    )
+    try:
+        if isinstance(log_index, str):
+            log_index = int(log_index)
+        if isinstance(integrated_time, str):
+            integrated_time = int(integrated_time)
+    except (TypeError, ValueError) as error:
+        raise CollectionError("Rekor entry index or integrated time is malformed") from error
+    if (
+        isinstance(log_index, bool)
+        or isinstance(integrated_time, bool)
+        or not isinstance(log_index, int)
+        or not isinstance(integrated_time, int)
+    ):
         raise CollectionError("Rekor entry is missing index or integrated time")
     return {
-        "log_id": _log_id(entry.get("logId", entry.get("log_id"))),
+        "log_id": _log_id(_aliased_value(entry, ("logId", "log_id"), "Rekor log ID")),
         "log_index": log_index,
         "integrated_time": integrated_time,
     }
+
+
+def _is_direct_bundle(value: Any) -> bool:
+    """Recognize only the tested signed Sigstore bundle compatibility shape."""
+    if not isinstance(value, Mapping) or not value:
+        return False
+    if "bundle" in value:
+        return False
+    if "dsseEnvelope" not in value or "dsse_envelope" in value:
+        return False
+    if "verificationMaterial" not in value or "verification_material" in value:
+        return False
+    media_type = _aliased_value(value, ("mediaType", "media_type"), "bundle media type")
+    if media_type != "application/vnd.dev.sigstore.bundle.v0.3+json":
+        return False
+    if "statement" in value or "signature" in value or "certificate" in value:
+        return False
+    envelope = value["dsseEnvelope"]
+    material = value["verificationMaterial"]
+    return (
+        isinstance(envelope, Mapping)
+        and isinstance(envelope.get("payload"), str)
+        and bool(envelope["payload"])
+        and isinstance(material, Mapping)
+        and isinstance(material.get("certificate"), Mapping)
+        and isinstance(material.get("tlogEntries"), list)
+        and bool(material["tlogEntries"])
+    )
+
+
+def _bundle_from_verified_record(verified: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize one verified GitHub CLI record without fallback or merging."""
+    if not isinstance(verified, Mapping):
+        raise CollectionError("verified attestation record is malformed")
+    has_attestation = "attestation" in verified
+    has_bundle = "bundle" in verified
+    if has_attestation and has_bundle:
+        raise CollectionError("verified attestation has conflicting bundle representations")
+
+    if has_bundle:
+        candidate = verified["bundle"]
+        if not _is_direct_bundle(candidate):
+            raise CollectionError("verified attestation bundle is missing or malformed")
+        return dict(candidate)
+
+    if not has_attestation:
+        raise CollectionError("verified attestation bundle is missing")
+    attestation = verified["attestation"]
+    if not isinstance(attestation, Mapping) or not attestation:
+        raise CollectionError("verified attestation is missing or malformed")
+
+    if "bundle" in attestation:
+        candidate = attestation["bundle"]
+        if not _is_direct_bundle(candidate):
+            raise CollectionError("verified attestation.bundle is missing or malformed")
+        # A wrapper must not also carry direct bundle material.
+        if _DIRECT_BUNDLE_FIELDS.intersection(attestation):
+            raise CollectionError("verified attestation wrapper is hybrid")
+        return dict(candidate)
+
+    raise CollectionError("verified attestation.bundle is missing or malformed")
 
 
 def _record(
@@ -189,8 +321,14 @@ def _record(
     run_id: int,
     run_attempt: int,
 ) -> dict[str, Any]:
-    bundle_raw = verified.get("attestation", verified.get("bundle"))
-    result = verified.get("verificationResult", verified.get("verification_result", {}))
+    bundle_raw = _bundle_from_verified_record(verified)
+    result = _aliased_value(
+        verified,
+        ("verificationResult", "verification_result"),
+        "verification result",
+    )
+    if result is None:
+        result = {}
     authoritative_raw = verified.get("authoritative")
     if authoritative_raw is None and isinstance(result, Mapping):
         authoritative_raw = result.get("authoritativeBundle", result.get("authoritative"))
@@ -271,10 +409,7 @@ def _record(
         "statement": statement,
         "certificate": certificate,
         "rekor": rekor,
-        "signature": bundle_raw.get(
-            "dsseEnvelope",
-            bundle_raw.get("signature", {}),
-        ),
+        "signature": bundle_raw["dsseEnvelope"],
     }
     authoritative_bundle = {
         "media_type": "application/vnd.dev.sigstore.bundle.v0.3+json",
