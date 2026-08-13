@@ -8,7 +8,12 @@ import hashlib
 import json
 from pathlib import Path
 
-from release_evidence import EvidenceError, verify_attestation_link
+from release_evidence import (
+    EvidenceError,
+    verify_attestation_group,
+    verify_attestation_groups,
+    verify_attestation_link,
+)
 
 
 class ChainError(ValueError):
@@ -83,8 +88,8 @@ def verify(directory: Path) -> None:
     covered_subjects: set[str] = set()
     canonical_bundles: set[str] = set()
     statements: set[str] = set()
-    rekor_identities: set[str] = set()
     identities: set[str] = set()
+    group_records: list[dict] = []
     for reference in references:
         reference_name = reference["name"]
         if Path(reference_name).name != reference_name:
@@ -120,18 +125,59 @@ def verify(directory: Path) -> None:
         for name, value in linked.items():
             if attestation.get(name) != value or reference.get(name) != value:
                 raise ChainError(f"attestation {name} mismatch for {attestation_path.name}")
+        has_attestation_group = "attestation_group" in attestation
+        has_reference_group = "attestation_group" in reference
+        attestation_group = attestation.get("attestation_group")
+        reference_group = reference.get("attestation_group")
+        if has_attestation_group != has_reference_group:
+            raise ChainError(f"attestation/reference group presence mismatch for {attestation_path.name}")
+        if has_attestation_group:
+            if attestation_group is None or reference_group is None:
+                raise ChainError(f"attestation group is null for {attestation_path.name}")
+            if attestation_group != reference_group:
+                raise ChainError(f"attestation/reference group mismatch for {attestation_path.name}")
+            try:
+                producer_group = verify_attestation_group(
+                    attestation_group,
+                    attestation["producer"]["bundle"],
+                    attestation["producer"]["statement"],
+                    attestation["producer"]["certificate"],
+                    attestation["producer"]["rekor"],
+                )
+                authoritative_group = verify_attestation_group(
+                    attestation_group,
+                    attestation["authoritative"]["bundle"],
+                    attestation["authoritative"]["statement"],
+                    attestation["authoritative"]["certificate"],
+                    attestation["authoritative"]["rekor"],
+                )
+            except (EvidenceError, KeyError, TypeError, ValueError) as error:
+                raise ChainError(
+                    f"invalid attestation group for {attestation_path.name}: {error}"
+                ) from error
+            if producer_group != authoritative_group:
+                raise ChainError(f"producer/authoritative group mismatch for {attestation_path.name}")
         if linked["canonical_bundle_sha256"] in canonical_bundles:
             raise ChainError("duplicate canonical attestation bundle")
         if linked["statement_sha256"] in statements:
             raise ChainError("duplicate canonical attestation statement")
-        if linked["rekor_identity"] in rekor_identities:
-            raise ChainError("duplicate canonical Rekor identity")
         if linked["attestation_identity"] in identities:
             raise ChainError("duplicate canonical attestation identity")
         canonical_bundles.add(linked["canonical_bundle_sha256"])
         statements.add(linked["statement_sha256"])
-        rekor_identities.add(linked["rekor_identity"])
         identities.add(linked["attestation_identity"])
+        group_records.append({
+            "subject": {
+                "name": subject["name"],
+                "sha256": subject["sha256"],
+            },
+            "rekor_identity": linked["rekor_identity"],
+            "attestation_group": attestation_group,
+        })
+    try:
+        verify_attestation_groups(group_records)
+    except (EvidenceError, KeyError, TypeError, ValueError) as error:
+        raise ChainError(f"invalid attestation group cardinality: {error}") from error
     if covered_subjects != expected_subjects:
         raise ChainError("attestation coverage is not exact")
     expected_files = {

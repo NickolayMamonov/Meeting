@@ -10,7 +10,14 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from release_evidence import canonical_json, sha256_bytes, verify_attestation_link
+from release_evidence import (
+    AttestationGroupIdentity,
+    canonical_json,
+    sha256_bytes,
+    verify_attestation_group,
+    verify_attestation_groups,
+    verify_attestation_link,
+)
 
 
 def _read_json(path: Path) -> Any:
@@ -208,11 +215,24 @@ def package(args: argparse.Namespace) -> None:
     expected_names = {item["name"] for item in attested_subjects}
     if set(records_by_subject) != expected_names:
         raise SystemExit("attestation evidence coverage is not exact")
+    validated_records: list[dict[str, Any]] = []
     for item in attested_subjects:
         record = records_by_subject[item["name"]]
         subject = {"name": item["name"], "sha256": item["sha256"]}
         if record["subject"] != subject:
             raise SystemExit(f"attestation evidence subject mismatch for {item['name']}")
+        for source_name in ("producer", "authoritative"):
+            source = record.get(source_name)
+            if not isinstance(source, dict):
+                raise SystemExit(
+                    f"invalid canonical attestation evidence for {item['name']}: "
+                    f"{source_name} evidence is malformed"
+                )
+            statement = source.get("statement")
+            if not isinstance(statement, dict) or statement.get("subject") != subject:
+                raise SystemExit(
+                    f"{source_name} attestation subject mismatch for {item['name']}"
+                )
         try:
             identities = verify_attestation_link(
                 record["producer"],
@@ -222,6 +242,51 @@ def package(args: argparse.Namespace) -> None:
             raise SystemExit(
                 f"invalid canonical attestation evidence for {item['name']}: {error}"
             ) from error
+        has_declared_group = "attestation_group" in record
+        declared_group = record.get("attestation_group")
+        group: AttestationGroupIdentity | None = None
+        if has_declared_group:
+            try:
+                producer_group = verify_attestation_group(
+                    declared_group,
+                    record["producer"]["bundle"],
+                    record["producer"]["statement"],
+                    record["producer"]["certificate"],
+                    record["producer"]["rekor"],
+                )
+                authoritative_group = verify_attestation_group(
+                    declared_group,
+                    record["authoritative"]["bundle"],
+                    record["authoritative"]["statement"],
+                    record["authoritative"]["certificate"],
+                    record["authoritative"]["rekor"],
+                )
+                if producer_group != authoritative_group:
+                    raise ValueError("producer/authoritative attestation groups differ")
+                group = producer_group
+            except (KeyError, TypeError, ValueError) as error:
+                raise SystemExit(
+                    f"invalid canonical attestation group for {item['name']}: {error}"
+                ) from error
+        validated_records.append({
+            "subject": subject,
+            "rekor_identity": identities["rekor_identity"],
+            "attestation_group": group,
+            "item": item,
+            "record": record,
+        })
+
+    try:
+        verify_attestation_groups(validated_records)
+    except (KeyError, TypeError, ValueError) as error:
+        raise SystemExit(f"invalid attestation group cardinality: {error}") from error
+
+    for validated in validated_records:
+        item = validated["item"]
+        record = validated["record"]
+        identities = verify_attestation_link(record["producer"], record["authoritative"])
+        group = validated["attestation_group"]
+        group_mapping = None if group is None else group.to_mapping()
         attestation = {
             "schema": 1,
             "kind": "individual-attestation",
@@ -230,14 +295,19 @@ def package(args: argparse.Namespace) -> None:
             "authoritative": record["authoritative"],
             **identities,
         }
+        if group_mapping is not None:
+            attestation["attestation_group"] = group_mapping
         attestation_path = out / f"{item['name']}.attestation.json"
         attestation_path.unlink(missing_ok=True)
         attestation_bytes = _write_json(attestation_path, attestation)
-        attestations.append({
+        reference = {
             "name": attestation_path.name,
             "sha256": sha256_bytes(attestation_bytes),
             **identities,
-        })
+        }
+        if group_mapping is not None:
+            reference["attestation_group"] = group_mapping
+        attestations.append(reference)
 
     envelope = {
         "schema": 1,

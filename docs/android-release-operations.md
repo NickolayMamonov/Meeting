@@ -75,9 +75,21 @@ candidate covers manifest/checksums; the envelope covers candidate and
 attestations. The envelope and candidate are excluded from their own coverage,
 so the graph is acyclic.
 
-Attestation identity is the executable bundle digest, statement subject,
-certificate identity, and Rekor entry identity. List IDs and producer action
-IDs are informational and are never used as uniqueness keys.
+Each individual attestation retains a unique executable bundle identity,
+canonical statement identity, certificate identity, Rekor entry identity, and
+full attestation identity. List IDs and producer action IDs are informational
+and are never used as uniqueness keys. A single verified DSSE attestation may
+legitimately cover multiple local subjects and therefore share one Rekor entry.
+Newly collected schema-1 evidence carries an additive `attestation_group`
+document. Its identity is recomputed from the retained signed payload bytes,
+the complete normalized name/SHA-256 subject set, predicate, certificate and
+Rekor identities, verified repository, signer, ref, commit SHA, run ID, and
+attempt. Every represented subject must be an exact member of that signed set.
+Repeated Rekor entries are accepted only when every record has the identical
+valid group and the represented subjects exactly equal the complete signed
+set. A grouped singleton must name exactly that singleton. Historical schema-1
+evidence without a group remains compatible only when its Rekor identity is
+unique; repeated legacy or mixed grouped/legacy Rekor evidence fails closed.
 
 Attestation collection requests a bounded complete result set, rejects
 multiple verified results, decodes and hashes the signed DSSE payload, parses
