@@ -10,6 +10,7 @@ from collect_attestation_evidence import (
     CollectionError,
     _payload_from_bundle,
     _record,
+    _rekor,
 )
 
 
@@ -104,11 +105,82 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
                 },
             },
             "non_mapping_top_level_bundle": {"bundle": []},
+            "statement_only": {
+                "bundle": {
+                    "mediaType": direct["mediaType"],
+                    "statement": {
+                        "subject": [{"name": "artifact.apk"}],
+                        "predicate": {},
+                    },
+                    "verificationMaterial": copy.deepcopy(direct["verificationMaterial"]),
+                },
+            },
+            "unsigned_statement": {
+                "bundle": {
+                    "mediaType": direct["mediaType"],
+                    "statement": {"subject": []},
+                    "certificate": copy.deepcopy(
+                        direct["verificationMaterial"]["certificate"]
+                    ),
+                },
+            },
+            "unsigned_dsse": {
+                "bundle": {
+                    "dsseEnvelope": copy.deepcopy(direct["dsseEnvelope"]),
+                },
+            },
         }
         for name, verified in cases.items():
             with self.subTest(name=name):
                 with self.assertRaises(CollectionError):
                     self.record(verified)
+
+    def test_conflicting_bundle_aliases_fail_closed(self):
+        direct = self.verified_fixture["attestation"]["bundle"]
+
+        def conflicting_rekor_alias(bundle):
+            bundle["verificationMaterial"]["tlog_entries"] = []
+
+        cases = {
+            "conflicting_dsse_alias": lambda bundle: bundle.update(
+                {"dsse_envelope": {"payload": "different"}}
+            ),
+            "conflicting_material_alias": lambda bundle: bundle.update(
+                {"verification_material": {}}
+            ),
+            "conflicting_certificate_encoding": lambda bundle: bundle[
+                "verificationMaterial"
+            ]["certificate"].update({"der_base64": "different"}),
+            "conflicting_rekor_alias": conflicting_rekor_alias,
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                verified = copy.deepcopy(self.verified_fixture)
+                mutate(verified["attestation"]["bundle"])
+                with self.assertRaises(CollectionError):
+                    self.record(verified)
+
+    def test_malformed_rekor_conversion_is_collection_error(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        verified["attestation"]["bundle"]["verificationMaterial"]["tlogEntries"][0][
+            "logIndex"
+        ] = "not-an-integer"
+        with self.assertRaises(CollectionError):
+            self.record(verified)
+
+        with self.assertRaises(CollectionError):
+            _rekor(
+                {},
+                {
+                    "verifiedTimestamps": [
+                        {
+                            "logId": {"keyId": "a" * 64},
+                            "logIndex": 1,
+                            "integratedTime": "not-a-timestamp",
+                        }
+                    ]
+                },
+            )
 
     def test_dsse_payload_is_decoded_when_top_level_statement_is_absent(self):
         statement = {"subject": [{"name": "artifact.apk"}], "predicate": {}}
