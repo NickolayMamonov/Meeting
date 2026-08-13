@@ -121,6 +121,59 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
         with self.assertRaisesRegex(CollectionError, "Rekor"):
             self.record(conflicting_rekor)
 
+    def test_conflicting_authoritative_locations_fail_closed(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+        verified["authoritative"] = authoritative
+        conflicting = copy.deepcopy(authoritative)
+        conflicting["verificationMaterial"]["tlogEntries"][0]["logIndex"] = 8
+        verified["verificationResult"]["authoritativeBundle"] = conflicting
+
+        with self.assertRaisesRegex(CollectionError, "conflicting authoritative"):
+            self.record(verified)
+
+        verified = copy.deepcopy(self.verified_fixture)
+        verified["verificationResult"]["authoritativeBundle"] = copy.deepcopy(authoritative)
+        conflicting = copy.deepcopy(authoritative)
+        conflicting["dsseEnvelope"]["payload"] = base64.b64encode(
+            b'{"predicate":{"buildType":"different"},"subject":[]}'
+        ).decode()
+        verified["verificationResult"]["authoritative"] = conflicting
+
+        with self.assertRaisesRegex(CollectionError, "conflicting authoritative"):
+            self.record(verified)
+
+    def test_explicit_null_or_malformed_authoritative_locations_do_not_fallback(self):
+        cases = (
+            lambda verified: verified.update({"authoritative": None}),
+            lambda verified: verified["verificationResult"].update(
+                {"authoritativeBundle": None}
+            ),
+            lambda verified: verified["verificationResult"].update(
+                {"authoritative": None}
+            ),
+            lambda verified: verified.update({"authoritative": "malformed"}),
+            lambda verified: verified["verificationResult"].update(
+                {"authoritativeBundle": "malformed"}
+            ),
+        )
+        for mutate in cases:
+            with self.subTest(mutate=mutate):
+                verified = copy.deepcopy(self.verified_fixture)
+                mutate(verified)
+                with self.assertRaises(CollectionError):
+                    self.record(verified)
+
+    def test_matching_authoritative_locations_are_normalized_once(self):
+        verified = copy.deepcopy(self.verified_fixture)
+        authoritative = copy.deepcopy(verified["attestation"]["bundle"])
+        verified["authoritative"] = copy.deepcopy(authoritative)
+        verified["verificationResult"]["authoritativeBundle"] = copy.deepcopy(authoritative)
+        verified["verificationResult"]["authoritative"] = copy.deepcopy(authoritative)
+
+        record = self.record(verified)
+        self.assertEqual(record["producer"]["certificate"], record["authoritative"]["certificate"])
+
     def test_explicit_authoritative_bundle_requires_strict_shape_and_own_rekor(self):
         mutations = (
             lambda bundle: bundle.pop("mediaType"),

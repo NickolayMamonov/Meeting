@@ -312,6 +312,66 @@ def _bundle_from_verified_record(verified: Mapping[str, Any]) -> dict[str, Any]:
     raise CollectionError("verified attestation.bundle is missing or malformed")
 
 
+def _authoritative_bundle_from_verified_record(
+    verified: Mapping[str, Any],
+    result: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Normalize every supported authoritative representation before fallback.
+
+    GitHub CLI responses and older callers can expose authoritative evidence in
+    more than one location.  Presence is intentionally tested with ``in``:
+    an explicit null is a supplied, malformed representation, not an absent
+    one that may re-enter the split-response fallback.
+    """
+    sources: list[tuple[str, Any]] = []
+    if "authoritative" in verified:
+        sources.append(("top-level authoritative", verified["authoritative"]))
+    if "authoritativeBundle" in result:
+        sources.append(
+            ("verificationResult.authoritativeBundle", result["authoritativeBundle"])
+        )
+    if "authoritative" in result:
+        sources.append(("verificationResult.authoritative", result["authoritative"]))
+    if not sources:
+        return None
+
+    normalized: list[tuple[str, dict[str, Any], tuple[Any, ...]]] = []
+    for name, candidate in sources:
+        if not isinstance(candidate, Mapping) or not _is_direct_bundle(candidate):
+            raise CollectionError(f"{name} is missing or malformed")
+        bundle = dict(candidate)
+        statement, payload = _payload_from_bundle(bundle)
+        certificate = _certificate_from_bundle(bundle)
+        rekor = _rekor(bundle, {}, allow_verification_fallback=False)
+        media_type = _aliased_value(
+            bundle,
+            ("mediaType", "media_type"),
+            "bundle media type",
+        )
+        identity = (
+            media_type,
+            payload,
+            json.dumps(
+                bundle["dsseEnvelope"],
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            json.dumps(statement, sort_keys=True, separators=(",", ":")),
+            certificate,
+            json.dumps(rekor, sort_keys=True, separators=(",", ":")),
+        )
+        normalized.append((name, bundle, identity))
+
+    first_name, first_bundle, first_identity = normalized[0]
+    for name, _, identity in normalized[1:]:
+        if identity != first_identity:
+            raise CollectionError(
+                f"conflicting authoritative attestation representations: "
+                f"{first_name} and {name}"
+            )
+    return first_bundle
+
+
 def _record(
     path: Path,
     verified: dict[str, Any],
@@ -330,9 +390,9 @@ def _record(
     )
     if result is None:
         result = {}
-    authoritative_raw = verified.get("authoritative")
-    if authoritative_raw is None and isinstance(result, Mapping):
-        authoritative_raw = result.get("authoritativeBundle", result.get("authoritative"))
+    if not isinstance(bundle_raw, dict) or not isinstance(result, dict):
+        raise CollectionError(f"malformed verified attestation for {path.name}")
+    authoritative_raw = _authoritative_bundle_from_verified_record(verified, result)
     has_explicit_authoritative = authoritative_raw is not None
     if authoritative_raw is None:
         # GitHub CLI 2.93 emits the signed bundle and parsed verification
@@ -340,18 +400,6 @@ def _record(
         # identity metadata, never cryptographic DER.  In the absence of an
         # explicit authoritative bundle, the validated signed bundle remains
         # the sole authority for certificate and Rekor evidence.
-        authoritative_raw = bundle_raw
-    if not isinstance(bundle_raw, dict) or not isinstance(result, dict):
-        raise CollectionError(f"malformed verified attestation for {path.name}")
-    if not isinstance(authoritative_raw, Mapping):
-        raise CollectionError(f"authoritative attestation bundle is malformed for {path.name}")
-    if has_explicit_authoritative:
-        if not _is_direct_bundle(authoritative_raw):
-            raise CollectionError(
-                f"authoritative attestation bundle is missing or malformed for {path.name}"
-            )
-        authoritative_raw = dict(authoritative_raw)
-    else:
         authoritative_raw = bundle_raw
     statement_raw, payload_bytes = _payload_from_bundle(bundle_raw)
     if not isinstance(statement_raw, dict):
