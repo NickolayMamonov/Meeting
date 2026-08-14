@@ -19,7 +19,6 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
         publishingInput("releaseCommitSha", "GITHUB_SHA")
             .orElse(publishingInput("RELEASE_COMMIT_SHA"))
     val baseUrl = publishingInput("BASE_URL_RELEASE")
-    val pins = publishingInput("RELEASE_SPKI_PINS")
     val expectedCertificate = publishingInput("ANDROID_RELEASE_CERT_SHA256")
     val snapshotExpectedCertificate = publishingInput("ANDROID_SNAPSHOT_CERT_SHA256")
     val signingValues =
@@ -90,7 +89,6 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             description = "Validates stable TLS configuration and the release signing identity."
             this.versionFile.set(versionFile)
             this.baseUrl.convention(baseUrl)
-            this.pins.convention(pins)
             expectedCertificateSha256.convention(expectedCertificate)
             dependsOn(validateVersion)
         }
@@ -100,7 +98,6 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             group = "build"
             description = "Generates the validated release-only Android network security resource."
             this.baseUrl.convention(baseUrl)
-            this.pins.convention(pins)
             outputDirectory.set(layout.buildDirectory.dir("generated/res/releaseNetworkSecurityConfig"))
         }
 
@@ -122,7 +119,6 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
         description = "Generates canonical metadata for stable release artifacts."
         this.versionFile.set(versionFile)
         this.baseUrl.convention(baseUrl)
-        this.pins.convention(pins)
         commitSha.convention(releaseCommitSha)
         expectedCertificateSha256.convention(expectedCertificate)
         workflowName.convention(publishingInput("releaseWorkflowName", "GITHUB_WORKFLOW").orElse("local"))

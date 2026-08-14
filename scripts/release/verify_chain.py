@@ -46,8 +46,8 @@ def verify(directory: Path) -> None:
     checksum_names = [line.split("  ", 1)[1] for line in checksum_lines]
     if checksum_names != sorted(checksum_names):
         raise ChainError("SHA256SUMS names are not byte-order sorted")
-    if any(name in checksum_names for name in ("release-candidate.json", "recovery-envelope.json")):
-        raise ChainError("candidate/envelope must be excluded from checksums")
+    if any(name in checksum_names for name in ("release-candidate.json", "attestation-index.json")):
+        raise ChainError("candidate/index must be excluded from checksums")
     for line in checksum_lines:
         expected, name = line.split("  ", 1)
         actual = digest(directory / name)
@@ -65,14 +65,14 @@ def verify(directory: Path) -> None:
         raise ChainError("candidate manifest reference mismatch")
     if candidate.get("checksums", {}).get("sha256") != digest(checksums_path):
         raise ChainError("candidate checksum reference mismatch")
-    envelope = read(directory / "recovery-envelope.json")
-    if envelope.get("candidate", {}).get("sha256") != digest(directory / "release-candidate.json"):
-        raise ChainError("recovery envelope candidate reference mismatch")
-    if envelope.get("authority", {}).get("name") != authority_path.name or envelope.get("authority", {}).get("sha256") != digest(authority_path):
-        raise ChainError("recovery envelope authority reference mismatch")
-    if "recovery-envelope.json" not in envelope.get("excluded_from_coverage", []):
-        raise ChainError("recovery envelope is not excluded from coverage")
-    references = envelope.get("attestations", [])
+    index = read(directory / "attestation-index.json")
+    if index.get("candidate", {}).get("sha256") != digest(directory / "release-candidate.json"):
+        raise ChainError("attestation index candidate reference mismatch")
+    if index.get("authority", {}).get("name") != authority_path.name or index.get("authority", {}).get("sha256") != digest(authority_path):
+        raise ChainError("attestation index authority reference mismatch")
+    if "attestation-index.json" not in index.get("excluded_from_coverage", []):
+        raise ChainError("attestation index is not excluded from coverage")
+    references = index.get("attestations", [])
     if not isinstance(references, list):
         raise ChainError("attestation references are not a list")
     reference_names = [reference.get("name") for reference in references]
@@ -185,7 +185,7 @@ def verify(directory: Path) -> None:
         manifest_path.name,
         "SHA256SUMS",
         "release-candidate.json",
-        "recovery-envelope.json",
+        "attestation-index.json",
         *(item["name"] for item in manifest.get("artifacts", [])),
         *(reference["name"] for reference in references),
     }

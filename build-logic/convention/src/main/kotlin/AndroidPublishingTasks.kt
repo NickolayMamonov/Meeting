@@ -72,16 +72,12 @@ abstract class ValidateReleasePublishingInputsTask : DefaultTask() {
 
     @get:Input
     @get:Optional
-    abstract val pins: Property<String>
-
-    @get:Input
-    @get:Optional
     abstract val expectedCertificateSha256: Property<String>
 
     @TaskAction
     fun validate() {
         versionFile.get().asFile.readAndroidVersion()
-        ReleaseNetworkConfig.parse(baseUrl.orNull, pins.orNull)
+        ReleaseNetworkConfig.parse(baseUrl.orNull)
         AndroidSigningInputs.normalizeCertificateFingerprint(expectedCertificateSha256.orNull)
     }
 }
@@ -91,22 +87,17 @@ abstract class GenerateReleaseNetworkSecurityConfigTask : DefaultTask() {
     @get:Optional
     abstract val baseUrl: Property<String>
 
-    @get:Input
-    @get:Optional
-    abstract val pins: Property<String>
-
     @get:OutputDirectory
     abstract val outputDirectory: DirectoryProperty
 
     @TaskAction
     fun generate() {
         val baseUrlValue = baseUrl.orNull
-        val pinsValue = pins.orNull
         val xml =
-            if (baseUrlValue == null && pinsValue == null) {
+            if (baseUrlValue == null) {
                 lintOnlyNetworkSecurityConfig()
             } else {
-                ReleaseNetworkConfig.parse(baseUrlValue, pinsValue).networkSecurityConfigXml()
+                ReleaseNetworkConfig.parse(baseUrlValue).networkSecurityConfigXml()
             }
         outputDirectory.file("xml/network_security_config.xml").get().asFile.apply {
             parentFile.mkdirs()
@@ -176,9 +167,6 @@ abstract class GenerateReleaseBuildMetadataTask : DefaultTask() {
     abstract val baseUrl: Property<String>
 
     @get:Input
-    abstract val pins: Property<String>
-
-    @get:Input
     abstract val commitSha: Property<String>
 
     @get:Input
@@ -193,7 +181,7 @@ abstract class GenerateReleaseBuildMetadataTask : DefaultTask() {
     @TaskAction
     fun generate() {
         val version = versionFile.get().asFile.readAndroidVersion()
-        val network = ReleaseNetworkConfig.parse(baseUrl.orNull, pins.orNull)
+        val network = ReleaseNetworkConfig.parse(baseUrl.orNull)
         require(fullReleaseCommitShaPattern.matches(commitSha.get())) {
             "releaseCommitSha must be exactly 40 lowercase hexadecimal characters."
         }
@@ -211,7 +199,7 @@ abstract class GenerateReleaseBuildMetadataTask : DefaultTask() {
                 "sourceBranch" to "dev",
                 "workflow" to workflowName.get(),
                 "releaseHost" to network.host,
-                "spkiPins" to network.pins,
+                "releaseBaseUrl" to network.baseUrl,
                 "expectedCertificateSha256" to certificate,
                 "signingFingerprint" to certificate,
             ),
