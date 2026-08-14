@@ -25,7 +25,7 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         ]
         cls.stable_evidence = cls.release_workflow[
             cls.release_workflow.index("  stable-evidence:")
-            : cls.release_workflow.index("  stable-runtime-gate:")
+            : cls.release_workflow.index("  stable-public-probe:")
         ]
 
     def test_snapshot_sign_is_checkout_free_and_resolves_before_secret_decode(self):
@@ -129,14 +129,16 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             "if: ${{ needs.snapshot-sign.result == 'success' }}",
             self.snapshot_evidence,
         )
-        runtime_gate = self.release_workflow[
-            self.release_workflow.index("  stable-runtime-gate:")
+        public_probe = self.release_workflow[
+            self.release_workflow.index("  stable-public-probe:")
             : self.release_workflow.index("  stable-mutate:")
         ]
         mutation = self.release_workflow[self.release_workflow.index("  stable-mutate:") :]
-        self.assertIn("needs.stable-evidence.result == 'success'", runtime_gate)
-        self.assertIn("needs.stable-runtime-gate.result == 'success'", mutation)
-        self.assertNotIn("continue-on-error", runtime_gate + mutation)
+        self.assertIn("needs.stable-evidence.result == 'success'", public_probe)
+        self.assertIn("needs.stable-public-probe.result == 'success'", mutation)
+        self.assertNotIn("continue-on-error", public_probe + mutation)
+        self.assertNotIn("RELEASE_KEYSTORE", public_probe + mutation)
+        self.assertNotIn("RELEASE_KEY_PASSWORD", public_probe + mutation)
 
 
 if __name__ == "__main__":

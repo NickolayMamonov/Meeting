@@ -170,6 +170,8 @@ class PackageArtifactsTest(unittest.TestCase):
                     "sourceBranch": "dev",
                     "workflow": "test",
                     "expectedCertificateSha256": "b" * 64,
+                    "releaseBaseUrl": "https://api.whysoezzy.online",
+                    "releaseHost": "api.whysoezzy.online",
                 }
             ),
             encoding="utf-8",
@@ -260,10 +262,10 @@ class PackageArtifactsTest(unittest.TestCase):
             verify(output)
             manifest = json.loads((output / "release-manifest.json").read_text())
             candidate = json.loads((output / "release-candidate.json").read_text())
-            envelope = json.loads((output / "recovery-envelope.json").read_text())
+            envelope = json.loads((output / "attestation-index.json").read_text())
             self.assertEqual(manifest["tag"], "v1.0.0")
             self.assertNotIn("release-candidate.json", (output / "SHA256SUMS").read_text())
-            self.assertNotIn("recovery-envelope.json", (output / "SHA256SUMS").read_text())
+            self.assertNotIn("attestation-index.json", (output / "SHA256SUMS").read_text())
             self.assertEqual(
                 [line.split("  ", 1)[1] for line in (output / "SHA256SUMS").read_text().splitlines()],
                 sorted(line.split("  ", 1)[1] for line in (output / "SHA256SUMS").read_text().splitlines()),
@@ -284,7 +286,7 @@ class PackageArtifactsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_five_subject_group_release(Path(root))
             verify(output)
-            envelope = json.loads((output / "recovery-envelope.json").read_text(encoding="utf-8"))
+            envelope = json.loads((output / "attestation-index.json").read_text(encoding="utf-8"))
             groups = []
             for reference in envelope["attestations"]:
                 attestation = json.loads(
@@ -344,7 +346,7 @@ class PackageArtifactsTest(unittest.TestCase):
     def test_shared_rekor_group_boundaries_fail_closed_in_chain(self):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_five_subject_group_release(Path(root))
-            envelope_path = output / "recovery-envelope.json"
+            envelope_path = output / "attestation-index.json"
             envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
             first_reference = envelope["attestations"][0]
             second_reference = envelope["attestations"][1]
@@ -364,7 +366,7 @@ class PackageArtifactsTest(unittest.TestCase):
                 verify(output)
 
             output = self.package_five_subject_group_release(Path(root))
-            envelope_path = output / "recovery-envelope.json"
+            envelope_path = output / "attestation-index.json"
             envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
             first_reference = envelope["attestations"][0]
             second_reference = envelope["attestations"][1]
@@ -382,7 +384,7 @@ class PackageArtifactsTest(unittest.TestCase):
                 verify(output)
 
             output = self.package_five_subject_group_release(Path(root))
-            envelope_path = output / "recovery-envelope.json"
+            envelope_path = output / "attestation-index.json"
             envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
             first_reference = envelope["attestations"][0]
             second_reference = envelope["attestations"][1]
@@ -438,7 +440,7 @@ class PackageArtifactsTest(unittest.TestCase):
     def test_attestation_identity_tamper_is_rejected(self):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_release(Path(root))
-            envelope_path = output / "recovery-envelope.json"
+            envelope_path = output / "attestation-index.json"
             envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
             reference = envelope["attestations"][0]
             attestation_path = output / reference["name"]
@@ -454,7 +456,7 @@ class PackageArtifactsTest(unittest.TestCase):
     def test_recomputed_producer_bundle_cannot_replace_authoritative_bundle(self):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_release(Path(root))
-            envelope_path = output / "recovery-envelope.json"
+            envelope_path = output / "attestation-index.json"
             envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
             reference = envelope["attestations"][0]
             attestation_path = output / reference["name"]
@@ -480,7 +482,7 @@ class PackageArtifactsTest(unittest.TestCase):
     def test_attestation_coverage_and_uniqueness_are_exact(self):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_release(Path(root))
-            envelope_path = output / "recovery-envelope.json"
+            envelope_path = output / "attestation-index.json"
             original = json.loads(envelope_path.read_text(encoding="utf-8"))
             envelope_path.write_bytes(
                 canonical_json({
@@ -505,7 +507,7 @@ class PackageArtifactsTest(unittest.TestCase):
     def test_duplicate_rekor_identity_is_rejected(self):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_release(Path(root))
-            envelope_path = output / "recovery-envelope.json"
+            envelope_path = output / "attestation-index.json"
             envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
             first_path = output / envelope["attestations"][0]["name"]
             second_reference = envelope["attestations"][1]

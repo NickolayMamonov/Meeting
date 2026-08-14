@@ -3,71 +3,43 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.Base64
 
 class ReleaseNetworkConfigTest {
-    private val firstPin = Base64.getEncoder().encodeToString(ByteArray(32) { (it + 1).toByte() })
-    private val secondPin = Base64.getEncoder().encodeToString(ByteArray(32) { (it + 33).toByte() })
-
     @Test
-    fun `normalizes host and generates exact pinned HTTPS resource`() {
-        val config =
-            ReleaseNetworkConfig.parse(
-                "https://API.whysoezzy.dev/v1/",
-                "$firstPin\r\n$secondPin",
-            )
+    fun `accepts only the production origin and generates system CA config`() {
+        val config = ReleaseNetworkConfig.parse("https://api.whysoezzy.online")
 
-        assertEquals("api.whysoezzy.dev", config.host)
+        assertEquals("https://api.whysoezzy.online", config.baseUrl)
+        assertEquals("api.whysoezzy.online", config.host)
         val xml = config.networkSecurityConfigXml()
-        assertTrue(xml.contains("""<domain includeSubdomains="false">api.whysoezzy.dev</domain>"""))
-        assertTrue(xml.contains("""<pin digest="SHA-256">$firstPin</pin>"""))
-        assertTrue(xml.contains("""<pin digest="SHA-256">$secondPin</pin>"""))
+        assertTrue(xml.contains("""<domain includeSubdomains="false">api.whysoezzy.online</domain>"""))
+        assertTrue(xml.contains("""<certificates src="system" />"""))
         assertTrue(xml.contains("""cleartextTrafficPermitted="false""""))
-        assertFalse(xml.contains("expiration="))
+        assertFalse(xml.contains("pin-set"))
+        assertFalse(xml.contains("<pin"))
     }
 
     @Test
-    fun `rejects missing insecure credentialed and placeholder URLs`() {
+    fun `rejects every non exact release URL`() {
         listOf(
             null,
             "",
-            "http://api.whysoezzy.dev",
-            "https://user:password@api.whysoezzy.dev",
+            " ",
+            "http://api.whysoezzy.online",
+            "https://api.whysoezzy.online/",
+            "https://api.whysoezzy.online/path",
+            "https://api.whysoezzy.online?query=1",
+            "https://api.whysoezzy.online#fragment",
+            "https://user:password@api.whysoezzy.online",
+            "https://api.whysoezzy.online:443",
+            "https://www.api.whysoezzy.online",
             "https://api.example.com",
             "https://release-test.invalid",
             "https://localhost",
             "https://10.0.2.2",
-            "https://192.0.2.1",
-            "https://api.whysoezzy.dev/#fragment",
-        ).forEach { url ->
-            assertThrows(
-                url,
-                IllegalArgumentException::class.java,
-            ) {
-                ReleaseNetworkConfig.parse(url, "$firstPin\n$secondPin")
-            }
-        }
-    }
-
-    @Test
-    fun `rejects weak malformed duplicate and placeholder pins`() {
-        val placeholder = Base64.getEncoder().encodeToString(ByteArray(32))
-        listOf(
-            null,
-            "",
-            firstPin,
-            "$firstPin\n$firstPin",
-            "$firstPin\nnot-base64",
-            "$firstPin\n${Base64.getEncoder().encodeToString(ByteArray(31) { 1 })}",
-            "$firstPin\n$placeholder",
-            "$firstPin\n $secondPin",
-            "$firstPin\n$secondPin\n",
-        ).forEach { pins ->
-            assertThrows(
-                pins,
-                IllegalArgumentException::class.java,
-            ) {
-                ReleaseNetworkConfig.parse("https://api.whysoezzy.dev", pins)
+        ).forEach { value ->
+            assertThrows(value, IllegalArgumentException::class.java) {
+                ReleaseNetworkConfig.parse(value)
             }
         }
     }

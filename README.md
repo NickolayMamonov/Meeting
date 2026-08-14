@@ -26,17 +26,23 @@ Pet-проект: приложение для поиска и посещения
 
 ## Release BASE_URL
 
-Release-сборка требует явный HTTPS URL в `BASE_URL_RELEASE`; значение не хранится в репозитории:
+Release-сборка принимает только production origin
+`https://api.whysoezzy.online`. Android release networking uses the platform
+system CA store, disables cleartext traffic, and has no certificate or public
+key pin contract.
 
 ```sh
-./gradlew assembleRelease -PBASE_URL_RELEASE=https://release-test.invalid
+./gradlew assembleRelease -PBASE_URL_RELEASE=https://api.whysoezzy.online
 ```
 
-В CI передавай защищённый секрет без вывода в логи через Gradle project property:
+In CI, configure the non-secret `BASE_URL_RELEASE` variable on the protected
+`android-release` environment:
 
 ```yaml
 env:
-  ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ secrets.BASE_URL_RELEASE }}
+  ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ vars.BASE_URL_RELEASE }}
 ```
 
-Пустые значения, HTTP и `https://api.example.com` отклоняются. Реальный release URL и настройки TLS/pinning должны быть согласованы с production-конфигурацией сети.
+The release build fails closed for any other value, including HTTP, paths,
+queries, fragments, credentials, ports, placeholders, or whitespace changes.
+Debug and snapshot variants retain their existing local-backend behavior.

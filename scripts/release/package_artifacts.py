@@ -51,9 +51,9 @@ def package(args: argparse.Namespace) -> None:
     out = Path(args.output).resolve()
     out.mkdir(parents=True, exist_ok=True)
     metadata = _read_json(Path(args.metadata))
-    previous_envelope = out / "recovery-envelope.json"
-    if previous_envelope.is_file():
-        previous = _read_json(previous_envelope)
+    previous_index = out / "attestation-index.json"
+    if previous_index.is_file():
+        previous = _read_json(previous_index)
         for reference in previous.get("attestations", []):
             name = reference.get("name")
             if isinstance(name, str) and Path(name).name == name:
@@ -64,7 +64,7 @@ def package(args: argparse.Namespace) -> None:
         "release-manifest.json",
         "SHA256SUMS",
         "release-candidate.json",
-        "recovery-envelope.json",
+        "attestation-index.json",
     ):
         (out / owned).unlink(missing_ok=True)
     commit = args.commit or metadata.get("commit", metadata.get("commitSha"))
@@ -74,8 +74,12 @@ def package(args: argparse.Namespace) -> None:
         "signing_fingerprint",
         metadata.get("signingFingerprint", metadata.get("expectedCertificateSha256")),
     )
+    release_url = metadata.get("release_url", metadata.get("releaseBaseUrl"))
     release_host = metadata.get("release_host", metadata.get("releaseHost"))
-    pin_values = metadata.get("spki_pin_digests", metadata.get("spkiPins", []))
+    if metadata["channel"] == "release" and release_url != "https://api.whysoezzy.online":
+        raise SystemExit("release metadata must contain the exact production URL")
+    if metadata["channel"] == "release" and release_host != "api.whysoezzy.online":
+        raise SystemExit("release metadata must contain the exact production host")
     application_id = metadata.get("application_id", metadata.get("applicationId"))
     version_name = metadata.get("version_name", metadata.get("versionName"))
     version_code = metadata.get("version_code", metadata.get("versionCode"))
@@ -127,8 +131,8 @@ def package(args: argparse.Namespace) -> None:
         "version_code": version_code,
         "variant": variant,
         "toolchain": metadata.get("toolchain", {}),
+        "release_url": release_url,
         "release_host": release_host,
-        "spki_pin_digests": pin_values,
         "signing_fingerprint": signing_fingerprint,
         "workflow": workflow,
         "authority": {
@@ -309,15 +313,15 @@ def package(args: argparse.Namespace) -> None:
             reference["attestation_group"] = group_mapping
         attestations.append(reference)
 
-    envelope = {
+    index = {
         "schema": 1,
-        "kind": "recovery-envelope",
+        "kind": "attestation-index",
         "candidate": {"name": candidate_path.name, "sha256": sha256_bytes(candidate_bytes)},
         "attestations": attestations,
         "authority": {"name": authority_path.name, "sha256": sha256_bytes(authority_bytes)},
-        "excluded_from_coverage": ["release-candidate.json", "recovery-envelope.json"],
+        "excluded_from_coverage": ["release-candidate.json", "attestation-index.json"],
     }
-    _write_json(out / "recovery-envelope.json", envelope)
+    _write_json(out / "attestation-index.json", index)
 
 
 def main() -> None:
