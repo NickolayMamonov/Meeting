@@ -206,6 +206,20 @@ jobs:
           umask 077
           test -n "$GOOGLE_SERVICES_JSON"
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+      - name: Validate stable Firebase configuration
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "object" and
+            (.project_info | type == "object") and
+            (.client | type == "array" and length > 0) and
+            any(.client[];
+              type == "object" and
+              (.client_info | type == "object") and
+              (.client_info.android_client_info | type == "object") and
+              (.client_info.android_client_info.package_name == "dev.whysoezzy.meet")
+            )
+          ' app/google-services.json >/dev/null
       - name: Build unsigned stable artifacts
         env:
           ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ vars.BASE_URL_RELEASE }}
