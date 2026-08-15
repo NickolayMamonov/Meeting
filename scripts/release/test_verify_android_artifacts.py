@@ -1,5 +1,6 @@
 import argparse
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,8 @@ from verify_android_artifacts import (
     ArtifactError,
     decode_debuggable_output,
     parse_expected_debuggable,
+    run,
+    verify_jarsigner_bundle,
     verify_rsa4096_signer,
 )
 
@@ -32,6 +35,56 @@ class SignerInvariantTest(unittest.TestCase):
             verify_rsa4096_signer(
                 "Signer #1 key algorithm: RSA\nSigner #1 key size (bits): 2048\n"
             )
+
+
+class JarsignerVerificationTest(unittest.TestCase):
+    def test_accepts_verified_self_signed_pkix_and_no_timestamp_warnings(self):
+        output = (
+            "jar verified.\n"
+            "Warning: This jar contains entries whose signer certificate is self-signed.\n"
+            "Warning: This jar contains entries whose certificate chain is not trusted.\n"
+            "Warning: This jar contains entries whose signer certificate is not timestamped.\n"
+        )
+        with patch.object(
+            verify_android_artifacts, "run", return_value=output
+        ) as invoked:
+            verify_jarsigner_bundle(Path("app.aab"))
+        command = invoked.call_args.args[0]
+        self.assertEqual(
+            command,
+            ["jarsigner", "-verify", "-verbose", "-certs", "app.aab"],
+        )
+        self.assertNotIn("-strict", command)
+
+    def test_rejects_missing_verification_success(self):
+        with self.assertRaisesRegex(ArtifactError, "did not report"):
+            with patch.object(
+                verify_android_artifacts,
+                "run",
+                return_value="Warning: signer certificate is self-signed.\n",
+            ):
+                verify_jarsigner_bundle(Path("app.aab"))
+
+    def test_rejects_unsigned_entry_and_jar_unsigned_warnings(self):
+        for warning in (
+            "jar verified.\nWarning: This jar contains unsigned entries.\n",
+            "jar verified.\nWarning: jar is unsigned.\n",
+            "jar verified.\nWarning: jar-unsigned entry.\n",
+        ):
+            with self.subTest(warning=warning):
+                with self.assertRaisesRegex(ArtifactError, "unsigned"):
+                    with patch.object(
+                        verify_android_artifacts, "run", return_value=warning
+                    ):
+                        verify_jarsigner_bundle(Path("app.aab"))
+
+    def test_run_preserves_nonzero_subprocess_failures(self):
+        failure = subprocess.CalledProcessError(
+            1, ["jarsigner"], output="jar verified.\n", stderr="failure\n"
+        )
+        with patch("verify_android_artifacts.subprocess.run", side_effect=failure):
+            with self.assertRaises(ArtifactError):
+                run(["jarsigner", "-verify", "app.aab"])
 
 
 class ApksignerInjectionTest(unittest.TestCase):

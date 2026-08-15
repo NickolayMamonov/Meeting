@@ -126,8 +126,25 @@ def verify_apk(
         )
 
 
+_JARSIGNER_VERIFIED = re.compile(r"(?im)^\s*jar verified\.\s*$")
+_JARSIGNER_UNSIGNED = re.compile(
+    r"(?i)(?:\bjar\s+is\s+unsigned\b|\bunsigned[-\s]+entries?\b|\bjar[-\s]unsigned\b)"
+)
+
+
+def verify_jarsigner_bundle(aab: Path) -> str:
+    """Verify an AAB while allowing the repository's self-signed release cert."""
+
+    output = run(["jarsigner", "-verify", "-verbose", "-certs", str(aab)])
+    if not _JARSIGNER_VERIFIED.search(output):
+        raise ArtifactError("jarsigner did not report a verified JAR")
+    if _JARSIGNER_UNSIGNED.search(output):
+        raise ArtifactError("jarsigner reported unsigned entries")
+    return output
+
+
 def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
-    run(["jarsigner", "-verify", "-strict", str(aab)])
+    verify_jarsigner_bundle(aab)
     signer_output = run(["keytool", "-printcert", "-jarfile", str(aab)])
     verify_rsa4096_signer(signer_output)
     signer_digests = re.findall(
