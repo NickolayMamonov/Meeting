@@ -246,6 +246,31 @@ class PublicationGateTest(unittest.TestCase):
         self.assertIn("release_id: ${{ needs.release-please.outputs.release_id }}", stable_build)
         self.assertIn("git ls-remote --exit-code --refs origin", stable_build)
 
+    def test_stable_firebase_validation_precedes_gradle_and_cleanup(self):
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
+        ).read_text(encoding="utf-8")
+        stable_build = workflow[
+            workflow.index("  stable-build:") : workflow.index("  stable-sign:")
+        ]
+        provision = stable_build.index("Provision stable Firebase configuration")
+        validation = stable_build.index("Validate stable Firebase configuration")
+        gradle = stable_build.index("./gradlew")
+        cleanup = stable_build.index("Remove Firebase configuration")
+        self.assertLess(provision, validation)
+        self.assertLess(validation, gradle)
+        self.assertLess(gradle, cleanup)
+        validation_step = stable_build[validation:gradle]
+        self.assertIn("jq -e", validation_step)
+        self.assertIn('type == "object"', validation_step)
+        self.assertIn('(.project_info | type == "object")', validation_step)
+        self.assertIn('(.client | type == "array" and length > 0)', validation_step)
+        self.assertIn('package_name == "dev.whysoezzy.meet"', validation_step)
+        self.assertIn("app/google-services.json >/dev/null", validation_step)
+        self.assertNotIn("GOOGLE_SERVICES_JSON", validation_step)
+        self.assertNotIn("echo", validation_step)
+        self.assertIn("if: ${{ always() }}", stable_build)
+
     def test_mutation_is_sha_bound_create_only_then_publish_and_verify(self):
         workflow = (
             Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
