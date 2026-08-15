@@ -27,7 +27,9 @@ ktlint = "1.5.0"
 coreSplashscreen = "1.2.0"
 googleServices = "4.4.4"
 firebaseCrashlyticsPlugin = "3.0.7"
-firebaseBom = "34.14.0"
+firebaseBom = "34.16.0"
+firebaseMessaging = "25.1.1"
+workManager = "2.10.1"
 paging = "3.4.2"
 
 # Testing
@@ -95,6 +97,8 @@ ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessaging" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
 
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

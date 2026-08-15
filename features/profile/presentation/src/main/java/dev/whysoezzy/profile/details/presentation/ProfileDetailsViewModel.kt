@@ -6,6 +6,7 @@ import com.whysoezzy.auth.domain.usecase.LogoutUseCase
 import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.common.error.AppException
 import com.whysoezzy.common.error.toErrorType
+import com.whysoezzy.domain.usecase.AccountExitCoordinator
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
 import com.whysoezzy.domain.usecase.GetUserByIdUseCase
 import com.whysoezzy.domain.usecase.GetUserCommunitiesUseCase
@@ -35,6 +36,7 @@ class ProfileDetailsViewModel
         private val manageCommunitySubscriptionUseCase: ManageCommunitySubscriptionUseCase,
         private val logoutUseCase: LogoutUseCase,
         private val dispatchers: DispatcherProvider,
+        private val accountExitCoordinator: AccountExitCoordinator? = null,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<ProfileDetailsUiState>(ProfileDetailsUiState.Loading)
         val uiState: StateFlow<ProfileDetailsUiState> = _uiState.asStateFlow()
@@ -117,7 +119,7 @@ class ProfileDetailsViewModel
 
         private fun handleLogout() {
             viewModelScope.launch {
-                logoutUseCase()
+                accountExitCoordinator?.logout() ?: logoutUseCase()
             }
         }
 

@@ -1,8 +1,10 @@
 package com.whysoezzy.auth
 
 import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.models.CredentialVersion
 import com.whysoezzy.network.TokenProvider
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Контракт хранилища токенов. Реализация — DataStoreTokenManager (DataStore + Tink AEAD).
@@ -11,6 +13,8 @@ import kotlinx.coroutines.flow.Flow
 internal interface TokenManager : TokenProvider {
     val isLoggedInFlow: Flow<Boolean>
     val session: Flow<AuthSession>
+    val credentialVersion: Flow<CredentialVersion>
+        get() = flowOf(CredentialVersion("legacy", 0L))
 
     suspend fun saveTokens(
         accessToken: String,
