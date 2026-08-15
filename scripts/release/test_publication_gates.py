@@ -177,6 +177,47 @@ class PublicationGateTest(unittest.TestCase):
         self.assertNotIn("BUNDLETOOL_VERSION:", workflow)
         self.assertNotIn("BUNDLETOOL_SHA256:", workflow)
 
+    def test_release_static_audit_is_credential_free_and_focused(self):
+        workflow = (
+            Path(__file__).parents[2]
+            / ".github"
+            / "workflows"
+            / "release-credential-audit.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("  pull_request:\n    branches: [dev]", workflow)
+        self.assertIn("  push:\n    branches: [dev]", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
+        self.assertEqual(workflow.count("permissions:"), 1)
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn(
+            "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+            workflow,
+        )
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn(
+            "python scripts/release/test_publication_gates.py",
+            workflow,
+        )
+        self.assertIn(
+            "python scripts/release/test_snapshot_apksigner_workflow.py",
+            workflow,
+        )
+        for forbidden in (
+            "pull_request_target",
+            "merge_group",
+            "audit_cli",
+            "secrets.",
+            "vars.",
+            "GITHUB_TOKEN",
+            "RELEASE_KEYSTORE_BASE64",
+            "RELEASE_KEYSTORE_PASSWORD",
+            "RELEASE_KEY_PASSWORD",
+            "RELEASE_PLEASE_TOKEN",
+            "GOOGLE_SERVICES_JSON",
+        ):
+            self.assertNotIn(forbidden, workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
