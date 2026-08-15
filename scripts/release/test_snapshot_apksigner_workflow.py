@@ -31,6 +31,10 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             cls.release_workflow.index("  stable-evidence:")
             : cls.release_workflow.index("  stable-public-probe:")
         ]
+        cls.stable_public_probe = cls.release_workflow[
+            cls.release_workflow.index("  stable-public-probe:")
+            : cls.release_workflow.index("  stable-mutate:")
+        ]
 
     def test_snapshot_sign_is_checkout_free_and_resolves_before_secret_decode(self):
         self.assertNotIn("actions/checkout", self.snapshot_sign)
@@ -70,16 +74,19 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
 
     def test_stable_sign_resolves_apksigner_before_secrets_and_uses_quoted_path(self):
         self.assertIn(
-            'ref: ${{ needs.release-please.outputs.source_sha }}',
+            'ref: ${{ github.sha }}',
             self.stable_sign,
         )
-        self.assertIn("fetch-depth: 0", self.stable_sign)
+        self.assertIn("path: release-tooling", self.stable_sign)
+        self.assertNotIn('ref: ${{ needs.release-please.outputs.source_sha }}', self.stable_sign)
+        self.assertNotIn('ref: ${{ needs.release-please.outputs.tag_name }}', self.stable_sign)
+        self.assertIn("fetch-depth: 1", self.stable_sign)
         self.assertIn("persist-credentials: false", self.stable_sign)
         self.assertIn("actions/setup-java", self.stable_sign)
         self.assertIn("java-version: \"21\"", self.stable_sign)
         self.assertIn("actions/setup-python", self.stable_sign)
         self.assertIn("python-version: \"3.12\"", self.stable_sign)
-        self.assertIn("python scripts/release/android_sdk_tools.py apksigner", self.stable_sign)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apksigner", self.stable_sign)
         self.assertIn("APKSIGNER_PATH", self.stable_sign)
         self.assertLess(
             self.stable_sign.index("Resolve stable apksigner"),
@@ -101,7 +108,7 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
 
     def test_stable_call_site_requires_false_and_keeps_aab_contract(self):
         verifier_call = self.stable_evidence[
-            self.stable_evidence.index("python scripts/release/verify_android_artifacts.py") :
+            self.stable_evidence.index("python release-tooling/scripts/release/verify_android_artifacts.py") :
         ]
         self.assertEqual(verifier_call.count("--expected-debuggable false"), 1)
         self.assertNotIn("--expected-debuggable true", verifier_call)
@@ -109,22 +116,18 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertIn("--bundletool-jar", verifier_call)
         self.assertIn("--bundletool-sha256", verifier_call)
         self.assertIn('name: Resolve stable Android SDK tools', self.stable_evidence)
-        self.assertIn("python scripts/release/android_sdk_tools.py apksigner", self.stable_evidence)
-        self.assertIn("python scripts/release/android_sdk_tools.py apkanalyzer", self.stable_evidence)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apksigner", self.stable_evidence)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apkanalyzer", self.stable_evidence)
         self.assertIn('--apksigner "$APKSIGNER_PATH"', verifier_call)
         self.assertIn('--apkanalyzer "$APKANALYZER_PATH"', verifier_call)
         self.assertNotIn("--apksigner apksigner", verifier_call)
         self.assertNotIn("--apkanalyzer apkanalyzer", verifier_call)
 
     def test_verifiers_fail_fast_before_evidence_production(self):
-        for workflow, verifier_call, downstream in (
+        for workflow, verifier_script, downstream in (
             (
                 self.snapshot_evidence,
-                self.snapshot_evidence[
-                    self.snapshot_evidence.index(
-                        "python scripts/release/verify_android_artifacts.py"
-                    ) :
-                ],
+                "python scripts/release/verify_android_artifacts.py",
                 (
                     "Prepare snapshot evidence",
                     "Attest snapshot subjects",
@@ -134,11 +137,7 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             ),
             (
                 self.stable_evidence,
-                self.stable_evidence[
-                    self.stable_evidence.index(
-                        "python scripts/release/verify_android_artifacts.py"
-                    ) :
-                ],
+                "python release-tooling/scripts/release/verify_android_artifacts.py",
                 (
                     "Prepare deterministic release evidence",
                     "actions/attest-build-provenance",
@@ -147,13 +146,52 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
                 ),
             ),
         ):
+            verifier_call = workflow[workflow.index(verifier_script) :]
             self.assertIn("set -euo pipefail", verifier_call)
-            verifier_position = workflow.index(
-                "python scripts/release/verify_android_artifacts.py"
-            )
+            verifier_position = workflow.index(verifier_script)
             for step in downstream:
                 self.assertGreater(workflow.index(step), verifier_position)
             self.assertNotIn("continue-on-error", workflow)
+
+    def test_post_build_jobs_use_reviewed_workflow_tooling_commit(self):
+        workflow = self.release_workflow
+        stable_build = workflow[
+            workflow.index("  stable-build:") : workflow.index("  stable-sign:")
+        ]
+        self.assertIn('ref: ${{ needs.release-please.outputs.source_sha }}', stable_build)
+        self.assertNotIn('ref: ${{ needs.release-please.outputs.tag_name }}', stable_build)
+
+        for section in (self.stable_sign, self.stable_evidence, self.stable_public_probe):
+            self.assertNotIn('ref: ${{ needs.release-please.outputs.tag_name }}', section)
+            self.assertNotIn("python scripts/release/", section)
+
+        self.assertIn('ref: ${{ github.sha }}', self.stable_sign)
+        self.assertIn("path: release-tooling", self.stable_sign)
+        self.assertNotIn('ref: ${{ needs.release-please.outputs.source_sha }}', self.stable_sign)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py", self.stable_sign)
+
+        self.assertIn('ref: ${{ needs.release-please.outputs.source_sha }}', self.stable_evidence)
+        self.assertIn('ref: ${{ github.sha }}', self.stable_evidence)
+        self.assertIn("path: release-tooling", self.stable_evidence)
+        for script in (
+            "android_sdk_tools.py",
+            "verify_android_artifacts.py",
+            "package_artifacts.py",
+            "collect_attestation_evidence.py",
+            "verify_chain.py",
+        ):
+            self.assertIn(
+                f"python release-tooling/scripts/release/{script}",
+                self.stable_evidence,
+            )
+
+        self.assertIn('ref: ${{ needs.release-please.outputs.source_sha }}', self.stable_public_probe)
+        self.assertIn('ref: ${{ github.sha }}', self.stable_public_probe)
+        self.assertIn("path: release-tooling", self.stable_public_probe)
+        self.assertIn(
+            "run: python release-tooling/scripts/release/public_backend_probe.py",
+            self.stable_public_probe,
+        )
 
     def test_stable_downstream_jobs_require_successful_predecessors(self):
         self.assertIn(
