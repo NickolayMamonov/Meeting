@@ -149,6 +149,70 @@ class PublicationGateTest(unittest.TestCase):
             workflow.index("PATCH"),
         )
 
+    def test_release_please_resolves_one_canonical_authority_and_safe_noop(self):
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
+        ).read_text(encoding="utf-8")
+        release_job = workflow[
+            workflow.index("  release-please:") : workflow.index("  stable-build:")
+        ]
+        self.assertIn("fetch-depth: 0", release_job)
+        self.assertIn("release_created: ${{ steps.authority.outputs.release_created }}", release_job)
+        self.assertIn("materialize: ${{ steps.authority.outputs.materialize }}", release_job)
+        self.assertIn("tag_name: ${{ steps.authority.outputs.tag_name }}", release_job)
+        self.assertIn("source_sha: ${{ steps.authority.outputs.source_sha }}", release_job)
+        self.assertIn("release_id: ${{ steps.authority.outputs.release_id }}", release_job)
+        self.assertIn("manifest_version=", release_job)
+        self.assertIn("releases/tags/$tag_name", release_job)
+        self.assertIn("(.draft != true) or (.published_at != null)", release_job)
+        self.assertIn("emit_noop", release_job)
+        self.assertIn("HTTP 404|Not Found", release_job)
+        self.assertIn(".target_commitish", release_job)
+        self.assertIn(".assets | length == 0", release_job)
+        self.assertIn("^[0-9a-fA-F]{40}$", release_job)
+        self.assertIn("git merge-base --is-ancestor", release_job)
+        self.assertIn("refs/tags/$tag_name", release_job)
+        resolver = release_job[release_job.index("Resolve canonical release authority") :]
+        for forbidden in ("--method POST", "--method PATCH", "--method DELETE", "uploads.github.com"):
+            self.assertNotIn(forbidden, resolver)
+
+    def test_stable_jobs_build_evidence_and_probe_only_canonical_sha(self):
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
+        ).read_text(encoding="utf-8")
+        job_boundaries = {
+            "stable-build": "  stable-sign:",
+            "stable-evidence": "  stable-public-probe:",
+            "stable-public-probe": "  stable-mutate:",
+        }
+        for job, boundary in job_boundaries.items():
+            section = workflow[workflow.index(f"  {job}:") : workflow.index(boundary)]
+            self.assertIn("ref: ${{ needs.release-please.outputs.source_sha }}", section)
+            self.assertNotIn("ref: ${{ needs.release-please.outputs.tag_name }}", section)
+        stable_build = workflow[
+            workflow.index("  stable-build:") : workflow.index("  stable-sign:")
+        ]
+        self.assertIn('test "$(git rev-parse HEAD)" = "$RELEASE_SHA"', stable_build)
+        self.assertIn(".target_commitish == $sha", stable_build)
+        self.assertIn(".assets | length == 0", stable_build)
+        self.assertIn("release_id: ${{ needs.release-please.outputs.release_id }}", stable_build)
+        self.assertIn("git ls-remote --exit-code --refs origin", stable_build)
+
+    def test_mutation_is_sha_bound_create_only_then_publish_and_verify(self):
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
+        ).read_text(encoding="utf-8")
+        mutation = workflow[workflow.index("  stable-mutate:") :]
+        self.assertIn(".target_commitish == $sha", mutation)
+        self.assertIn("release tag already exists before upload", mutation)
+        self.assertIn("--request POST", mutation)
+        self.assertIn("gh api --method PATCH", mutation)
+        self.assertLess(mutation.index("--request POST"), mutation.index("--method PATCH"))
+        self.assertIn("Verify public release and lightweight tag", mutation)
+        self.assertIn(".draft == false and (.published_at != null)", mutation)
+        self.assertIn("git ls-remote --exit-code --refs", mutation)
+        self.assertIn('test "$ref" = "$RELEASE_SHA refs/tags/$RELEASE_TAG"', mutation)
+
     def test_release_credential_inventory_and_secret_boundaries_are_exact(self):
         workflow = (
             Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
