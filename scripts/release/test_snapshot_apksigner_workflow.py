@@ -123,6 +123,19 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertNotIn("--apksigner apksigner", verifier_call)
         self.assertNotIn("--apkanalyzer apkanalyzer", verifier_call)
 
+    def test_attestation_workflow_sha_is_separate_from_app_source_sha(self):
+        self.assertIn(
+            'RELEASE_SHA: ${{ needs.release-please.outputs.source_sha }}',
+            self.stable_evidence,
+        )
+        self.assertIn('--commit "$RELEASE_SHA"', self.stable_evidence)
+        self.assertIn('--source-ref refs/heads/dev', self.stable_evidence)
+        self.assertIn('--source-sha "${{ github.sha }}"', self.stable_evidence)
+        self.assertNotIn(
+            '--source-sha "${{ needs.release-please.outputs.source_sha }}"',
+            self.stable_evidence,
+        )
+
     def test_verifiers_fail_fast_before_evidence_production(self):
         for workflow, verifier_script, downstream in (
             (
