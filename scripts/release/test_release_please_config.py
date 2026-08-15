@@ -143,11 +143,11 @@ class ReleasePleaseConfigTest(unittest.TestCase):
                     updater_spec(bad)
 
     def test_typed_json_update_changes_only_the_version_field(self):
-        original = copy.deepcopy(self.version_document)
+        original = {"version": "7.8.9"}
         updated = apply_json_version(original, "1.1.0")
         self.assertEqual(set(updated), {"version"})
         self.assertEqual(updated["version"], "1.1.0")
-        self.assertEqual(original, {"version": "1.0.0"})
+        self.assertEqual(original, {"version": "7.8.9"})
 
     def test_bootstrap_collection_is_exclusive_without_repository_history(self):
         commits = ["before-bootstrap", BOOTSTRAP_SHA, "after-one", "after-two"]
@@ -169,23 +169,33 @@ class ReleasePleaseConfigTest(unittest.TestCase):
         validate_repository_state(
             self.config, self.manifest, self.version_document, self.version_text
         )
+        generated_version = "7.8.9"
         validate_repository_state(
-            self.config, {".": "1.0.0"}, self.version_document, self.version_text
+            self.config,
+            {".": generated_version},
+            {"version": generated_version},
+            f"{generated_version}\n",
         )
         with self.assertRaises(ValueError):
             validate_repository_state(
-                self.config, {"other": "1.0.0"}, self.version_document, self.version_text
+                self.config,
+                {"other": generated_version},
+                {"version": generated_version},
+                f"{generated_version}\n",
             )
         with self.assertRaises(ValueError):
             validate_repository_state(
                 self.config,
                 {},
-                {"version": "1.0.0", "extra": "field"},
-                self.version_text,
+                {"version": generated_version, "extra": "field"},
+                f"{generated_version}\n",
             )
         with self.assertRaises(ValueError):
             validate_repository_state(
-                self.config, {".": "1.1.0"}, self.version_document, self.version_text
+                self.config,
+                {".": "7.8.8"},
+                {"version": generated_version},
+                f"{generated_version}\n",
             )
 
 
