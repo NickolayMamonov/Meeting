@@ -256,8 +256,9 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ needs.release-please.outputs.source_sha }}
-          fetch-depth: 0
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 1
           persist-credentials: false
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
@@ -269,7 +270,7 @@ jobs:
       - name: Resolve stable apksigner
         run: |
           set -euo pipefail
-          apksigner="$(python scripts/release/android_sdk_tools.py apksigner)"
+          apksigner="$(python release-tooling/scripts/release/android_sdk_tools.py apksigner)"
           test -x "$apksigner"
           printf 'APKSIGNER_PATH=%s\n' "$apksigner" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -336,6 +337,12 @@ jobs:
           ref: ${{ needs.release-please.outputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 1
+          persist-credentials: false
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
@@ -346,8 +353,8 @@ jobs:
       - name: Resolve stable Android SDK tools
         run: |
           set -euo pipefail
-          apksigner="$(python scripts/release/android_sdk_tools.py apksigner)"
-          apkanalyzer="$(python scripts/release/android_sdk_tools.py apkanalyzer)"
+          apksigner="$(python release-tooling/scripts/release/android_sdk_tools.py apksigner)"
+          apkanalyzer="$(python release-tooling/scripts/release/android_sdk_tools.py apkanalyzer)"
           test -x "$apksigner" && test -x "$apkanalyzer"
           printf 'APKSIGNER_PATH=%s\n' "$apksigner" >> "$GITHUB_ENV"
           printf 'APKANALYZER_PATH=%s\n' "$apkanalyzer" >> "$GITHUB_ENV"
@@ -372,7 +379,7 @@ jobs:
           metadata="$(find signed -name release-build.json -print -quit)"
           apk="$(find signed -name '*.apk' -print -quit)"
           aab="$(find signed -name '*.aab' -print -quit)"
-          python scripts/release/verify_android_artifacts.py \
+          python release-tooling/scripts/release/verify_android_artifacts.py \
             --metadata "$metadata" --apk "$apk" --aab "$aab" \
             --apksigner "$APKSIGNER_PATH" --apkanalyzer "$APKANALYZER_PATH" \
             --expected-debuggable false \
@@ -395,7 +402,7 @@ jobs:
             --workflow "${GITHUB_WORKFLOW}" --prepare-only)
           test -z "$mapping" || args+=(--mapping "$mapping")
           test -z "$symbols" || args+=(--symbols "$symbols")
-          python scripts/release/package_artifacts.py "${args[@]}"
+          python release-tooling/scripts/release/package_artifacts.py "${args[@]}"
       - uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
           subject-path: release-output/*
@@ -404,7 +411,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python scripts/release/collect_attestation_evidence.py \
+          python release-tooling/scripts/release/collect_attestation_evidence.py \
             --directory release-output \
             --output "$RUNNER_TEMP/release-attestation-evidence.json" \
             --repo "$GITHUB_REPOSITORY" \
@@ -428,8 +435,8 @@ jobs:
           symbols="$(find signed -type f -path '*/native-debug-symbols/release/*' -print -quit || true)"
           test -z "$mapping" || args+=(--mapping "$mapping")
           test -z "$symbols" || args+=(--symbols "$symbols")
-          python scripts/release/package_artifacts.py "${args[@]}"
-          python scripts/release/verify_chain.py release-output
+          python release-tooling/scripts/release/package_artifacts.py "${args[@]}"
+          python release-tooling/scripts/release/verify_chain.py release-output
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android-release-evidence-${{ needs.release-please.outputs.tag_name }}
@@ -451,6 +458,12 @@ jobs:
           ref: ${{ needs.release-please.outputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 1
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: android-release-evidence-${{ needs.release-please.outputs.tag_name }}
@@ -468,7 +481,7 @@ jobs:
             '.id == $id and .tag_name == $tag and .target_commitish == $sha and
              .draft == true and (.published_at == null) and (.assets | length == 0)' <<<"$state" >/dev/null
       - name: Probe public production backend
-        run: python scripts/release/public_backend_probe.py
+        run: python release-tooling/scripts/release/public_backend_probe.py
 
   stable-mutate:
     name: Upload and publish verified draft
