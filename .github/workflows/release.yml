@@ -62,61 +62,73 @@ jobs:
           manifest_tag="v${manifest_version}"
           release_created="${ACTION_RELEASE_CREATED:-false}"
           state="$RUNNER_TEMP/release-authority.json"
-          error="$RUNNER_TEMP/release-authority-error.txt"
+          release_pages="$RUNNER_TEMP/release-pages.json"
+          release_error="$RUNNER_TEMP/release-list-error.txt"
 
           if [ "$release_created" = "true" ]; then
             tag_name="$ACTION_TAG_NAME"
             source_sha="$ACTION_SOURCE_SHA"
           elif [ "$release_created" = "false" ]; then
             tag_name="$manifest_tag"
-            release_pages="$RUNNER_TEMP/release-pages.json"
-            release_error="$RUNNER_TEMP/release-list-error.txt"
-            if ! gh api --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$release_pages" 2> "$release_error"; then
-              cat "$release_error" >&2
+          else
+            echo "unexpected Release Please release_created output" >&2
+            exit 1
+          fi
+
+          if ! gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$release_pages" 2> "$release_error"; then
+            cat "$release_error" >&2
+            exit 1
+          fi
+          matches="$RUNNER_TEMP/release-matches.json"
+          if ! jq -e --arg tag "$tag_name" '
+            def malformed:
+              (type != "object") or
+              (has("id") | not) or
+              (has("tag_name") | not) or
+              (has("target_commitish") | not) or
+              (has("draft") | not) or
+              (has("published_at") | not) or
+              (has("assets") | not) or
+              ((.id | type) != "number") or
+              ((.tag_name | type) != "string") or
+              ((.target_commitish | type) != "string") or
+              ((.draft | type) != "boolean") or
+              ((.published_at != null) and ((.published_at | type) != "string")) or
+              ((.assets | type) != "array");
+            if (type != "array" or length == 0 or
+                any(.[]; (type != "array") or length > 100) or
+                (.[0:-1] | any(.[]; length != 100)) or
+                (.[-1] | length >= 100) or
+                any(.[][]; malformed)) then
+              error("release list pagination is incomplete or malformed")
+            else
+              [.[][] | select(.tag_name == $tag)]
+            end
+          ' "$release_pages" > "$matches"; then
+            echo "release list pagination is incomplete or malformed" >&2
+            exit 1
+          fi
+          match_count="$(jq -er 'length' "$matches")"
+          if [ "$match_count" -eq 0 ]; then
+            if [ "$release_created" = "true" ]; then
+              echo "new Release Please draft is missing from the releases list: $tag_name" >&2
               exit 1
             fi
-            matches="$RUNNER_TEMP/release-matches.json"
-            if ! jq -e --arg tag "$tag_name" '
-              def malformed:
-                (type != "object") or
-                ((.id | type) != "number") or
-                ((.tag_name | type) != "string") or
-                ((.target_commitish | type) != "string") or
-                ((.draft | type) != "boolean") or
-                ((.published_at != null) and ((.published_at | type) != "string")) or
-                ((.assets | type) != "array");
-              if (type != "array" or length == 0 or
-                  any(.[]; (type != "array") or length > 100) or
-                  (.[0:-1] | any(.[]; length != 100)) or
-                  (.[-1] | length >= 100) or
-                  any(.[][]; malformed)) then
-                error("release list pagination is incomplete or malformed")
-              else
-                [.[][] | select(.tag_name == $tag)]
-              end
-            ' "$release_pages" > "$matches"; then
-              echo "release list pagination is incomplete or malformed" >&2
-              exit 1
-            fi
-            match_count="$(jq -er 'length' "$matches")"
-            if [ "$match_count" -eq 0 ]; then
-              emit_noop
-              exit 0
-            fi
-            if [ "$match_count" -ne 1 ]; then
-              echo "release list contains duplicate exact tag matches: $tag_name" >&2
-              exit 1
-            fi
-            jq -e '.[0]' "$matches" > "$state"
+            emit_noop
+            exit 0
+          fi
+          if [ "$match_count" -ne 1 ]; then
+            echo "release list contains duplicate exact tag matches: $tag_name" >&2
+            exit 1
+          fi
+          jq -e '.[0]' "$matches" > "$state"
+          if [ "$release_created" = "false" ]; then
             if jq -e '(.draft != true) or (.published_at != null)' "$state" >/dev/null; then
               emit_noop
               exit 0
             fi
             source_sha="$(jq -er '.target_commitish' "$state")"
-          else
-            echo "unexpected Release Please release_created output" >&2
-            exit 1
           fi
 
           valid_sha "$source_sha"
@@ -128,10 +140,8 @@ jobs:
             exit 1
           fi
 
-          if [ "$release_created" = "true" ]; then
-            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag_name" > "$state"
-          fi
           release_id="$(jq -er '.id' "$state")"
+          test "$release_id" -gt 0
           jq -e --arg tag "$tag_name" --arg sha "$source_sha" --argjson id "$release_id" \
             '.id == $id and .tag_name == $tag and .target_commitish == $sha and
              .draft == true and (.published_at == null) and (.assets | length == 0)' \

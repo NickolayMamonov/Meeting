@@ -163,7 +163,7 @@ class PublicationGateTest(unittest.TestCase):
         self.assertIn("source_sha: ${{ steps.authority.outputs.source_sha }}", release_job)
         self.assertIn("release_id: ${{ steps.authority.outputs.release_id }}", release_job)
         self.assertIn("manifest_version=", release_job)
-        self.assertIn("releases/tags/$tag_name", release_job)
+        self.assertNotIn("releases/tags/", release_job)
         self.assertIn("(.draft != true) or (.published_at != null)", release_job)
         self.assertIn("emit_noop", release_job)
         self.assertIn("release-list-error.txt", release_job)
@@ -184,23 +184,45 @@ class PublicationGateTest(unittest.TestCase):
             workflow.index("  release-please:") : workflow.index("  stable-build:")
         ]
         resume_start = release_job.index('elif [ "$release_created" = "false" ]')
-        resume_end = release_job.index(
-            'else\n            echo "unexpected Release Please release_created output"',
-            resume_start,
-        )
-        resume = release_job[resume_start:resume_end]
+        resume = release_job[resume_start:]
         self.assertIn("gh api --paginate --slurp", resume)
         self.assertIn("releases?per_page=100", resume)
-        self.assertIn("release-pages.json", resume)
+        self.assertIn("release-pages.json", release_job)
         self.assertIn("release list pagination is incomplete or malformed", resume)
         self.assertIn("[.[][] | select(.tag_name == $tag)]", resume)
         self.assertIn("match_count=\"$(jq -er 'length'", resume)
         self.assertIn('if [ "$match_count" -ne 1 ]; then', resume)
-        self.assertNotIn("releases/tags/$tag_name", resume)
+        self.assertIn('if [ "$match_count" -eq 0 ]; then', resume)
+        self.assertNotIn("releases/tags/", resume)
         self.assertIn("emit_noop", resume)
         self.assertIn("(.draft != true) or (.published_at != null)", resume)
         for forbidden in ("--method POST", "--method PATCH", "--method DELETE", "uploads.github.com"):
             self.assertNotIn(forbidden, resume)
+
+    def test_fresh_created_draft_uses_same_list_authority_and_fails_closed(self):
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
+        ).read_text(encoding="utf-8")
+        release_job = workflow[
+            workflow.index("  release-please:") : workflow.index("  stable-build:")
+        ]
+        resolver = release_job[release_job.index("Resolve canonical release authority") :]
+        self.assertEqual(resolver.count("gh api --paginate --slurp"), 1)
+        self.assertIn('if [ "$release_created" = "true" ]; then', resolver)
+        self.assertIn('source_sha="$ACTION_SOURCE_SHA"', resolver)
+        self.assertIn("new Release Please draft is missing from the releases list", resolver)
+        self.assertIn(".id == $id and .tag_name == $tag and .target_commitish == $sha", resolver)
+        self.assertIn('if [ "$release_created" = "false" ]; then', resolver)
+        self.assertIn('source_sha="$(jq -er \'.target_commitish\' "$state")"', resolver)
+        self.assertIn('has("id")', resolver)
+        self.assertIn('has("tag_name")', resolver)
+        self.assertIn('has("target_commitish")', resolver)
+        self.assertIn('has("draft")', resolver)
+        self.assertIn('has("published_at")', resolver)
+        self.assertIn('has("assets")', resolver)
+        self.assertNotIn("releases/tags/", resolver)
+        for forbidden in ("--method POST", "--method PATCH", "--method DELETE", "uploads.github.com"):
+            self.assertNotIn(forbidden, resolver)
 
     def test_stable_jobs_build_evidence_and_probe_only_canonical_sha(self):
         workflow = (
