@@ -23,6 +23,10 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             cls.workflow.index("  unit-tests:")
             : cls.workflow.index("  assemble:")
         ]
+        cls.stable_sign = cls.release_workflow[
+            cls.release_workflow.index("  stable-sign:")
+            : cls.release_workflow.index("  stable-evidence:")
+        ]
         cls.stable_evidence = cls.release_workflow[
             cls.release_workflow.index("  stable-evidence:")
             : cls.release_workflow.index("  stable-public-probe:")
@@ -64,6 +68,28 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertNotIn("--expected-debuggable false", verifier_call)
         self.assertNotIn('--apkanalyzer apkanalyzer', verifier_call)
 
+    def test_stable_sign_resolves_apksigner_before_secrets_and_uses_quoted_path(self):
+        self.assertIn(
+            'ref: ${{ needs.release-please.outputs.source_sha }}',
+            self.stable_sign,
+        )
+        self.assertIn("fetch-depth: 0", self.stable_sign)
+        self.assertIn("persist-credentials: false", self.stable_sign)
+        self.assertIn("actions/setup-java", self.stable_sign)
+        self.assertIn("java-version: \"21\"", self.stable_sign)
+        self.assertIn("actions/setup-python", self.stable_sign)
+        self.assertIn("python-version: \"3.12\"", self.stable_sign)
+        self.assertIn("python scripts/release/android_sdk_tools.py apksigner", self.stable_sign)
+        self.assertIn("APKSIGNER_PATH", self.stable_sign)
+        self.assertLess(
+            self.stable_sign.index("Resolve stable apksigner"),
+            self.stable_sign.index("Decode release keystore"),
+        )
+        self.assertIn('"$apksigner" sign', self.stable_sign)
+        self.assertIn('"$apksigner" verify', self.stable_sign)
+        self.assertNotIn("\napksigner sign", self.stable_sign)
+        self.assertNotIn("\napksigner verify", self.stable_sign)
+
     def test_release_tooling_tests_run_in_unprivileged_unit_job(self):
         self.assertIn(
             'python -m unittest discover -s scripts/release -p "test_*.py"',
@@ -82,8 +108,13 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertIn("--aab", verifier_call)
         self.assertIn("--bundletool-jar", verifier_call)
         self.assertIn("--bundletool-sha256", verifier_call)
-        self.assertIn("--apksigner apksigner", verifier_call)
-        self.assertIn("--apkanalyzer apkanalyzer", verifier_call)
+        self.assertIn('name: Resolve stable Android SDK tools', self.stable_evidence)
+        self.assertIn("python scripts/release/android_sdk_tools.py apksigner", self.stable_evidence)
+        self.assertIn("python scripts/release/android_sdk_tools.py apkanalyzer", self.stable_evidence)
+        self.assertIn('--apksigner "$APKSIGNER_PATH"', verifier_call)
+        self.assertIn('--apkanalyzer "$APKANALYZER_PATH"', verifier_call)
+        self.assertNotIn("--apksigner apksigner", verifier_call)
+        self.assertNotIn("--apkanalyzer apkanalyzer", verifier_call)
 
     def test_verifiers_fail_fast_before_evidence_production(self):
         for workflow, verifier_call, downstream in (
