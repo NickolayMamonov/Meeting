@@ -69,20 +69,51 @@ jobs:
             source_sha="$ACTION_SOURCE_SHA"
           elif [ "$release_created" = "false" ]; then
             tag_name="$manifest_tag"
-            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag_name" > "$state" 2> "$error"; then
-              if jq -e '(.draft != true) or (.published_at != null)' "$state" >/dev/null; then
-                emit_noop
-                exit 0
-              fi
-              source_sha="$(jq -er '.target_commitish' "$state")"
-            else
-              if grep -Eq 'HTTP 404|Not Found' "$error"; then
-                emit_noop
-                exit 0
-              fi
-              cat "$error" >&2
+            release_pages="$RUNNER_TEMP/release-pages.json"
+            release_error="$RUNNER_TEMP/release-list-error.txt"
+            if ! gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$release_pages" 2> "$release_error"; then
+              cat "$release_error" >&2
               exit 1
             fi
+            matches="$RUNNER_TEMP/release-matches.json"
+            if ! jq -e --arg tag "$tag_name" '
+              def malformed:
+                (type != "object") or
+                ((.id | type) != "number") or
+                ((.tag_name | type) != "string") or
+                ((.target_commitish | type) != "string") or
+                ((.draft | type) != "boolean") or
+                ((.published_at != null) and ((.published_at | type) != "string")) or
+                ((.assets | type) != "array");
+              if (type != "array" or length == 0 or
+                  any(.[]; (type != "array") or length > 100) or
+                  (.[0:-1] | any(.[]; length != 100)) or
+                  (.[-1] | length >= 100) or
+                  any(.[][]; malformed)) then
+                error("release list pagination is incomplete or malformed")
+              else
+                [.[][] | select(.tag_name == $tag)]
+              end
+            ' "$release_pages" > "$matches"; then
+              echo "release list pagination is incomplete or malformed" >&2
+              exit 1
+            fi
+            match_count="$(jq -er 'length' "$matches")"
+            if [ "$match_count" -eq 0 ]; then
+              emit_noop
+              exit 0
+            fi
+            if [ "$match_count" -ne 1 ]; then
+              echo "release list contains duplicate exact tag matches: $tag_name" >&2
+              exit 1
+            fi
+            jq -e '.[0]' "$matches" > "$state"
+            if jq -e '(.draft != true) or (.published_at != null)' "$state" >/dev/null; then
+              emit_noop
+              exit 0
+            fi
+            source_sha="$(jq -er '.target_commitish' "$state")"
           else
             echo "unexpected Release Please release_created output" >&2
             exit 1
