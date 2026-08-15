@@ -7,11 +7,19 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 
-internal object PushWorkScheduler {
-    const val UNIQUE_WORK_NAME = "push-registration-reconcile"
+internal interface PushWorkScheduler {
+    fun enqueue()
 
-    fun enqueue(context: Context) {
-        WorkManager.getInstance(context).enqueueUniqueWork(
+    fun cancel()
+}
+
+internal class AndroidPushWorkScheduler(
+    context: Context,
+) : PushWorkScheduler {
+    private val workManager = WorkManager.getInstance(context.applicationContext)
+
+    override fun enqueue() {
+        workManager.enqueueUniqueWork(
             UNIQUE_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<PushReconcileWorker>()
@@ -24,7 +32,17 @@ internal object PushWorkScheduler {
         )
     }
 
-    fun cancel(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+    override fun cancel() {
+        workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
     }
+
+    private companion object {
+        const val UNIQUE_WORK_NAME = "push-registration-reconcile"
+    }
+}
+
+internal object NoOpPushWorkScheduler : PushWorkScheduler {
+    override fun enqueue() = Unit
+
+    override fun cancel() = Unit
 }

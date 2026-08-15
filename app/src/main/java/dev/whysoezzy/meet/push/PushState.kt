@@ -157,6 +157,8 @@ internal object PushStateReducer {
             operation = operation,
             nonce = nonce,
             retryAttempt = 0,
+            blockedCredentialEpoch = null,
+            blockedCredentialRevision = null,
             terminal = RegistrationTerminal.NONE,
         )
         return state.copy(registration = next)
@@ -194,6 +196,30 @@ internal object PushStateReducer {
         } else {
             state
         }
+
+    fun recordBlockedAuth(
+        state: PushStateV1,
+        owner: OwnerSnapshot,
+        nonce: Long,
+        credentialEpoch: String,
+        credentialRevision: Long,
+    ): PushStateV1 =
+        if (state.registration.owner == owner && state.registration.nonce == nonce) {
+            state.copy(
+                registration = state.registration.copy(
+                    terminal = RegistrationTerminal.BLOCKED_AUTH,
+                    blockedCredentialEpoch = credentialEpoch,
+                    blockedCredentialRevision = credentialRevision,
+                ),
+            )
+        } else {
+            state
+        }
+
+    fun suppressCorrupt(state: PushStateV1): PushStateV1 =
+        state.copy(
+            installPolicy = state.installPolicy.copy(permission = PermissionState.SUPPRESSED_CORRUPT),
+        )
 
     fun clearAccountScopedState(
         state: PushStateV1,

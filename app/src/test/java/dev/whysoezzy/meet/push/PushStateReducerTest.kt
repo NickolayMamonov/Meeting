@@ -63,4 +63,50 @@ class PushStateReducerTest {
         )
         assertTrue(duplicate is LedgerIngressResult.Duplicate)
     }
+
+    @Test
+    fun `blocked auth records credential version and a later registration clears it`() {
+        val owner = OwnerSnapshot(7, 4)
+        val state = PushStateV1(
+            registration = RegistrationState(owner = owner, nonce = 9),
+        )
+
+        val blocked = PushStateReducer.recordBlockedAuth(state, owner, 9, "epoch-a", 3)
+        assertEquals(RegistrationTerminal.BLOCKED_AUTH, blocked.registration.terminal)
+        assertEquals("epoch-a", blocked.registration.blockedCredentialEpoch)
+        assertEquals(3L, blocked.registration.blockedCredentialRevision)
+
+        val rearmed = PushStateReducer.beginRegistration(
+            blocked,
+            owner,
+            "fid",
+            10,
+            RegistrationOperation.CREATE,
+        )
+        assertEquals(RegistrationTerminal.NONE, rearmed.registration.terminal)
+        assertEquals(null, rearmed.registration.blockedCredentialEpoch)
+        assertEquals(null, rearmed.registration.blockedCredentialRevision)
+    }
+
+    @Test
+    fun `pending display remains pending until presentation succeeds`() {
+        val owner = OwnerSnapshot(3, 1)
+        val accepted = PushStateReducer.ingest(
+            PushStateV1(),
+            owner,
+            "event",
+            42,
+            60,
+            1,
+            2,
+        ) as LedgerIngressResult.Accepted
+        val pending = accepted.state.ledger.single() as LedgerRecord.OwnedReminderEvent
+        assertEquals(OwnedEventStatus.PENDING_DISPLAY, pending.status)
+
+        val displayed = PushStateReducer.markDisplayed(accepted.state, "event", owner)
+        assertEquals(
+            OwnedEventStatus.DISPLAYED,
+            (displayed.ledger.single() as LedgerRecord.OwnedReminderEvent).status,
+        )
+    }
 }

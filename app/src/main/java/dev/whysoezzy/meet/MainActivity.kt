@@ -16,6 +16,10 @@ import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
@@ -25,9 +29,8 @@ import androidx.navigation.compose.rememberNavController
 import com.whysoezzy.common.push.MeetingJoinEvents
 import dev.whysoezzy.meet.navigation.MeetNavHost
 import dev.whysoezzy.meet.navigation.MeetRoute
-import dev.whysoezzy.meet.push.PermissionState
+import dev.whysoezzy.meet.push.NotificationPermissionPolicy
 import dev.whysoezzy.meet.push.PushRegistrationCoordinator
-import dev.whysoezzy.meet.push.PushStateReducer
 import dev.whysoezzy.meet.push.PushStateStore
 import dev.whysoezzy.meet.push.PushTapCommand
 import dev.whysoezzy.meet.push.PushTapIntent
@@ -46,7 +49,9 @@ class MainActivity : ComponentActivity() {
         extraBufferCapacity = 1,
     )
     private val notificationPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            lifecycleScope.launch { pushRegistrationCoordinator.drainPendingDisplays() }
+        }
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,14 +80,21 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 MeetingJoinEvents.events.collect {
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@collect
-                    val eligible = pushStateStore.update(PushStateReducer::markPermissionEligible)
-                    if (eligible.installPolicy.permission != PermissionState.ELIGIBLE) return@collect
-                    pushStateStore.update(PushStateReducer::markPermissionRequested)
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || it == null) return@collect
+                    val eligible = pushStateStore.update(NotificationPermissionPolicy::markSuccessfulJoin)
+                    if (!NotificationPermissionPolicy.shouldRequest(eligible, Build.VERSION.SDK_INT)) {
+                        return@collect
+                    }
+                    pushStateStore.update(NotificationPermissionPolicy::markRequested)
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch { pushRegistrationCoordinator.drainPendingDisplays() }
     }
 }
 
@@ -92,13 +104,24 @@ internal fun MeetApp(
     coordinator: PushRegistrationCoordinator? = null,
 ) {
     val navController = rememberNavController()
+    var navHostReady by remember { mutableStateOf(false) }
 
-    if (pushTapCommands != null && coordinator != null) {
-        LaunchedEffect(pushTapCommands) {
+    if (pushTapCommands != null && coordinator != null && navHostReady) {
+        LaunchedEffect(pushTapCommands, navHostReady) {
             pushTapCommands.collect { command ->
                 if (coordinator.claimTap(command)) {
-                    navController.navigate(MeetRoute.MeetingDetails.createRoute(command.meetingId)) {
-                        launchSingleTop = true
+                    val destination = MeetRoute.MeetingDetails.createRoute(command.meetingId)
+                    val currentMeetingId = navController.currentBackStackEntry
+                        ?.arguments
+                        ?.getString("meetingId")
+                        ?.toLongOrNull()
+                    val alreadyAtDestination =
+                        navController.currentDestination?.route == MeetRoute.MeetingDetails.route &&
+                            currentMeetingId == command.meetingId
+                    if (!alreadyAtDestination) {
+                        navController.navigate(destination) {
+                            launchSingleTop = true
+                        }
                     }
                     coordinator.completeTap(command)
                 }
@@ -110,6 +133,9 @@ internal fun MeetApp(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        MeetNavHost(navController = navController)
+        MeetNavHost(
+            navController = navController,
+            onReady = { navHostReady = true },
+        )
     }
 }

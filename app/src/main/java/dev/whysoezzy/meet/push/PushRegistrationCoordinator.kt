@@ -1,6 +1,7 @@
 package dev.whysoezzy.meet.push
 
 import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.models.CredentialVersion
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.domain.models.PushInstallationFid
 import com.whysoezzy.domain.models.PushInstallationUpsertResult
@@ -14,8 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -26,6 +26,7 @@ internal class PushRegistrationCoordinator(
     private val fcm: FcmRegistrationClient,
     private val stateStore: PushStateStore,
     private val presentation: ReminderPresentationGateway = NoOpReminderPresentationGateway,
+    private val workScheduler: PushWorkScheduler = NoOpPushWorkScheduler,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val stateMutex = Mutex()
@@ -38,14 +39,21 @@ internal class PushRegistrationCoordinator(
         val newScope = CoroutineScope(SupervisorJob() + dispatcher)
         scope = newScope
         observationJob = newScope.launch {
-            authSessionRepository.session
-                .map { session -> session.userId.takeIf { session.stage != AuthSession.Stage.LoggedOut } }
+            authSessionRepository.credentialState
                 .distinctUntilChanged()
-                .collectLatest { userId ->
+                .collectLatest { credentialState ->
+                    val userId = credentialState.session.userId
+                        .takeIf { credentialState.session.stage != AuthSession.Stage.LoggedOut }
                     if (userId == null) {
                         clearCurrentOwner()
                     } else {
-                        reconcile(userId)
+                        val hasDifferentOwner = stateMutex.withLock {
+                            stateStore.read().registration.owner
+                                ?.let { it.userId != userId }
+                                ?: false
+                        }
+                        if (hasDifferentOwner) clearAccountState()
+                        reconcile(userId, credentialState.credentialVersion)
                     }
                 }
         }
@@ -53,6 +61,7 @@ internal class PushRegistrationCoordinator(
 
     fun close() {
         scope?.cancel()
+        workScheduler.cancel()
         scope = null
         observationJob = null
         reconciliationJob = null
@@ -60,49 +69,55 @@ internal class PushRegistrationCoordinator(
 
     fun onRegistered(fid: String) {
         val currentScope = scope ?: return
+        workScheduler.enqueue()
         currentScope.launch { reconcileWithFid(fid.trim()) }
     }
 
-    internal suspend fun reconcileCurrent() {
-        val session = authSessionRepository.read()
-        val userId = session.userId ?: return
-        if (session.stage != AuthSession.Stage.LoggedOut) reconcile(userId)
+    internal suspend fun reconcileCurrent(): Boolean {
+        val credentialState = authSessionRepository.credentialState.first()
+        val userId = credentialState.session.userId ?: return true
+        if (credentialState.session.stage == AuthSession.Stage.LoggedOut) return true
+        return reconcile(userId, credentialState.credentialVersion)
     }
 
     internal suspend fun claimTap(command: PushTapCommand): Boolean {
-        val session = authSessionRepository.read()
-        val state = stateStore.read()
-        val owner = state.registration.owner
-            ?.takeIf { session.userId != null && it.userId == session.userId }
-            ?: return false
-        val event = state.ledger
-            .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
-            .firstOrNull {
-                it.eventId == command.eventId &&
-                    it.meetingId == command.meetingId &&
-                    it.owner == owner &&
-                    it.status == OwnedEventStatus.DISPLAYED
-            } ?: return false
-        val next = stateStore.update {
-            PushStateReducer.claimNavigation(it, event.eventId, owner)
-        }
-        return next.ledger
-            .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
-            .any {
-                it.eventId == event.eventId &&
-                    it.status == OwnedEventStatus.NAVIGATION_CLAIMED &&
-                    it.owner == owner
+        return stateMutex.withLock {
+            val session = authSessionRepository.read()
+            val state = stateStore.read()
+            val owner = state.registration.owner
+                ?.takeIf { session.userId != null && it.userId == session.userId }
+                ?: return@withLock false
+            val event = state.ledger
+                .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
+                .firstOrNull {
+                    it.eventId == command.eventId &&
+                        it.meetingId == command.meetingId &&
+                        it.owner == owner &&
+                        it.status == OwnedEventStatus.DISPLAYED
+                } ?: return@withLock false
+            val next = stateStore.update {
+                PushStateReducer.claimNavigation(it, event.eventId, owner)
             }
+            next.ledger
+                .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
+                .any {
+                    it.eventId == event.eventId &&
+                        it.status == OwnedEventStatus.NAVIGATION_CLAIMED &&
+                        it.owner == owner
+                }
+        }
     }
 
     internal suspend fun completeTap(command: PushTapCommand) {
-        val session = authSessionRepository.read()
-        val state = stateStore.read()
-        val owner = state.registration.owner
-            ?.takeIf { session.userId != null && it.userId == session.userId }
-            ?: return
-        stateStore.update {
-            PushStateReducer.markNavigated(it, command.eventId, owner)
+        stateMutex.withLock {
+            val session = authSessionRepository.read()
+            val state = stateStore.read()
+            val owner = state.registration.owner
+                ?.takeIf { session.userId != null && it.userId == session.userId }
+                ?: return@withLock
+            stateStore.update {
+                PushStateReducer.markNavigated(it, command.eventId, owner)
+            }
         }
     }
 
@@ -112,12 +127,13 @@ internal class PushRegistrationCoordinator(
      */
     fun onUnregistered() {
         val currentScope = scope ?: return
+        workScheduler.enqueue()
         reconciliationJob?.cancel()
         reconciliationJob = currentScope.launch {
             val session = authSessionRepository.read()
             if (session.stage != AuthSession.Stage.LoggedOut) {
                 val userId = session.userId
-                if (userId != null) reconcile(userId)
+                if (userId != null) reconcile(userId, authSessionRepository.credentialState.first().credentialVersion)
             }
         }
     }
@@ -129,50 +145,64 @@ internal class PushRegistrationCoordinator(
         val currentScope = scope ?: return
         currentScope.launch {
             val reminder = MeetingReminderParser.parse(data, hasNotificationBlock) ?: return@launch
-            val session = authSessionRepository.read()
-            val state = stateStore.read()
-            val owner = state.registration.owner
-                ?.takeIf { session.stage != AuthSession.Stage.LoggedOut && it.userId == session.userId }
-            var accepted = false
-            val next = stateStore.update { current ->
-                val ingress = PushStateReducer.ingest(
-                    current,
-                    owner,
-                    reminder.eventId.toString(),
-                    reminder.meetingId,
-                    reminder.reminderOffsetMinutes,
-                    reminder.issuedAt.toEpochMilli(),
-                    System.currentTimeMillis(),
-                )
-                when (ingress) {
-                    is LedgerIngressResult.Accepted -> {
-                        // Rendering is intentionally downstream of the durable ingress CAS.
-                        // No notification block can bypass this parser or ledger.
-                        accepted = true
-                        ingress.state
-                    }
+            stateMutex.withLock {
+                val session = authSessionRepository.read()
+                val state = stateStore.read()
+                val owner = state.registration.owner
+                    ?.takeIf { session.stage != AuthSession.Stage.LoggedOut && it.userId == session.userId }
+                var accepted = false
+                val next = stateStore.update { current ->
+                    val ingress = PushStateReducer.ingest(
+                        current,
+                        owner,
+                        reminder.eventId.toString(),
+                        reminder.meetingId,
+                        reminder.reminderOffsetMinutes,
+                        reminder.issuedAt.toEpochMilli(),
+                        System.currentTimeMillis(),
+                    )
+                    when (ingress) {
+                        is LedgerIngressResult.Accepted -> {
+                            accepted = true
+                            ingress.state
+                        }
 
-                    LedgerIngressResult.Duplicate,
-                    LedgerIngressResult.LedgerCapacityBlocked,
-                    -> current
-                    else -> current
+                        LedgerIngressResult.Duplicate,
+                        LedgerIngressResult.LedgerCapacityBlocked,
+                        -> current
+                        else -> current
+                    }
                 }
-            }
-            val owned = next.ledger
-                .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
-                .firstOrNull { it.eventId == reminder.eventId.toString() }
-            if (accepted && owned != null && owned.owner == owner) {
-                presentation.present(owned)
-                stateStore.update {
-                    PushStateReducer.markDisplayed(it, owned.eventId, owned.owner)
+                val owned = next.ledger
+                    .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
+                    .firstOrNull { it.eventId == reminder.eventId.toString() }
+                if (accepted && owned != null && owned.owner == owner && presentation.present(owned)) {
+                    stateStore.update {
+                        PushStateReducer.markDisplayed(it, owned.eventId, owned.owner)
+                    }
                 }
             }
         }
     }
 
+    internal suspend fun drainPendingDisplays() {
+        stateMutex.withLock {
+            drainPendingDisplaysLocked()
+        }
+    }
+
     suspend fun clearAccountState(now: Long = System.currentTimeMillis()) {
         stateMutex.withLock {
+            val current = stateStore.read()
+            val installationId = current.registration.installationId
             var discarded = emptyList<String>()
+            if (installationId != null) {
+                runCatching {
+                    installationRepository.delete(
+                        com.whysoezzy.domain.models.PushInstallationId(installationId),
+                    )
+                }
+            }
             stateStore.update { state ->
                 discarded = state.ledger
                     .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
@@ -181,11 +211,22 @@ internal class PushRegistrationCoordinator(
                 PushStateReducer.clearAccountScopedState(state, state.registration.owner, now)
             }
             presentation.cancel(discarded)
+            workScheduler.cancel()
         }
     }
 
-    private suspend fun reconcile(userId: Long) {
-        val state = stateStore.read()
+    private suspend fun reconcile(
+        userId: Long,
+        credentialVersion: CredentialVersion,
+    ): Boolean {
+        val state = stateMutex.withLock { stateStore.read() }
+        val registration = state.registration
+        if (registration.owner?.userId == userId &&
+            registration.terminal == RegistrationTerminal.BLOCKED_AUTH &&
+            !credentialVersion.isAdvancedFrom(registration)
+        ) {
+            return true
+        }
         val currentOwner = state.registration.owner
         val owner = if (currentOwner?.userId == userId) {
             currentOwner
@@ -198,24 +239,25 @@ internal class PushRegistrationCoordinator(
         val fid = state.registration.pendingFid
         if (fid == null) {
             runCatching { fcm.register() }
-            return
+            return true
         }
-        reconcileWithFid(fid, owner)
+        return reconcileWithFid(fid, owner)
     }
 
     private suspend fun reconcileWithFid(fid: String) {
         if (fid.isBlank()) return
-        val session = authSessionRepository.read()
+        val credentialState = authSessionRepository.credentialState.first()
+        val session = credentialState.session
         if (session.stage == AuthSession.Stage.LoggedOut) return
-        val state = stateStore.read()
+        val state = stateMutex.withLock { stateStore.read() }
         val userId = session.userId ?: return
         val owner = state.registration.owner?.takeIf { it.userId == userId }
             ?: OwnerSnapshot(userId, state.registration.accountGeneration + 1L)
         reconcileWithFid(fid, owner)
     }
 
-    private suspend fun reconcileWithFid(fid: String, owner: OwnerSnapshot) {
-        if (fid.isBlank()) return
+    private suspend fun reconcileWithFid(fid: String, owner: OwnerSnapshot): Boolean {
+        if (fid.isBlank()) return true
         stateMutex.withLock {
             val current = stateStore.read()
             var operation = if (current.registration.installationId == null) {
@@ -267,7 +309,7 @@ internal class PushRegistrationCoordinator(
                                 upsert.installation.installationId.value,
                             )
                         }
-                        return
+                        return true
                     }
                     if (upsert is PushInstallationUpsertResult.Terminal) {
                         stateStore.update {
@@ -278,7 +320,7 @@ internal class PushRegistrationCoordinator(
                                 RegistrationTerminal.MALFORMED_SUCCESS,
                             )
                         }
-                        return
+                        return true
                     }
                 }
                 val error = result.exceptionOrNull()
@@ -295,6 +337,19 @@ internal class PushRegistrationCoordinator(
                     operation = RegistrationOperation.CREATE
                     continue
                 }
+                if (status == 401) {
+                    val credentialVersion = authSessionRepository.credentialState.first().credentialVersion
+                    stateStore.update {
+                        PushStateReducer.recordBlockedAuth(
+                            it,
+                            owner,
+                            nonce,
+                            credentialVersion.epoch,
+                            credentialVersion.revision,
+                        )
+                    }
+                    return true
+                }
                 val terminal = error.terminalStatus()
                 if (terminal != null) {
                     stateStore.update {
@@ -305,9 +360,9 @@ internal class PushRegistrationCoordinator(
                             terminal,
                         )
                     }
-                    return
+                    return true
                 }
-                if (!isTransient(error)) return
+                if (!isTransient(error)) return true
             }
             stateStore.update {
                 PushStateReducer.recordTerminal(
@@ -317,27 +372,38 @@ internal class PushRegistrationCoordinator(
                     RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED,
                 )
             }
+            return false
         }
     }
 
     private suspend fun clearCurrentOwner() {
-        stateMutex.withLock {
-            var discarded = emptyList<String>()
-            stateStore.update { state ->
-                discarded = state.ledger
-                    .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
-                    .filter { it.owner == state.registration.owner }
-                    .map { it.eventId }
-                PushStateReducer.clearAccountScopedState(
-                    state,
-                    state.registration.owner,
-                    System.currentTimeMillis(),
-                )
-            }
-            presentation.cancel(discarded)
-        }
+        clearAccountState()
         // Deliberately not awaited: the durable generation boundary makes this callback harmless.
         runCatching { fcm.unregister() }
+    }
+
+    private suspend fun drainPendingDisplaysLocked() {
+        val session = authSessionRepository.read()
+        val state = stateStore.read()
+        val owner = state.registration.owner
+            ?.takeIf { session.stage != AuthSession.Stage.LoggedOut && it.userId == session.userId }
+            ?: return
+        state.ledger
+            .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
+            .filter { it.owner == owner && it.status == OwnedEventStatus.PENDING_DISPLAY }
+            .forEach { event ->
+                if (presentation.present(event)) {
+                    stateStore.update {
+                        PushStateReducer.markDisplayed(it, event.eventId, event.owner)
+                    }
+                }
+            }
+    }
+
+    private fun CredentialVersion.isAdvancedFrom(registration: RegistrationState): Boolean {
+        val blockedEpoch = registration.blockedCredentialEpoch ?: return true
+        val blockedRevision = registration.blockedCredentialRevision ?: return true
+        return epoch != blockedEpoch || revision > blockedRevision
     }
 
     private fun Throwable?.httpStatus(): Int? =

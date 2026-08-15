@@ -10,7 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import dev.whysoezzy.meet.MainActivity
 
 internal interface ReminderPresentationGateway {
-    fun present(event: LedgerRecord.OwnedReminderEvent)
+    fun present(event: LedgerRecord.OwnedReminderEvent): Boolean
 
     fun cancel(eventIds: Collection<String>) = Unit
 }
@@ -34,8 +34,8 @@ internal class AndroidReminderPresentationGateway(
         )
     }
 
-    override fun present(event: LedgerRecord.OwnedReminderEvent) {
-        if (!notificationManager.areNotificationsEnabled()) return
+    override fun present(event: LedgerRecord.OwnedReminderEvent): Boolean {
+        if (!notificationManager.areNotificationsEnabled()) return false
         val offsetText = if (event.reminderOffsetMinutes == 60) "1 hour" else "24 hours"
         val tapIntent = Intent(context, MainActivity::class.java)
             .putExtra(PushTapIntent.EVENT_ID, event.eventId)
@@ -60,6 +60,7 @@ internal class AndroidReminderPresentationGateway(
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .build(),
         )
+        return true
     }
 
     override fun cancel(eventIds: Collection<String>) {
@@ -94,5 +95,5 @@ internal object PushTapIntent {
 }
 
 internal object NoOpReminderPresentationGateway : ReminderPresentationGateway {
-    override fun present(event: LedgerRecord.OwnedReminderEvent) = Unit
+    override fun present(event: LedgerRecord.OwnedReminderEvent): Boolean = true
 }

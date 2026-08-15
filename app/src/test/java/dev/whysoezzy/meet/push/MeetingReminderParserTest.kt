@@ -22,6 +22,8 @@ class MeetingReminderParserTest {
     fun `rejects noncanonical values`() {
         assertNull(MeetingReminderParser.parse(fixture() + ("meetingId" to "01")))
         assertNull(MeetingReminderParser.parse(fixture() + ("reminderOffsetMinutes" to "60 ")))
+        assertNull(MeetingReminderParser.parse(fixture() + ("reminderOffsetMinutes" to "+60")))
+        assertNull(MeetingReminderParser.parse(fixture() + ("reminderOffsetMinutes" to "060")))
         assertNull(MeetingReminderParser.parse(fixture() + ("eventId" to "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")))
         assertNull(MeetingReminderParser.parse(fixture() + ("issuedAt" to "2026-08-15T12:00:00+00:00")))
     }

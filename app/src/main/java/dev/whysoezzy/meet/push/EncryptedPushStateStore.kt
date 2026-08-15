@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -71,18 +73,24 @@ internal class EncryptedPushStateStore(
     }
 
     private fun decryptOrSuppressed(envelope: EncryptedEnvelope): PushStateV1 =
-        if (envelope.ciphertext.isEmpty()) {
+        if (envelope.formatVersion != PUSH_STATE_VERSION) {
+            suppressedCorruptState()
+        } else if (envelope.ciphertext.isEmpty()) {
             PushStateV1()
         } else {
             runCatching {
-                Json.decodeFromString<PushStateV1>(decrypt(envelope.ciphertext).toString(Charsets.UTF_8))
+                Json.decodeFromString<PushStateV1>(
+                    decrypt(envelope.ciphertext).toString(Charsets.UTF_8),
+                ).also { state ->
+                    require(state.version == PUSH_STATE_VERSION)
+                }
             }.getOrElse {
-                PushStateV1(
-                    installPolicy = InstallPolicyState(PermissionState.SUPPRESSED_CORRUPT),
-                    registration = RegistrationState(),
-                )
+                suppressedCorruptState()
             }
         }
+
+    private fun suppressedCorruptState(): PushStateV1 =
+        PushStateReducer.suppressCorrupt(PushStateV1())
 
     private fun migrateUnshippedPlaintextStore(context: Context) {
         File(context.filesDir, "datastore/pending_push_registration_store.preferences_pb")
@@ -150,8 +158,13 @@ private object EnvelopeSerializer : Serializer<EncryptedEnvelope> {
 
     override suspend fun readFrom(input: InputStream): EncryptedEnvelope =
         runCatching {
-            Json.decodeFromString<EncryptedEnvelope>(input.readBytes().toString(Charsets.UTF_8))
-        }.getOrDefault(defaultValue)
+            val source = input.readBytes().toString(Charsets.UTF_8)
+            val element = Json.decodeFromString<JsonObject>(source)
+            require(element.jsonObject.keys == setOf("formatVersion", "ciphertext"))
+            Json.decodeFromJsonElement(EncryptedEnvelope.serializer(), element)
+        }.getOrElse {
+            EncryptedEnvelope(formatVersion = INVALID_FORMAT_VERSION)
+        }
 
     override suspend fun writeTo(t: EncryptedEnvelope, output: OutputStream) {
         output.write(
@@ -159,3 +172,5 @@ private object EnvelopeSerializer : Serializer<EncryptedEnvelope> {
         )
     }
 }
+
+private const val INVALID_FORMAT_VERSION = -1
