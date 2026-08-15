@@ -416,7 +416,7 @@ jobs:
             --output "$RUNNER_TEMP/release-attestation-evidence.json" \
             --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
-            --source-ref refs/heads/dev --source-sha "${{ needs.release-please.outputs.source_sha }}" \
+            --source-ref refs/heads/dev --source-sha "${{ github.sha }}" \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
       - name: Finalize and verify release evidence
         env:
