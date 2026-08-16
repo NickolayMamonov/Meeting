@@ -392,6 +392,7 @@ internal class PushRegistrationCoordinator(
                         it.userId == session.userId
                 }
             var accepted = false
+            var evictedDisplayedEventIds: List<String> = emptyList()
             val next = stateStore.update { current ->
                 when (
                     val ingress = PushStateReducer.ingest(
@@ -406,6 +407,7 @@ internal class PushRegistrationCoordinator(
                 ) {
                     is LedgerIngressResult.Accepted -> {
                         accepted = true
+                        evictedDisplayedEventIds = ingress.evictedDisplayedEventIds
                         ingress.state
                     }
                     LedgerIngressResult.Duplicate,
@@ -413,6 +415,9 @@ internal class PushRegistrationCoordinator(
                     LedgerIngressResult.InvalidOwner,
                     -> current
                 }
+            }
+            if (evictedDisplayedEventIds.isNotEmpty()) {
+                runCatching { presentation.cancel(evictedDisplayedEventIds) }
             }
             val owned = next.ledger
                 .filterIsInstance<LedgerRecord.OwnedReminderEvent>()

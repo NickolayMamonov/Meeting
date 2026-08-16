@@ -67,6 +67,51 @@ class PushStateReducerTest {
     }
 
     @Test
+    fun `aged displayed records expose notification ids when atomically evicted`() {
+        val owner = OwnerSnapshot(1, 1)
+        val now = PUSH_LEDGER_RETENTION_MILLIS + 100L
+        val state = PushStateV1(
+            ledger = buildList {
+                add(
+                    LedgerRecord.OwnedReminderEvent(
+                        eventId = "0-displayed",
+                        owner = owner,
+                        meetingId = 1L,
+                        reminderOffsetMinutes = 60,
+                        issuedAt = 1L,
+                        receivedAt = 1L,
+                        status = OwnedEventStatus.DISPLAYED,
+                        statusChangedAt = 0L,
+                    ),
+                )
+                repeat(PUSH_LEDGER_CAPACITY - 1) { index ->
+                    add(
+                        LedgerRecord.DedupeTombstone(
+                            eventId = "tombstone-$index",
+                            reason = TombstoneReason.DISCARDED_NO_OWNER,
+                            terminalAt = 0L,
+                        ),
+                    )
+                }
+            },
+        )
+
+        val result = PushStateReducer.ingest(
+            state = state,
+            owner = owner,
+            eventId = "new-event",
+            meetingId = 2L,
+            reminderOffsetMinutes = 60,
+            issuedAt = now,
+            receivedAt = now,
+        ) as LedgerIngressResult.Accepted
+
+        assertEquals(listOf("0-displayed"), result.evictedDisplayedEventIds)
+        assertEquals(PUSH_LEDGER_CAPACITY, result.state.ledger.size)
+        assertTrue(result.state.ledger.none { it.eventId == "0-displayed" })
+    }
+
+    @Test
     fun `blocked auth records credential version and a later registration clears it`() {
         val owner = OwnerSnapshot(7, 4)
         val state = PushStateV1(

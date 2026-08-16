@@ -197,7 +197,7 @@ internal class DataStoreTokenManager(
                 clearAuthKeys(preferences)
                 writeCredentialVersion(
                     preferences,
-                    newCredentialVersion(if (state.hasAnyAuthKey) 1L else 0L),
+                    newCredentialVersion(0L),
                 )
             }
             state.needsCredentialMigration -> {

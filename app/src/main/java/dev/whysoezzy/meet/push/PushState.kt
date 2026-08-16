@@ -130,6 +130,7 @@ internal data class PushStateV1(
 internal sealed interface LedgerIngressResult {
     data class Accepted(
         val state: PushStateV1,
+        val evictedDisplayedEventIds: List<String> = emptyList(),
     ) : LedgerIngressResult
 
     data object Duplicate : LedgerIngressResult
@@ -556,14 +557,22 @@ internal object PushStateReducer {
             .filter { isEvictable(it, now) }
             .sortedWith(compareBy<LedgerRecord> { it.terminalAt }.thenBy { it.eventId })
             .toMutableList()
+        val evictedDisplayedEventIds = mutableListOf<String>()
         while (retained.size + evictable.size >= PUSH_LEDGER_CAPACITY && evictable.isNotEmpty()) {
-            evictable.removeAt(0)
+            evictable.removeAt(0).let { evicted ->
+                if (evicted is LedgerRecord.OwnedReminderEvent &&
+                    evicted.status == OwnedEventStatus.DISPLAYED
+                ) {
+                    evictedDisplayedEventIds += evicted.eventId
+                }
+            }
         }
         if (retained.size + evictable.size >= PUSH_LEDGER_CAPACITY) {
             return LedgerIngressResult.LedgerCapacityBlocked
         }
         return LedgerIngressResult.Accepted(
             state.copy(ledger = retained + evictable + record),
+            evictedDisplayedEventIds = evictedDisplayedEventIds,
         )
     }
 

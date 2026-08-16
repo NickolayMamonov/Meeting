@@ -194,7 +194,15 @@ class AuthPersistenceInstrumentationTest {
         assertNull(tokenManager.loadTokens())
         val repaired = tokenManager.credentialVersion.first()
         assertTrue(repaired.epoch != "legacy")
-        assertEquals(1L, repaired.revision)
+        assertEquals(0L, repaired.revision)
+
+        tokenManager.saveAuthenticated(
+            accessToken = "recovered-access",
+            refreshToken = "recovered-refresh",
+            userId = 42L,
+            stage = AuthSession.Stage.Ready,
+        )
+        assertEquals(1L, tokenManager.credentialVersion.first().revision)
     }
 
     @Test
@@ -216,8 +224,16 @@ class AuthPersistenceInstrumentationTest {
         assertEquals(AuthSession.LoggedOut, tokenManager.readSession())
         assertNull(tokenManager.loadTokens())
         val repaired = tokenManager.credentialVersion.first()
-        assertEquals(1L, repaired.revision)
+        assertEquals(0L, repaired.revision)
         assertTrue(repaired.epoch != "legacy")
+
+        tokenManager.saveAuthenticated(
+            accessToken = "recovered-access",
+            refreshToken = "recovered-refresh",
+            userId = 42L,
+            stage = AuthSession.Stage.Ready,
+        )
+        assertEquals(1L, tokenManager.credentialVersion.first().revision)
     }
 
     private suspend fun authSession_allowsForwardCasAndIdentityReplacement_butRejectsStaleTransitions() {

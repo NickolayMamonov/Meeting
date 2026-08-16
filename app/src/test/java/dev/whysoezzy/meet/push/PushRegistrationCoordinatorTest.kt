@@ -125,6 +125,68 @@ class PushRegistrationCoordinatorTest {
         }
 
     @Test
+    fun `atomic aged-record eviction cancels displayed notifications after commit`() =
+        runTest {
+            val owner = OwnerSnapshot(userId = 7L, generation = 1L)
+            val now = PUSH_LEDGER_RETENTION_MILLIS + 100L
+            val store = RecordingStateStore(
+                PushStateV1(
+                    registration = RegistrationState(
+                        owner = owner,
+                        accountGeneration = owner.generation,
+                    ),
+                    ledger = buildList {
+                        add(
+                            LedgerRecord.OwnedReminderEvent(
+                                eventId = "0-displayed",
+                                owner = owner,
+                                meetingId = 1L,
+                                reminderOffsetMinutes = 60,
+                                issuedAt = 1L,
+                                receivedAt = 1L,
+                                status = OwnedEventStatus.DISPLAYED,
+                                statusChangedAt = 0L,
+                            ),
+                        )
+                        repeat(PUSH_LEDGER_CAPACITY - 1) { index ->
+                            add(
+                                LedgerRecord.DedupeTombstone(
+                                    eventId = "tombstone-$index",
+                                    reason = TombstoneReason.DISCARDED_NO_OWNER,
+                                    terminalAt = 0L,
+                                ),
+                            )
+                        }
+                    },
+                ),
+            )
+            val presentation = RecordingPresentation {
+                store.state.ledger.none { it.eventId == "0-displayed" }
+            }
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = RecordingAuth(
+                    AuthSession(owner.userId, AuthSession.Stage.Ready),
+                ),
+                installationRepository = RecordingInstallations(),
+                fcm = RecordingFirebase(),
+                stateStore = store,
+                presentation = presentation,
+                workScheduler = RecordingScheduler(),
+            )
+
+            coordinator.handleDataMessage(
+                data = reminderData(),
+                hasNotificationBlock = false,
+                ingressExitEpoch = coordinator.captureExitEpoch(),
+            )
+
+            assertEquals(listOf("0-displayed"), presentation.cancelled)
+            assertTrue(presentation.committedAtCancellation)
+            assertTrue(store.state.ledger.none { it.eventId == "0-displayed" })
+            coordinator.close()
+        }
+
+    @Test
     fun `tap consumption is rejected while account exit fence is active`() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -481,6 +543,20 @@ class PushRegistrationCoordinatorTest {
 
         override fun cancel() {
             cancels++
+        }
+    }
+
+    private class RecordingPresentation(
+        private val isCommitted: () -> Boolean = { true },
+    ) : ReminderPresentationGateway {
+        val cancelled = mutableListOf<String>()
+        var committedAtCancellation = false
+
+        override fun present(event: LedgerRecord.OwnedReminderEvent): Boolean = true
+
+        override fun cancel(eventIds: Collection<String>) {
+            cancelled += eventIds
+            committedAtCancellation = isCommitted()
         }
     }
 

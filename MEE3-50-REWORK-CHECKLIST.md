@@ -54,4 +54,6 @@
 - [x] Add a service-path A-exit-B race test proving a stale callback cannot be attributed to B.
 - [x] Re-enqueue a guarded current-state reconciliation after transient/timeout A-to-B installation DELETE failure.
 - [x] Assert scheduler activity and eventual B installation registration after cleanup retry.
+- [x] Recover corrupt credential metadata into a fresh epoch at revision 0 and advance to revision 1 only on the next complete authenticated write, with instrumentation coverage.
+- [x] Return evicted displayed notification IDs from bounded-ledger pruning and best-effort cancel them after the atomic state commit, with reducer/coordinator coverage.
 - [ ] Re-run snapshot/release/device/backend gates; prerequisites remain externally blocked.
