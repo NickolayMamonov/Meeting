@@ -2,6 +2,7 @@ package dev.whysoezzy.meet.di
 
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
+import com.whysoezzy.domain.models.PushInstallationDeleteResult
 import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import dev.whysoezzy.meet.push.PushRegistrationCoordinator
 import io.mockk.coEvery
@@ -10,6 +11,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -121,6 +123,38 @@ class BoundedAccountExitCoordinatorTest {
         coVerify(exactly = 1) {
             push.recordAccountCleanupOutcome(installationId, any())
         }
+    }
+
+    @Test
+    fun `explicit logout deletes and persists installation cleanup before firebase unregister`() = runTest {
+        val installationId = "550e8400-e29b-41d4-a716-446655440000"
+        val calls = mutableListOf<String>()
+        coEvery { push.beginAccountExit() } returns Unit
+        coEvery { push.endAccountExit() } returns Unit
+        coEvery {
+            push.clearAccountState(any(), true)
+        } returns installationId
+        coEvery {
+            push.deleteInstallation(installationId)
+        } coAnswers {
+            calls += "delete"
+            Result.success(PushInstallationDeleteResult.Acknowledged)
+        }
+        coEvery {
+            push.recordAccountCleanupOutcome(installationId, any())
+        } coAnswers {
+            calls += "persist"
+            Unit
+        }
+        every { push.unregisterFirebase() } answers {
+            calls += "unregister"
+        }
+        coEvery { logout() } returns Unit
+        coEvery { auth.clear() } returns Unit
+
+        coordinator().logout()
+
+        assertEquals(listOf("delete", "persist", "unregister"), calls)
     }
 
     @Test

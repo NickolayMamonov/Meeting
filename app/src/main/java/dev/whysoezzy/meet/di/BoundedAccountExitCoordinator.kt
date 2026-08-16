@@ -26,7 +26,6 @@ internal class BoundedAccountExitCoordinator(
                                 retainInstallationCleanup = true,
                             )
                         }
-                        pushRegistrationCoordinator.unregisterFirebase()
                         if (installationId != null) {
                             val deleteResult = withTimeoutOrNull(1_250L) {
                                 pushRegistrationCoordinator.deleteInstallation(installationId)
@@ -40,6 +39,7 @@ internal class BoundedAccountExitCoordinator(
                                 ),
                             )
                         }
+                        pushRegistrationCoordinator.unregisterFirebase()
                         withTimeoutOrNull(1_250L) { logoutUseCase() }
                     }
                 } finally {
