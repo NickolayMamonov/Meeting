@@ -12,6 +12,8 @@ import com.whysoezzy.domain.models.PushInstallationId
 import com.whysoezzy.domain.models.PushInstallationStatus
 import com.whysoezzy.domain.models.PushInstallationUpsertResult
 import com.whysoezzy.domain.repository.PushInstallationRepository
+import com.whysoezzy.network.error.ApiErrorMetadata
+import com.whysoezzy.network.error.ApiException
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -348,16 +350,19 @@ class PushRegistrationCoordinatorTest {
                 ),
             )
             val auth = RecordingAuth(AuthSession(7L, AuthSession.Stage.Ready))
+            val scheduler = RecordingScheduler()
+            val firebase = RecordingFirebase()
             val coordinator = PushRegistrationCoordinator(
                 authSessionRepository = auth,
                 installationRepository = installations,
-                fcm = RecordingFirebase(),
+                fcm = firebase,
                 stateStore = store,
-                workScheduler = RecordingScheduler(),
+                workScheduler = scheduler,
                 dispatcher = dispatcher,
             )
             coordinator.start()
             runCurrent()
+            scheduler.enqueues = 0
 
             auth.setSession(AuthSession(8L, AuthSession.Stage.Ready))
             runCurrent()
@@ -367,7 +372,90 @@ class PushRegistrationCoordinatorTest {
                 RegistrationTerminal.MALFORMED_SUCCESS,
                 store.state.accountCleanup?.terminal,
             )
+            assertTrue(scheduler.enqueues > 0)
+
+            coordinator.reconcileCurrent()
+            coordinator.onRegistered("fid-b")
+            runCurrent()
+            coordinator.reconcileCurrent()
+
+            assertEquals(
+                PushInstallationId("550e8400-e29b-41d4-a716-446655440001"),
+                installations.createdInstallationId,
+            )
+            assertEquals(1, firebase.registers)
             coordinator.close()
+        }
+
+    @Test
+    fun `account replacement terminal HTTP failures rearm current account registration`() =
+        runTest {
+            listOf(403, 409).forEach { status ->
+                val dispatcher = StandardTestDispatcher(testScheduler)
+                val oldOwner = OwnerSnapshot(userId = 7L, generation = 1L)
+                val oldInstallationId = "550e8400-e29b-41d4-a716-446655440000"
+                val store = RecordingStateStore(
+                    PushStateV1(
+                        registration = RegistrationState(
+                            owner = oldOwner,
+                            accountGeneration = oldOwner.generation,
+                            installationId = oldInstallationId,
+                        ),
+                    ),
+                )
+                val auth = RecordingAuth(AuthSession(7L, AuthSession.Stage.Ready))
+                val installations = RecordingInstallations(
+                    deleteResults = listOf(
+                        Result.failure(
+                            when (status) {
+                                403 -> ApiException.UnauthorizedError(
+                                    ApiErrorMetadata(status = status, code = "TERMINAL"),
+                                )
+                                else -> ApiException.ServerError(
+                                    ApiErrorMetadata(status = status, code = "TERMINAL"),
+                                )
+                            },
+                        ),
+                    ),
+                )
+                val scheduler = RecordingScheduler()
+                val firebase = RecordingFirebase()
+                val coordinator = PushRegistrationCoordinator(
+                    authSessionRepository = auth,
+                    installationRepository = installations,
+                    fcm = firebase,
+                    stateStore = store,
+                    workScheduler = scheduler,
+                    dispatcher = dispatcher,
+                )
+                coordinator.start()
+                runCurrent()
+                scheduler.enqueues = 0
+
+                auth.setSession(AuthSession(8L, AuthSession.Stage.Ready))
+                runCurrent()
+
+                assertEquals(
+                    when (status) {
+                        403 -> RegistrationTerminal.FORBIDDEN
+                        else -> RegistrationTerminal.CONFLICT_BLOCKED
+                    },
+                    store.state.accountCleanup?.terminal,
+                )
+                assertTrue(scheduler.enqueues > 0)
+
+                coordinator.reconcileCurrent()
+                coordinator.onRegistered("fid-b")
+                runCurrent()
+                coordinator.reconcileCurrent()
+
+                assertEquals(
+                    PushInstallationId("550e8400-e29b-41d4-a716-446655440001"),
+                    installations.createdInstallationId,
+                )
+                assertEquals(1, firebase.registers)
+                coordinator.close()
+            }
         }
 
     private class RecordingStateStore(

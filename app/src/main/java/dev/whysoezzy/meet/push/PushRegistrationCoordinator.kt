@@ -75,7 +75,7 @@ internal class PushRegistrationCoordinator(
                         oldRegistration != null ||
                         pendingCleanup != null
                     ) {
-                        var retryCleanupAfterExit = false
+                        var rearmCurrentAccountAfterExit = false
                         beginAccountExit()
                         try {
                             if (userId != null && pendingCleanup != null) {
@@ -94,7 +94,7 @@ internal class PushRegistrationCoordinator(
                                         pendingCleanup.installationId,
                                         cleanupFailure,
                                     )
-                                    retryCleanupAfterExit = cleanupFailure.shouldRetryCleanup()
+                                    rearmCurrentAccountAfterExit = true
                                     return@collectLatest
                                 }
                                 stateMutex.withLock {
@@ -120,26 +120,26 @@ internal class PushRegistrationCoordinator(
                                                     "Timed out deleting account installation",
                                                 ),
                                             )
+                                        clearAccountState(retainInstallationCleanup = true)
                                         recordAccountCleanupFailure(
                                             oldRegistration.first,
                                             oldInstallationId,
                                             cleanupFailure,
                                         )
-                                        retryCleanupAfterExit = cleanupFailure.shouldRetryCleanup()
-                                        clearAccountState()
+                                        rearmCurrentAccountAfterExit = true
                                         return@collectLatest
                                     }
                                 } catch (error: Exception) {
                                     if (error is kotlinx.coroutines.CancellationException) throw error
                                     val cleanupFailure =
                                         Result.failure<PushInstallationDeleteResult>(error)
+                                    clearAccountState(retainInstallationCleanup = true)
                                     recordAccountCleanupFailure(
                                         oldRegistration.first,
                                         oldInstallationId,
                                         cleanupFailure,
                                     )
-                                    retryCleanupAfterExit = cleanupFailure.shouldRetryCleanup()
-                                    clearAccountState()
+                                    rearmCurrentAccountAfterExit = true
                                     return@collectLatest
                                 }
                             }
@@ -149,8 +149,8 @@ internal class PushRegistrationCoordinator(
                             }
                         } finally {
                             endAccountExit()
-                            if (retryCleanupAfterExit && userId != null) {
-                                enqueueCurrentStateRetry(userId)
+                            if (rearmCurrentAccountAfterExit && userId != null) {
+                                enqueueCurrentStateReconcile(userId)
                             }
                         }
                     }
@@ -940,15 +940,13 @@ internal class PushRegistrationCoordinator(
 
     override fun captureExitEpoch(): Long = exitEpoch
 
-    private suspend fun enqueueCurrentStateRetry(userId: Long) {
+    private suspend fun enqueueCurrentStateReconcile(userId: Long) {
         stateMutex.withLock {
             val session = authSessionRepository.read()
-            val cleanup = stateStore.read().accountCleanup
             if (
                 !accountExitInProgress &&
                 session.stage != AuthSession.Stage.LoggedOut &&
-                session.userId == userId &&
-                cleanup?.terminal == RegistrationTerminal.NONE
+                session.userId == userId
             ) {
                 workScheduler.enqueue()
             }
