@@ -157,6 +157,52 @@ class PushRegistrationCoordinatorTest {
             coordinator.close()
         }
 
+    @Test
+    fun `account replacement preserves terminal cleanup outcome`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val oldOwner = OwnerSnapshot(userId = 7L, generation = 1L)
+            val oldInstallationId = "550e8400-e29b-41d4-a716-446655440000"
+            val store = RecordingStateStore(
+                PushStateV1(
+                    registration = RegistrationState(
+                        owner = oldOwner,
+                        accountGeneration = oldOwner.generation,
+                        installationId = oldInstallationId,
+                    ),
+                ),
+            )
+            val installations = RecordingInstallations(
+                deleteResult = Result.success(
+                    PushInstallationDeleteResult.Terminal(
+                        com.whysoezzy.domain.models.PushInstallationTerminalStatus
+                            .MALFORMED_SUCCESS,
+                    ),
+                ),
+            )
+            val auth = RecordingAuth(AuthSession(7L, AuthSession.Stage.Ready))
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = auth,
+                installationRepository = installations,
+                fcm = RecordingFirebase(),
+                stateStore = store,
+                workScheduler = RecordingScheduler(),
+                dispatcher = dispatcher,
+            )
+            coordinator.start()
+            runCurrent()
+
+            auth.setSession(AuthSession(8L, AuthSession.Stage.Ready))
+            runCurrent()
+
+            assertEquals(1, store.state.accountCleanup?.retryAttempt)
+            assertEquals(
+                RegistrationTerminal.MALFORMED_SUCCESS,
+                store.state.accountCleanup?.terminal,
+            )
+            coordinator.close()
+        }
+
     private class RecordingStateStore(
         var state: PushStateV1,
     ) : PushStateStore {
