@@ -60,6 +60,14 @@ internal data class RegistrationState(
 )
 
 @Serializable
+internal data class AccountCleanupState(
+    val owner: OwnerSnapshot,
+    val installationId: String,
+    val retryAttempt: Int = 0,
+    val terminal: RegistrationTerminal = RegistrationTerminal.NONE,
+)
+
+@Serializable
 internal enum class OwnedEventStatus {
     PENDING_DISPLAY,
     DISPLAYED,
@@ -115,6 +123,7 @@ internal data class PushStateV1(
     val migrationVersion: Int = PUSH_MIGRATION_VERSION,
     val installPolicy: InstallPolicyState = InstallPolicyState(),
     val registration: RegistrationState = RegistrationState(),
+    val accountCleanup: AccountCleanupState? = null,
     val ledger: List<LedgerRecord> = emptyList(),
 )
 
@@ -289,6 +298,32 @@ internal object PushStateReducer {
             state
         }
 
+    fun recordAccountCleanupFailure(
+        state: PushStateV1,
+        owner: OwnerSnapshot,
+        installationId: String,
+        retryAttempt: Int,
+        terminal: RegistrationTerminal,
+    ): PushStateV1 =
+        state.copy(
+            accountCleanup = AccountCleanupState(
+                owner = owner,
+                installationId = installationId,
+                retryAttempt = retryAttempt,
+                terminal = terminal,
+            ),
+        )
+
+    fun acknowledgeAccountCleanup(
+        state: PushStateV1,
+        owner: OwnerSnapshot,
+        installationId: String,
+    ): PushStateV1 =
+        state.accountCleanup
+            ?.takeIf { it.owner == owner && it.installationId == installationId }
+            ?.let { state.copy(accountCleanup = null) }
+            ?: state
+
     fun suppressCorrupt(state: PushStateV1): PushStateV1 =
         state.copy(
             installPolicy = state.installPolicy.copy(permission = PermissionState.SUPPRESSED_CORRUPT),
@@ -309,6 +344,15 @@ internal object PushStateReducer {
         require(state.registration.terminalNonce >= 0L)
         require(state.registration.retryAttempt in 0..MAX_RETRY_ATTEMPTS)
         require(state.registration.firebaseRetryAttempt in 0..MAX_RETRY_ATTEMPTS)
+        state.accountCleanup?.let {
+            require(it.owner.userId > 0L && it.owner.generation >= 0L)
+            require(
+                com.whysoezzy.domain.models
+                    .PushInstallationId(it.installationId)
+                    .value == it.installationId,
+            )
+            require(it.retryAttempt in 0..MAX_RETRY_ATTEMPTS)
+        }
         if (state.registration.operation != RegistrationOperation.NONE) {
             require(state.registration.owner != null)
             require(state.registration.pendingFid != null)

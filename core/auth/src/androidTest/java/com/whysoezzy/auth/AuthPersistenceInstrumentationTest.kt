@@ -197,6 +197,29 @@ class AuthPersistenceInstrumentationTest {
         assertEquals(1L, repaired.revision)
     }
 
+    @Test
+    fun malformedCredentialCiphertext_failsClosed() = runBlocking {
+        val crypto = TokenCrypto(context)
+        writeRawPreferences(TOKEN_STORE) {
+            it[stringPreferencesKey("access_token")] =
+                crypto.encrypt("access", "access_token")
+            it[stringPreferencesKey("refresh_token")] =
+                crypto.encrypt("refresh", "refresh_token")
+            it[stringPreferencesKey("user_id")] =
+                crypto.encrypt("42", "user_id")
+            it[stringPreferencesKey("stage")] =
+                crypto.encrypt(AuthSession.Stage.Ready.name, "stage")
+            it[stringPreferencesKey("credential_epoch")] = "malformed-ciphertext"
+            it[stringPreferencesKey("credential_revision")] = "also-malformed"
+        }
+
+        assertEquals(AuthSession.LoggedOut, tokenManager.readSession())
+        assertNull(tokenManager.loadTokens())
+        val repaired = tokenManager.credentialVersion.first()
+        assertEquals(1L, repaired.revision)
+        assertTrue(repaired.epoch != "legacy")
+    }
+
     private suspend fun authSession_allowsForwardCasAndIdentityReplacement_butRejectsStaleTransitions() {
         val repository = DataStoreAuthSessionRepository(tokenManager)
         tokenManager.saveAuthenticated(

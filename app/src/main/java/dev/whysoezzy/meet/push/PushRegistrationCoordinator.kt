@@ -34,6 +34,9 @@ internal class PushRegistrationCoordinator(
 ) {
     private val stateMutex = Mutex()
     private val reconciliationMutex = Mutex()
+
+    @Volatile
+    private var exitEpoch = 0L
     private var accountExitInProgress = false
     private var scope: CoroutineScope? = null
     private var observationJob: Job? = null
@@ -46,7 +49,12 @@ internal class PushRegistrationCoordinator(
             authSessionRepository.credentialState
                 .distinctUntilChanged()
                 .collectLatest { credentialState ->
-                    if (stateMutex.withLock { accountExitInProgress }) {
+                    val ingressExitEpoch = captureExitEpoch()
+                    if (
+                        stateMutex.withLock {
+                            accountExitInProgress || exitEpoch != ingressExitEpoch
+                        }
+                    ) {
                         return@collectLatest
                     }
                     val userId = credentialState.session.userId
@@ -57,17 +65,74 @@ internal class PushRegistrationCoordinator(
                             ?.takeIf { userId == null || it.userId != userId }
                             ?.let { it to state.registration.installationId }
                     }
-                    if (userId == null || oldRegistration != null) {
+                    val pendingCleanup = stateMutex.withLock {
+                        stateStore
+                            .read()
+                            .accountCleanup
+                            ?.takeIf { it.terminal == RegistrationTerminal.NONE }
+                    }
+                    if (userId == null ||
+                        oldRegistration != null ||
+                        pendingCleanup != null
+                    ) {
                         beginAccountExit()
                         try {
+                            if (userId != null && pendingCleanup != null) {
+                                val deleteResult = withTimeoutOrNull(1_250L) {
+                                    deleteInstallation(pendingCleanup.installationId)
+                                }
+                                if (deleteResult?.isAcknowledged() != true) {
+                                    recordAccountCleanupFailure(
+                                        pendingCleanup.owner,
+                                        pendingCleanup.installationId,
+                                        deleteResult
+                                            ?: Result.failure(
+                                                IllegalStateException(
+                                                    "Timed out deleting account installation",
+                                                ),
+                                            ),
+                                    )
+                                    return@collectLatest
+                                }
+                                stateMutex.withLock {
+                                    stateStore.update {
+                                        PushStateReducer.acknowledgeAccountCleanup(
+                                            it,
+                                            pendingCleanup.owner,
+                                            pendingCleanup.installationId,
+                                        )
+                                    }
+                                }
+                            }
                             val oldInstallationId = oldRegistration?.second
                             if (userId != null && oldInstallationId != null) {
                                 try {
-                                    withTimeoutOrNull(1_250L) {
+                                    val deleteResult = withTimeoutOrNull(1_250L) {
                                         deleteInstallation(oldInstallationId)
+                                    }
+                                    if (deleteResult?.isAcknowledged() != true) {
+                                        recordAccountCleanupFailure(
+                                            oldRegistration.first,
+                                            oldInstallationId,
+                                            deleteResult
+                                                ?: Result.failure(
+                                                    IllegalStateException(
+                                                        "Timed out deleting account installation",
+                                                    ),
+                                                ),
+                                        )
+                                        clearAccountState()
+                                        return@collectLatest
                                     }
                                 } catch (error: Exception) {
                                     if (error is kotlinx.coroutines.CancellationException) throw error
+                                    recordAccountCleanupFailure(
+                                        oldRegistration.first,
+                                        oldInstallationId,
+                                        Result.failure(error),
+                                    )
+                                    clearAccountState()
+                                    return@collectLatest
                                 }
                             }
                             clearAccountState()
@@ -79,15 +144,27 @@ internal class PushRegistrationCoordinator(
                         }
                     }
                     if (userId != null) {
+                        val schedulingExitEpoch = captureExitEpoch()
                         val registrationCanRun = stateMutex.withLock {
                             val registration = stateStore.read().registration
-                            registration.terminal == RegistrationTerminal.NONE ||
+                            exitEpoch == schedulingExitEpoch &&
+                                !accountExitInProgress &&
                                 (
-                                    registration.terminal == RegistrationTerminal.BLOCKED_AUTH &&
-                                        credentialState.credentialVersion.isAdvancedFrom(registration)
+                                    registration.terminal == RegistrationTerminal.NONE ||
+                                        (
+                                            registration.terminal == RegistrationTerminal.BLOCKED_AUTH &&
+                                                credentialState.credentialVersion
+                                                    .isAdvancedFrom(registration)
+                                        )
                                 )
                         }
-                        if (registrationCanRun) workScheduler.enqueue()
+                        if (registrationCanRun) {
+                            stateMutex.withLock {
+                                if (exitEpoch == schedulingExitEpoch && !accountExitInProgress) {
+                                    workScheduler.enqueue()
+                                }
+                            }
+                        }
                     }
                 }
         }
@@ -102,6 +179,7 @@ internal class PushRegistrationCoordinator(
 
     internal suspend fun beginAccountExit() {
         stateMutex.withLock {
+            exitEpoch++
             accountExitInProgress = true
             workScheduler.cancel()
         }
@@ -115,6 +193,7 @@ internal class PushRegistrationCoordinator(
 
     fun onRegistered(fid: String) {
         val currentScope = scope ?: return
+        val ingressExitEpoch = captureExitEpoch()
         val validFid = try {
             PushInstallationFid(fid).value
         } catch (_: IllegalArgumentException) {
@@ -122,7 +201,9 @@ internal class PushRegistrationCoordinator(
         }
         currentScope.launch {
             val staged = stateMutex.withLock {
-                if (accountExitInProgress) return@withLock false
+                if (accountExitInProgress || exitEpoch != ingressExitEpoch) {
+                    return@withLock false
+                }
                 val before = stateStore.read()
                 val after = stateStore.update { PushStateReducer.stageFid(it, validFid) }
                 before != after
@@ -132,11 +213,12 @@ internal class PushRegistrationCoordinator(
     }
 
     internal suspend fun reconcileCurrent(): Boolean {
+        val ingressExitEpoch = captureExitEpoch()
         val credentialState = authSessionRepository.credentialState.first()
         val userId = credentialState.session.userId
             ?.takeIf { credentialState.session.stage != AuthSession.Stage.LoggedOut }
             ?: return true
-        return reconcile(userId, credentialState.credentialVersion)
+        return reconcile(userId, credentialState.credentialVersion, ingressExitEpoch)
     }
 
     internal suspend fun claimTap(command: PushTapCommand): Boolean =
@@ -186,10 +268,14 @@ internal class PushRegistrationCoordinator(
      */
     fun onUnregistered() {
         val currentScope = scope ?: return
+        val ingressExitEpoch = captureExitEpoch()
         currentScope.launch {
             stateMutex.withLock {
                 val session = authSessionRepository.read()
-                if (!accountExitInProgress && session.stage != AuthSession.Stage.LoggedOut) {
+                if (!accountExitInProgress &&
+                    exitEpoch == ingressExitEpoch &&
+                    session.stage != AuthSession.Stage.LoggedOut
+                ) {
                     workScheduler.enqueue()
                 }
             }
@@ -279,16 +365,59 @@ internal class PushRegistrationCoordinator(
     private suspend fun reconcile(
         userId: Long,
         credentialVersion: CredentialVersion,
+        ingressExitEpoch: Long,
     ): Boolean = reconciliationMutex.withLock {
-        reconcileSerialized(userId, credentialVersion)
+        reconcileSerialized(userId, credentialVersion, ingressExitEpoch)
     }
 
     private suspend fun reconcileSerialized(
         userId: Long,
         credentialVersion: CredentialVersion,
+        ingressExitEpoch: Long,
     ): Boolean {
+        val pendingCleanup = stateMutex.withLock {
+            if (accountExitInProgress || exitEpoch != ingressExitEpoch) {
+                null
+            } else {
+                stateStore
+                    .read()
+                    .accountCleanup
+                    ?.takeIf { it.terminal == RegistrationTerminal.NONE }
+            }
+        }
+        if (pendingCleanup != null) {
+            val deleteResult = if (isExitEpochCurrent(ingressExitEpoch)) {
+                installationRepository.delete(
+                    PushInstallationId(pendingCleanup.installationId),
+                )
+            } else {
+                return true
+            }
+            if (!deleteResult.isAcknowledged()) {
+                if (!isExitEpochCurrent(ingressExitEpoch)) return true
+                recordAccountCleanupFailure(
+                    pendingCleanup.owner,
+                    pendingCleanup.installationId,
+                    deleteResult,
+                    ingressExitEpoch,
+                )
+                return !isTransient(deleteResult.exceptionOrNull())
+            }
+            stateMutex.withLock {
+                if (exitEpoch == ingressExitEpoch && !accountExitInProgress) {
+                    stateStore.update {
+                        PushStateReducer.acknowledgeAccountCleanup(
+                            it,
+                            pendingCleanup.owner,
+                            pendingCleanup.installationId,
+                        )
+                    }
+                }
+            }
+            return reconcileSerialized(userId, credentialVersion, ingressExitEpoch)
+        }
         val snapshot = stateMutex.withLock {
-            if (accountExitInProgress) return@withLock null
+            if (accountExitInProgress || exitEpoch != ingressExitEpoch) return@withLock null
             val session = authSessionRepository.read()
             val state = stateStore.read()
             if (session.stage == AuthSession.Stage.LoggedOut || session.userId != userId) {
@@ -338,17 +467,24 @@ internal class PushRegistrationCoordinator(
 
         val (owner, fid) = snapshot
         return if (fid == null) {
-            ensureFirebaseRegistered(owner)
+            ensureFirebaseRegistered(owner, ingressExitEpoch)
         } else {
-            reconcileWithFid(fid, owner)
+            reconcileWithFid(fid, owner, ingressExitEpoch)
         }
     }
 
-    private suspend fun ensureFirebaseRegistered(owner: OwnerSnapshot): Boolean {
+    private suspend fun ensureFirebaseRegistered(
+        owner: OwnerSnapshot,
+        ingressExitEpoch: Long,
+    ): Boolean {
         val request = stateMutex.withLock {
             val session = authSessionRepository.read()
             val state = stateStore.read()
-            if (session.stage == AuthSession.Stage.LoggedOut || session.userId != owner.userId) {
+            if (accountExitInProgress ||
+                exitEpoch != ingressExitEpoch ||
+                session.stage == AuthSession.Stage.LoggedOut ||
+                session.userId != owner.userId
+            ) {
                 return@withLock null
             }
             val registration = state.registration
@@ -360,14 +496,19 @@ internal class PushRegistrationCoordinator(
                 nonce = registration.nonce,
                 terminalNonce = registration.terminalNonce,
                 attempt = registration.firebaseRetryAttempt,
+                exitEpoch = ingressExitEpoch,
             )
         } ?: return true
 
         return try {
+            if (!isExitEpochCurrent(ingressExitEpoch)) return true
             fcm.register()
             stateMutex.withLock {
                 val current = stateStore.read()
-                if (isCurrentRequest(authSessionRepository.read(), current, request)) {
+                if (isCurrentRequest(authSessionRepository.read(), current, request) &&
+                    exitEpoch == ingressExitEpoch &&
+                    !accountExitInProgress
+                ) {
                     stateStore.update(PushStateReducer::resetFirebaseRetry)
                 }
             }
@@ -376,7 +517,10 @@ internal class PushRegistrationCoordinator(
             if (error is kotlinx.coroutines.CancellationException) throw error
             stateMutex.withLock {
                 val current = stateStore.read()
-                if (!isCurrentRequest(authSessionRepository.read(), current, request)) {
+                if (!isCurrentRequest(authSessionRepository.read(), current, request) ||
+                    exitEpoch != ingressExitEpoch ||
+                    accountExitInProgress
+                ) {
                     return@withLock true
                 }
                 if (request.attempt + 1 >= MAX_ATTEMPTS) {
@@ -406,11 +550,16 @@ internal class PushRegistrationCoordinator(
     private suspend fun reconcileWithFid(
         fid: String,
         owner: OwnerSnapshot,
+        ingressExitEpoch: Long,
     ): Boolean {
         val request = stateMutex.withLock {
             val session = authSessionRepository.read()
             val current = stateStore.read()
-            if (session.stage == AuthSession.Stage.LoggedOut || session.userId != owner.userId) {
+            if (accountExitInProgress ||
+                exitEpoch != ingressExitEpoch ||
+                session.stage == AuthSession.Stage.LoggedOut ||
+                session.userId != owner.userId
+            ) {
                 return@withLock null
             }
             val registration = current.registration
@@ -453,9 +602,11 @@ internal class PushRegistrationCoordinator(
                 installationId = installationId,
                 nonce = nonce,
                 terminalNonce = if (sameRequest) registration.terminalNonce else 0L,
+                exitEpoch = ingressExitEpoch,
             )
         } ?: return true
 
+        if (!isExitEpochCurrent(ingressExitEpoch)) return true
         val result = when (request.operation) {
             RegistrationOperation.CREATE ->
                 installationRepository.create(PushInstallationFid(request.pendingFid))
@@ -480,7 +631,12 @@ internal class PushRegistrationCoordinator(
         return stateMutex.withLock {
             val session = authSessionRepository.read()
             val current = stateStore.read()
-            if (!request.matches(session, current)) return@withLock true
+            if (!request.matches(session, current) ||
+                request.exitEpoch != exitEpoch ||
+                accountExitInProgress
+            ) {
+                return@withLock true
+            }
 
             val error = result.exceptionOrNull()
             val status = error.httpStatus()
@@ -643,6 +799,54 @@ internal class PushRegistrationCoordinator(
             registration.terminalNonce == request.terminalNonce
     }
 
+    private fun captureExitEpoch(): Long = exitEpoch
+
+    private suspend fun isExitEpochCurrent(epoch: Long): Boolean =
+        stateMutex.withLock {
+            !accountExitInProgress && exitEpoch == epoch
+        }
+
+    private suspend fun recordAccountCleanupFailure(
+        owner: OwnerSnapshot,
+        installationId: String,
+        result: Result<PushInstallationDeleteResult>,
+        expectedExitEpoch: Long? = null,
+    ) {
+        val terminal = when {
+            result.isSuccess &&
+                result.getOrNull() is PushInstallationDeleteResult.Terminal ->
+                RegistrationTerminal.MALFORMED_SUCCESS
+            else -> result.exceptionOrNull().terminalStatus()
+        }
+        stateMutex.withLock {
+            if (expectedExitEpoch != null &&
+                (accountExitInProgress || exitEpoch != expectedExitEpoch)
+            ) {
+                return@withLock
+            }
+            val current = stateStore.read()
+            val previous = current.accountCleanup
+                ?.takeIf { it.owner == owner && it.installationId == installationId }
+            val retryAttempt = (previous?.retryAttempt ?: 0) + 1
+            stateStore.update {
+                PushStateReducer.recordAccountCleanupFailure(
+                    it,
+                    owner,
+                    installationId,
+                    retryAttempt.coerceAtMost(MAX_ATTEMPTS),
+                    terminal ?: if (retryAttempt >= MAX_ATTEMPTS) {
+                        RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED
+                    } else {
+                        RegistrationTerminal.NONE
+                    },
+                )
+            }
+        }
+    }
+
+    private fun Result<PushInstallationDeleteResult>.isAcknowledged(): Boolean =
+        getOrNull() == PushInstallationDeleteResult.Acknowledged
+
     private data class FirebaseRegistrationRequest(
         val owner: OwnerSnapshot,
         val pendingFid: String?,
@@ -651,6 +855,7 @@ internal class PushRegistrationCoordinator(
         val nonce: Long,
         val terminalNonce: Long,
         val attempt: Int,
+        val exitEpoch: Long,
     )
 
     private typealias RegistrationRequest = PushRegistrationRequestFence
@@ -667,6 +872,7 @@ internal data class PushRegistrationRequestFence(
     val installationId: String?,
     val nonce: Long,
     val terminalNonce: Long,
+    val exitEpoch: Long = 0L,
 ) {
     fun matches(
         session: AuthSession,

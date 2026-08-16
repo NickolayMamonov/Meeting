@@ -55,12 +55,12 @@ class BoundedAccountExitCoordinatorTest {
         coEvery { push.clearAccountState(any()) } returns
             "550e8400-e29b-41d4-a716-446655440000"
         every { push.unregisterFirebase() } returns Unit
-        coEvery { logout() } returns Unit
         coEvery { auth.clear() } returns Unit
 
         coordinator().forcedLogout()
 
         coVerify(exactly = 0) { push.deleteInstallation(any()) }
+        coVerify(exactly = 0) { logout() }
         coVerify { push.beginAccountExit() }
         coVerify { push.endAccountExit() }
     }
@@ -93,5 +93,17 @@ class BoundedAccountExitCoordinatorTest {
 
         assertTrue(outcome.exceptionOrNull() is IllegalStateException)
         coVerify { auth.clear() }
+    }
+
+    @Test
+    fun `auth is cleared when exit fence acquisition fails`() = runTest {
+        coEvery { push.beginAccountExit() } throws IllegalStateException("fence failure")
+        coEvery { auth.clear() } returns Unit
+
+        val outcome = runCatching { coordinator().forcedLogout() }
+
+        assertTrue(outcome.exceptionOrNull() is IllegalStateException)
+        coVerify { auth.clear() }
+        coVerify(exactly = 0) { push.endAccountExit() }
     }
 }

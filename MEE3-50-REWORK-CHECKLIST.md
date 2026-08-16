@@ -32,6 +32,9 @@
 - [x] Atomically migrate valid legacy authenticated credential stores to a random epoch revision 1 and fail closed on corrupt metadata; preserve the epoch across clears.
 - [x] Perform bounded installation DELETE before authenticated A-to-B owner replacement cleanup.
 - [x] Add focused forced-exit, exit-race, account-transition DELETE, tombstone, retention, migration, and corruption tests.
-- [ ] Re-run the complete required verification matrix and record external runtime/snapshot/release gates.
+- [x] Re-run the local verification matrix: focused exit/fencing/state/auth tests, module unit tests,
+  app/core-auth ktlint, app lint, and debug assemble.
+- [ ] Run core-auth instrumentation for malformed ciphertext when an API 33+ authorized device is
+  supplied; record external runtime/snapshot/release gates.
 
 - [ ] API 33+ authorized-device runtime, backend fixture, snapshot Firebase client, and release-signing prerequisites remain environment gates.

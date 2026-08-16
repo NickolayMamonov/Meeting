@@ -11,9 +11,9 @@ import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.CredentialVersion
 import com.whysoezzy.network.TokenSnapshot
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.io.IOException
@@ -314,7 +314,9 @@ internal class DataStoreTokenManager(
     }
 
     private sealed interface CredentialMetadata {
-        data class Valid(val value: CredentialVersion) : CredentialMetadata
+        data class Valid(
+            val value: CredentialVersion,
+        ) : CredentialMetadata
 
         data object Missing : CredentialMetadata
 
@@ -338,11 +340,16 @@ internal class DataStoreTokenManager(
     }
 
     private fun readCredentialMetadata(preferences: Preferences): CredentialMetadata {
-        val epoch = preferences[KEY_CREDENTIAL_EPOCH]?.decrypt(KEY_CREDENTIAL_EPOCH.name)
-        val revision = preferences[KEY_CREDENTIAL_REVISION]
-            ?.decrypt(KEY_CREDENTIAL_REVISION.name)
-            ?.toLongOrNull()
-        if (epoch == null && revision == null) return CredentialMetadata.Missing
+        val epochCiphertext = preferences[KEY_CREDENTIAL_EPOCH]
+        val revisionCiphertext = preferences[KEY_CREDENTIAL_REVISION]
+        if (epochCiphertext == null && revisionCiphertext == null) {
+            return CredentialMetadata.Missing
+        }
+        if (epochCiphertext == null || revisionCiphertext == null) {
+            return CredentialMetadata.Corrupt
+        }
+        val epoch = epochCiphertext.decrypt(KEY_CREDENTIAL_EPOCH.name)
+        val revision = revisionCiphertext.decrypt(KEY_CREDENTIAL_REVISION.name)?.toLongOrNull()
         if (epoch.isNullOrBlank() || revision == null || revision < 0L) {
             return CredentialMetadata.Corrupt
         }
