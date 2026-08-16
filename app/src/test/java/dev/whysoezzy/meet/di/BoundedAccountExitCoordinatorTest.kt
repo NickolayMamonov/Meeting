@@ -8,6 +8,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,6 +32,8 @@ class BoundedAccountExitCoordinatorTest {
         coEvery {
             push.clearAccountState(any())
         } returns "550e8400-e29b-41d4-a716-446655440000"
+        coEvery { push.beginAccountExit() } returns Unit
+        coEvery { push.endAccountExit() } returns Unit
         every { push.unregisterFirebase() } returns Unit
         coEvery { logout() } returns Unit
         coEvery { auth.clear() } returns Unit
@@ -41,10 +44,46 @@ class BoundedAccountExitCoordinatorTest {
             push.deleteInstallation(any())
         }
         coVerify { auth.clear() }
+        coVerify { push.beginAccountExit() }
+        coVerify { push.endAccountExit() }
+    }
+
+    @Test
+    fun `forced logout never deletes an installation`() = runTest {
+        coEvery { push.beginAccountExit() } returns Unit
+        coEvery { push.endAccountExit() } returns Unit
+        coEvery { push.clearAccountState(any()) } returns
+            "550e8400-e29b-41d4-a716-446655440000"
+        every { push.unregisterFirebase() } returns Unit
+        coEvery { logout() } returns Unit
+        coEvery { auth.clear() } returns Unit
+
+        coordinator().forcedLogout()
+
+        coVerify(exactly = 0) { push.deleteInstallation(any()) }
+        coVerify { push.beginAccountExit() }
+        coVerify { push.endAccountExit() }
+    }
+
+    @Test
+    fun `account deletion bounds state cleanup to 500 milliseconds`() = runTest {
+        coEvery { deleteProfile() } returns Result.success(Unit)
+        coEvery { push.beginAccountExit() } returns Unit
+        coEvery { push.endAccountExit() } returns Unit
+        coEvery { push.clearAccountState(any()) } coAnswers { awaitCancellation() }
+        every { push.unregisterFirebase() } returns Unit
+        coEvery { logout() } returns Unit
+        coEvery { auth.clear() } returns Unit
+
+        assertTrue(coordinator().deleteCurrentAccount().isSuccess)
+        coVerify { auth.clear() }
+        coVerify { push.unregisterFirebase() }
     }
 
     @Test
     fun `logout attempts auth clear when push cleanup throws`() = runTest {
+        coEvery { push.beginAccountExit() } returns Unit
+        coEvery { push.endAccountExit() } returns Unit
         coEvery {
             push.clearAccountState(any())
         } throws IllegalStateException("store failure")

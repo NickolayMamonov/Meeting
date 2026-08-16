@@ -77,7 +77,7 @@ class ProfileDetailsViewModel
                 userResult
                     .onFailure { exception ->
                         if (exception is AppException.UnauthorizedError) {
-                            handleLogout()
+                            handleForcedLogout()
                         } else {
                             _uiState.value = ProfileDetailsUiState.Error(
                                 errorType = exception.toErrorType(),
@@ -120,6 +120,12 @@ class ProfileDetailsViewModel
         private fun handleLogout() {
             viewModelScope.launch {
                 accountExitCoordinator?.logout() ?: logoutUseCase()
+            }
+        }
+
+        private fun handleForcedLogout() {
+            viewModelScope.launch {
+                accountExitCoordinator?.forcedLogout() ?: logoutUseCase()
             }
         }
 

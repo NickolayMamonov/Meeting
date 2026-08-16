@@ -21,4 +21,17 @@
 - [x] Preserve DELETE repository failures and terminal malformed-success classification.
 - [x] Add focused fencing, reducer, and account-cleanup tests.
 - [x] Re-run focused tests, full relevant unit suites, ktlint, lint, debug assemble, dependency insight, and diff check.
+
+## Fresh implementation findings — 2026-08-16
+
+- [x] Separate explicit logout's bounded installation DELETE from forced `UnauthorizedError` logout and successful account deletion.
+- [x] Fence the full account-exit interval from state cleanup through auth/session cleanup; block `onUnregistered` and `onRegistered` resurrection during the fence.
+- [x] Apply the individual 500 ms `clearAccountState` bound to account deletion.
+- [x] Validate account-changed tombstone owner `userId` and `generation` semantics.
+- [x] Advance `statusChangedAt` for display, navigation-claim, and navigation-complete transitions.
+- [x] Atomically migrate valid legacy authenticated credential stores to a random epoch revision 1 and fail closed on corrupt metadata; preserve the epoch across clears.
+- [x] Perform bounded installation DELETE before authenticated A-to-B owner replacement cleanup.
+- [x] Add focused forced-exit, exit-race, account-transition DELETE, tombstone, retention, migration, and corruption tests.
+- [ ] Re-run the complete required verification matrix and record external runtime/snapshot/release gates.
+
 - [ ] API 33+ authorized-device runtime, backend fixture, snapshot Firebase client, and release-signing prerequisites remain environment gates.

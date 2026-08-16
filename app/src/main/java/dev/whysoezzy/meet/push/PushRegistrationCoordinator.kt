@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal class PushRegistrationCoordinator(
     private val authSessionRepository: AuthSessionRepository,
@@ -33,6 +34,7 @@ internal class PushRegistrationCoordinator(
 ) {
     private val stateMutex = Mutex()
     private val reconciliationMutex = Mutex()
+    private var accountExitInProgress = false
     private var scope: CoroutineScope? = null
     private var observationJob: Job? = null
 
@@ -44,18 +46,36 @@ internal class PushRegistrationCoordinator(
             authSessionRepository.credentialState
                 .distinctUntilChanged()
                 .collectLatest { credentialState ->
+                    if (stateMutex.withLock { accountExitInProgress }) {
+                        return@collectLatest
+                    }
                     val userId = credentialState.session.userId
                         .takeIf { credentialState.session.stage != AuthSession.Stage.LoggedOut }
-                    val oldOwner = stateMutex.withLock {
+                    val oldRegistration = stateMutex.withLock {
                         val state = stateStore.read()
-                        state.registration.owner?.takeIf {
-                            userId == null || it.userId != userId
-                        }
+                        state.registration.owner
+                            ?.takeIf { userId == null || it.userId != userId }
+                            ?.let { it to state.registration.installationId }
                     }
-                    if (userId == null || oldOwner != null) {
-                        clearAccountState()
-                        if (userId == null) {
-                            fcm.unregister()
+                    if (userId == null || oldRegistration != null) {
+                        beginAccountExit()
+                        try {
+                            val oldInstallationId = oldRegistration?.second
+                            if (userId != null && oldInstallationId != null) {
+                                try {
+                                    withTimeoutOrNull(1_250L) {
+                                        deleteInstallation(oldInstallationId)
+                                    }
+                                } catch (error: Exception) {
+                                    if (error is kotlinx.coroutines.CancellationException) throw error
+                                }
+                            }
+                            clearAccountState()
+                            if (userId == null) {
+                                fcm.unregister()
+                            }
+                        } finally {
+                            endAccountExit()
                         }
                     }
                     if (userId != null) {
@@ -80,6 +100,19 @@ internal class PushRegistrationCoordinator(
         observationJob = null
     }
 
+    internal suspend fun beginAccountExit() {
+        stateMutex.withLock {
+            accountExitInProgress = true
+            workScheduler.cancel()
+        }
+    }
+
+    internal suspend fun endAccountExit() {
+        stateMutex.withLock {
+            accountExitInProgress = false
+        }
+    }
+
     fun onRegistered(fid: String) {
         val currentScope = scope ?: return
         val validFid = try {
@@ -89,6 +122,7 @@ internal class PushRegistrationCoordinator(
         }
         currentScope.launch {
             val staged = stateMutex.withLock {
+                if (accountExitInProgress) return@withLock false
                 val before = stateStore.read()
                 val after = stateStore.update { PushStateReducer.stageFid(it, validFid) }
                 before != after
@@ -155,7 +189,7 @@ internal class PushRegistrationCoordinator(
         currentScope.launch {
             stateMutex.withLock {
                 val session = authSessionRepository.read()
-                if (session.stage != AuthSession.Stage.LoggedOut) {
+                if (!accountExitInProgress && session.stage != AuthSession.Stage.LoggedOut) {
                     workScheduler.enqueue()
                 }
             }
@@ -254,6 +288,7 @@ internal class PushRegistrationCoordinator(
         credentialVersion: CredentialVersion,
     ): Boolean {
         val snapshot = stateMutex.withLock {
+            if (accountExitInProgress) return@withLock null
             val session = authSessionRepository.read()
             val state = stateStore.read()
             if (session.stage == AuthSession.Stage.LoggedOut || session.userId != userId) {

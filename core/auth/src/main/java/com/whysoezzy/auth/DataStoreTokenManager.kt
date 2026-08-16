@@ -11,8 +11,10 @@ import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.CredentialVersion
 import com.whysoezzy.network.TokenSnapshot
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 import java.util.UUID
@@ -29,11 +31,15 @@ internal class DataStoreTokenManager(
     private val crypto = TokenCrypto(appContext)
 
     private val resolvedState: Flow<ResolvedState> =
-        dataStore.data
-            .catch { error ->
-                if (error is IOException) emit(emptyPreferences()) else throw error
-            }.map(::resolve)
-            .distinctUntilChanged()
+        flow {
+            readSession()
+            emitAll(
+                dataStore.data
+                    .catch { error ->
+                        if (error is IOException) emit(emptyPreferences()) else throw error
+                    }.map(::resolve),
+            )
+        }.distinctUntilChanged()
 
     override val isLoggedInFlow: Flow<Boolean> =
         resolvedState
@@ -73,7 +79,7 @@ internal class DataStoreTokenManager(
             preferences[KEY_ACCESS_TOKEN] = crypto.encrypt(accessToken, KEY_ACCESS_TOKEN.name)
             preferences[KEY_REFRESH_TOKEN] = crypto.encrypt(refreshToken, KEY_REFRESH_TOKEN.name)
             preferences[KEY_USER_ID] = crypto.encrypt(resolvedUserId.toString(), KEY_USER_ID.name)
-            if (current.needsLegacyMigration) {
+            if (current.needsLegacyStageMigration) {
                 preferences[KEY_STAGE] =
                     crypto.encrypt(AuthSession.Stage.Ready.name, KEY_STAGE.name)
             }
@@ -187,8 +193,26 @@ internal class DataStoreTokenManager(
         state: ResolvedState,
     ) {
         when {
+            state.corruptCredentialMetadata -> {
+                clearAuthKeys(preferences)
+                writeCredentialVersion(
+                    preferences,
+                    newCredentialVersion(if (state.hasAnyAuthKey) 1L else 0L),
+                )
+            }
+            state.needsCredentialMigration -> {
+                writeCredentialVersion(preferences, newCredentialVersion(1L))
+                if (state.needsLegacyStageMigration) {
+                    preferences[KEY_STAGE] =
+                        crypto.encrypt(AuthSession.Stage.Ready.name, KEY_STAGE.name)
+                }
+            }
+            state.needsCredentialInitialization -> {
+                if (state.shouldClear) clearAuthKeys(preferences)
+                writeCredentialVersion(preferences, newCredentialVersion(0L))
+            }
             state.shouldClear -> clearAuthKeys(preferences)
-            state.needsLegacyMigration ->
+            state.needsLegacyStageMigration ->
                 preferences[KEY_STAGE] =
                     crypto.encrypt(AuthSession.Stage.Ready.name, KEY_STAGE.name)
         }
@@ -196,11 +220,14 @@ internal class DataStoreTokenManager(
 
     private fun resolve(preferences: Preferences): ResolvedState {
         val hasAnyAuthKey = AUTH_KEYS.any { preferences[it] != null }
-        val credentialVersion = readCredentialVersion(preferences)
+        val credentialMetadata = readCredentialMetadata(preferences)
+        val credentialVersion = credentialMetadata.version ?: CredentialVersion("legacy", 0L)
         if (!hasAnyAuthKey) {
             return ResolvedState(
                 session = AuthSession.LoggedOut,
                 credentialVersion = credentialVersion,
+                needsCredentialInitialization = credentialMetadata is CredentialMetadata.Missing,
+                corruptCredentialMetadata = credentialMetadata is CredentialMetadata.Corrupt,
             )
         }
 
@@ -221,13 +248,16 @@ internal class DataStoreTokenManager(
             refresh.isNullOrBlank() ||
             userId == null ||
             stage == null ||
-            stage == AuthSession.Stage.LoggedOut
+            stage == AuthSession.Stage.LoggedOut ||
+            credentialMetadata is CredentialMetadata.Corrupt
         ) {
             return ResolvedState(
                 session = AuthSession.LoggedOut,
                 shouldClear = true,
                 hasAnyAuthKey = hasAnyAuthKey,
                 credentialVersion = credentialVersion,
+                corruptCredentialMetadata = credentialMetadata is CredentialMetadata.Corrupt,
+                needsCredentialInitialization = credentialMetadata is CredentialMetadata.Missing,
             )
         }
 
@@ -235,7 +265,8 @@ internal class DataStoreTokenManager(
         return ResolvedState(
             session = session,
             decryptedSession = DecryptedSession(access, refresh, userId),
-            needsLegacyMigration = stageCiphertext == null,
+            needsLegacyStageMigration = stageCiphertext == null,
+            needsCredentialMigration = credentialMetadata is CredentialMetadata.Missing,
             hasAnyAuthKey = hasAnyAuthKey,
             credentialVersion = credentialVersion,
         )
@@ -262,7 +293,10 @@ internal class DataStoreTokenManager(
         val credentialVersion: CredentialVersion = CredentialVersion("legacy", 0L),
         val decryptedSession: DecryptedSession? = null,
         val shouldClear: Boolean = false,
-        val needsLegacyMigration: Boolean = false,
+        val needsLegacyStageMigration: Boolean = false,
+        val needsCredentialMigration: Boolean = false,
+        val needsCredentialInitialization: Boolean = false,
+        val corruptCredentialMetadata: Boolean = false,
         val hasAnyAuthKey: Boolean = false,
     ) {
         val isValid: Boolean
@@ -279,29 +313,47 @@ internal class DataStoreTokenManager(
         private val AUTH_KEYS = setOf(KEY_ACCESS_TOKEN, KEY_REFRESH_TOKEN, KEY_USER_ID, KEY_STAGE)
     }
 
+    private sealed interface CredentialMetadata {
+        data class Valid(val value: CredentialVersion) : CredentialMetadata
+
+        data object Missing : CredentialMetadata
+
+        data object Corrupt : CredentialMetadata
+    }
+
+    private val CredentialMetadata.version: CredentialVersion?
+        get() = (this as? CredentialMetadata.Valid)?.value
+
     private fun ensureCredentialVersion(
         preferences: androidx.datastore.preferences.core.MutablePreferences,
     ): CredentialVersion {
-        val current = readCredentialVersion(preferences)
-        if (preferences[KEY_CREDENTIAL_EPOCH] == null) {
-            val initialized = CredentialVersion(UUID.randomUUID().toString(), 0L)
-            writeCredentialVersion(preferences, initialized)
-            return initialized
+        return when (val metadata = readCredentialMetadata(preferences)) {
+            is CredentialMetadata.Valid -> metadata.value
+            CredentialMetadata.Missing,
+            CredentialMetadata.Corrupt,
+            -> newCredentialVersion(0L).also {
+                writeCredentialVersion(preferences, it)
+            }
         }
-        return current
     }
 
-    private fun readCredentialVersion(preferences: Preferences): CredentialVersion {
+    private fun readCredentialMetadata(preferences: Preferences): CredentialMetadata {
         val epoch = preferences[KEY_CREDENTIAL_EPOCH]?.decrypt(KEY_CREDENTIAL_EPOCH.name)
         val revision = preferences[KEY_CREDENTIAL_REVISION]
             ?.decrypt(KEY_CREDENTIAL_REVISION.name)
             ?.toLongOrNull()
-        return if (epoch.isNullOrBlank() || revision == null || revision < 0L) {
-            CredentialVersion("legacy", 0L)
-        } else {
-            CredentialVersion(epoch, revision)
+        if (epoch == null && revision == null) return CredentialMetadata.Missing
+        if (epoch.isNullOrBlank() || revision == null || revision < 0L) {
+            return CredentialMetadata.Corrupt
         }
+        return runCatching {
+            UUID.fromString(epoch)
+            CredentialMetadata.Valid(CredentialVersion(epoch, revision))
+        }.getOrElse { CredentialMetadata.Corrupt }
     }
+
+    private fun newCredentialVersion(revision: Long): CredentialVersion =
+        CredentialVersion(UUID.randomUUID().toString(), revision)
 
     private fun writeCredentialVersion(
         preferences: androidx.datastore.preferences.core.MutablePreferences,

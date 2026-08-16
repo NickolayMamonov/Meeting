@@ -110,6 +110,55 @@ class PushStateReducerTest {
             OwnedEventStatus.DISPLAYED,
             (displayed.ledger.single() as LedgerRecord.OwnedReminderEvent).status,
         )
+        val displayedState = PushStateReducer.markDisplayed(
+            accepted.state,
+            "event",
+            owner,
+            now = 3L,
+        )
+        val displayedAtThree =
+            displayedState.ledger.single() as LedgerRecord.OwnedReminderEvent
+        assertEquals(3L, displayedAtThree.statusChangedAt)
+
+        val claimedState = PushStateReducer.claimNavigation(
+            displayedState,
+            "event",
+            owner,
+            now = 4L,
+        )
+        val claimed = claimedState.ledger.single() as LedgerRecord.OwnedReminderEvent
+        assertEquals(OwnedEventStatus.NAVIGATION_CLAIMED, claimed.status)
+        assertEquals(4L, claimed.statusChangedAt)
+
+        val navigatedState = PushStateReducer.markNavigated(
+            claimedState,
+            "event",
+            owner,
+            now = 5L,
+        )
+        val navigated = navigatedState.ledger.single() as LedgerRecord.OwnedReminderEvent
+        assertEquals(OwnedEventStatus.NAVIGATED, navigated.status)
+        assertEquals(5L, navigated.statusChangedAt)
+    }
+
+    @Test
+    fun `account changed tombstones reject invalid owner semantics`() {
+        val rejected = runCatching {
+            PushStateReducer.requireValid(
+                PushStateV1(
+                    ledger = listOf(
+                        LedgerRecord.DedupeTombstone(
+                            eventId = "550e8400-e29b-41d4-a716-446655440000",
+                            reason = TombstoneReason.DISCARDED_ACCOUNT_CHANGED,
+                            owner = OwnerSnapshot(userId = 0L, generation = -1L),
+                            terminalAt = 1L,
+                        ),
+                    ),
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(rejected is IllegalArgumentException)
     }
 
     @Test

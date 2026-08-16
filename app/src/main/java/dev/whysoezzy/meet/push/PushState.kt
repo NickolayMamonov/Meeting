@@ -348,7 +348,8 @@ internal object PushStateReducer {
                     if (record.reason == TombstoneReason.DISCARDED_NO_OWNER) {
                         require(record.owner == null)
                     } else {
-                        require(record.owner != null)
+                        require(record.owner?.userId ?: 0L > 0L)
+                        require(record.owner?.generation ?: -1L >= 0L)
                     }
                 }
             }
@@ -433,6 +434,7 @@ internal object PushStateReducer {
         state: PushStateV1,
         eventId: String,
         owner: OwnerSnapshot,
+        now: Long = System.currentTimeMillis(),
     ): PushStateV1 {
         val index = state.ledger.indexOfFirst {
             it is LedgerRecord.OwnedReminderEvent &&
@@ -446,7 +448,7 @@ internal object PushStateReducer {
             ledger = state.ledger.toMutableList().also {
                 it[index] = event.copy(
                     status = OwnedEventStatus.NAVIGATION_CLAIMED,
-                    statusChangedAt = event.statusChangedAt,
+                    statusChangedAt = now,
                 )
             },
         )
@@ -456,6 +458,7 @@ internal object PushStateReducer {
         state: PushStateV1,
         eventId: String,
         owner: OwnerSnapshot,
+        now: Long = System.currentTimeMillis(),
     ): PushStateV1 =
         state.copy(
             ledger = state.ledger.map { record ->
@@ -464,7 +467,10 @@ internal object PushStateReducer {
                     record.owner == owner &&
                     record.status == OwnedEventStatus.PENDING_DISPLAY
                 ) {
-                    record.copy(status = OwnedEventStatus.DISPLAYED)
+                    record.copy(
+                        status = OwnedEventStatus.DISPLAYED,
+                        statusChangedAt = now,
+                    )
                 } else {
                     record
                 }
@@ -475,6 +481,7 @@ internal object PushStateReducer {
         state: PushStateV1,
         eventId: String,
         owner: OwnerSnapshot,
+        now: Long = System.currentTimeMillis(),
     ): PushStateV1 =
         state.copy(
             ledger = state.ledger.map { record ->
@@ -483,7 +490,10 @@ internal object PushStateReducer {
                     record.owner == owner &&
                     record.status == OwnedEventStatus.NAVIGATION_CLAIMED
                 ) {
-                    record.copy(status = OwnedEventStatus.NAVIGATED)
+                    record.copy(
+                        status = OwnedEventStatus.NAVIGATED,
+                        statusChangedAt = now,
+                    )
                 } else {
                     record
                 }

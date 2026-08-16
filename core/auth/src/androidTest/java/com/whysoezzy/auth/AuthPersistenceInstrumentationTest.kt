@@ -149,6 +149,54 @@ class AuthPersistenceInstrumentationTest {
         )
     }
 
+    @Test
+    fun legacyCredentialMetadata_migratesAtomically_andSurvivesClear() = runBlocking {
+        val crypto = TokenCrypto(context)
+        writeRawPreferences(TOKEN_STORE) {
+            it[stringPreferencesKey("access_token")] =
+                crypto.encrypt("legacy-access", "access_token")
+            it[stringPreferencesKey("refresh_token")] =
+                crypto.encrypt("legacy-refresh", "refresh_token")
+            it[stringPreferencesKey("user_id")] =
+                crypto.encrypt("42", "user_id")
+            it[stringPreferencesKey("stage")] =
+                crypto.encrypt(AuthSession.Stage.Ready.name, "stage")
+        }
+
+        assertEquals(AuthSession(42L, AuthSession.Stage.Ready), tokenManager.readSession())
+        val migrated = tokenManager.credentialVersion.first()
+        assertTrue(migrated.epoch != "legacy")
+        assertEquals(1L, migrated.revision)
+
+        tokenManager.clearTokens()
+        assertEquals(migrated, tokenManager.credentialVersion.first())
+    }
+
+    @Test
+    fun corruptCredentialMetadata_failsClosed() = runBlocking {
+        val crypto = TokenCrypto(context)
+        writeRawPreferences(TOKEN_STORE) {
+            it[stringPreferencesKey("access_token")] =
+                crypto.encrypt("corrupt-access", "access_token")
+            it[stringPreferencesKey("refresh_token")] =
+                crypto.encrypt("corrupt-refresh", "refresh_token")
+            it[stringPreferencesKey("user_id")] =
+                crypto.encrypt("42", "user_id")
+            it[stringPreferencesKey("stage")] =
+                crypto.encrypt(AuthSession.Stage.Ready.name, "stage")
+            it[stringPreferencesKey("credential_epoch")] =
+                crypto.encrypt("not-a-uuid", "credential_epoch")
+            it[stringPreferencesKey("credential_revision")] =
+                crypto.encrypt("0", "credential_revision")
+        }
+
+        assertEquals(AuthSession.LoggedOut, tokenManager.readSession())
+        assertNull(tokenManager.loadTokens())
+        val repaired = tokenManager.credentialVersion.first()
+        assertTrue(repaired.epoch != "legacy")
+        assertEquals(1L, repaired.revision)
+    }
+
     private suspend fun authSession_allowsForwardCasAndIdentityReplacement_butRejectsStaleTransitions() {
         val repository = DataStoreAuthSessionRepository(tokenManager)
         tokenManager.saveAuthenticated(

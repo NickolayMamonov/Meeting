@@ -17,6 +17,7 @@ internal class BoundedAccountExitCoordinator(
 ) : AccountExitCoordinator {
     override suspend fun logout() {
         withContext(NonCancellable) {
+            pushRegistrationCoordinator.beginAccountExit()
             try {
                 withTimeoutOrNull(4_000L) {
                     val installationId = withTimeoutOrNull(500L) {
@@ -34,6 +35,27 @@ internal class BoundedAccountExitCoordinator(
                 runCatching {
                     withTimeoutOrNull(750L) { authSessionRepository.clear() }
                 }
+                pushRegistrationCoordinator.endAccountExit()
+            }
+        }
+    }
+
+    override suspend fun forcedLogout() {
+        withContext(NonCancellable) {
+            pushRegistrationCoordinator.beginAccountExit()
+            try {
+                withTimeoutOrNull(4_000L) {
+                    withTimeoutOrNull(500L) {
+                        pushRegistrationCoordinator.clearAccountState()
+                    }
+                    pushRegistrationCoordinator.unregisterFirebase()
+                    withTimeoutOrNull(1_250L) { logoutUseCase() }
+                }
+            } finally {
+                runCatching {
+                    withTimeoutOrNull(750L) { authSessionRepository.clear() }
+                }
+                pushRegistrationCoordinator.endAccountExit()
             }
         }
     }
@@ -42,9 +64,12 @@ internal class BoundedAccountExitCoordinator(
         val deletion = deleteCurrentUserProfile()
         if (deletion.isFailure) return deletion
         withContext(NonCancellable) {
+            pushRegistrationCoordinator.beginAccountExit()
             try {
                 withTimeoutOrNull(4_000L) {
-                    pushRegistrationCoordinator.clearAccountState()
+                    withTimeoutOrNull(500L) {
+                        pushRegistrationCoordinator.clearAccountState()
+                    }
                     pushRegistrationCoordinator.unregisterFirebase()
                     withTimeoutOrNull(1_250L) { logoutUseCase() }
                 }
@@ -52,6 +77,7 @@ internal class BoundedAccountExitCoordinator(
                 runCatching {
                     withTimeoutOrNull(750L) { authSessionRepository.clear() }
                 }
+                pushRegistrationCoordinator.endAccountExit()
             }
         }
         return Result.success(Unit)
