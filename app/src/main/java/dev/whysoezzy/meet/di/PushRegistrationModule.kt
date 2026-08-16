@@ -3,8 +3,8 @@ package dev.whysoezzy.meet.di
 import com.whysoezzy.domain.repository.PushInstallationRepository
 import com.whysoezzy.domain.usecase.AccountExitCoordinator
 import dev.whysoezzy.meet.di.BoundedAccountExitCoordinator
-import dev.whysoezzy.meet.push.AndroidReminderPresentationGateway
 import dev.whysoezzy.meet.push.AndroidPushWorkScheduler
+import dev.whysoezzy.meet.push.AndroidReminderPresentationGateway
 import dev.whysoezzy.meet.push.EncryptedPushStateStore
 import dev.whysoezzy.meet.push.FcmRegistrationClient
 import dev.whysoezzy.meet.push.FirebaseMessagingRegistrationClient

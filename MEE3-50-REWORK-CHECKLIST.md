@@ -9,4 +9,4 @@
 - [x] Quarantine malformed/version-invalid envelopes as `SUPPRESSED_CORRUPT`; accept reminder offsets lexically only as `60` or `1440`.
 - [x] Replace lossy join permission signaling with a durable consumable eligibility handoff and add focused API 33+ policy tests.
 - [x] Complete the implementation checklist only after focused tests pass.
-- [ ] Run required static/build checks and record unavailable runtime/backend/release evidence without inventing claims.
+- [x] Run required static/build checks and record unavailable runtime/backend/release evidence without inventing claims.

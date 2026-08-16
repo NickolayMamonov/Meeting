@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 internal interface PushWorkScheduler {
     fun enqueue()
@@ -21,13 +22,17 @@ internal class AndroidPushWorkScheduler(
     override fun enqueue() {
         workManager.enqueueUniqueWork(
             UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<PushReconcileWorker>()
                 .setConstraints(
                     Constraints
                         .Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
                         .build(),
+                ).setBackoffCriteria(
+                    androidx.work.BackoffPolicy.EXPONENTIAL,
+                    30L,
+                    TimeUnit.SECONDS,
                 ).build(),
         )
     }

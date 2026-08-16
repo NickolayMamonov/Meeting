@@ -13,8 +13,8 @@ import dev.whysoezzy.meet.crash.CrashReportingTree
 import dev.whysoezzy.meet.di.appGlueModule
 import dev.whysoezzy.meet.di.appModule
 import dev.whysoezzy.meet.di.pushRegistrationModule
-import dev.whysoezzy.meet.push.PushRegistrationCoordinator
 import dev.whysoezzy.meet.push.PushReconcileWorkerFactory
+import dev.whysoezzy.meet.push.PushRegistrationCoordinator
 import dev.whysoezzy.meetings.di.mainFeatureModule
 import dev.whysoezzy.profile.di.profileFeatureModule
 import org.koin.android.ext.android.inject
@@ -24,7 +24,9 @@ import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import timber.log.Timber
 
-class MeetApplication : Application(), Configuration.Provider {
+class MeetApplication :
+    Application(),
+    Configuration.Provider {
     private val crashReporter: CrashReporter by inject()
     private val pushRegistrationCoordinator: PushRegistrationCoordinator by inject()
 
@@ -59,7 +61,8 @@ class MeetApplication : Application(), Configuration.Provider {
     }
 
     override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder()
+        get() = Configuration
+            .Builder()
             .setWorkerFactory(PushReconcileWorkerFactory())
             .build()
 }

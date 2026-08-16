@@ -51,6 +51,7 @@ internal data class RegistrationState(
     val operation: RegistrationOperation = RegistrationOperation.NONE,
     val nonce: Long = 0L,
     val retryAttempt: Int = 0,
+    val firebaseRetryAttempt: Int = 0,
     val blockedCredentialEpoch: String? = null,
     val blockedCredentialRevision: Long? = null,
     val terminal: RegistrationTerminal = RegistrationTerminal.NONE,
@@ -150,19 +151,70 @@ internal object PushStateReducer {
         nonce: Long,
         operation: RegistrationOperation,
     ): PushStateV1 {
-        require(fid.isNotBlank()) { "FID must be non-blank" }
+        require(
+            com.whysoezzy.domain.models
+                .PushInstallationFid(fid)
+                .value == fid,
+        ) {
+            "FID must be a bounded opaque UTF-8 value"
+        }
         val next = state.registration.copy(
             owner = owner,
             pendingFid = fid,
             operation = operation,
             nonce = nonce,
             retryAttempt = 0,
+            firebaseRetryAttempt = 0,
             blockedCredentialEpoch = null,
             blockedCredentialRevision = null,
             terminal = RegistrationTerminal.NONE,
         )
         return state.copy(registration = next)
     }
+
+    fun recordFirebaseRetry(state: PushStateV1): PushStateV1 =
+        state.copy(
+            registration = state.registration.copy(
+                firebaseRetryAttempt = state.registration.firebaseRetryAttempt + 1,
+            ),
+        )
+
+    fun resetFirebaseRetry(state: PushStateV1): PushStateV1 =
+        state.copy(registration = state.registration.copy(firebaseRetryAttempt = 0))
+
+    fun stageFid(state: PushStateV1, fid: String): PushStateV1 {
+        require(
+            com.whysoezzy.domain.models
+                .PushInstallationFid(fid)
+                .value == fid,
+        )
+        val registration = state.registration
+        if (registration.pendingFid == fid) return state
+        return state.copy(
+            registration = registration.copy(
+                pendingFid = fid,
+                operation = RegistrationOperation.NONE,
+                nonce = registration.nonce + 1L,
+                retryAttempt = 0,
+                terminal = RegistrationTerminal.NONE,
+            ),
+        )
+    }
+
+    fun recordRetry(
+        state: PushStateV1,
+        owner: OwnerSnapshot,
+        nonce: Long,
+    ): PushStateV1 =
+        if (state.registration.owner == owner && state.registration.nonce == nonce) {
+            state.copy(
+                registration = state.registration.copy(
+                    retryAttempt = state.registration.retryAttempt + 1,
+                ),
+            )
+        } else {
+            state
+        }
 
     fun acknowledgeRegistration(
         state: PushStateV1,
@@ -220,6 +272,55 @@ internal object PushStateReducer {
         state.copy(
             installPolicy = state.installPolicy.copy(permission = PermissionState.SUPPRESSED_CORRUPT),
         )
+
+    fun requireValid(state: PushStateV1) {
+        require(state.version == PUSH_STATE_VERSION)
+        require(state.ledger.size <= PUSH_LEDGER_CAPACITY)
+        require(
+            state.ledger
+                .map(LedgerRecord::eventId)
+                .toSet()
+                .size == state.ledger.size,
+        )
+        require(state.registration.accountGeneration >= 0L)
+        require(state.registration.nonce >= 0L)
+        require(state.registration.retryAttempt in 0..MAX_RETRY_ATTEMPTS)
+        require(state.registration.firebaseRetryAttempt in 0..MAX_RETRY_ATTEMPTS)
+        if (state.registration.operation != RegistrationOperation.NONE) {
+            require(state.registration.owner != null)
+            require(state.registration.pendingFid != null)
+        }
+        state.registration.pendingFid?.let {
+            require(
+                com.whysoezzy.domain.models
+                    .PushInstallationFid(it)
+                    .value == it,
+            )
+        }
+        state.registration.owner?.let {
+            require(it.userId > 0L && it.generation >= 0L)
+        }
+        state.ledger.forEach { record ->
+            when (record) {
+                is LedgerRecord.OwnedReminderEvent -> {
+                    require(record.owner.userId > 0L)
+                    require(record.owner.generation >= 0L)
+                    require(record.meetingId > 0L)
+                    require(record.reminderOffsetMinutes == 60 || record.reminderOffsetMinutes == 1440)
+                    require(record.eventId.isNotBlank())
+                }
+                is LedgerRecord.DedupeTombstone -> {
+                    require(record.eventId.isNotBlank())
+                    require(record.terminalAt >= 0L)
+                    if (record.reason == TombstoneReason.DISCARDED_NO_OWNER) {
+                        require(record.owner == null)
+                    } else {
+                        require(record.owner != null)
+                    }
+                }
+            }
+        }
+    }
 
     fun clearAccountScopedState(
         state: PushStateV1,
@@ -389,3 +490,5 @@ internal object PushStateReducer {
 
 internal fun isCanonicalUuid(value: String): Boolean =
     runCatching { UUID.fromString(value).toString() == value }.getOrDefault(false)
+
+private const val MAX_RETRY_ATTEMPTS = 6

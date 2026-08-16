@@ -17,19 +17,19 @@ internal class BoundedAccountExitCoordinator(
 ) : AccountExitCoordinator {
     override suspend fun logout() {
         withContext(NonCancellable) {
+            val installationId = withTimeoutOrNull(500L) {
+                pushRegistrationCoordinator.clearAccountState()
+            }
+            pushRegistrationCoordinator.unregisterFirebase()
+            if (installationId != null) {
+                withTimeoutOrNull(1_250L) {
+                    pushRegistrationCoordinator.deleteInstallation(installationId)
+                }
+            }
             try {
-                withTimeoutOrNull(4_000L) {
-                    withTimeoutOrNull(500L) {
-                        pushRegistrationCoordinator.clearAccountState()
-                    }
-                    withTimeoutOrNull(1_250L) {
-                        logoutUseCase()
-                    }
-                }
+                withTimeoutOrNull(1_250L) { logoutUseCase() }
             } finally {
-                withTimeoutOrNull(750L) {
-                    authSessionRepository.clear()
-                }
+                withTimeoutOrNull(750L) { authSessionRepository.clear() }
             }
         }
     }
@@ -38,19 +38,19 @@ internal class BoundedAccountExitCoordinator(
         val deletion = deleteCurrentUserProfile()
         if (deletion.isFailure) return deletion
         withContext(NonCancellable) {
+            val installationId = withTimeoutOrNull(500L) {
+                pushRegistrationCoordinator.clearAccountState()
+            }
+            pushRegistrationCoordinator.unregisterFirebase()
+            if (installationId != null) {
+                withTimeoutOrNull(1_250L) {
+                    pushRegistrationCoordinator.deleteInstallation(installationId)
+                }
+            }
             try {
-                withTimeoutOrNull(4_000L) {
-                    withTimeoutOrNull(500L) {
-                        pushRegistrationCoordinator.clearAccountState()
-                    }
-                    withTimeoutOrNull(1_250L) {
-                        logoutUseCase()
-                    }
-                }
+                withTimeoutOrNull(1_250L) { logoutUseCase() }
             } finally {
-                withTimeoutOrNull(750L) {
-                    authSessionRepository.clear()
-                }
+                withTimeoutOrNull(750L) { authSessionRepository.clear() }
             }
         }
         return Result.success(Unit)

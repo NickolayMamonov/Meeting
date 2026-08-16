@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.google.tink.android)
+    implementation(libs.kotlinx.serialization.protobuf)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.work.runtime.ktx)
 

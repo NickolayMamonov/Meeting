@@ -1,26 +1,24 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package dev.whysoezzy.meet.push
 
 import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.Serializer
+import com.google.crypto.tink.Aead
+import com.google.crypto.tink.BinaryKeysetReader
+import com.google.crypto.tink.BinaryKeysetWriter
+import com.google.crypto.tink.KeyTemplates
+import com.google.crypto.tink.KeysetHandle
+import com.google.crypto.tink.config.TinkConfig
+import com.google.crypto.tink.integration.android.AndroidKeystoreKmsClient
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.protobuf.ProtoBuf
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
-import java.security.KeyStore
-import java.security.SecureRandom
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
 
 internal interface PushStateStore {
     suspend fun read(): PushStateV1
@@ -29,68 +27,71 @@ internal interface PushStateStore {
 }
 
 /**
- * The DataStore envelope contains only AEAD ciphertext. The key is held by Android Keystore;
- * the keyset marker is deliberately kept in noBackupFilesDir so this store cannot be restored
- * onto another installation.
+ * Only an AEAD ciphertext is persisted in DataStore. The typed ProtoBuf aggregate is
+ * encrypted before serialization to disk, and the encrypted Tink keyset is kept beside
+ * the state file, protected by an Android Keystore master key.
  */
 internal class EncryptedPushStateStore(
     context: Context,
 ) : PushStateStore {
-    private val root = File(context.noBackupFilesDir, "push")
+    private val root = File(context.noBackupFilesDir, "push").apply {
+        require(mkdirs() || isDirectory) { "Cannot create push state directory" }
+    }
     private val stateFile = File(root, "push_state.pb")
     private val keysetFile = File(root, "push_state_keyset.bin")
     private val dataStore: DataStore<EncryptedEnvelope>
+    private val aead: Aead
 
     init {
-        require(root.mkdirs() || root.isDirectory) { "Cannot create push state directory" }
+        TinkConfig.register()
+        aead = loadAead()
         migrateUnshippedPlaintextStore(context)
-        if (!keysetFile.exists()) {
-            keysetFile.writeText(KEY_ALIAS, Charsets.UTF_8)
-        }
         dataStore = DataStoreFactory.create(
             serializer = EnvelopeSerializer,
             produceFile = { stateFile },
         )
     }
 
-    override suspend fun read(): PushStateV1 =
-        dataStore.data
-            .map { envelope -> decryptOrSuppressed(envelope) }
-            .first()
+    override suspend fun read(): PushStateV1 {
+        val envelope = dataStore.data.first()
+        val decoded = decode(envelope)
+        if (decoded != null) return decoded
+
+        quarantineStateFile()
+        val quarantined = PushStateReducer.suppressCorrupt(PushStateV1())
+        dataStore.updateData { EncryptedEnvelope(ciphertext = encrypt(quarantined)) }
+        return quarantined
+    }
 
     override suspend fun update(transform: (PushStateV1) -> PushStateV1): PushStateV1 {
         var result: PushStateV1? = null
         dataStore.updateData { envelope ->
-            val current = decryptOrSuppressed(envelope)
-            val next = transform(current)
+            val current = decode(envelope) ?: PushStateReducer.suppressCorrupt(PushStateV1())
+            val next = transform(current).also(PushStateReducer::requireValid)
             result = next
-            EncryptedEnvelope(
-                formatVersion = PUSH_STATE_VERSION,
-                ciphertext = encrypt(next),
-            )
+            EncryptedEnvelope(ciphertext = encrypt(next))
         }
         return checkNotNull(result)
     }
 
-    private fun decryptOrSuppressed(envelope: EncryptedEnvelope): PushStateV1 =
-        if (envelope.formatVersion != PUSH_STATE_VERSION) {
-            suppressedCorruptState()
-        } else if (envelope.ciphertext.isEmpty()) {
-            PushStateV1()
-        } else {
-            runCatching {
-                Json.decodeFromString<PushStateV1>(
-                    decrypt(envelope.ciphertext).toString(Charsets.UTF_8),
-                ).also { state ->
-                    require(state.version == PUSH_STATE_VERSION)
-                }
-            }.getOrElse {
-                suppressedCorruptState()
-            }
+    private fun decode(envelope: EncryptedEnvelope): PushStateV1? {
+        if (envelope.formatVersion != PUSH_STATE_VERSION || envelope.ciphertext.isEmpty()) {
+            return if (envelope.ciphertext.isEmpty()) PushStateV1() else null
         }
+        return runCatching {
+            ProtoBuf
+                .decodeFromByteArray(
+                    PushStateV1.serializer(),
+                    aead.decrypt(envelope.ciphertext, ASSOCIATED_DATA),
+                ).also(PushStateReducer::requireValid)
+        }.getOrNull()
+    }
 
-    private fun suppressedCorruptState(): PushStateV1 =
-        PushStateReducer.suppressCorrupt(PushStateV1())
+    private fun encrypt(state: PushStateV1): ByteArray =
+        aead.encrypt(
+            ProtoBuf.encodeToByteArray(PushStateV1.serializer(), state),
+            ASSOCIATED_DATA,
+        )
 
     private fun migrateUnshippedPlaintextStore(context: Context) {
         File(context.filesDir, "datastore/pending_push_registration_store.preferences_pb")
@@ -98,52 +99,56 @@ internal class EncryptedPushStateStore(
             ?.delete()
     }
 
-    private companion object {
-        const val KEY_ALIAS = "meet.push.state.aead.v1"
-        val associatedData = "meet.push.state.v1".toByteArray(Charsets.UTF_8)
+    private fun quarantineStateFile() {
+        if (!stateFile.exists()) return
+        val quarantine = File(
+            root,
+            "push_state.pb.corrupt.${System.currentTimeMillis()}",
+        )
+        stateFile.copyTo(quarantine, overwrite = false)
+    }
 
-        fun key(): SecretKey {
-            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-            if (!keyStore.containsAlias(KEY_ALIAS)) {
-                KeyGenerator
-                    .getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-                    .apply {
-                        init(
-                            KeyGenParameterSpec
-                                .Builder(
-                                    KEY_ALIAS,
-                                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                                ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                                .setRandomizedEncryptionRequired(true)
-                                .build(),
-                        )
-                    }.generateKey()
+    private fun loadAead(): Aead {
+        val masterKey = AndroidKeystoreKmsClient.getOrGenerateNewAeadKey(MASTER_KEY_URI)
+        val handle = if (keysetFile.exists()) {
+            runCatching {
+                KeysetHandle.readWithAssociatedData(
+                    BinaryKeysetReader.withFile(keysetFile),
+                    masterKey,
+                    KEYSET_ASSOCIATED_DATA,
+                )
+            }.getOrElse {
+                quarantineKeyset()
+                createKeyset(masterKey)
             }
-            return keyStore.getKey(KEY_ALIAS, null) as SecretKey
+        } else {
+            createKeyset(masterKey)
         }
+        return handle.getPrimitive(Aead::class.java)
+    }
 
-        fun encrypt(state: PushStateV1): ByteArray {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            val iv = ByteArray(12).also(SecureRandom()::nextBytes)
-            cipher.init(Cipher.ENCRYPT_MODE, key(), GCMParameterSpec(128, iv))
-            cipher.updateAAD(associatedData)
-            return iv + cipher.doFinal(
-                Json.encodeToString(PushStateV1.serializer(), state).toByteArray(Charsets.UTF_8),
+    private fun createKeyset(masterKey: Aead): KeysetHandle =
+        KeysetHandle.generateNew(KeyTemplates.get("AES256_GCM")).also {
+            it.writeWithAssociatedData(
+                BinaryKeysetWriter.withFile(keysetFile),
+                masterKey,
+                KEYSET_ASSOCIATED_DATA,
             )
         }
 
-        fun decrypt(ciphertext: ByteArray): ByteArray {
-            require(ciphertext.size > 12)
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(
-                Cipher.DECRYPT_MODE,
-                key(),
-                GCMParameterSpec(128, ciphertext.copyOfRange(0, 12)),
-            )
-            cipher.updateAAD(associatedData)
-            return cipher.doFinal(ciphertext.copyOfRange(12, ciphertext.size))
-        }
+    private fun quarantineKeyset() {
+        val quarantine = File(
+            root,
+            "push_state_keyset.bin.corrupt.${System.currentTimeMillis()}",
+        )
+        check(keysetFile.renameTo(quarantine)) { "Unable to quarantine corrupt push keyset" }
+    }
+
+    private companion object {
+        const val MASTER_KEY_URI = "android-keystore://meet.push.state.master.v1"
+        val ASSOCIATED_DATA = "meet.push.state.proto.v1".toByteArray(Charsets.UTF_8)
+        val KEYSET_ASSOCIATED_DATA =
+            "meet.push.state.keyset.v1".toByteArray(Charsets.UTF_8)
     }
 }
 
@@ -158,19 +163,13 @@ private object EnvelopeSerializer : Serializer<EncryptedEnvelope> {
 
     override suspend fun readFrom(input: InputStream): EncryptedEnvelope =
         runCatching {
-            val source = input.readBytes().toString(Charsets.UTF_8)
-            val element = Json.decodeFromString<JsonObject>(source)
-            require(element.jsonObject.keys == setOf("formatVersion", "ciphertext"))
-            Json.decodeFromJsonElement(EncryptedEnvelope.serializer(), element)
-        }.getOrElse {
-            EncryptedEnvelope(formatVersion = INVALID_FORMAT_VERSION)
-        }
+            ProtoBuf.decodeFromByteArray(
+                EncryptedEnvelope.serializer(),
+                input.readBytes(),
+            )
+        }.getOrElse { EncryptedEnvelope(formatVersion = -1) }
 
     override suspend fun writeTo(t: EncryptedEnvelope, output: OutputStream) {
-        output.write(
-            Json.encodeToString(EncryptedEnvelope.serializer(), t).toByteArray(Charsets.UTF_8),
-        )
+        output.write(ProtoBuf.encodeToByteArray(EncryptedEnvelope.serializer(), t))
     }
 }
-
-private const val INVALID_FORMAT_VERSION = -1

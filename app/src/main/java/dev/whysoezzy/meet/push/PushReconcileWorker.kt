@@ -13,9 +13,7 @@ internal class PushReconcileWorker(
     private val coordinator: PushRegistrationCoordinator,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
-        return runCatching {
-            if (coordinator.reconcileCurrent()) Result.success() else Result.retry()
-        }.getOrElse { Result.retry() }
+        return if (coordinator.reconcileCurrent()) Result.success() else Result.retry()
     }
 }
 
