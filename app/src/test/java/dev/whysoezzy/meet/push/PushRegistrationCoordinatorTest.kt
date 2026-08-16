@@ -1,20 +1,26 @@
 package dev.whysoezzy.meet.push
 
+import com.google.firebase.messaging.RemoteMessage
 import com.whysoezzy.auth.domain.models.AuthCredentialState
 import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.CredentialVersion
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
+import com.whysoezzy.domain.models.PushInstallation
 import com.whysoezzy.domain.models.PushInstallationDeleteResult
 import com.whysoezzy.domain.models.PushInstallationFid
 import com.whysoezzy.domain.models.PushInstallationId
+import com.whysoezzy.domain.models.PushInstallationStatus
 import com.whysoezzy.domain.models.PushInstallationUpsertResult
 import com.whysoezzy.domain.repository.PushInstallationRepository
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -22,9 +28,62 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PushRegistrationCoordinatorTest {
+    @Test
+    fun `service path rejects A message captured before exit when B is current at handoff`() =
+        runTest {
+            val owner = OwnerSnapshot(userId = 7L, generation = 1L)
+            val store = RecordingStateStore(
+                PushStateV1(
+                    registration = RegistrationState(
+                        owner = owner,
+                        accountGeneration = owner.generation,
+                    ),
+                ),
+            )
+            val auth = RecordingAuth(AuthSession(7L, AuthSession.Stage.Ready))
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = auth,
+                installationRepository = RecordingInstallations(),
+                fcm = RecordingFirebase(),
+                stateStore = store,
+                workScheduler = RecordingScheduler(),
+            )
+            val handoff = object : PushMessageHandoff {
+                override fun captureExitEpoch(): Long {
+                    val epoch = coordinator.captureExitEpoch()
+                    runBlocking {
+                        coordinator.beginAccountExit()
+                        coordinator.endAccountExit()
+                    }
+                    auth.setSession(AuthSession(8L, AuthSession.Stage.Ready))
+                    return epoch
+                }
+
+                override suspend fun handleDataMessage(
+                    data: Map<String, String>,
+                    hasNotificationBlock: Boolean,
+                    ingressExitEpoch: Long,
+                ) {
+                    coordinator.handleDataMessage(
+                        data = data,
+                        hasNotificationBlock = hasNotificationBlock,
+                        ingressExitEpoch = ingressExitEpoch,
+                    )
+                }
+            }
+
+            val message = mockk<RemoteMessage>()
+            every { message.data } returns reminderData()
+            every { message.notification } returns null
+            MeetFirebaseMessagingService(handoff).onMessageReceived(message)
+
+            assertTrue(store.state.ledger.isEmpty())
+        }
+
     @Test
     fun `delayed data message from a departed epoch cannot bind to a replacement account`() =
         runTest {
@@ -216,18 +275,24 @@ class PushRegistrationCoordinatorTest {
             )
             val auth = RecordingAuth(AuthSession(7L, AuthSession.Stage.Ready))
             val installations = RecordingInstallations(
-                deleteResult = Result.failure(IllegalStateException("offline")),
+                deleteResults = listOf(
+                    Result.failure(IllegalStateException("offline")),
+                    Result.success(PushInstallationDeleteResult.Acknowledged),
+                ),
             )
+            val scheduler = RecordingScheduler()
+            val firebase = RecordingFirebase()
             val coordinator = PushRegistrationCoordinator(
                 authSessionRepository = auth,
                 installationRepository = installations,
-                fcm = RecordingFirebase(),
+                fcm = firebase,
                 stateStore = store,
-                workScheduler = RecordingScheduler(),
+                workScheduler = scheduler,
                 dispatcher = dispatcher,
             )
             coordinator.start()
             runCurrent()
+            scheduler.enqueues = 0
 
             auth.setSession(AuthSession(8L, AuthSession.Stage.Ready))
             runCurrent()
@@ -242,6 +307,18 @@ class PushRegistrationCoordinatorTest {
                 RegistrationTerminal.NONE,
                 store.state.accountCleanup?.terminal,
             )
+            assertEquals(1, scheduler.enqueues)
+
+            coordinator.reconcileCurrent()
+            coordinator.onRegistered("fid-b")
+            runCurrent()
+            coordinator.reconcileCurrent()
+
+            assertEquals(
+                PushInstallationId("550e8400-e29b-41d4-a716-446655440001"),
+                installations.createdInstallationId,
+            )
+            assertEquals(1, firebase.registers)
             coordinator.close()
         }
 
@@ -261,10 +338,12 @@ class PushRegistrationCoordinatorTest {
                 ),
             )
             val installations = RecordingInstallations(
-                deleteResult = Result.success(
-                    PushInstallationDeleteResult.Terminal(
-                        com.whysoezzy.domain.models.PushInstallationTerminalStatus
-                            .MALFORMED_SUCCESS,
+                deleteResults = listOf(
+                    Result.success(
+                        PushInstallationDeleteResult.Terminal(
+                            com.whysoezzy.domain.models.PushInstallationTerminalStatus
+                                .MALFORMED_SUCCESS,
+                        ),
                     ),
                 ),
             )
@@ -329,15 +408,30 @@ class PushRegistrationCoordinatorTest {
     }
 
     private class RecordingInstallations(
-        private val deleteResult: Result<PushInstallationDeleteResult> =
+        deleteResults: List<Result<PushInstallationDeleteResult>> = listOf(
             Result.success(PushInstallationDeleteResult.Acknowledged),
+        ),
     ) : PushInstallationRepository {
+        private val remainingDeleteResults = deleteResults.toMutableList()
         val deleted = mutableListOf<String>()
+        var createdInstallationId: PushInstallationId? = null
 
         override suspend fun create(
             fid: PushInstallationFid,
-        ): Result<PushInstallationUpsertResult> =
-            error("Unexpected create")
+        ): Result<PushInstallationUpsertResult> {
+            createdInstallationId = PushInstallationId(
+                "550e8400-e29b-41d4-a716-446655440001",
+            )
+            return Result.success(
+                PushInstallationUpsertResult.Acknowledged(
+                    PushInstallation(
+                        installationId = createdInstallationId!!,
+                        status = PushInstallationStatus.ACTIVE,
+                        lastSeenAt = Instant.EPOCH,
+                    ),
+                ),
+            )
+        }
 
         override suspend fun update(
             installationId: PushInstallationId,
@@ -349,7 +443,11 @@ class PushRegistrationCoordinatorTest {
             installationId: PushInstallationId,
         ): Result<PushInstallationDeleteResult> {
             deleted += installationId.value
-            return deleteResult
+            return if (remainingDeleteResults.isNotEmpty()) {
+                remainingDeleteResults.removeAt(0)
+            } else {
+                Result.success(PushInstallationDeleteResult.Acknowledged)
+            }
         }
     }
 

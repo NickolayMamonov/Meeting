@@ -47,3 +47,11 @@
 - [x] Revalidate the captured exit epoch before `onRegistered` scheduling.
 - [x] Persist and classify explicit logout installation DELETE outcomes after local binding clear.
 - [x] Re-run the required targeted/static/build verification and record external gates.
+
+## Fresh Implementation session — latest approval findings (2026-08-16)
+
+- [x] Capture the Firebase service callback exit epoch before the synchronous handoff and pass the immutable epoch into durable message processing.
+- [x] Add a service-path A-exit-B race test proving a stale callback cannot be attributed to B.
+- [x] Re-enqueue a guarded current-state reconciliation after transient/timeout A-to-B installation DELETE failure.
+- [x] Assert scheduler activity and eventual B installation registration after cleanup retry.
+- [ ] Re-run snapshot/release/device/backend gates; prerequisites remain externally blocked.

@@ -31,7 +31,7 @@ internal class PushRegistrationCoordinator(
     private val presentation: ReminderPresentationGateway = NoOpReminderPresentationGateway,
     private val workScheduler: PushWorkScheduler = NoOpPushWorkScheduler,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-) {
+) : PushMessageHandoff {
     private val stateMutex = Mutex()
     private val reconciliationMutex = Mutex()
 
@@ -75,6 +75,7 @@ internal class PushRegistrationCoordinator(
                         oldRegistration != null ||
                         pendingCleanup != null
                     ) {
+                        var retryCleanupAfterExit = false
                         beginAccountExit()
                         try {
                             if (userId != null && pendingCleanup != null) {
@@ -82,16 +83,18 @@ internal class PushRegistrationCoordinator(
                                     deleteInstallation(pendingCleanup.installationId)
                                 }
                                 if (deleteResult?.isAcknowledged() != true) {
+                                    val cleanupFailure = deleteResult
+                                        ?: Result.failure(
+                                            IllegalStateException(
+                                                "Timed out deleting account installation",
+                                            ),
+                                        )
                                     recordAccountCleanupFailure(
                                         pendingCleanup.owner,
                                         pendingCleanup.installationId,
-                                        deleteResult
-                                            ?: Result.failure(
-                                                IllegalStateException(
-                                                    "Timed out deleting account installation",
-                                                ),
-                                            ),
+                                        cleanupFailure,
                                     )
+                                    retryCleanupAfterExit = cleanupFailure.shouldRetryCleanup()
                                     return@collectLatest
                                 }
                                 stateMutex.withLock {
@@ -111,26 +114,31 @@ internal class PushRegistrationCoordinator(
                                         deleteInstallation(oldInstallationId)
                                     }
                                     if (deleteResult?.isAcknowledged() != true) {
+                                        val cleanupFailure = deleteResult
+                                            ?: Result.failure(
+                                                IllegalStateException(
+                                                    "Timed out deleting account installation",
+                                                ),
+                                            )
                                         recordAccountCleanupFailure(
                                             oldRegistration.first,
                                             oldInstallationId,
-                                            deleteResult
-                                                ?: Result.failure(
-                                                    IllegalStateException(
-                                                        "Timed out deleting account installation",
-                                                    ),
-                                                ),
+                                            cleanupFailure,
                                         )
+                                        retryCleanupAfterExit = cleanupFailure.shouldRetryCleanup()
                                         clearAccountState()
                                         return@collectLatest
                                     }
                                 } catch (error: Exception) {
                                     if (error is kotlinx.coroutines.CancellationException) throw error
+                                    val cleanupFailure =
+                                        Result.failure<PushInstallationDeleteResult>(error)
                                     recordAccountCleanupFailure(
                                         oldRegistration.first,
                                         oldInstallationId,
-                                        Result.failure(error),
+                                        cleanupFailure,
                                     )
+                                    retryCleanupAfterExit = cleanupFailure.shouldRetryCleanup()
                                     clearAccountState()
                                     return@collectLatest
                                 }
@@ -141,6 +149,9 @@ internal class PushRegistrationCoordinator(
                             }
                         } finally {
                             endAccountExit()
+                            if (retryCleanupAfterExit && userId != null) {
+                                enqueueCurrentStateRetry(userId)
+                            }
                         }
                     }
                     if (userId != null) {
@@ -350,14 +361,15 @@ internal class PushRegistrationCoordinator(
         }
     }
 
-    internal suspend fun handleDataMessage(
+    override suspend fun handleDataMessage(
         data: Map<String, String>,
         hasNotificationBlock: Boolean,
+        ingressExitEpoch: Long,
     ) {
         processDataMessage(
             data = data,
             hasNotificationBlock = hasNotificationBlock,
-            ingressExitEpoch = captureExitEpoch(),
+            ingressExitEpoch = ingressExitEpoch,
         )
     }
 
@@ -926,7 +938,22 @@ internal class PushRegistrationCoordinator(
             registration.terminalNonce == request.terminalNonce
     }
 
-    private fun captureExitEpoch(): Long = exitEpoch
+    override fun captureExitEpoch(): Long = exitEpoch
+
+    private suspend fun enqueueCurrentStateRetry(userId: Long) {
+        stateMutex.withLock {
+            val session = authSessionRepository.read()
+            val cleanup = stateStore.read().accountCleanup
+            if (
+                !accountExitInProgress &&
+                session.stage != AuthSession.Stage.LoggedOut &&
+                session.userId == userId &&
+                cleanup?.terminal == RegistrationTerminal.NONE
+            ) {
+                workScheduler.enqueue()
+            }
+        }
+    }
 
     private suspend fun isExitEpochCurrent(epoch: Long): Boolean =
         stateMutex.withLock {
@@ -986,6 +1013,9 @@ internal class PushRegistrationCoordinator(
 
     private fun Result<PushInstallationDeleteResult>.isAcknowledged(): Boolean =
         getOrNull() == PushInstallationDeleteResult.Acknowledged
+
+    private fun Result<PushInstallationDeleteResult>.shouldRetryCleanup(): Boolean =
+        !isSuccess && exceptionOrNull().terminalStatus() == null
 
     private data class FirebaseRegistrationRequest(
         val owner: OwnerSnapshot,
