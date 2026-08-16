@@ -2,21 +2,29 @@ package dev.whysoezzy.meet.di
 
 import com.whysoezzy.domain.repository.PushInstallationRepository
 import com.whysoezzy.domain.usecase.AccountExitCoordinator
-import dev.whysoezzy.meet.di.BoundedAccountExitCoordinator
 import dev.whysoezzy.meet.push.AndroidPushWorkScheduler
 import dev.whysoezzy.meet.push.AndroidReminderPresentationGateway
 import dev.whysoezzy.meet.push.EncryptedPushStateStore
 import dev.whysoezzy.meet.push.FcmRegistrationClient
 import dev.whysoezzy.meet.push.FirebaseMessagingRegistrationClient
+import dev.whysoezzy.meet.push.PushReconcileWorker
 import dev.whysoezzy.meet.push.PushRegistrationCoordinator
 import dev.whysoezzy.meet.push.PushStateStore
 import dev.whysoezzy.meet.push.PushWorkScheduler
 import dev.whysoezzy.meet.push.ReminderPresentationGateway
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.workmanager.dsl.worker
 import org.koin.dsl.module
 
 val pushRegistrationModule =
     module {
+        worker { parameters ->
+            PushReconcileWorker(
+                appContext = parameters.get(),
+                workerParams = parameters.get(),
+                coordinator = get(),
+            )
+        }
         single<FcmRegistrationClient> { FirebaseMessagingRegistrationClient() }
         single<PushStateStore> { EncryptedPushStateStore(androidContext()) }
         single<PushWorkScheduler> { AndroidPushWorkScheduler(androidContext()) }

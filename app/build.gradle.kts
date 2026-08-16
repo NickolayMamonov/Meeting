@@ -71,6 +71,7 @@ dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.android)
+    implementation(libs.koin.workmanager)
     implementation(libs.koin.compose)
 
     implementation(libs.androidx.core.ktx)

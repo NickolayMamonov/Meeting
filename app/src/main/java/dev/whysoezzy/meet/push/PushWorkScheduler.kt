@@ -22,7 +22,7 @@ internal class AndroidPushWorkScheduler(
     override fun enqueue() {
         workManager.enqueueUniqueWork(
             UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<PushReconcileWorker>()
                 .setConstraints(
                     Constraints

@@ -39,6 +39,9 @@ internal class EncryptedPushStateStore(
     }
     private val stateFile = File(root, "push_state.pb")
     private val keysetFile = File(root, "push_state_keyset.bin")
+
+    @Volatile
+    private var pristine = !stateFile.exists() && !keysetFile.exists()
     private val dataStore: DataStore<EncryptedEnvelope>
     private val aead: Aead
 
@@ -55,7 +58,21 @@ internal class EncryptedPushStateStore(
     override suspend fun read(): PushStateV1 {
         val envelope = dataStore.data.first()
         val decoded = decode(envelope)
-        if (decoded != null) return decoded
+        if (decoded != null) {
+            if (decoded.migrationVersion < PUSH_MIGRATION_VERSION) {
+                val migrated = decoded.copy(migrationVersion = PUSH_MIGRATION_VERSION)
+                dataStore.updateData { EncryptedEnvelope(ciphertext = encrypt(migrated)) }
+                return migrated
+            }
+            return decoded
+        }
+
+        if (pristine && envelope.ciphertext.isEmpty()) {
+            val pristine = PushStateV1()
+            dataStore.updateData { EncryptedEnvelope(ciphertext = encrypt(pristine)) }
+            this.pristine = false
+            return pristine
+        }
 
         quarantineStateFile()
         val quarantined = PushStateReducer.suppressCorrupt(PushStateV1())
@@ -66,18 +83,21 @@ internal class EncryptedPushStateStore(
     override suspend fun update(transform: (PushStateV1) -> PushStateV1): PushStateV1 {
         var result: PushStateV1? = null
         dataStore.updateData { envelope ->
-            val current = decode(envelope) ?: PushStateReducer.suppressCorrupt(PushStateV1())
+            val current = decode(envelope) ?: if (pristine && envelope.ciphertext.isEmpty()) {
+                PushStateV1()
+            } else {
+                PushStateReducer.suppressCorrupt(PushStateV1())
+            }
             val next = transform(current).also(PushStateReducer::requireValid)
             result = next
+            pristine = false
             EncryptedEnvelope(ciphertext = encrypt(next))
         }
         return checkNotNull(result)
     }
 
     private fun decode(envelope: EncryptedEnvelope): PushStateV1? {
-        if (envelope.formatVersion != PUSH_STATE_VERSION || envelope.ciphertext.isEmpty()) {
-            return if (envelope.ciphertext.isEmpty()) PushStateV1() else null
-        }
+        if (envelope.formatVersion != PUSH_STATE_VERSION || envelope.ciphertext.isEmpty()) return null
         return runCatching {
             ProtoBuf
                 .decodeFromByteArray(

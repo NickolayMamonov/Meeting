@@ -1,6 +1,8 @@
 package dev.whysoezzy.meet.push
 
+import com.whysoezzy.auth.domain.models.AuthSession
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -107,6 +109,94 @@ class PushStateReducerTest {
         assertEquals(
             OwnedEventStatus.DISPLAYED,
             (displayed.ledger.single() as LedgerRecord.OwnedReminderEvent).status,
+        )
+    }
+
+    @Test
+    fun `same FID callback rearms a terminal registration`() {
+        val owner = OwnerSnapshot(7, 4)
+        val state = PushStateV1(
+            registration = RegistrationState(
+                owner = owner,
+                accountGeneration = owner.generation,
+                pendingFid = "opaque",
+                nonce = 12,
+                retryAttempt = 6,
+                terminal = RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED,
+                terminalNonce = 12,
+            ),
+        )
+
+        val rearmed = PushStateReducer.stageFid(state, "opaque")
+
+        assertEquals(RegistrationTerminal.NONE, rearmed.registration.terminal)
+        assertEquals(13L, rearmed.registration.nonce)
+        assertEquals(0, rearmed.registration.retryAttempt)
+        assertEquals(0L, rearmed.registration.terminalNonce)
+    }
+
+    @Test
+    fun `aggregate validation rejects noncanonical IDs and timestamps`() {
+        val owner = OwnerSnapshot(7, 4)
+        val event = LedgerRecord.OwnedReminderEvent(
+            eventId = "event",
+            owner = owner,
+            meetingId = 42,
+            reminderOffsetMinutes = 60,
+            issuedAt = 10,
+            receivedAt = 9,
+            statusChangedAt = 8,
+        )
+
+        val rejected = runCatching {
+            PushStateReducer.requireValid(
+                PushStateV1(
+                    registration = RegistrationState(
+                        owner = owner,
+                        installationId = "550E8400-E29B-41D4-A716-446655440000",
+                    ),
+                    ledger = listOf(event),
+                ),
+            )
+        }.exceptionOrNull()
+        assertTrue(rejected is IllegalArgumentException)
+    }
+
+    @Test
+    fun `request fence rejects stale operation and nonce`() {
+        val owner = OwnerSnapshot(7, 4)
+        val fence = PushRegistrationRequestFence(
+            owner = owner,
+            pendingFid = "fid-a",
+            operation = RegistrationOperation.ROTATE,
+            installationId = "550e8400-e29b-41d4-a716-446655440000",
+            nonce = 12,
+            terminalNonce = 12,
+        )
+        val session = AuthSession(7, AuthSession.Stage.Ready)
+        val matching = PushStateV1(
+            registration = RegistrationState(
+                owner = owner,
+                accountGeneration = owner.generation,
+                installationId = fence.installationId,
+                pendingFid = fence.pendingFid,
+                operation = fence.operation,
+                nonce = fence.nonce,
+                terminalNonce = fence.terminalNonce,
+            ),
+        )
+
+        assertTrue(fence.matches(session, matching))
+        assertFalse(
+            fence.matches(
+                session,
+                matching.copy(
+                    registration = matching.registration.copy(
+                        operation = RegistrationOperation.CREATE,
+                        nonce = 13,
+                    ),
+                ),
+            ),
         )
     }
 }

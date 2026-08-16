@@ -1,7 +1,6 @@
 package dev.whysoezzy.meet
 
 import android.app.Application
-import androidx.work.Configuration
 import com.whysoezzy.auth.di.authModule
 import com.whysoezzy.common.crash.CrashReporter
 import com.whysoezzy.data.di.communitiesModule
@@ -13,20 +12,18 @@ import dev.whysoezzy.meet.crash.CrashReportingTree
 import dev.whysoezzy.meet.di.appGlueModule
 import dev.whysoezzy.meet.di.appModule
 import dev.whysoezzy.meet.di.pushRegistrationModule
-import dev.whysoezzy.meet.push.PushReconcileWorkerFactory
 import dev.whysoezzy.meet.push.PushRegistrationCoordinator
 import dev.whysoezzy.meetings.di.mainFeatureModule
 import dev.whysoezzy.profile.di.profileFeatureModule
 import org.koin.android.ext.android.inject
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
+import org.koin.androidx.workmanager.koin.workManagerFactory
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import timber.log.Timber
 
-class MeetApplication :
-    Application(),
-    Configuration.Provider {
+class MeetApplication : Application() {
     private val crashReporter: CrashReporter by inject()
     private val pushRegistrationCoordinator: PushRegistrationCoordinator by inject()
 
@@ -36,6 +33,7 @@ class MeetApplication :
         startKoin {
             androidLogger(if (BuildConfig.DEBUG) Level.DEBUG else Level.ERROR)
             androidContext(this@MeetApplication)
+            workManagerFactory()
             modules(
                 appModule,
                 appGlueModule,
@@ -59,10 +57,4 @@ class MeetApplication :
             Timber.plant(CrashReportingTree(crashReporter))
         }
     }
-
-    override val workManagerConfiguration: Configuration
-        get() = Configuration
-            .Builder()
-            .setWorkerFactory(PushReconcileWorkerFactory())
-            .build()
 }

@@ -32,6 +32,7 @@ internal class PushRegistrationCoordinator(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val stateMutex = Mutex()
+    private val reconciliationMutex = Mutex()
     private var scope: CoroutineScope? = null
     private var observationJob: Job? = null
 
@@ -52,8 +53,7 @@ internal class PushRegistrationCoordinator(
                         }
                     }
                     if (userId == null || oldOwner != null) {
-                        val installationId = clearAccountState()
-                        if (installationId != null) deleteInstallation(installationId)
+                        clearAccountState()
                         if (userId == null) {
                             fcm.unregister()
                         }
@@ -68,7 +68,6 @@ internal class PushRegistrationCoordinator(
                                 )
                         }
                         if (registrationCanRun) workScheduler.enqueue()
-                        reconcile(userId, credentialState.credentialVersion)
                     }
                 }
         }
@@ -91,8 +90,8 @@ internal class PushRegistrationCoordinator(
         currentScope.launch {
             val staged = stateMutex.withLock {
                 val before = stateStore.read()
-                stateStore.update { PushStateReducer.stageFid(it, validFid) }
-                before.registration.pendingFid != validFid
+                val after = stateStore.update { PushStateReducer.stageFid(it, validFid) }
+                before != after
             }
             if (staged) workScheduler.enqueue()
         }
@@ -148,9 +147,20 @@ internal class PushRegistrationCoordinator(
 
     /**
      * Firebase's callback has no installation identity. It is advisory only: it cannot
-     * mutate durable state or enqueue work, because it can arrive after logout.
+     * mutate durable registration state. The guarded wake-up reads the current session
+     * under the same mutex as cleanup before replacing the current unique work.
      */
-    fun onUnregistered() = Unit
+    fun onUnregistered() {
+        val currentScope = scope ?: return
+        currentScope.launch {
+            stateMutex.withLock {
+                val session = authSessionRepository.read()
+                if (session.stage != AuthSession.Stage.LoggedOut) {
+                    workScheduler.enqueue()
+                }
+            }
+        }
+    }
 
     fun unregisterFirebase() {
         fcm.unregister()
@@ -225,19 +235,21 @@ internal class PushRegistrationCoordinator(
             installationId
         }
 
-    suspend fun deleteInstallation(installationId: String): PushInstallationDeleteResult {
+    suspend fun deleteInstallation(
+        installationId: String,
+    ): Result<PushInstallationDeleteResult> {
         val id = PushInstallationId(installationId)
-        return installationRepository.delete(id).fold(
-            onSuccess = { it },
-            onFailure = {
-                PushInstallationDeleteResult.Terminal(
-                    com.whysoezzy.domain.models.PushInstallationTerminalStatus.MALFORMED_SUCCESS,
-                )
-            },
-        )
+        return installationRepository.delete(id)
     }
 
     private suspend fun reconcile(
+        userId: Long,
+        credentialVersion: CredentialVersion,
+    ): Boolean = reconciliationMutex.withLock {
+        reconcileSerialized(userId, credentialVersion)
+    }
+
+    private suspend fun reconcileSerialized(
         userId: Long,
         credentialVersion: CredentialVersion,
     ): Boolean {
@@ -247,17 +259,45 @@ internal class PushRegistrationCoordinator(
             if (session.stage == AuthSession.Stage.LoggedOut || session.userId != userId) {
                 return@withLock null
             }
-            val registration = state.registration
-            if (registration.terminal != RegistrationTerminal.NONE &&
-                !(
-                    registration.terminal == RegistrationTerminal.BLOCKED_AUTH &&
-                        credentialVersion.isAdvancedFrom(registration)
-                )
-            ) {
+            var registration = state.registration
+            val credentialRearm = registration.terminal == RegistrationTerminal.BLOCKED_AUTH &&
+                credentialVersion.isAdvancedFrom(registration)
+            if (registration.terminal != RegistrationTerminal.NONE && !credentialRearm) {
                 return@withLock null
             }
             val owner = registration.owner?.takeIf { it.userId == userId }
                 ?: OwnerSnapshot(userId, registration.accountGeneration + 1L)
+            if (credentialRearm) {
+                registration = stateStore
+                    .update {
+                        it.copy(
+                            registration = it.registration.copy(
+                                terminal = RegistrationTerminal.NONE,
+                                terminalNonce = 0L,
+                                retryAttempt = 0,
+                                firebaseRetryAttempt = 0,
+                                blockedCredentialEpoch = null,
+                                blockedCredentialRevision = null,
+                                nonce = it.registration.nonce + 1L,
+                            ),
+                        )
+                    }.registration
+            }
+            if (registration.owner != owner ||
+                registration.accountGeneration != owner.generation
+            ) {
+                registration = stateStore
+                    .update {
+                        it.copy(
+                            registration = it.registration.copy(
+                                owner = owner,
+                                accountGeneration = owner.generation,
+                                nonce = it.registration.nonce + 1L,
+                                terminalNonce = 0L,
+                            ),
+                        )
+                    }.registration
+            }
             owner to registration.pendingFid
         } ?: return true
 
@@ -270,35 +310,58 @@ internal class PushRegistrationCoordinator(
     }
 
     private suspend fun ensureFirebaseRegistered(owner: OwnerSnapshot): Boolean {
-        val attempt = stateMutex.withLock {
+        val request = stateMutex.withLock {
             val session = authSessionRepository.read()
             val state = stateStore.read()
             if (session.stage == AuthSession.Stage.LoggedOut || session.userId != owner.userId) {
                 return@withLock null
             }
-            state.registration.firebaseRetryAttempt
+            val registration = state.registration
+            FirebaseRegistrationRequest(
+                owner = owner,
+                pendingFid = registration.pendingFid,
+                operation = registration.operation,
+                installationId = registration.installationId,
+                nonce = registration.nonce,
+                terminalNonce = registration.terminalNonce,
+                attempt = registration.firebaseRetryAttempt,
+            )
         } ?: return true
+
         return try {
             fcm.register()
             stateMutex.withLock {
-                stateStore.update(PushStateReducer::resetFirebaseRetry)
+                val current = stateStore.read()
+                if (isCurrentRequest(authSessionRepository.read(), current, request)) {
+                    stateStore.update(PushStateReducer::resetFirebaseRetry)
+                }
             }
             true
         } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
             stateMutex.withLock {
-                val state = stateStore.read()
-                if (attempt + 1 >= MAX_ATTEMPTS) {
+                val current = stateStore.read()
+                if (!isCurrentRequest(authSessionRepository.read(), current, request)) {
+                    return@withLock true
+                }
+                if (request.attempt + 1 >= MAX_ATTEMPTS) {
                     stateStore.update {
                         PushStateReducer.recordTerminal(
                             it,
-                            owner,
-                            it.registration.nonce,
+                            request.owner,
+                            request.nonce,
                             RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED,
                         )
                     }
                     true
                 } else {
-                    stateStore.update(PushStateReducer::recordFirebaseRetry)
+                    stateStore.update {
+                        it.copy(
+                            registration = it.registration.copy(
+                                firebaseRetryAttempt = request.attempt + 1,
+                            ),
+                        )
+                    }
                     false
                 }
             }
@@ -331,11 +394,8 @@ internal class PushRegistrationCoordinator(
                 registration.pendingFid == fid &&
                 registration.operation == operation &&
                 registration.terminal == RegistrationTerminal.NONE
-            val nonce = if (sameRequest) {
-                registration.nonce
-            } else {
-                registration.nonce + 1L
-            }
+            val nonce = if (sameRequest) registration.nonce else registration.nonce + 1L
+            val installationId = registration.installationId
             if (!sameRequest) {
                 stateStore.update {
                     PushStateReducer.beginRegistration(
@@ -351,37 +411,42 @@ internal class PushRegistrationCoordinator(
                     )
                 }
             }
-            RegistrationRequest(owner, nonce, operation)
+            RegistrationRequest(
+                owner = owner,
+                pendingFid = fid,
+                operation = operation,
+                installationId = installationId,
+                nonce = nonce,
+                terminalNonce = if (sameRequest) registration.terminalNonce else 0L,
+            )
         } ?: return true
 
         val result = when (request.operation) {
-            RegistrationOperation.CREATE -> installationRepository.create(PushInstallationFid(fid))
+            RegistrationOperation.CREATE ->
+                installationRepository.create(PushInstallationFid(request.pendingFid))
+
             RegistrationOperation.ROTATE -> {
-                val installationId = stateMutex.withLock {
-                    stateStore.read().registration.installationId
-                }
+                val installationId = request.installationId
                 if (installationId == null) {
-                    installationRepository.create(PushInstallationFid(fid))
+                    installationRepository.create(PushInstallationFid(request.pendingFid))
                 } else {
                     installationRepository.update(
                         PushInstallationId(installationId),
-                        PushInstallationFid(fid),
+                        PushInstallationFid(request.pendingFid),
                     )
                 }
             }
-            else -> return true
+
+            RegistrationOperation.NONE,
+            RegistrationOperation.DELETE,
+            -> return true
         }
 
         return stateMutex.withLock {
             val session = authSessionRepository.read()
             val current = stateStore.read()
-            if (session.stage == AuthSession.Stage.LoggedOut ||
-                session.userId != request.owner.userId ||
-                current.registration.owner != request.owner ||
-                current.registration.nonce != request.nonce
-            ) {
-                return@withLock true
-            }
+            if (!request.matches(session, current)) return@withLock true
+
             val error = result.exceptionOrNull()
             val status = error.httpStatus()
             if (result.isSuccess) {
@@ -420,64 +485,62 @@ internal class PushRegistrationCoordinator(
                     )
                 }
                 false
+            } else if (status == 401) {
+                val credentialVersion = authSessionRepository.credentialState.first().credentialVersion
+                stateStore.update {
+                    PushStateReducer.recordBlockedAuth(
+                        it,
+                        request.owner,
+                        request.nonce,
+                        credentialVersion.epoch,
+                        credentialVersion.revision,
+                    )
+                }
+                true
             } else {
-                if (status == 401) {
-                    val credentialVersion = authSessionRepository.credentialState.first().credentialVersion
+                val terminal = error.terminalStatus()
+                if (terminal != null) {
                     stateStore.update {
-                        PushStateReducer.recordBlockedAuth(
+                        PushStateReducer.recordTerminal(
                             it,
                             request.owner,
                             request.nonce,
-                            credentialVersion.epoch,
-                            credentialVersion.revision,
+                            terminal,
                         )
                     }
                     true
-                } else {
-                    val terminal = error.terminalStatus()
-                    if (terminal != null) {
+                } else if (isTransient(error)) {
+                    val nextAttempt = current.registration.retryAttempt + 1
+                    if (nextAttempt >= MAX_ATTEMPTS) {
                         stateStore.update {
                             PushStateReducer.recordTerminal(
                                 it,
                                 request.owner,
                                 request.nonce,
-                                terminal,
+                                RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED,
                             )
                         }
                         true
-                    } else if (isTransient(error)) {
-                        val nextAttempt = current.registration.retryAttempt + 1
-                        if (nextAttempt >= MAX_ATTEMPTS) {
-                            stateStore.update {
-                                PushStateReducer.recordTerminal(
-                                    it,
-                                    request.owner,
-                                    request.nonce,
-                                    RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED,
-                                )
-                            }
-                            true
-                        } else {
-                            stateStore.update {
-                                PushStateReducer.recordRetry(
-                                    it,
-                                    request.owner,
-                                    request.nonce,
-                                )
-                            }
-                            false
-                        }
                     } else {
                         stateStore.update {
-                            PushStateReducer.recordTerminal(
+                            PushStateReducer.recordRetry(
                                 it,
                                 request.owner,
                                 request.nonce,
-                                RegistrationTerminal.PERMANENT_FAILURE,
                             )
                         }
-                        true
+                        false
                     }
+                } else {
+                    stateStore.update {
+                        PushStateReducer.recordTerminal(
+                            it,
+                            request.owner,
+                            request.nonce,
+                            RegistrationTerminal.PERMANENT_FAILURE,
+                        )
+                    }
+                    true
                 }
             }
         }
@@ -528,13 +591,61 @@ internal class PushRegistrationCoordinator(
             error.httpStatus() in setOf(408, 429) ||
             error.httpStatus()?.let { it in 500..599 } == true
 
-    private data class RegistrationRequest(
+    private fun isCurrentRequest(
+        session: AuthSession,
+        state: PushStateV1,
+        request: FirebaseRegistrationRequest,
+    ): Boolean {
+        val registration = state.registration
+        return session.stage != AuthSession.Stage.LoggedOut &&
+            session.userId == request.owner.userId &&
+            registration.owner == request.owner &&
+            registration.accountGeneration == request.owner.generation &&
+            registration.operation == request.operation &&
+            registration.pendingFid == request.pendingFid &&
+            registration.installationId == request.installationId &&
+            registration.nonce == request.nonce &&
+            registration.terminalNonce == request.terminalNonce
+    }
+
+    private data class FirebaseRegistrationRequest(
         val owner: OwnerSnapshot,
-        val nonce: Long,
+        val pendingFid: String?,
         val operation: RegistrationOperation,
+        val installationId: String?,
+        val nonce: Long,
+        val terminalNonce: Long,
+        val attempt: Int,
     )
+
+    private typealias RegistrationRequest = PushRegistrationRequestFence
 
     private companion object {
         const val MAX_ATTEMPTS = 6
+    }
+}
+
+internal data class PushRegistrationRequestFence(
+    val owner: OwnerSnapshot,
+    val pendingFid: String,
+    val operation: RegistrationOperation,
+    val installationId: String?,
+    val nonce: Long,
+    val terminalNonce: Long,
+) {
+    fun matches(
+        session: AuthSession,
+        state: PushStateV1,
+    ): Boolean {
+        val registration = state.registration
+        return session.stage != AuthSession.Stage.LoggedOut &&
+            session.userId == owner.userId &&
+            registration.owner == owner &&
+            registration.accountGeneration == owner.generation &&
+            registration.operation == operation &&
+            registration.pendingFid == pendingFid &&
+            registration.installationId == installationId &&
+            registration.nonce == nonce &&
+            registration.terminalNonce == terminalNonce
     }
 }
