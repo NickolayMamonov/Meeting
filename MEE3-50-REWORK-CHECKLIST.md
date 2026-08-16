@@ -38,3 +38,12 @@
   supplied; record external runtime/snapshot/release gates.
 
 - [ ] API 33+ authorized-device runtime, backend fixture, snapshot Firebase client, and release-signing prerequisites remain environment gates.
+
+## Implementation session — approved gate findings (2026-08-16)
+
+- [x] Restore the auth token keyset backup exclusion in both Android backup rule files.
+- [x] Fence delayed Firebase data-message ingress by exit epoch and keep the service alive through synchronous durable handoff completion.
+- [x] Make tap claim, navigation, and completion execute under the account-exit fence.
+- [x] Revalidate the captured exit epoch before `onRegistered` scheduling.
+- [x] Persist and classify explicit logout installation DELETE outcomes after local binding clear.
+- [x] Re-run the required targeted/static/build verification and record external gates.

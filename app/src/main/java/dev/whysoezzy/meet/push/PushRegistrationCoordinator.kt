@@ -208,7 +208,13 @@ internal class PushRegistrationCoordinator(
                 val after = stateStore.update { PushStateReducer.stageFid(it, validFid) }
                 before != after
             }
-            if (staged) workScheduler.enqueue()
+            if (staged) {
+                stateMutex.withLock {
+                    if (!accountExitInProgress && exitEpoch == ingressExitEpoch) {
+                        workScheduler.enqueue()
+                    }
+                }
+            }
         }
     }
 
@@ -247,6 +253,45 @@ internal class PushRegistrationCoordinator(
                         it.owner == owner
                 }
         }
+
+    internal suspend fun consumeTap(
+        command: PushTapCommand,
+        isAlreadyAtDestination: () -> Boolean,
+        navigate: () -> Unit,
+    ): Boolean = stateMutex.withLock {
+        if (accountExitInProgress) return@withLock false
+        val session = authSessionRepository.read()
+        val state = stateStore.read()
+        val owner = state.registration.owner
+            ?.takeIf { session.userId != null && it.userId == session.userId }
+            ?: return@withLock false
+        val event = state.ledger
+            .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
+            .firstOrNull {
+                it.eventId == command.eventId &&
+                    it.meetingId == command.meetingId &&
+                    it.owner == owner &&
+                    it.status == OwnedEventStatus.DISPLAYED
+            } ?: return@withLock false
+        val claimed = stateStore.update {
+            PushStateReducer.claimNavigation(it, event.eventId, owner)
+        }
+        val claimSucceeded = claimed.ledger
+            .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
+            .any {
+                it.eventId == event.eventId &&
+                    it.status == OwnedEventStatus.NAVIGATION_CLAIMED &&
+                    it.owner == owner
+            }
+        if (!claimSucceeded || accountExitInProgress) return@withLock false
+        if (!isAlreadyAtDestination()) {
+            navigate()
+        }
+        stateStore.update {
+            PushStateReducer.markNavigated(it, command.eventId, owner)
+        }
+        true
+    }
 
     internal suspend fun completeTap(command: PushTapCommand) {
         stateMutex.withLock {
@@ -289,45 +334,84 @@ internal class PushRegistrationCoordinator(
     fun onDataMessage(
         data: Map<String, String>,
         hasNotificationBlock: Boolean,
+        onComplete: () -> Unit = {},
     ) {
-        val currentScope = scope ?: return
+        val currentScope = scope ?: run {
+            onComplete()
+            return
+        }
+        val ingressExitEpoch = captureExitEpoch()
         currentScope.launch {
-            val reminder = MeetingReminderParser.parse(data, hasNotificationBlock) ?: return@launch
-            stateMutex.withLock {
-                val session = authSessionRepository.read()
-                val state = stateStore.read()
-                val owner = state.registration.owner
-                    ?.takeIf { session.stage != AuthSession.Stage.LoggedOut && it.userId == session.userId }
-                var accepted = false
-                val next = stateStore.update { current ->
-                    when (
-                        val ingress = PushStateReducer.ingest(
-                            current,
-                            owner,
-                            reminder.eventId.toString(),
-                            reminder.meetingId,
-                            reminder.reminderOffsetMinutes,
-                            reminder.issuedAt.toEpochMilli(),
-                            System.currentTimeMillis(),
-                        )
-                    ) {
-                        is LedgerIngressResult.Accepted -> {
-                            accepted = true
-                            ingress.state
-                        }
-                        LedgerIngressResult.Duplicate,
-                        LedgerIngressResult.LedgerCapacityBlocked,
-                        LedgerIngressResult.InvalidOwner,
-                        -> current
-                    }
+            try {
+                processDataMessage(data, hasNotificationBlock, ingressExitEpoch)
+            } finally {
+                onComplete()
+            }
+        }
+    }
+
+    internal suspend fun handleDataMessage(
+        data: Map<String, String>,
+        hasNotificationBlock: Boolean,
+    ) {
+        processDataMessage(
+            data = data,
+            hasNotificationBlock = hasNotificationBlock,
+            ingressExitEpoch = captureExitEpoch(),
+        )
+    }
+
+    private suspend fun processDataMessage(
+        data: Map<String, String>,
+        hasNotificationBlock: Boolean,
+        ingressExitEpoch: Long,
+    ) {
+        val reminder =
+            MeetingReminderParser.parse(data, hasNotificationBlock) ?: return
+        stateMutex.withLock {
+            if (accountExitInProgress || exitEpoch != ingressExitEpoch) {
+                return@withLock
+            }
+            val session = authSessionRepository.read()
+            val state = stateStore.read()
+            val owner = state.registration.owner
+                ?.takeIf {
+                    session.stage != AuthSession.Stage.LoggedOut &&
+                        it.userId == session.userId
                 }
-                val owned = next.ledger
-                    .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
-                    .firstOrNull { it.eventId == reminder.eventId.toString() }
-                if (accepted && owned != null && owned.owner == owner && presentation.present(owned)) {
-                    stateStore.update {
-                        PushStateReducer.markDisplayed(it, owned.eventId, owned.owner)
+            var accepted = false
+            val next = stateStore.update { current ->
+                when (
+                    val ingress = PushStateReducer.ingest(
+                        current,
+                        owner,
+                        reminder.eventId.toString(),
+                        reminder.meetingId,
+                        reminder.reminderOffsetMinutes,
+                        reminder.issuedAt.toEpochMilli(),
+                        System.currentTimeMillis(),
+                    )
+                ) {
+                    is LedgerIngressResult.Accepted -> {
+                        accepted = true
+                        ingress.state
                     }
+                    LedgerIngressResult.Duplicate,
+                    LedgerIngressResult.LedgerCapacityBlocked,
+                    LedgerIngressResult.InvalidOwner,
+                    -> current
+                }
+            }
+            val owned = next.ledger
+                .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
+                .firstOrNull { it.eventId == reminder.eventId.toString() }
+            if (accepted &&
+                owned != null &&
+                owned.owner == owner &&
+                presentation.present(owned)
+            ) {
+                stateStore.update {
+                    PushStateReducer.markDisplayed(it, owned.eventId, owned.owner)
                 }
             }
         }
@@ -339,16 +423,31 @@ internal class PushRegistrationCoordinator(
         }
     }
 
-    suspend fun clearAccountState(now: Long = System.currentTimeMillis()): String? =
+    suspend fun clearAccountState(
+        now: Long = System.currentTimeMillis(),
+        retainInstallationCleanup: Boolean = false,
+    ): String? =
         stateMutex.withLock {
             val current = stateStore.read()
             val installationId = current.registration.installationId
+            val owner = current.registration.owner
             val discarded = current.ledger
                 .filterIsInstance<LedgerRecord.OwnedReminderEvent>()
                 .filter { it.owner == current.registration.owner }
                 .map { it.eventId }
             stateStore.update {
-                PushStateReducer.clearAccountScopedState(it, it.registration.owner, now)
+                val cleared = PushStateReducer.clearAccountScopedState(it, owner, now)
+                if (retainInstallationCleanup && owner != null && installationId != null) {
+                    PushStateReducer.recordAccountCleanupFailure(
+                        cleared,
+                        owner,
+                        installationId,
+                        retryAttempt = 0,
+                        terminal = RegistrationTerminal.NONE,
+                    )
+                } else {
+                    cleared
+                }
             }
             presentation.cancel(discarded)
             workScheduler.cancel()
@@ -360,6 +459,34 @@ internal class PushRegistrationCoordinator(
     ): Result<PushInstallationDeleteResult> {
         val id = PushInstallationId(installationId)
         return installationRepository.delete(id)
+    }
+
+    internal suspend fun recordAccountCleanupOutcome(
+        installationId: String,
+        result: Result<PushInstallationDeleteResult>,
+    ) {
+        stateMutex.withLock {
+            val current = stateStore.read()
+            val pending = current.accountCleanup
+                ?.takeIf { it.installationId == installationId }
+                ?: return@withLock
+            if (result.isAcknowledged()) {
+                stateStore.update {
+                    PushStateReducer.acknowledgeAccountCleanup(
+                        it,
+                        pending.owner,
+                        installationId,
+                    )
+                }
+            } else {
+                recordAccountCleanupFailureLocked(
+                    current,
+                    pending.owner,
+                    installationId,
+                    result,
+                )
+            }
+        }
     }
 
     private suspend fun reconcile(
@@ -812,35 +939,48 @@ internal class PushRegistrationCoordinator(
         result: Result<PushInstallationDeleteResult>,
         expectedExitEpoch: Long? = null,
     ) {
-        val terminal = when {
-            result.isSuccess &&
-                result.getOrNull() is PushInstallationDeleteResult.Terminal ->
-                RegistrationTerminal.MALFORMED_SUCCESS
-            else -> result.exceptionOrNull().terminalStatus()
-        }
         stateMutex.withLock {
             if (expectedExitEpoch != null &&
                 (accountExitInProgress || exitEpoch != expectedExitEpoch)
             ) {
                 return@withLock
             }
-            val current = stateStore.read()
-            val previous = current.accountCleanup
-                ?.takeIf { it.owner == owner && it.installationId == installationId }
-            val retryAttempt = (previous?.retryAttempt ?: 0) + 1
-            stateStore.update {
-                PushStateReducer.recordAccountCleanupFailure(
-                    it,
-                    owner,
-                    installationId,
-                    retryAttempt.coerceAtMost(MAX_ATTEMPTS),
-                    terminal ?: if (retryAttempt >= MAX_ATTEMPTS) {
-                        RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED
-                    } else {
-                        RegistrationTerminal.NONE
-                    },
-                )
-            }
+            recordAccountCleanupFailureLocked(
+                current = stateStore.read(),
+                owner = owner,
+                installationId = installationId,
+                result = result,
+            )
+        }
+    }
+
+    private suspend fun recordAccountCleanupFailureLocked(
+        current: PushStateV1,
+        owner: OwnerSnapshot,
+        installationId: String,
+        result: Result<PushInstallationDeleteResult>,
+    ) {
+        val terminal = when {
+            result.isSuccess &&
+                result.getOrNull() is PushInstallationDeleteResult.Terminal ->
+                RegistrationTerminal.MALFORMED_SUCCESS
+            else -> result.exceptionOrNull().terminalStatus()
+        }
+        val previous = current.accountCleanup
+            ?.takeIf { it.owner == owner && it.installationId == installationId }
+        val retryAttempt = (previous?.retryAttempt ?: 0) + 1
+        stateStore.update {
+            PushStateReducer.recordAccountCleanupFailure(
+                it,
+                owner,
+                installationId,
+                retryAttempt.coerceAtMost(MAX_ATTEMPTS),
+                terminal ?: if (retryAttempt >= MAX_ATTEMPTS) {
+                    RegistrationTerminal.SUSPENDED_RETRY_EXHAUSTED
+                } else {
+                    RegistrationTerminal.NONE
+                },
+            )
         }
     }
 

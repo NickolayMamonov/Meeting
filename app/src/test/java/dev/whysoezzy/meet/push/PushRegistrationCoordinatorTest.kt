@@ -26,6 +26,94 @@ import org.junit.Test
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PushRegistrationCoordinatorTest {
     @Test
+    fun `delayed data message from a departed epoch cannot bind to a replacement account`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val owner = OwnerSnapshot(userId = 7L, generation = 1L)
+            val store = RecordingStateStore(
+                PushStateV1(
+                    registration = RegistrationState(
+                        owner = owner,
+                        accountGeneration = owner.generation,
+                    ),
+                ),
+            )
+            val auth = RecordingAuth(AuthSession(7L, AuthSession.Stage.Ready))
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = auth,
+                installationRepository = RecordingInstallations(),
+                fcm = RecordingFirebase(),
+                stateStore = store,
+                workScheduler = RecordingScheduler(),
+                dispatcher = dispatcher,
+            )
+            coordinator.start()
+            runCurrent()
+
+            coordinator.onDataMessage(
+                data = reminderData(),
+                hasNotificationBlock = false,
+            )
+            coordinator.beginAccountExit()
+            coordinator.endAccountExit()
+            auth.setSession(AuthSession(8L, AuthSession.Stage.Ready))
+            runCurrent()
+
+            assertTrue(store.state.ledger.isEmpty())
+            coordinator.close()
+        }
+
+    @Test
+    fun `tap consumption is rejected while account exit fence is active`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val owner = OwnerSnapshot(userId = 7L, generation = 1L)
+            val eventId = "550e8400-e29b-41d4-a716-446655440000"
+            val store = RecordingStateStore(
+                PushStateV1(
+                    registration = RegistrationState(
+                        owner = owner,
+                        accountGeneration = owner.generation,
+                    ),
+                    ledger = listOf(
+                        LedgerRecord.OwnedReminderEvent(
+                            eventId = eventId,
+                            owner = owner,
+                            meetingId = 42L,
+                            reminderOffsetMinutes = 60,
+                            issuedAt = 1L,
+                            receivedAt = 2L,
+                            status = OwnedEventStatus.DISPLAYED,
+                            statusChangedAt = 2L,
+                        ),
+                    ),
+                ),
+            )
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = RecordingAuth(
+                    AuthSession(7L, AuthSession.Stage.Ready),
+                ),
+                installationRepository = RecordingInstallations(),
+                fcm = RecordingFirebase(),
+                stateStore = store,
+                workScheduler = RecordingScheduler(),
+                dispatcher = dispatcher,
+            )
+            coordinator.beginAccountExit()
+
+            var navigated = false
+            val consumed = coordinator.consumeTap(
+                command = PushTapCommand(eventId, 42L),
+                isAlreadyAtDestination = { false },
+                navigate = { navigated = true },
+            )
+
+            assertTrue(!consumed)
+            assertTrue(!navigated)
+            coordinator.endAccountExit()
+        }
+
+    @Test
     fun `unregistered and registered callbacks cannot resurrect state during account exit`() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -295,5 +383,17 @@ class PushRegistrationCoordinatorTest {
         override suspend fun clear() {
             state.value = AuthCredentialState(AuthSession.LoggedOut, state.value.credentialVersion)
         }
+    }
+
+    private companion object {
+        fun reminderData(): Map<String, String> = mapOf(
+            "eventType" to "MEETING_REMINDER",
+            "schemaVersion" to "1",
+            "eventId" to "550e8400-e29b-41d4-a716-446655440000",
+            "meetingId" to "42",
+            "reminderOffsetMinutes" to "60",
+            "issuedAt" to "2026-01-01T00:00:00Z",
+            "destination" to "MEETING_DETAILS",
+        )
     }
 }

@@ -22,13 +22,23 @@ internal class BoundedAccountExitCoordinator(
                 try {
                     withTimeoutOrNull(4_000L) {
                         val installationId = withTimeoutOrNull(500L) {
-                            pushRegistrationCoordinator.clearAccountState()
+                            pushRegistrationCoordinator.clearAccountState(
+                                retainInstallationCleanup = true,
+                            )
                         }
                         pushRegistrationCoordinator.unregisterFirebase()
                         if (installationId != null) {
-                            withTimeoutOrNull(1_250L) {
+                            val deleteResult = withTimeoutOrNull(1_250L) {
                                 pushRegistrationCoordinator.deleteInstallation(installationId)
                             }
+                            pushRegistrationCoordinator.recordAccountCleanupOutcome(
+                                installationId,
+                                deleteResult ?: Result.failure(
+                                    IllegalStateException(
+                                        "Timed out deleting account installation",
+                                    ),
+                                ),
+                            )
                         }
                         withTimeoutOrNull(1_250L) { logoutUseCase() }
                     }

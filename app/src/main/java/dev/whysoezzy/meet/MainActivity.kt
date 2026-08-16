@@ -109,22 +109,23 @@ internal fun MeetApp(
     if (pushTapCommands != null && coordinator != null && navHostReady) {
         LaunchedEffect(pushTapCommands, navHostReady) {
             pushTapCommands.collect { command ->
-                if (coordinator.claimTap(command)) {
-                    val destination = MeetRoute.MeetingDetails.createRoute(command.meetingId)
-                    val currentMeetingId = navController.currentBackStackEntry
-                        ?.arguments
-                        ?.getString("meetingId")
-                        ?.toLongOrNull()
-                    val alreadyAtDestination =
+                coordinator.consumeTap(
+                    command = command,
+                    isAlreadyAtDestination = {
+                        val currentMeetingId = navController.currentBackStackEntry
+                            ?.arguments
+                            ?.getString("meetingId")
+                            ?.toLongOrNull()
                         navController.currentDestination?.route == MeetRoute.MeetingDetails.route &&
                             currentMeetingId == command.meetingId
-                    if (!alreadyAtDestination) {
+                    },
+                    navigate = {
+                        val destination = MeetRoute.MeetingDetails.createRoute(command.meetingId)
                         navController.navigate(destination) {
                             launchSingleTop = true
                         }
-                    }
-                    coordinator.completeTap(command)
-                }
+                    },
+                )
             }
         }
     }

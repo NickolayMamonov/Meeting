@@ -85,7 +85,7 @@ class BoundedAccountExitCoordinatorTest {
         coEvery { push.beginAccountExit() } returns Unit
         coEvery { push.endAccountExit() } returns Unit
         coEvery {
-            push.clearAccountState(any())
+            push.clearAccountState(any(), true)
         } throws IllegalStateException("store failure")
         coEvery { auth.clear() } returns Unit
 
@@ -93,6 +93,34 @@ class BoundedAccountExitCoordinatorTest {
 
         assertTrue(outcome.exceptionOrNull() is IllegalStateException)
         coVerify { auth.clear() }
+    }
+
+    @Test
+    fun `explicit logout persists installation delete transport outcome`() = runTest {
+        val installationId = "550e8400-e29b-41d4-a716-446655440000"
+        coEvery { push.beginAccountExit() } returns Unit
+        coEvery { push.endAccountExit() } returns Unit
+        coEvery {
+            push.clearAccountState(any(), true)
+        } returns installationId
+        every { push.unregisterFirebase() } returns Unit
+        coEvery {
+            push.deleteInstallation(installationId)
+        } returns Result.failure(IllegalStateException("offline"))
+        coEvery {
+            push.recordAccountCleanupOutcome(
+                installationId,
+                any(),
+            )
+        } returns Unit
+        coEvery { logout() } returns Unit
+        coEvery { auth.clear() } returns Unit
+
+        coordinator().logout()
+
+        coVerify(exactly = 1) {
+            push.recordAccountCleanupOutcome(installationId, any())
+        }
     }
 
     @Test
