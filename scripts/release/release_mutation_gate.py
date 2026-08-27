@@ -195,6 +195,12 @@ def verify_uploaded_assets(
     names = {str(asset.get("name", "")) for asset in assets}
     _require(names == expected_names, "uploaded release assets are not exact")
     asset = assets[0]
+    _require(
+        isinstance(asset.get("size"), int)
+        and not isinstance(asset["size"], bool)
+        and 0 < asset["size"] <= MAX_RELEASE_ASSET_BYTES,
+        "uploaded release asset size is invalid",
+    )
     if expected_size is not None:
         _require(
             isinstance(expected_size, int) and not isinstance(expected_size, bool)
@@ -258,8 +264,15 @@ def verify_public_release_state(
         isinstance(asset, Mapping)
         and asset.get("name") == "Meet.apk"
         and isinstance(asset.get("id"), int)
+        and not isinstance(asset.get("id"), bool)
         and asset["id"] > 0,
         "published release installer is not exact",
+    )
+    _require(
+        isinstance(asset.get("size"), int)
+        and not isinstance(asset["size"], bool)
+        and 0 < asset["size"] <= MAX_RELEASE_ASSET_BYTES,
+        "published release installer size is invalid",
     )
 
 

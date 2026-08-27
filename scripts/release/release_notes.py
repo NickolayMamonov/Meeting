@@ -72,11 +72,24 @@ def render_release_notes(existing_body: str, manifest: Mapping[str, Any]) -> str
         raise ReleaseNotesError("release body verification markers are unbalanced")
     if starts:
         end = ends[0] + len(END_MARKER)
-        body = existing_body[: starts[0]] + existing_body[end:]
+        prefix = existing_body[: starts[0]]
+        suffix = existing_body[end:]
+        # Remove only the separators and terminal newline owned by a prior
+        # rendering.  All caller text, including trailing whitespace, stays
+        # byte-for-byte intact.
+        if prefix.endswith("\n\n"):
+            prefix = prefix[:-2]
+        if suffix.startswith("\n"):
+            suffix = suffix[1:]
+        body = prefix + suffix
     else:
         body = existing_body
-    body = body.rstrip()
-    return f"{body}\n\n{section}\n" if body else f"{section}\n"
+    # The caller owns every byte outside the marker section, including
+    # trailing spaces and newlines.  Only the separator introduced by this
+    # renderer is normalized.
+    if body:
+        return f"{body}\n\n{section}\n"
+    return f"{section}\n"
 
 
 def render_release_notes_file(existing_body_path: Path, manifest_path: Path, output_path: Path) -> None:

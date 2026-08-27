@@ -70,13 +70,19 @@ class PublishReleaseTest(unittest.TestCase):
             self.assertIn("content-length", data_legs[0]["response_headers"])
             self.assertIn("content-type", data_legs[0]["response_headers"])
 
-    def test_final_read_race_is_detected_without_repair(self):
+    def test_final_read_race_is_indeterminate_without_repair(self):
         with tempfile.TemporaryDirectory() as root:
             evidence = PackageArtifactsTest.package_release(Path(root))
             options = self.harness_options(evidence)
             options["inject_after_final_read"] = True
-            with self.assertRaises(PublicationError):
-                run_harness(**options)
+            result = run_harness(**options)
+            self.assertTrue(result["indeterminate"])
+            self.assertEqual(result["classification"], "excluded-concurrency/indeterminate")
+            self.assertEqual(result["race"]["request_counts"]["POST"], 1)
+            self.assertEqual(result["race"]["request_counts"]["PATCH"], 1)
+            self.assertFalse(result["race"]["retry_attempted"])
+            self.assertFalse(result["race"]["repair_attempted"])
+            self.assertEqual(result["request_counts"]["DELETE"], 0)
 
     def test_harness_rejects_missing_identity_inputs(self):
         with tempfile.TemporaryDirectory() as root:

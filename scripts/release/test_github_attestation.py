@@ -80,6 +80,9 @@ class GitHubAttestationTest(unittest.TestCase):
                 "GITHUB_TOKEN": "github-secret",
                 "SIGNING_PASSWORD": "signing-secret",
                 "ANDROID_KEYSTORE_FILE": "keystore",
+                "QA_STORE_PASSWORD_FILE": "store-password-file",
+                "QA_KEY_PASSWORD_FILE": "key-password-file",
+                "ORG_GRADLE_PROJECT_ANDROID_RELEASE_CERT_SHA256": "fingerprint",
                 "KEEP": "value",
             },
         )
@@ -92,6 +95,9 @@ class GitHubAttestationTest(unittest.TestCase):
             "GITHUB_TOKEN",
             "SIGNING_PASSWORD",
             "ANDROID_KEYSTORE_FILE",
+            "QA_STORE_PASSWORD_FILE",
+            "QA_KEY_PASSWORD_FILE",
+            "ORG_GRADLE_PROJECT_ANDROID_RELEASE_CERT_SHA256",
         ):
             self.assertNotIn(name, environment)
 
@@ -151,6 +157,45 @@ class GitHubAttestationTest(unittest.TestCase):
         )
         self.assertEqual(verified.matched_subject.name, "Meet.apk")
         self.assertEqual(verified.file_sha256, digest)
+
+    def test_current_run_identity_selects_one_result_from_retained_attestations(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "Meet.apk"
+            path.write_bytes(b"installer bytes")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+
+            def result(run_id):
+                value = self.result([("Meet.apk", digest)])
+                value["verificationResult"]["signature"] = {
+                    "certificate": {
+                        "runInvocationURI": (
+                            f"https://github.com/{self.REPOSITORY}/actions/runs/"
+                            f"{run_id}/attempts/1"
+                        )
+                    }
+                }
+                return value
+
+            output = json.dumps([result(10), result(11), result(12)]).encode()
+            verified = verify_file(
+                path,
+                self.policy(),
+                token="secret",
+                run_id=12,
+                run_attempt=1,
+                runner=lambda *args, **kwargs: output,
+            )
+            self.assertEqual(verified.matched_subject.name, "Meet.apk")
+
+            with self.assertRaisesRegex(AttestationError, "current-run"):
+                verify_file(
+                    path,
+                    self.policy(),
+                    token="secret",
+                    run_id=13,
+                    run_attempt=1,
+                    runner=lambda *args, **kwargs: output,
+                )
 
     def test_result_cardinality_and_stdout_bound_are_fail_closed(self):
         with tempfile.TemporaryDirectory() as root:

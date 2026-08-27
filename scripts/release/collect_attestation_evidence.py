@@ -74,6 +74,8 @@ def run_gh(
     source_sha: str,
     *,
     attestation_token: str | None = None,
+    run_id: int | None = None,
+    run_attempt: int | None = None,
 ) -> dict[str, Any]:
     """Compatibility adapter returning the raw one-result CLI record."""
 
@@ -95,6 +97,8 @@ def run_gh(
                 if attestation_token is None
                 else attestation_token
             ),
+            run_id=run_id,
+            run_attempt=run_attempt,
         )
     except AttestationError as error:
         raise CollectionError(str(error)) from error
@@ -571,7 +575,15 @@ def collect(args: argparse.Namespace) -> None:
     files = sorted(path for path in Path(args.directory).iterdir() if path.is_file())
     records: list[dict[str, Any]] = []
     for path in files:
-        verified = run_gh(path, args.repo, args.signer_workflow, args.source_ref, args.source_sha)
+        verified = run_gh(
+            path,
+            args.repo,
+            args.signer_workflow,
+            args.source_ref,
+            args.source_sha,
+            run_id=args.run_id,
+            run_attempt=args.run_attempt,
+        )
         records.append(
             _record(
                 path,

@@ -549,4 +549,6 @@ jobs:
             --apkanalyzer "$APKANALYZER_PATH" \
             --attestation-signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
             --attestation-source-ref refs/heads/dev \
-            --attestation-source-sha "${{ github.sha }}"
+            --attestation-source-sha "${{ github.sha }}" \
+            --attestation-run-id "$GITHUB_RUN_ID" \
+            --attestation-run-attempt "$GITHUB_RUN_ATTEMPT"

@@ -48,13 +48,16 @@ def verify(local_apk: Path, remote_json: Path, downloaded_apk: Path) -> None:
         raise AssetError("local Meet.apk size is outside the bounded range")
     item = _asset(json.loads(remote_json.read_text(encoding="utf-8")))
     try:
-        if isinstance(item["size"], bool):
-            raise ValueError
-        expected_size = int(item["size"])
-    except (KeyError, TypeError, ValueError) as error:
+        expected_size = item["size"]
+    except KeyError as error:
         raise AssetError("remote Meet.apk size is invalid") from error
-    if expected_size <= 0 or expected_size > MAX_RELEASE_ASSET_BYTES:
-        raise AssetError("remote Meet.apk size is outside the bounded range")
+    if (
+        isinstance(expected_size, bool)
+        or not isinstance(expected_size, int)
+        or expected_size <= 0
+        or expected_size > MAX_RELEASE_ASSET_BYTES
+    ):
+        raise AssetError("remote Meet.apk size is invalid")
     if expected_size != local_size or downloaded_apk.stat().st_size != expected_size:
         raise AssetError("remote Meet.apk size mismatch")
     actual = digest(downloaded_apk)

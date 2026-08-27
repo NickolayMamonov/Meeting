@@ -72,7 +72,7 @@ class PublicationGateTest(unittest.TestCase):
             )
 
     def test_uploaded_assets_are_exact_and_authoritative(self):
-        assets = [{"id": 1, "name": "Meet.apk"}]
+        assets = [{"id": 1, "name": "Meet.apk", "size": 1}]
         verify_uploaded_assets(
             self.state(assets=assets),
             release_id=42,

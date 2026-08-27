@@ -44,3 +44,8 @@ class ReleaseNotesTest(unittest.TestCase):
         ):
             with self.subTest(body=body), self.assertRaises(ReleaseNotesError):
                 render_release_notes(body, self.MANIFEST)
+
+    def test_preserves_caller_owned_trailing_whitespace(self):
+        body = "Release Please changes \t\n\n"
+        rendered = render_release_notes(body, self.MANIFEST)
+        self.assertIn(body + "\n\n" + START_MARKER, rendered)

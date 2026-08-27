@@ -140,6 +140,41 @@ def _serialize_verification(value: Any) -> dict[str, Any] | None:
     }
 
 
+def _asset_identity(asset: Mapping[str, Any]) -> tuple[int, str, int, str | None]:
+    """Return only immutable asset fields; REST telemetry is intentionally ignored."""
+
+    if not isinstance(asset, Mapping):
+        raise PublicationError("release asset is malformed")
+    asset_id = asset.get("id")
+    name = asset.get("name")
+    size = asset.get("size")
+    digest = asset.get("digest")
+    if (
+        isinstance(asset_id, bool)
+        or not isinstance(asset_id, int)
+        or asset_id <= 0
+        or not isinstance(name, str)
+        or not name
+        or isinstance(size, bool)
+        or not isinstance(size, int)
+        or size <= 0
+        or size > MAX_RELEASE_ASSET_BYTES
+    ):
+        raise PublicationError("release asset immutable identity is malformed")
+    if digest in (None, ""):
+        canonical_digest = None
+    elif (
+        isinstance(digest, str)
+        and len(digest) == 71
+        and digest.startswith("sha256:")
+        and all(character in "0123456789abcdef" for character in digest[7:])
+    ):
+        canonical_digest = digest
+    else:
+        raise PublicationError("release asset digest is malformed")
+    return asset_id, name, size, canonical_digest
+
+
 class GitHubReleaseClient:
     """Fixed-host GitHub REST client with no automatic redirect or retry."""
 
@@ -184,6 +219,7 @@ class GitHubReleaseClient:
         try:
             return opener.open(request)
         except urllib.error.HTTPError as error:
+            error.close()
             raise PublicationError(f"GitHub REST {method} failed with HTTP {error.code}") from error
         except OSError as error:
             raise PublicationError(f"GitHub REST {method} transport failed") from error
@@ -292,6 +328,7 @@ class GitHubReleaseClient:
             response = self._opener.open(request)
         except urllib.error.HTTPError as error:
             if error.code != 302:
+                error.close()
                 raise PublicationError(f"asset download failed with HTTP {error.code}") from error
             response = error
         except OSError as error:
@@ -311,6 +348,7 @@ class GitHubReleaseClient:
                 or parsed.password is not None
                 or parsed.fragment
             ):
+                response.close()
                 raise PublicationError("asset redirect location is not allowed")
             response.close()
             try:
@@ -532,7 +570,9 @@ def run(
     except MutationError as error:
         raise PublicationError(f"pre-publish release state is invalid: {error}") from error
     current = _snapshot(before_patch)
-    if current != original or before_patch.get("assets") != state.get("assets"):
+    before_asset_identity = _asset_identity(before_patch["assets"][0])
+    uploaded_asset_identity = _asset_identity(state["assets"][0])
+    if current != original or before_asset_identity != uploaded_asset_identity:
         raise PublicationError("release changed before final publication")
     tag_checker(tag)
     patched = client.patch_release(
@@ -619,6 +659,8 @@ def main() -> int:
     parser.add_argument("--attestation-signer-workflow", required=True)
     parser.add_argument("--attestation-source-ref", required=True)
     parser.add_argument("--attestation-source-sha", required=True)
+    parser.add_argument("--attestation-run-id", required=True, type=int)
+    parser.add_argument("--attestation-run-attempt", required=True, type=int)
     args = parser.parse_args()
     try:
         if not os.environ.get("ATTESTATION_TOKEN"):
@@ -652,6 +694,8 @@ def main() -> int:
                 path,
                 policy,
                 token=os.environ["ATTESTATION_TOKEN"],
+                run_id=args.attestation_run_id,
+                run_attempt=args.attestation_run_attempt,
             )
 
         run(

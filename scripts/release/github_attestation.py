@@ -37,6 +37,10 @@ _REMOVED_ENVIRONMENT_NAMES = frozenset(
         "GITHUB_TOKEN",
     }
 )
+_RUN_INVOCATION_RE = re.compile(
+    r"^https://github\.com/(?P<repository>[^/\s]+/[^/\s]+)"
+    r"/actions/runs/(?P<run_id>[0-9]+)/attempts/(?P<run_attempt>[0-9]+)$"
+)
 
 
 class AttestationError(ValueError):
@@ -80,6 +84,7 @@ def _is_signing_environment_name(name: str) -> bool:
         or upper.endswith(
             (
                 "_ALIAS",
+                "_PASSWORD_FILE",
                 "_CERT_SHA256",
                 "_KEY_PASSWORD",
                 "_SIGNING_PASSWORD",
@@ -297,6 +302,27 @@ def _decode_stdout(value: Any) -> Any:
     raise AttestationError("gh attestation verification returned no JSON output")
 
 
+def _result_run_identity(
+    result: Mapping[str, Any],
+    *,
+    repository: str,
+) -> tuple[int, int]:
+    """Read the immutable Actions run identity from the verified certificate."""
+
+    verification_result = result.get("verificationResult", result.get("verification_result"))
+    certificate = (
+        verification_result.get("signature", {}).get("certificate", {})
+        if isinstance(verification_result, Mapping)
+        else {}
+    )
+    invocation = certificate.get("runInvocationURI") if isinstance(certificate, Mapping) else None
+    _require(isinstance(invocation, str), "verified attestation run identity is missing")
+    match = _RUN_INVOCATION_RE.fullmatch(invocation)
+    _require(match is not None, "verified attestation run identity is malformed")
+    _require(match.group("repository") == repository, "verified attestation run repository changed")
+    return int(match.group("run_id")), int(match.group("run_attempt"))
+
+
 def _run_bounded_command(
     command: tuple[str, ...],
     *,
@@ -363,6 +389,8 @@ def verify_file(
     *,
     token: str,
     runner: Callable[..., Any] | None = None,
+    run_id: int | None = None,
+    run_attempt: int | None = None,
 ) -> VerifiedAttestation:
     """Run the exact bounded CLI query and verify target membership."""
 
@@ -370,6 +398,21 @@ def verify_file(
         path = Path(path)
     _require(path.is_file(), f"attestation subject file is missing: {path.name}")
     expected_digest = _file_sha256(path)
+    _require(
+        (run_id is None) == (run_attempt is None)
+        and (
+            run_id is None
+            or (
+                isinstance(run_id, int)
+                and not isinstance(run_id, bool)
+                and run_id > 0
+                and isinstance(run_attempt, int)
+                and not isinstance(run_attempt, bool)
+                and run_attempt > 0
+            )
+        ),
+        "attestation run identity is incomplete or invalid",
+    )
     command = build_gh_command(path, policy)
     environment = child_environment(token)
     try:
@@ -405,12 +448,26 @@ def verify_file(
         raise AttestationError(
             f"gh attestation result reached its pagination limit for {path.name}"
         )
-    if len(value) != 1 or not isinstance(value[0], Mapping):
+    candidates = [item for item in value if isinstance(item, Mapping)]
+    if len(candidates) != len(value):
+        raise AttestationError(f"gh attestation result contains a non-object for {path.name}")
+    if run_id is not None:
+        candidates = [
+            item
+            for item in candidates
+            if _result_run_identity(item, repository=policy.repository)
+            == (run_id, run_attempt)
+        ]
+    if len(candidates) != 1:
+        identity = (
+            f" for run {run_id}/{run_attempt}" if run_id is not None else ""
+        )
         raise AttestationError(
-            f"gh attestation result must contain exactly one object for {path.name}"
+            f"gh attestation result must contain exactly one current-run object{identity} "
+            f"for {path.name}"
         )
 
-    verified_result = value[0]
+    verified_result = candidates[0]
     subjects = parse_verified_result(verified_result)
     matches = tuple(
         subject
@@ -438,7 +495,16 @@ def verify_attestation(
     attestation_token: str,
     *,
     runner: Callable[..., Any] | None = None,
+    run_id: int | None = None,
+    run_attempt: int | None = None,
 ) -> VerifiedAttestation:
     """Compatibility spelling for callers that use the older token name."""
 
-    return verify_file(path, policy, token=attestation_token, runner=runner)
+    return verify_file(
+        path,
+        policy,
+        token=attestation_token,
+        runner=runner,
+        run_id=run_id,
+        run_attempt=run_attempt,
+    )

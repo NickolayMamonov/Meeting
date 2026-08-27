@@ -113,7 +113,7 @@ class CollectAttestationEvidenceTest(unittest.TestCase):
             )()
             with patch(
                 "collect_attestation_evidence.run_gh",
-                side_effect=lambda *unused: copy.deepcopy(verified),
+                side_effect=lambda *unused, **kwargs: copy.deepcopy(verified),
             ), patch(
                 "collect_attestation_evidence.subprocess.run",
                 side_effect=self._openssl_success,
