@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import threading
 import urllib.error
@@ -740,6 +741,138 @@ def _loopback_state_identity_mismatch_rejected(
     return False
 
 
+def _release_state_identity_mismatch_rejected(
+    *,
+    tag: str,
+    source_sha: str,
+) -> bool:
+    state = {
+        "id": 42,
+        "name": "Meet v1.0.0",
+        "tag_name": tag,
+        "target_commitish": "c" * 40,
+        "draft": True,
+        "published_at": None,
+        "body": "Release Please QA fixture",
+        "prerelease": False,
+        "assets": [],
+    }
+    try:
+        verify_release_state(
+            state,
+            release_id=42,
+            tag=tag,
+            allowed_names={"Meet.apk"},
+            source_sha=source_sha,
+        )
+    except MutationError:
+        return True
+    return False
+
+
+def _make_checkout_fixture(root: Path, name: str, content: str) -> tuple[Path, str]:
+    checkout = root / name
+    subprocess.run(
+        ["git", "init", "--quiet", str(checkout)],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "config", "user.email", "qa-fixture@example.invalid"],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "config", "user.name", "QA fixture"],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    (checkout / "authority.txt").write_text(content, encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", "authority.txt"],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "commit", "--quiet", "-m", "authority fixture"],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    head = subprocess.check_output(
+        ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip()
+    return checkout, head
+
+
+def _checkout_identity_fixture(
+    *,
+    authority: str,
+    checkout: Path,
+    declared: str,
+    expected_head: str,
+) -> dict[str, Any]:
+    exists = (
+        _SHA_RE.fullmatch(declared) is not None
+        and subprocess.run(
+            ["git", "-C", str(checkout), "cat-file", "-e", f"{declared}^{{commit}}"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
+    observed_head = subprocess.check_output(
+        ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip()
+    rejected = not exists or declared != observed_head or observed_head != expected_head
+    return {
+        "authority": authority,
+        "declared": declared,
+        "expected": expected_head,
+        "observed": observed_head,
+        "checkout_commit_exists": exists,
+        "head_matches": declared == observed_head,
+        "rejected": rejected,
+    }
+
+
+def _generated_metadata_fixture(
+    *,
+    authority: str,
+    commit_key: str,
+    declared: str,
+    expected: str,
+    additional_commit_key: str | None = None,
+    additional_commit: str | None = None,
+) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="meet-metadata-fixture-") as root:
+        path = Path(root) / "application-source" / "app" / "build" / "release-metadata" / "release-build.json"
+        path.parent.mkdir(parents=True)
+        metadata: dict[str, Any] = {"channel": "release", commit_key: declared}
+        if additional_commit_key is not None and additional_commit is not None:
+            metadata[additional_commit_key] = additional_commit
+        path.write_text(json.dumps(metadata), encoding="utf-8")
+        observed = json.loads(path.read_text(encoding="utf-8"))
+        selected = observed.get("commit", observed.get("commitSha"))
+        rejected = selected != expected
+        return {
+            "authority": authority,
+            "path": "application-source/app/build/release-metadata/release-build.json",
+            "field": commit_key if additional_commit_key is None else "commit",
+            "declared": selected,
+            "expected": expected,
+            "rejected": rejected,
+        }
+
+
 def _final_asset_metadata_drift_rejected(
     *,
     evidence_directory: Path,
@@ -844,7 +977,7 @@ def _identity_rejection_matrix(
     evidence_directory: Path,
     manifest_path: Path,
     tag: str,
-) -> dict[str, bool]:
+) -> tuple[dict[str, bool], dict[str, dict[str, Any]]]:
     def rejects(source: str, application: str, tooling: str) -> bool:
         try:
             _validate_identity_inputs(
@@ -856,53 +989,140 @@ def _identity_rejection_matrix(
             return True
         return False
 
-    def rejects_checkout(declared: str, checkout_head: str) -> bool:
-        try:
-            if _SHA_RE.fullmatch(declared) is None or declared != checkout_head:
-                raise PublicationError("declared identity is not the checkout commit")
-        except PublicationError:
-            return True
-        return False
+    with tempfile.TemporaryDirectory(prefix="meet-checkout-fixtures-") as root:
+        tooling_checkout, tooling_head = _make_checkout_fixture(
+            Path(root), "release-tooling", "tooling authority",
+        )
+        application_checkout, application_head = _make_checkout_fixture(
+            Path(root), "application-source", "application authority",
+        )
+        checkout_fixtures = {
+            "checkout_head_identity": _checkout_identity_fixture(
+                authority="application-source/.git/HEAD/noncanonical-declaration",
+                checkout=application_checkout,
+                declared="not-a-checkout-head",
+                expected_head=application_head,
+            ),
+            "tooling_checkout_absent_commit": _checkout_identity_fixture(
+                authority="release-tooling/.git/objects",
+                checkout=tooling_checkout,
+                declared="c" * 40,
+                expected_head=tooling_head,
+            ),
+            "application_checkout_absent_commit": _checkout_identity_fixture(
+                authority="application-source/.git/objects",
+                checkout=application_checkout,
+                declared="d" * 40,
+                expected_head=application_head,
+            ),
+            "tooling_checkout_head_mismatch": _checkout_identity_fixture(
+                authority="release-tooling/.git/HEAD",
+                checkout=tooling_checkout,
+                declared=application_head,
+                expected_head=tooling_head,
+            ),
+            "application_checkout_head_mismatch": _checkout_identity_fixture(
+                authority="application-source/.git/HEAD/declaration-mismatch",
+                checkout=application_checkout,
+                declared=tooling_head,
+                expected_head=application_head,
+            ),
+        }
 
-    def rejects_metadata(actual: str, expected: str) -> bool:
-        try:
-            if actual != expected:
-                raise PublicationError("generated metadata identity changed")
-        except PublicationError:
-            return True
-        return False
-
-    return {
-        "equal_identity": rejects(source_sha, application_source_sha, application_source_sha),
-        "swapped_identity": rejects(attestation_source_sha, application_source_sha, source_sha),
-        "synthetic_identity": rejects("f" * 40, application_source_sha, attestation_source_sha),
-        "checkout_head_identity": rejects_checkout("not-a-checkout-head", application_source_sha),
-        "metadata_identity": rejects_metadata(attestation_source_sha, application_source_sha),
-        "release_state_identity": rejects_metadata(attestation_source_sha, application_source_sha),
-        "tooling_checkout_absent_commit": rejects_checkout("c" * 40, attestation_source_sha),
-        "application_checkout_absent_commit": rejects_checkout("d" * 40, application_source_sha),
-        "tooling_checkout_head_mismatch": rejects_checkout(application_source_sha, attestation_source_sha),
-        "application_checkout_head_mismatch": rejects_checkout(attestation_source_sha, application_source_sha),
-        "generated_metadata_mismatch": rejects_metadata(attestation_source_sha, application_source_sha),
-        "manifest_identity_mismatch": _evidence_identity_mismatch_rejected(
+    fixtures: dict[str, dict[str, Any]] = {
+        "equal_identity": {
+            "authority": "identity validation/equal roles",
+            "declared": [source_sha, application_source_sha, application_source_sha],
+            "expected": "three identities must preserve distinct tooling/application roles",
+            "rejected": rejects(source_sha, application_source_sha, application_source_sha),
+        },
+        "swapped_identity": {
+            "authority": "identity validation/swapped roles",
+            "declared": [attestation_source_sha, application_source_sha, source_sha],
+            "expected": "release source and tooling source must not be swapped",
+            "rejected": rejects(attestation_source_sha, application_source_sha, source_sha),
+        },
+        "synthetic_identity": {
+            "authority": "identity validation/synthetic source",
+            "declared": ["f" * 40, application_source_sha, attestation_source_sha],
+            "expected": "synthetic source identity is not an application authority",
+            "rejected": rejects("f" * 40, application_source_sha, attestation_source_sha),
+        },
+        "metadata_identity": _generated_metadata_fixture(
+            authority="application-source/app/build/release-metadata/release-build.json:commitSha",
+            commit_key="commitSha",
+            declared=attestation_source_sha,
+            expected=application_source_sha,
+        ),
+        "generated_metadata_mismatch": _generated_metadata_fixture(
+            authority="application-source/app/build/release-metadata/release-build.json:commit",
+            commit_key="commitSha",
+            declared=application_source_sha,
+            expected=application_source_sha,
+            additional_commit_key="commit",
+            additional_commit=attestation_source_sha,
+        ),
+        "release_state_identity": {
+            "authority": "release REST target_commitish/source",
+            "declared": "c" * 40,
+            "expected": source_sha,
+            "rejected": _release_state_identity_mismatch_rejected(
+                tag=tag,
+                source_sha=source_sha,
+            ),
+        },
+        "loopback_state_identity_mismatch": {
+            "authority": "loopback release REST initial draft target_commitish",
+            "declared": "c" * 40,
+            "expected": source_sha,
+            "rejected": _loopback_state_identity_mismatch_rejected(
+                evidence_directory=evidence_directory,
+                manifest_path=manifest_path,
+                tag=tag,
+                source_sha=source_sha,
+            ),
+        },
+        "manifest_identity_mismatch": {
+            "authority": "release-output/release-manifest.json:commit",
+            "rejected": _evidence_identity_mismatch_rejected(
             field="release-manifest.json",
             evidence_directory=evidence_directory,
             tag=tag,
             source_sha=source_sha,
-        ),
-        "candidate_identity_mismatch": _evidence_identity_mismatch_rejected(
+            ),
+        },
+        "candidate_identity_mismatch": {
+            "authority": "release-output/release-candidate.json:commit",
+            "rejected": _evidence_identity_mismatch_rejected(
             field="release-candidate.json",
             evidence_directory=evidence_directory,
             tag=tag,
             source_sha=source_sha,
-        ),
-        "loopback_state_identity_mismatch": _loopback_state_identity_mismatch_rejected(
-            evidence_directory=evidence_directory,
-            manifest_path=manifest_path,
-            tag=tag,
-            source_sha=source_sha,
-        ),
+            ),
+        },
     }
+    fixtures.update(checkout_fixtures)
+    if set(fixtures) != {
+        "equal_identity",
+        "swapped_identity",
+        "synthetic_identity",
+        "checkout_head_identity",
+        "metadata_identity",
+        "release_state_identity",
+        "tooling_checkout_absent_commit",
+        "application_checkout_absent_commit",
+        "tooling_checkout_head_mismatch",
+        "application_checkout_head_mismatch",
+        "generated_metadata_mismatch",
+        "manifest_identity_mismatch",
+        "candidate_identity_mismatch",
+        "loopback_state_identity_mismatch",
+    }:
+        raise PublicationError("identity fixture keys are not exact")
+    return (
+        {key: bool(value["rejected"]) for key, value in fixtures.items()},
+        fixtures,
+    )
 
 
 def _rejection_matrix(
@@ -912,7 +1132,7 @@ def _rejection_matrix(
     asset_size: int,
     evidence_directory: Path,
     manifest_path: Path,
-) -> dict[str, bool]:
+) -> tuple[dict[str, bool], dict[str, dict[str, Any]]]:
     """Run the fail-closed REST fixtures without touching any network."""
 
     base: dict[str, Any] = {
@@ -989,6 +1209,14 @@ def _rejection_matrix(
     # fixtures are exercised by the focused client tests; the harness report
     # retains the same complete matrix so exact-head QA cannot silently omit a
     # required rejection family.
+    identity_rejections, identity_fixtures = _identity_rejection_matrix(
+        source_sha=source_sha,
+        application_source_sha=source_sha,
+        attestation_source_sha="b" * 40,
+        evidence_directory=evidence_directory,
+        manifest_path=manifest_path,
+        tag=tag,
+    )
     results.update({
         "asset_legacy_name": expect_rejection(
             "asset_legacy_name",
@@ -1069,14 +1297,7 @@ def _rejection_matrix(
             source_sha=source_sha,
         ),
         "remote_tamper": _remote_tamper_rejected(),
-        **_identity_rejection_matrix(
-            source_sha=source_sha,
-            application_source_sha=source_sha,
-            attestation_source_sha="b" * 40,
-            evidence_directory=evidence_directory,
-            manifest_path=manifest_path,
-            tag=tag,
-        ),
+        **identity_rejections,
         "final_asset_metadata_drift": _final_asset_metadata_drift_rejected(
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
@@ -1094,7 +1315,7 @@ def _rejection_matrix(
     })
     if set(results) != EXPECTED_REJECTION_KEYS:
         raise PublicationError("rejection matrix keys are not exact")
-    return results
+    return results, identity_fixtures
 
 
 def run_harness(
@@ -1273,7 +1494,7 @@ def run_harness(
                 if entry["url"].startswith("https://release-assets.githubusercontent.com/")
             ),
         }
-        result["rejection_matrix"] = _rejection_matrix(
+        result["rejection_matrix"], result["identity_fixtures"] = _rejection_matrix(
             tag=tag,
             source_sha=source_sha,
             asset_size=(evidence_directory / "Meet.apk").stat().st_size,

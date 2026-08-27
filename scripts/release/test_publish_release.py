@@ -35,6 +35,14 @@ class PublishReleaseTest(unittest.TestCase):
             self.assertEqual(sum(item["method"] == "PATCH" for item in transcript), 1)
             self.assertEqual(transcript[-1]["method"], "GET")
             self.assertTrue(result["published"])
+            self.assertEqual(result["request_counts"], {"GET": 8, "POST": 1, "PATCH": 1, "DELETE": 0})
+            self.assertEqual(result["mutation_contract"], {
+                "exactly_one_post": True,
+                "exactly_one_patch": True,
+                "no_repair": True,
+                "no_retry": True,
+            })
+            self.assertEqual(result["external_hosts_contacted"], [])
             self.assertTrue(result["transport"]["loopback_http"])
             self.assertEqual(result["transport"]["mode"], "direct")
             self.assertTrue(all(result["rejection_matrix"].values()))
@@ -44,6 +52,13 @@ class PublishReleaseTest(unittest.TestCase):
             self.assertTrue(result["rejection_matrix"]["manifest_identity_mismatch"])
             self.assertTrue(result["rejection_matrix"]["candidate_identity_mismatch"])
             self.assertTrue(result["rejection_matrix"]["loopback_state_identity_mismatch"])
+            self.assertTrue(all(
+                fixture["rejected"] for fixture in result["identity_fixtures"].values()
+            ))
+            authorities = {
+                fixture["authority"] for fixture in result["identity_fixtures"].values()
+            }
+            self.assertEqual(len(authorities), len(result["identity_fixtures"]))
             self.assertTrue(result["android_checks"]["local"])
             self.assertTrue(result["android_checks"]["downloaded"])
             self.assertTrue(

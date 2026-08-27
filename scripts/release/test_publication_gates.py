@@ -388,6 +388,20 @@ class PublicationGateTest(unittest.TestCase):
         self.assertIn("transport_second_leg_non_200", workflow)
         self.assertIn("final_asset_metadata_drift", workflow)
         self.assertIn("| keys | sort", workflow)
+        for assertion in (
+            ".published == true",
+            ".request_counts.POST == 1",
+            ".request_counts.PATCH == 1",
+            ".request_counts.DELETE == 0",
+            ".mutation_contract.exactly_one_post",
+            ".mutation_contract.exactly_one_patch",
+            ".mutation_contract.no_repair",
+            ".mutation_contract.no_retry",
+            ".external_hosts_contacted == []",
+            ".identity_fixtures",
+            ".value.rejected == true",
+        ):
+            self.assertIn(assertion, workflow)
 
 
 if __name__ == "__main__":
