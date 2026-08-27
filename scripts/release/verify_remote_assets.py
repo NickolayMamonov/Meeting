@@ -9,12 +9,11 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from release_mutation_gate import MAX_RELEASE_ASSET_BYTES
+
 
 class AssetError(ValueError):
     pass
-
-
-MAX_RELEASE_ASSET_BYTES = 512 * 1024 * 1024
 
 
 def digest(path: Path) -> str:

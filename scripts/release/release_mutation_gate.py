@@ -25,6 +25,7 @@ FIXED_RELEASE_FILENAMES = frozenset(
 )
 RELEASE_ARTIFACT_TYPES = frozenset({"apk", "aab", "mapping", "native-symbols"})
 PUBLIC_RELEASE_ASSET_NAMES = frozenset({"Meet.apk"})
+MAX_RELEASE_ASSET_BYTES = 512 * 1024 * 1024
 
 
 def _require(condition: bool, message: str) -> None:
@@ -79,8 +80,16 @@ def expected_release_asset_names(
     _require(len(aab_artifacts) == 1, "release manifest must contain exactly one AAB")
     apk_path = directory / "Meet.apk"
     _require(apk_path.is_file() and apk_path.stat().st_size > 0, "Meet.apk is missing")
-    _require(int(apk_artifacts[0].get("size", -1)) == apk_path.stat().st_size,
-             "Meet.apk size does not match manifest")
+    local_size = apk_path.stat().st_size
+    _require(local_size <= MAX_RELEASE_ASSET_BYTES, "Meet.apk exceeds the configured size cap")
+    manifest_size = apk_artifacts[0].get("size")
+    _require(
+        isinstance(manifest_size, int)
+        and not isinstance(manifest_size, bool)
+        and 0 < manifest_size <= MAX_RELEASE_ASSET_BYTES,
+        "Meet.apk manifest size is invalid",
+    )
+    _require(manifest_size == local_size, "Meet.apk size does not match manifest")
     digest = hashlib.sha256()
     with apk_path.open("rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
@@ -116,6 +125,8 @@ def verify_release_state(
     source_sha: str | None = None,
     require_empty: bool = True,
 ) -> None:
+    _require(isinstance(release_id, int) and not isinstance(release_id, bool) and release_id > 0,
+             "release ID must be positive")
     _require(
         isinstance(payload.get("id"), int)
         and not isinstance(payload.get("id"), bool)
@@ -142,7 +153,8 @@ def verify_release_state(
     _require(payload.get("published_at") is None, "release is already published")
     _require(isinstance(payload.get("body"), str), "release body is malformed")
     _require(isinstance(payload.get("prerelease"), bool), "release prerelease state is malformed")
-    assets = payload.get("assets", [])
+    _require("assets" in payload, "release assets field is missing")
+    assets = payload["assets"]
     _require(isinstance(assets, list), "release assets are malformed")
     if require_empty:
         _require(not assets, "release draft must be initially empty")
@@ -160,6 +172,8 @@ def verify_uploaded_assets(
     tag: str,
     expected_names: set[str],
     source_sha: str | None = None,
+    expected_size: int | None = None,
+    expected_sha256: str | None = None,
 ) -> None:
     verify_release_state(
         payload,
@@ -169,7 +183,7 @@ def verify_uploaded_assets(
         source_sha=source_sha,
         require_empty=False,
     )
-    assets = payload.get("assets", [])
+    assets = payload["assets"]
     _require(len(assets) == 1, "uploaded release must contain exactly one asset")
     _require(isinstance(assets[0], Mapping), "uploaded release asset is malformed")
     _require(
@@ -180,6 +194,26 @@ def verify_uploaded_assets(
     )
     names = {str(asset.get("name", "")) for asset in assets}
     _require(names == expected_names, "uploaded release assets are not exact")
+    asset = assets[0]
+    if expected_size is not None:
+        _require(
+            isinstance(expected_size, int) and not isinstance(expected_size, bool)
+            and 0 < expected_size <= MAX_RELEASE_ASSET_BYTES,
+            "expected release asset size is invalid",
+        )
+        _require(asset.get("size") == expected_size, "uploaded release asset size is not exact")
+    if expected_sha256 is not None:
+        _require(
+            isinstance(expected_sha256, str)
+            and len(expected_sha256) == 64
+            and all(character in "0123456789abcdef" for character in expected_sha256),
+            "expected release asset digest is invalid",
+        )
+        reported = asset.get("digest")
+        _require(
+            reported in (None, "") or reported == f"sha256:{expected_sha256}",
+            "uploaded release asset digest is not exact",
+        )
 
 
 def verify_public_release_state(

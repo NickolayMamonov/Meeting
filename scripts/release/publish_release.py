@@ -63,18 +63,104 @@ class ReleaseSnapshot:
     prerelease: bool
 
 
+def _manifest_installer(manifest_path: Path, apk: Path) -> tuple[int, str]:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise PublicationError("release manifest cannot be read") from error
+    if not isinstance(manifest, Mapping):
+        raise PublicationError("release manifest is malformed")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise PublicationError("release manifest artifacts are malformed")
+    apk_entries = [
+        item for item in artifacts
+        if isinstance(item, Mapping) and item.get("type") == "apk"
+    ]
+    if len(apk_entries) != 1 or apk_entries[0].get("name") != "Meet.apk":
+        raise PublicationError("release manifest does not have exactly one Meet.apk")
+    entry = apk_entries[0]
+    size = entry.get("size")
+    digest = entry.get("sha256")
+    if (
+        isinstance(size, bool)
+        or not isinstance(size, int)
+        or size <= 0
+        or size > MAX_RELEASE_ASSET_BYTES
+        or not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+    ):
+        raise PublicationError("release manifest Meet.apk metadata is invalid")
+    try:
+        local_size = apk.stat().st_size
+    except OSError as error:
+        raise PublicationError("canonical Meet.apk cannot be read") from error
+    if local_size != size:
+        raise PublicationError("local Meet.apk size does not match manifest")
+    local_digest = hashlib.sha256()
+    with apk.open("rb") as source:
+        for block in iter(lambda: source.read(CHUNK_BYTES), b""):
+            local_digest.update(block)
+    if local_digest.hexdigest() != digest:
+        raise PublicationError("local Meet.apk digest does not match manifest")
+    return size, digest
+
+
+def _serialize_verification(value: Any) -> dict[str, Any] | None:
+    """Retain only validated, non-secret verification result metadata."""
+
+    if value is None:
+        return None
+    policy = getattr(value, "policy", None)
+    matched = getattr(value, "matched_subject", None)
+    subjects = getattr(value, "statement_subjects", ())
+    if policy is None or matched is None:
+        raise PublicationError("verification callback returned an unvalidated record")
+    return {
+        "verified": True,
+        "path": Path(getattr(value, "path", "")).name,
+        "file_sha256": getattr(value, "file_sha256", ""),
+        "policy": {
+            "repository": policy.repository,
+            "signer_workflow": policy.signer_workflow,
+            "source_ref": policy.source_ref,
+            "source_digest": policy.source_digest,
+            "predicate_type": policy.predicate_type,
+            "result_limit": policy.result_limit,
+        },
+        "matched_subject": {
+            "name": matched.name,
+            "sha256": matched.sha256,
+        },
+        "subjects": [
+            {"name": subject.name, "sha256": subject.sha256}
+            for subject in subjects
+        ],
+    }
+
+
 class GitHubReleaseClient:
     """Fixed-host GitHub REST client with no automatic redirect or retry."""
 
-    def __init__(self, repository: str, *, token: str | None = None) -> None:
+    def __init__(
+        self,
+        repository: str,
+        *,
+        token: str | None = None,
+        opener: Any | None = None,
+        data_opener: Any | None = None,
+    ) -> None:
         if "/" not in repository or repository.count("/") != 1:
             raise PublicationError("repository must be owner/repo")
         self.repository = repository
         self.token = token if token is not None else os.environ.get("RELEASE_API_TOKEN", "")
         if not self.token:
             raise PublicationError("RELEASE_API_TOKEN is required")
-        self._opener = urllib.request.build_opener(_NoRedirect, urllib.request.ProxyHandler({}))
-        self._data_opener = urllib.request.build_opener(_NoRedirect, urllib.request.ProxyHandler({}))
+        self._opener = opener or urllib.request.build_opener(_NoRedirect, urllib.request.ProxyHandler({}))
+        self._data_opener = data_opener or urllib.request.build_opener(
+            _NoRedirect, urllib.request.ProxyHandler({})
+        )
 
     def _open(
         self,
@@ -130,6 +216,7 @@ class GitHubReleaseClient:
             response = self._opener.open(request)
         except urllib.error.HTTPError as error:
             if error.code == 404:
+                error.close()
                 return
             raise PublicationError(f"tag authority lookup failed with HTTP {error.code}") from error
         except OSError as error:
@@ -138,15 +225,30 @@ class GitHubReleaseClient:
         raise PublicationError(f"release tag already exists: {tag}")
 
     def create_asset(self, release_id: int, path: Path) -> dict[str, Any]:
+        try:
+            size = path.stat().st_size
+        except OSError as error:
+            raise PublicationError("release asset cannot be stat'ed") from error
+        if size <= 0 or size > MAX_RELEASE_ASSET_BYTES:
+            raise PublicationError("release asset size is outside the configured bound")
         query_name = urllib.parse.quote(path.name, safe="")
         url = f"https://{UPLOAD_HOST}/repos/{self.repository}/releases/{release_id}/assets?name={query_name}"
         with path.open("rb") as source:
-            body = source.read()
+            body = bytearray()
+            while True:
+                block = source.read(CHUNK_BYTES)
+                if not block:
+                    break
+                body.extend(block)
+                if len(body) > MAX_RELEASE_ASSET_BYTES:
+                    raise PublicationError("release asset exceeds the configured bound")
+        if len(body) != size:
+            raise PublicationError("release asset changed while being read")
         with self._open(
             self._opener,
             url,
             method="POST",
-            body=body,
+            body=bytes(body),
             headers={"Content-Type": "application/octet-stream"},
         ) as response:
             try:
@@ -194,8 +296,9 @@ class GitHubReleaseClient:
             response = error
         except OSError as error:
             raise PublicationError("asset download transport failed") from error
+        status = getattr(response, "status", 200)
         location = response.headers.get("Location")
-        if getattr(response, "status", None) == 302 or location:
+        if status == 302:
             if not location:
                 raise PublicationError("asset redirect has no Location")
             parsed = urllib.parse.urlsplit(location)
@@ -218,9 +321,12 @@ class GitHubReleaseClient:
                 )
             except PublicationError:
                 raise
-        if getattr(response, "status", 200) != 200:
+        elif status != 200:
             response.close()
             raise PublicationError("asset data response is not HTTP 200")
+        elif location:
+            response.close()
+            raise PublicationError("direct asset response unexpectedly redirects")
         content_length = response.headers.get("Content-Length")
         if content_length is not None:
             try:
@@ -252,6 +358,45 @@ class GitHubReleaseClient:
         except Exception:
             partial.unlink(missing_ok=True)
             raise
+
+    def verify_tag_source(self, tag: str, source_sha: str) -> None:
+        """Resolve a final tag ref, including annotated tags, to the source commit."""
+
+        encoded_tag = urllib.parse.quote(tag, safe="")
+        url = self._api_url(f"git/ref/tags/{encoded_tag}")
+        with self._open(self._opener, url) as response:
+            try:
+                ref = json.loads(_bounded_read(response, MAX_JSON_BYTES))
+            except (json.JSONDecodeError, PublicationError) as error:
+                raise PublicationError("final tag ref response is malformed") from error
+        if not isinstance(ref, Mapping) or not isinstance(ref.get("object"), Mapping):
+            raise PublicationError("final tag ref response is malformed")
+        target = ref["object"]
+        target_type = target.get("type")
+        target_sha = target.get("sha")
+        if not isinstance(target_sha, str) or len(target_sha) != 40 or any(
+            character not in "0123456789abcdef" for character in target_sha
+        ):
+            raise PublicationError("final tag ref target is invalid")
+        if target_type == "commit":
+            resolved_sha = target_sha
+        elif target_type == "tag":
+            tag_url = self._api_url(f"git/tags/{target_sha}")
+            with self._open(self._opener, tag_url) as response:
+                try:
+                    annotated = json.loads(_bounded_read(response, MAX_JSON_BYTES))
+                except (json.JSONDecodeError, PublicationError) as error:
+                    raise PublicationError("annotated tag response is malformed") from error
+            nested = annotated.get("object") if isinstance(annotated, Mapping) else None
+            resolved_sha = nested.get("sha") if isinstance(nested, Mapping) else None
+            if not isinstance(resolved_sha, str) or len(resolved_sha) != 40 or any(
+                character not in "0123456789abcdef" for character in resolved_sha
+            ):
+                raise PublicationError("annotated tag target is invalid")
+        else:
+            raise PublicationError("final tag ref target type is invalid")
+        if resolved_sha != source_sha:
+            raise PublicationError("final tag ref does not resolve to source_sha")
 
 
 def _snapshot(payload: Mapping[str, Any]) -> ReleaseSnapshot:
@@ -290,8 +435,8 @@ def run(
     evidence_directory: Path,
     manifest_path: Path,
     rendered_body_path: Path | None = None,
-    verify_local: Callable[[Path], None] | None = None,
-    verify_downloaded: Callable[[Path], None] | None = None,
+    verify_local: Callable[[Path], Any] | None = None,
+    verify_downloaded: Callable[[Path], Any] | None = None,
     verify_attestation_local: Callable[[Path], Any] | None = None,
     verify_attestation_downloaded: Callable[[Path], Any] | None = None,
     assert_tag_absent: Callable[[str], None] | None = None,
@@ -306,6 +451,8 @@ def run(
         verify_chain(evidence_directory)
     except (MutationError, OSError, ValueError) as error:
         raise PublicationError(f"protected evidence admission failed: {error}") from error
+    apk = evidence_directory / "Meet.apk"
+    expected_size, expected_digest = _manifest_installer(manifest_path, apk)
     state = client.get_release(release_id)
     try:
         verify_release_state(state, release_id=release_id, tag=tag, allowed_names={"Meet.apk"})
@@ -318,15 +465,31 @@ def run(
     if rendered_body_path is None:
         rendered_body_path = Path(tempfile.mkstemp(prefix="meet-release-notes-", suffix=".md")[1])
     rendered_body_path.write_text(body, encoding="utf-8")
-    apk = evidence_directory / "Meet.apk"
+    tag_checker = assert_tag_absent
+    if tag_checker is None and hasattr(client, "assert_tag_absent"):
+        tag_checker = client.assert_tag_absent
+    if tag_checker is None:
+        raise PublicationError("tag authority checker is missing")
+    tag_checker(tag)
     if verify_local:
-        verify_local(apk)
+        local_android = verify_local(apk)
+    else:
+        local_android = None
     if verify_attestation_local:
-        verify_attestation_local(apk)
+        local_attestation = verify_attestation_local(apk)
+    else:
+        local_attestation = None
     uploaded = client.create_asset(release_id, apk)
     state = client.get_release(release_id)
     try:
-        verify_uploaded_assets(state, release_id=release_id, tag=tag, expected_names={"Meet.apk"})
+        verify_uploaded_assets(
+            state,
+            release_id=release_id,
+            tag=tag,
+            expected_names={"Meet.apk"},
+            expected_size=expected_size,
+            expected_sha256=expected_digest,
+        )
     except MutationError as error:
         raise PublicationError(f"uploaded release state is invalid: {error}") from error
     assets = state["assets"]
@@ -336,14 +499,6 @@ def run(
     asset_id = asset.get("id")
     if not isinstance(asset_id, int) or asset_id <= 0:
         raise PublicationError("uploaded asset ID is invalid")
-    expected_size = int(asset.get("size", -1))
-    manifest_artifacts = json.loads(manifest_path.read_text(encoding="utf-8")).get("artifacts", [])
-    apk_entries = [item for item in manifest_artifacts if item.get("type") == "apk"]
-    if len(apk_entries) != 1:
-        raise PublicationError("release manifest does not have exactly one APK")
-    expected_digest = str(apk_entries[0]["sha256"])
-    if len(expected_digest) != 64 or any(c not in "0123456789abcdef" for c in expected_digest):
-        raise PublicationError("release manifest APK digest is not canonical")
     temporary_download_directory: tempfile.TemporaryDirectory[str] | None = None
     if download_path is None:
         temporary_download_directory = tempfile.TemporaryDirectory(prefix="meet-release-download-")
@@ -351,23 +506,35 @@ def run(
     else:
         target = download_path
     client.download_asset(asset_id, target, expected_size=expected_size, expected_sha256=expected_digest)
-    verify_remote_assets(apk, _write_temp_json(state), target)
+    remote_state_path = _write_temp_json(state)
+    try:
+        verify_remote_assets(apk, remote_state_path, target)
+    finally:
+        remote_state_path.unlink(missing_ok=True)
     if verify_downloaded:
-        verify_downloaded(target)
+        downloaded_android = verify_downloaded(target)
+    else:
+        downloaded_android = None
     if verify_attestation_downloaded:
-        verify_attestation_downloaded(target)
+        downloaded_attestation = verify_attestation_downloaded(target)
+    else:
+        downloaded_attestation = None
     before_patch = client.get_release(release_id)
     try:
-        verify_uploaded_assets(before_patch, release_id=release_id, tag=tag, expected_names={"Meet.apk"})
+        verify_uploaded_assets(
+            before_patch,
+            release_id=release_id,
+            tag=tag,
+            expected_names={"Meet.apk"},
+            expected_size=expected_size,
+            expected_sha256=expected_digest,
+        )
     except MutationError as error:
         raise PublicationError(f"pre-publish release state is invalid: {error}") from error
     current = _snapshot(before_patch)
     if current != original or before_patch.get("assets") != state.get("assets"):
         raise PublicationError("release changed before final publication")
-    if assert_tag_absent:
-        assert_tag_absent(tag)
-    elif hasattr(client, "assert_tag_absent"):
-        client.assert_tag_absent(tag)
+    tag_checker(tag)
     patched = client.patch_release(
         release_id,
         {
@@ -404,6 +571,9 @@ def run(
         raise PublicationError(f"final public release state is not exact: {error}") from error
     if final["assets"][0]["id"] != asset_id:
         raise PublicationError("final public release asset identity changed")
+    if not hasattr(client, "verify_tag_source"):
+        raise PublicationError("final tag source verifier is missing")
+    client.verify_tag_source(tag, source_sha)
     result = {
         "release_id": release_id,
         "tag": tag,
@@ -411,6 +581,16 @@ def run(
         "asset_id": asset_id,
         "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
         "published": True,
+        "verification": {
+            "android_local": local_android,
+            "android_downloaded": downloaded_android,
+            "attestation_local": _serialize_verification(local_attestation),
+            "attestation_downloaded": _serialize_verification(downloaded_attestation),
+        },
+        "android_checks": {
+            "local": verify_local is not None,
+            "downloaded": verify_downloaded is not None,
+        },
     }
     if temporary_download_directory is not None:
         temporary_download_directory.cleanup()

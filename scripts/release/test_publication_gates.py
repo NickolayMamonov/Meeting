@@ -54,6 +54,22 @@ class PublicationGateTest(unittest.TestCase):
                 tag="v1.0.0",
                 allowed_names={"Meet.apk"},
             )
+        malformed = self.state()
+        del malformed["assets"]
+        with self.assertRaisesRegex(MutationError, "assets field is missing"):
+            verify_release_state(
+                malformed,
+                release_id=42,
+                tag="v1.0.0",
+                allowed_names={"Meet.apk"},
+            )
+        with self.assertRaisesRegex(MutationError, "positive"):
+            verify_release_state(
+                self.state(),
+                release_id=0,
+                tag="v1.0.0",
+                allowed_names={"Meet.apk"},
+            )
 
     def test_uploaded_assets_are_exact_and_authoritative(self):
         assets = [{"id": 1, "name": "Meet.apk"}]
@@ -353,6 +369,22 @@ class PublicationGateTest(unittest.TestCase):
             "GOOGLE_SERVICES_JSON",
         ):
             self.assertNotIn(forbidden, workflow)
+
+    def test_protected_fixture_keeps_signing_passwords_out_of_environment(self):
+        workflow = (
+            Path(__file__).parents[2]
+            / ".github"
+            / "workflows"
+            / "release-credential-audit.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("-storetype JKS", workflow)
+        self.assertIn("QA_STORE_PASSWORD_FILE", workflow)
+        self.assertIn("QA_KEY_PASSWORD_FILE", workflow)
+        self.assertNotIn("printf 'QA_STORE_PASSWORD=%s", workflow)
+        self.assertNotIn("printf 'QA_KEY_PASSWORD=%s", workflow)
+        self.assertGreaterEqual(workflow.count("publication_harness.py"), 2)
+        self.assertIn("--redirect", workflow)
+        self.assertIn(".rejection_matrix", workflow)
 
 
 if __name__ == "__main__":
