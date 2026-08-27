@@ -316,22 +316,45 @@ def _run_bounded_command(
         raise AttestationError("gh attestation verification could not start") from error
 
     assert process.stdout is not None
+    reaped = False
+
+    def kill_and_reap() -> None:
+        nonlocal reaped
+        if reaped:
+            return
+        try:
+            process.kill()
+        finally:
+            process.wait()
+            reaped = True
+
+    stdout = bytearray()
     try:
-        stdout = process.stdout.read(stdout_limit + 1)
-    except OSError as error:
-        process.kill()
-        process.wait()
-        raise AttestationError("gh attestation verification output could not be read") from error
+        while True:
+            remaining = stdout_limit + 1 - len(stdout)
+            if remaining <= 0:
+                kill_and_reap()
+                raise AttestationError(f"gh attestation JSON exceeded {stdout_limit} bytes")
+            chunk = process.stdout.read(min(64 * 1024, remaining))
+            if not chunk:
+                break
+            stdout.extend(chunk)
+            if len(stdout) > stdout_limit:
+                kill_and_reap()
+                raise AttestationError(f"gh attestation JSON exceeded {stdout_limit} bytes")
+        if process.wait() != 0:
+            reaped = True
+            raise AttestationError("gh attestation verification failed")
+        reaped = True
+    except AttestationError:
+        raise
+    except BaseException:
+        kill_and_reap()
+        raise
     finally:
         process.stdout.close()
 
-    if len(stdout) > stdout_limit:
-        process.kill()
-        process.wait()
-        raise AttestationError(f"gh attestation JSON exceeded {stdout_limit} bytes")
-    if process.wait() != 0:
-        raise AttestationError("gh attestation verification failed")
-    return stdout
+    return bytes(stdout)
 
 
 def verify_file(
@@ -363,12 +386,12 @@ def verify_file(
                 stdout_limit=MAX_ATTESTATION_JSON_BYTES,
             )
             stdout = getattr(output, "stdout", output)
-    except (OSError, subprocess.CalledProcessError, TypeError) as error:
+    except (OSError, subprocess.CalledProcessError, TypeError):
         raise AttestationError(
             f"gh attestation verification failed for {path.name} "
             f"(repository={policy.repository}, source_ref={policy.source_ref}, "
             f"source_digest={policy.source_digest}, subject_digest={expected_digest})"
-        ) from error
+        ) from None
 
     if _stdout_size(stdout) > MAX_ATTESTATION_JSON_BYTES:
         raise AttestationError(
