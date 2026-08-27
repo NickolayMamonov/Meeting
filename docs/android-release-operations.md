@@ -48,6 +48,22 @@ Debug and snapshot variants keep their local configuration. `:core:network`
 continues to expose the existing `BuildConfig.BASE_URL` boundary; no API,
 repository, domain, presentation, or UX contract changes are allowed.
 
+## Public installer and protected evidence
+
+The public GitHub Release projection contains exactly one project-uploaded asset:
+`Meet.apk`. GitHub's generated source ZIP and tarball links are platform links,
+not project-uploaded release assets.
+
+The protected Actions artifact `android-release-evidence-${tag}` remains the
+complete auditor chain. It contains the canonical `Meet.apk`, the signed AAB,
+optional mapping/native-symbol outputs, authority, manifest, checksums,
+candidate, attestation index, and every individual attestation. The AAB and
+evidence files never cross the public upload boundary.
+
+Release notes preserve Release Please's text and add one deterministic
+`meet-android-verification` section with the version/code, `Meet.apk` SHA-256,
+and expected RSA-4096 certificate fingerprint.
+
 ## Ordered publication
 
 1. Release Please creates the intended draft and stable build verifies the
@@ -66,17 +82,56 @@ repository, domain, presentation, or UX contract changes are allowed.
    valid JSON and `/actuator` to return HTTPS 404. It uses the standard
    operating-system/Python TLS verifier, rejects redirects and transport/TLS
    errors, and never logs response bodies.
-6. The protected mutation job revalidates the immutable draft and requires an
-   initially empty asset set. It builds the exact allowlist from the signed
-   evidence, uploads each allowlisted asset once, downloads every remote asset,
-   and verifies identity, size, and SHA-256.
-7. Setting `draft=false` is the final GitHub mutation. A failed upload remains
-   an unpublished draft and the workflow stops.
+6. The protected mutation job checks out the reviewed tooling revision, reads
+   the protected evidence, revalidates the immutable empty draft, verifies the
+   local `Meet.apk`, and performs one upload POST for that literal name.
+   It then validates the returned positive asset ID, downloads by that ID
+   through the bounded direct-200/one-302 transport, and independently verifies
+   bytes, Android identity, signer, and attestation.
+7. The final mutation is one non-retried PATCH carrying the captured release
+   name, tag, source, prerelease state, rendered body, and `draft=false`.
+   Read-only checks prove the exact public state afterward; no mutation follows.
+   A failed upload may leave an unpublished draft containing `Meet.apk`, and a
+   rerun fails empty-draft admission rather than deleting or replacing it.
 
-The release allowlist includes the authority document, release manifest,
-checksums, candidate, neutral attestation index, signed APK/AAB, optional
-outputs when produced, and each individual attestation. The local chain is
-acyclic and every attestation subject is covered exactly once.
+The release concurrency lane uses `cancel-in-progress: false`. Operators must
+not manually mutate the draft, its assets, body, or tag from protected mutation
+admission through final verification. GitHub exposes no supported transaction
+that atomically binds those values to the final PATCH. A mutation during the
+final request is therefore an explicitly excluded operator condition: if
+divergence is observed afterward, the result is indeterminate/manual
+investigation, with no retry, repair, delete, or rollback request.
+
+## Credential and QA boundaries
+
+`RELEASE_PLEASE_TOKEN` is exposed to the publication driver only as
+`RELEASE_API_TOKEN` for authenticated GitHub REST control-plane requests.
+`${{ github.token }}` is exposed only as `ATTESTATION_TOKEN`; the attestation
+child receives it as `GH_TOKEN`. The child receives no release API token,
+attestation-token variable, ambient GitHub token, cookies, or signing inputs.
+The redirected asset data request uses a fresh credential-free client.
+
+The exact-head non-production audit is run with:
+
+```text
+gh workflow run release-credential-audit.yml --ref <PR-branch> -f publication_harness=true -f expected_sha=<40-hex-PR-head>
+```
+
+The QA workflow checks out the requested tooling head separately from the
+fixed reviewed application source commit
+`1670aa6b9a415c7638c9b5b348d9ecd991b736c8`, requires both checkout HEADs and
+their commit objects, and requires SHA inequality. Gradle runs only in the
+application checkout with `-PreleaseCommitSha` set to that fixed commit; the
+attestation policy remains bound to the requested tooling head. Temporary
+keystores, passwords, Firebase configuration, and QA evidence/report artifacts
+are removed or expire after seven days. QA has no release secret, production
+release write permission, tag mutation, or PR mutation access.
+
+The protected chain's local inventory includes the authority document, release
+manifest, checksums, candidate, neutral attestation index, signed APK/AAB,
+optional outputs when produced, and each individual attestation. The local
+chain is acyclic and every attestation subject is covered exactly once. That
+inventory is not the public release asset set.
 
 ## Bundletool
 

@@ -238,22 +238,22 @@ class PackageArtifactsTest(unittest.TestCase):
             remote = root_path / "remote"
             local.mkdir()
             remote.mkdir()
-            (local / "a.apk").write_bytes(b"apk")
-            (local / "metadata.json").write_bytes(b"metadata")
-            for path in local.iterdir():
-                (remote / path.name).write_bytes(path.read_bytes())
+            (local / "Meet.apk").write_bytes(b"apk")
+            (remote / "Meet.apk").write_bytes(b"apk")
             assets = {
-                "assets": [
-                    {"name": path.name, "size": path.stat().st_size}
-                    for path in sorted(local.iterdir())
-                ]
+                "assets": [{
+                    "id": 1,
+                    "name": "Meet.apk",
+                    "size": 3,
+                    "digest": "sha256:dd37c2d7274f7ea982cb83390c36918fee9ce8889073c44b68cdc00bdb8c3e04",
+                }]
             }
             manifest = root_path / "assets.json"
             manifest.write_text(json.dumps(assets), encoding="utf-8")
-            verify_remote_assets(local, manifest, remote)
-            (remote / "a.apk").write_bytes(b"tampered")
+            verify_remote_assets(local / "Meet.apk", manifest, remote / "Meet.apk")
+            (remote / "Meet.apk").write_bytes(b"tampered")
             with self.assertRaises(ValueError):
-                verify_remote_assets(local, manifest, remote)
+                verify_remote_assets(local / "Meet.apk", manifest, remote / "Meet.apk")
 
     def test_chain_is_acyclic_and_checksums_are_byte_sorted(self):
         with tempfile.TemporaryDirectory() as root:

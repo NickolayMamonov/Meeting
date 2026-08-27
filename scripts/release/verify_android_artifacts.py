@@ -102,7 +102,14 @@ def verify_apk(
     digests = re.findall(r"SHA-256 digest:\s*([0-9a-f: ]+)", output, flags=re.IGNORECASE)
     if not digests:
         raise ArtifactError("APK signer output did not contain a SHA-256 certificate digest")
-    expected = normalized_digest(metadata_value(metadata, "expectedCertificateSha256", "signingFingerprint"))
+    expected = normalized_digest(
+        metadata_value(
+            metadata,
+            "expectedCertificateSha256",
+            "signingFingerprint",
+            "signing_fingerprint",
+        )
+    )
     if normalized_digest(digests[0]) != expected:
         raise ArtifactError("APK certificate does not match canonical metadata")
 
@@ -152,7 +159,14 @@ def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
     )
     if not signer_digests:
         raise ArtifactError("AAB signer output did not contain a SHA-256 certificate digest")
-    expected = normalized_digest(metadata_value(metadata, "expectedCertificateSha256", "signingFingerprint"))
+    expected = normalized_digest(
+        metadata_value(
+            metadata,
+            "expectedCertificateSha256",
+            "signingFingerprint",
+            "signing_fingerprint",
+        )
+    )
     if normalized_digest(signer_digests[0]) != expected:
         raise ArtifactError("AAB certificate does not match canonical metadata")
     output = run(["java", "-jar", str(bundletool_jar), "dump", "manifest", f"--bundle={aab}"])

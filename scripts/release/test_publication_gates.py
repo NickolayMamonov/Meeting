@@ -18,10 +18,13 @@ class PublicationGateTest(unittest.TestCase):
     def state(*, draft=True, assets=None):
         return {
             "id": 42,
-            "tagName": "v1.0.0",
-            "isDraft": draft,
-            "publishedAt": None if draft else "2026-08-09T00:00:00Z",
-            "author": {"login": "release-please"},
+            "name": "Meet v1.0.0",
+            "tag_name": "v1.0.0",
+            "target_commitish": "a" * 40,
+            "draft": draft,
+            "published_at": None if draft else "2026-08-09T00:00:00Z",
+            "body": "Release Please body",
+            "prerelease": False,
             "assets": assets if assets is not None else [],
         }
 
@@ -30,41 +33,42 @@ class PublicationGateTest(unittest.TestCase):
             self.state(),
             release_id=42,
             tag="v1.0.0",
-            allowed_names={"release.apk"},
+            allowed_names={"Meet.apk"},
         )
         with self.assertRaises(MutationError):
             verify_release_state(
                 self.state(
                     assets=[{
-                        "name": "release.apk",
+                        "id": 1,
+                        "name": "Meet.apk",
                     }]
                 ),
                 release_id=42,
                 tag="v1.0.0",
-                allowed_names={"release.apk"},
+                allowed_names={"Meet.apk"},
             )
         with self.assertRaises(MutationError):
             verify_release_state(
                 self.state(draft=False),
                 release_id=42,
                 tag="v1.0.0",
-                allowed_names={"release.apk"},
+                allowed_names={"Meet.apk"},
             )
 
     def test_uploaded_assets_are_exact_and_authoritative(self):
-        assets = [{"name": "release.apk"}]
+        assets = [{"id": 1, "name": "Meet.apk"}]
         verify_uploaded_assets(
             self.state(assets=assets),
             release_id=42,
             tag="v1.0.0",
-            expected_names={"release.apk"},
+            expected_names={"Meet.apk"},
         )
         with self.assertRaises(MutationError):
             verify_uploaded_assets(
                 self.state(assets=assets),
                 release_id=42,
                 tag="v1.0.0",
-                expected_names={"release.apk", "release-manifest.json"},
+                expected_names={"Meet.apk", "release-manifest.json"},
             )
 
     def test_public_probe_requires_meetings_json_200_and_actuator_404(self):
@@ -95,12 +99,13 @@ class PublicationGateTest(unittest.TestCase):
                 "SHA256SUMS",
                 "release-candidate.json",
                 "attestation-index.json",
-                "app.apk",
+                "Meet.apk",
                 "app.aab",
-                "app.apk.attestation.json",
+                "Meet.apk.attestation.json",
             }
             for name in names:
                 (directory / name).write_text("{}", encoding="utf-8")
+            (directory / "Meet.apk").write_bytes(b"apk")
             (directory / "release-manifest.json").write_text(
                 json.dumps({
                     "schema": 1,
@@ -108,8 +113,10 @@ class PublicationGateTest(unittest.TestCase):
                     "tag": "v1.0.0",
                     "commit": "a" * 40,
                     "artifacts": [
-                        {"name": "app.apk", "type": "apk"},
-                        {"name": "app.aab", "type": "aab"},
+                        {"name": "Meet.apk", "type": "apk", "size": 3,
+                         "sha256": "dd37c2d7274f7ea982cb83390c36918fee9ce8889073c44b68cdc00bdb8c3e04"},
+                        {"name": "app.aab", "type": "aab", "size": 2,
+                         "sha256": "441a7149f2ecf1fca813f9e0c6c1d7f6e4f0f7f2d6e1a0e2b8c7e3d1f5a4b2c1"},
                     ],
                 }),
                 encoding="utf-8",
@@ -119,14 +126,14 @@ class PublicationGateTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (directory / "attestation-index.json").write_text(
-                json.dumps({"attestations": [{"name": "app.apk.attestation.json"}]}),
+                json.dumps({"attestations": [{"name": "Meet.apk.attestation.json"}]}),
                 encoding="utf-8",
             )
             self.assertEqual(
                 expected_release_asset_names(
                     directory, tag="v1.0.0", source_sha="a" * 40
                 ),
-                names,
+                {"Meet.apk"},
             )
             (directory / "operator-note.txt").write_text("unexpected", encoding="utf-8")
             with self.assertRaisesRegex(MutationError, "unreferenced"):
@@ -144,10 +151,7 @@ class PublicationGateTest(unittest.TestCase):
             workflow.index("stable-public-probe"),
             workflow.index("stable-mutate"),
         )
-        self.assertLess(
-            workflow.index("POST"),
-            workflow.index("PATCH"),
-        )
+        self.assertIn("python release-tooling/scripts/release/publish_release.py", workflow)
 
     def test_release_please_resolves_one_canonical_authority_and_safe_noop(self):
         workflow = (
@@ -276,15 +280,10 @@ class PublicationGateTest(unittest.TestCase):
             Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
         ).read_text(encoding="utf-8")
         mutation = workflow[workflow.index("  stable-mutate:") :]
-        self.assertIn(".target_commitish == $sha", mutation)
-        self.assertIn("release tag already exists before upload", mutation)
-        self.assertIn("--request POST", mutation)
-        self.assertIn("gh api --method PATCH", mutation)
-        self.assertLess(mutation.index("--request POST"), mutation.index("--method PATCH"))
-        self.assertIn("Verify public release and lightweight tag", mutation)
-        self.assertIn(".draft == false and (.published_at != null)", mutation)
-        self.assertIn("git ls-remote --exit-code --refs", mutation)
-        self.assertIn('test "$ref" = "$RELEASE_SHA refs/tags/$RELEASE_TAG"', mutation)
+        self.assertIn("python release-tooling/scripts/release/publish_release.py", mutation)
+        self.assertIn("ATTESTATION_TOKEN: ${{ github.token }}", mutation)
+        self.assertIn("--evidence-directory release-output", mutation)
+        self.assertIn("--rendered-body", mutation)
 
     def test_release_credential_inventory_and_secret_boundaries_are_exact(self):
         workflow = (
@@ -325,7 +324,7 @@ class PublicationGateTest(unittest.TestCase):
         self.assertIn("  pull_request:\n    branches: [dev]", workflow)
         self.assertIn("  push:\n    branches: [dev]", workflow)
         self.assertIn("  workflow_dispatch:", workflow)
-        self.assertEqual(workflow.count("permissions:"), 1)
+        self.assertEqual(workflow.count("permissions:"), 3)
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertIn(
             "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
