@@ -217,7 +217,7 @@ def verify_uploaded_assets(
         )
         reported = asset.get("digest")
         _require(
-            reported in (None, "") or reported == f"sha256:{expected_sha256}",
+            reported == f"sha256:{expected_sha256}",
             "uploaded release asset digest is not exact",
         )
 

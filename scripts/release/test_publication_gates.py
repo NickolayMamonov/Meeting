@@ -385,6 +385,9 @@ class PublicationGateTest(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("publication_harness.py"), 2)
         self.assertIn("--redirect", workflow)
         self.assertIn(".rejection_matrix", workflow)
+        self.assertIn("transport_second_leg_non_200", workflow)
+        self.assertIn("final_asset_metadata_drift", workflow)
+        self.assertIn("| keys | sort", workflow)
 
 
 if __name__ == "__main__":

@@ -140,8 +140,8 @@ def _serialize_verification(value: Any) -> dict[str, Any] | None:
     }
 
 
-def _asset_identity(asset: Mapping[str, Any]) -> tuple[int, str, int, str | None]:
-    """Return only immutable asset fields; REST telemetry is intentionally ignored."""
+def _asset_identity(asset: Mapping[str, Any]) -> tuple[int, str, int, str]:
+    """Return the complete immutable asset identity, excluding REST telemetry."""
 
     if not isinstance(asset, Mapping):
         raise PublicationError("release asset is malformed")
@@ -161,9 +161,7 @@ def _asset_identity(asset: Mapping[str, Any]) -> tuple[int, str, int, str | None
         or size > MAX_RELEASE_ASSET_BYTES
     ):
         raise PublicationError("release asset immutable identity is malformed")
-    if digest in (None, ""):
-        canonical_digest = None
-    elif (
+    if (
         isinstance(digest, str)
         and len(digest) == 71
         and digest.startswith("sha256:")
@@ -171,7 +169,7 @@ def _asset_identity(asset: Mapping[str, Any]) -> tuple[int, str, int, str | None
     ):
         canonical_digest = digest
     else:
-        raise PublicationError("release asset digest is malformed")
+        raise PublicationError("release asset immutable digest is missing or malformed")
     return asset_id, name, size, canonical_digest
 
 
@@ -359,6 +357,14 @@ class GitHubReleaseClient:
                 )
             except PublicationError:
                 raise
+            data_status = getattr(response, "status", 200)
+            data_location = response.headers.get("Location")
+            if data_status != 200:
+                response.close()
+                raise PublicationError("asset data response is not HTTP 200")
+            if data_location:
+                response.close()
+                raise PublicationError("asset data response unexpectedly redirects")
         elif status != 200:
             response.close()
             raise PublicationError("asset data response is not HTTP 200")
@@ -537,6 +543,15 @@ def run(
     asset_id = asset.get("id")
     if not isinstance(asset_id, int) or asset_id <= 0:
         raise PublicationError("uploaded asset ID is invalid")
+    uploaded_asset_identity = _asset_identity(asset)
+    expected_asset_identity = (
+        asset_id,
+        "Meet.apk",
+        expected_size,
+        f"sha256:{expected_digest}",
+    )
+    if uploaded_asset_identity != expected_asset_identity:
+        raise PublicationError("uploaded release asset identity is not exact")
     temporary_download_directory: tempfile.TemporaryDirectory[str] | None = None
     if download_path is None:
         temporary_download_directory = tempfile.TemporaryDirectory(prefix="meet-release-download-")
@@ -571,7 +586,6 @@ def run(
         raise PublicationError(f"pre-publish release state is invalid: {error}") from error
     current = _snapshot(before_patch)
     before_asset_identity = _asset_identity(before_patch["assets"][0])
-    uploaded_asset_identity = _asset_identity(state["assets"][0])
     if current != original or before_asset_identity != uploaded_asset_identity:
         raise PublicationError("release changed before final publication")
     tag_checker(tag)
@@ -609,7 +623,8 @@ def run(
         )
     except MutationError as error:
         raise PublicationError(f"final public release state is not exact: {error}") from error
-    if final["assets"][0]["id"] != asset_id:
+    final_asset_identity = _asset_identity(final["assets"][0])
+    if final_asset_identity != expected_asset_identity:
         raise PublicationError("final public release asset identity changed")
     if not hasattr(client, "verify_tag_source"):
         raise PublicationError("final tag source verifier is missing")

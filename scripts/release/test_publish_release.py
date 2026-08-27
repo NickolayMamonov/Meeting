@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from publication_harness import run_harness
+from publication_harness import EXPECTED_REJECTION_KEYS, run_harness
 from publish_release import GitHubReleaseClient, MAX_RELEASE_ASSET_BYTES, PublicationError
 from test_package_artifacts import PackageArtifactsTest
 
@@ -38,6 +38,12 @@ class PublishReleaseTest(unittest.TestCase):
             self.assertTrue(result["transport"]["loopback_http"])
             self.assertEqual(result["transport"]["mode"], "direct")
             self.assertTrue(all(result["rejection_matrix"].values()))
+            self.assertEqual(set(result["rejection_matrix"]), EXPECTED_REJECTION_KEYS)
+            self.assertTrue(result["rejection_matrix"]["transport_second_leg_non_200"])
+            self.assertTrue(result["rejection_matrix"]["final_asset_metadata_drift"])
+            self.assertTrue(result["rejection_matrix"]["manifest_identity_mismatch"])
+            self.assertTrue(result["rejection_matrix"]["candidate_identity_mismatch"])
+            self.assertTrue(result["rejection_matrix"]["loopback_state_identity_mismatch"])
             self.assertTrue(result["android_checks"]["local"])
             self.assertTrue(result["android_checks"]["downloaded"])
             self.assertTrue(
@@ -110,3 +116,24 @@ class PublishReleaseTest(unittest.TestCase):
             )
             with self.assertRaisesRegex(PublicationError, "outside the configured bound"):
                 client.create_asset(42, path)
+
+    def test_redirect_data_leg_requires_exact_http_200(self):
+        from publication_harness import _DownloadFixtureOpener
+
+        with tempfile.TemporaryDirectory() as root:
+            client = GitHubReleaseClient(
+                "owner/repo",
+                token="fixture",
+                opener=_DownloadFixtureOpener(
+                    status=302,
+                    location="https://release-assets.githubusercontent.com/asset",
+                ),
+                data_opener=_DownloadFixtureOpener(status=201),
+            )
+            with self.assertRaisesRegex(PublicationError, "not HTTP 200"):
+                client.download_asset(
+                    1,
+                    Path(root) / "Meet.apk",
+                    expected_size=3,
+                    expected_sha256="d2f8b6f3e3f7f2f7b7b9f7a1d0f4f4e9f1e8c5b7b1f3f2d9d8f7e6c5b4a39281",
+                )

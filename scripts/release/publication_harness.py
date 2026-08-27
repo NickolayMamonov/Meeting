@@ -11,6 +11,7 @@ import http.server
 import json
 import os
 import re
+import shutil
 import tempfile
 import threading
 import urllib.error
@@ -31,6 +32,73 @@ from verify_remote_assets import AssetError, MAX_RELEASE_ASSET_BYTES, verify as 
 
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+EXPECTED_REJECTION_KEYS = frozenset({
+    "missing_assets",
+    "non_list_assets",
+    "invalid_release_id",
+    "duplicate_asset_names",
+    "unknown_asset_name",
+    "rest_size_mismatch",
+    "asset_legacy_name",
+    "asset_original_name",
+    "asset_aab_upload",
+    "asset_evidence_upload",
+    "asset_missing",
+    "asset_extra",
+    "asset_source_link_misclassified",
+    "rest_negative_size",
+    "rest_zero_size",
+    "rest_float_size",
+    "rest_string_size",
+    "rest_boolean_size",
+    "rest_oversized_size",
+    "rest_boolean_asset_id",
+    "rest_zero_asset_id",
+    "rest_negative_asset_id",
+    "rest_string_asset_id",
+    "source_drift_before_patch",
+    "tag_drift_before_patch",
+    "body_drift_before_patch",
+    "remote_tamper",
+    "equal_identity",
+    "swapped_identity",
+    "synthetic_identity",
+    "checkout_head_identity",
+    "metadata_identity",
+    "release_state_identity",
+    "tooling_checkout_absent_commit",
+    "application_checkout_absent_commit",
+    "tooling_checkout_head_mismatch",
+    "application_checkout_head_mismatch",
+    "generated_metadata_mismatch",
+    "manifest_identity_mismatch",
+    "candidate_identity_mismatch",
+    "loopback_state_identity_mismatch",
+    "final_asset_metadata_drift",
+    "no_pre_admission_post",
+    "asset_cap_constant",
+    "transport_missing_location",
+    "transport_malformed_location",
+    "transport_relative_location",
+    "transport_non_https_location",
+    "transport_wrong_host_location",
+    "transport_userinfo_location",
+    "transport_fragment_location",
+    "transport_301",
+    "transport_303",
+    "transport_307",
+    "transport_308",
+    "transport_second_redirect",
+    "transport_second_leg_non_200",
+    "transport_negative_size",
+    "transport_zero_size",
+    "transport_oversized_size",
+    "transport_overrun",
+    "transport_truncation",
+    "transport_wrong_content_length",
+    "transport_digest_mismatch",
+})
 
 
 def _validate_identity_inputs(
@@ -433,6 +501,11 @@ def _transport_rejection_matrix() -> dict[str, bool]:
             data_status=302,
             data_location="https://release-assets.githubusercontent.com/asset-2",
         ),
+        "transport_second_leg_non_200": rejects(
+            status=302,
+            location="https://release-assets.githubusercontent.com/asset",
+            data_status=201,
+        ),
         "transport_negative_size": rejects(expected_size=-1),
         "transport_zero_size": rejects(expected_size=0),
         "transport_oversized_size": rejects(
@@ -598,11 +671,179 @@ def _prepatch_divergence_rejected(
     return False
 
 
+def _evidence_identity_mismatch_rejected(
+    *,
+    field: str,
+    evidence_directory: Path,
+    tag: str,
+    source_sha: str,
+) -> bool:
+    with tempfile.TemporaryDirectory(prefix="meet-identity-fixture-") as root:
+        fixture = Path(root) / "release-output"
+        shutil.copytree(evidence_directory, fixture)
+        path = fixture / field
+        value = json.loads(path.read_text(encoding="utf-8"))
+        if field == "release-manifest.json":
+            value["commit"] = "c" * 40
+        elif field == "release-candidate.json":
+            value["commit"] = "c" * 40
+        else:
+            raise ValueError(f"unknown identity fixture: {field}")
+        path.write_text(json.dumps(value), encoding="utf-8")
+        try:
+            from release_mutation_gate import expected_release_asset_names
+            expected_release_asset_names(fixture, tag=tag, source_sha=source_sha)
+        except (MutationError, OSError, ValueError):
+            return True
+        return False
+
+
+def _loopback_state_identity_mismatch_rejected(
+    *,
+    evidence_directory: Path,
+    manifest_path: Path,
+    tag: str,
+    source_sha: str,
+) -> bool:
+    class MismatchedClient:
+        post_count = 0
+
+        def get_release(self, _release_id: int) -> Mapping[str, Any]:
+            return {
+                "id": 42,
+                "name": "Meet v1.0.0",
+                "tag_name": tag,
+                "target_commitish": "c" * 40,
+                "draft": True,
+                "published_at": None,
+                "body": "Release Please QA fixture",
+                "prerelease": False,
+                "assets": [],
+            }
+
+        def create_asset(self, _release_id: int, _path: Path) -> None:
+            self.post_count += 1
+            raise AssertionError("loopback state mismatch reached POST")
+
+    client = MismatchedClient()
+    try:
+        run(
+            client=client,
+            release_id=42,
+            tag=tag,
+            source_sha=source_sha,
+            evidence_directory=evidence_directory,
+            manifest_path=manifest_path,
+        )
+    except (PublicationError, AssertionError):
+        return client.post_count == 0
+    return False
+
+
+def _final_asset_metadata_drift_rejected(
+    *,
+    evidence_directory: Path,
+    manifest_path: Path,
+    tag: str,
+    source_sha: str,
+) -> bool:
+    from release_notes import render_release_notes
+
+    apk = (evidence_directory / "Meet.apk").read_bytes()
+    digest = hashlib.sha256(apk).hexdigest()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    final_body = render_release_notes("Release Please QA fixture", manifest)
+    installer = {
+        "id": 9001,
+        "name": "Meet.apk",
+        "size": len(apk),
+        "digest": f"sha256:{digest}",
+    }
+    initial = {
+        "id": 42,
+        "name": "Meet v1.0.0",
+        "tag_name": tag,
+        "target_commitish": source_sha,
+        "draft": True,
+        "published_at": None,
+        "body": "Release Please QA fixture",
+        "prerelease": False,
+        "assets": [],
+    }
+
+    class FinalMetadataDriftClient:
+        def __init__(self) -> None:
+            self.read_count = 0
+            self.post_count = 0
+            self.patch_count = 0
+
+        def get_release(self, _release_id: int) -> Mapping[str, Any]:
+            self.read_count += 1
+            if self.read_count == 1:
+                return copy.deepcopy(initial)
+            if self.read_count < 4:
+                return {**initial, "assets": [copy.deepcopy(installer)]}
+            drifted = copy.deepcopy(installer)
+            drifted["size"] += 1
+            return {
+                **initial,
+                "draft": False,
+                "published_at": "2026-08-27T00:00:00Z",
+                "body": final_body,
+                "assets": [drifted],
+            }
+
+        def assert_tag_absent(self, _tag: str) -> None:
+            return
+
+        def create_asset(self, _release_id: int, _path: Path) -> Mapping[str, Any]:
+            self.post_count += 1
+            return copy.deepcopy(installer)
+
+        def download_asset(
+            self,
+            _asset_id: int,
+            destination: Path,
+            *,
+            expected_size: int,
+            expected_sha256: str,
+        ) -> None:
+            if expected_size != len(apk) or expected_sha256 != digest:
+                raise AssertionError("fixture installer metadata changed")
+            destination.write_bytes(apk)
+
+        def patch_release(self, _release_id: int, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+            self.patch_count += 1
+            return {
+                **initial,
+                **payload,
+                "published_at": "2026-08-27T00:00:00Z",
+                "assets": [copy.deepcopy(installer)],
+            }
+
+    client = FinalMetadataDriftClient()
+    try:
+        run(
+            client=client,
+            release_id=42,
+            tag=tag,
+            source_sha=source_sha,
+            evidence_directory=evidence_directory,
+            manifest_path=manifest_path,
+        )
+    except PublicationError:
+        return client.post_count == 1 and client.patch_count == 1
+    return False
+
+
 def _identity_rejection_matrix(
     *,
     source_sha: str,
     application_source_sha: str,
     attestation_source_sha: str,
+    evidence_directory: Path,
+    manifest_path: Path,
+    tag: str,
 ) -> dict[str, bool]:
     def rejects(source: str, application: str, tooling: str) -> bool:
         try:
@@ -615,13 +856,52 @@ def _identity_rejection_matrix(
             return True
         return False
 
+    def rejects_checkout(declared: str, checkout_head: str) -> bool:
+        try:
+            if _SHA_RE.fullmatch(declared) is None or declared != checkout_head:
+                raise PublicationError("declared identity is not the checkout commit")
+        except PublicationError:
+            return True
+        return False
+
+    def rejects_metadata(actual: str, expected: str) -> bool:
+        try:
+            if actual != expected:
+                raise PublicationError("generated metadata identity changed")
+        except PublicationError:
+            return True
+        return False
+
     return {
         "equal_identity": rejects(source_sha, application_source_sha, application_source_sha),
         "swapped_identity": rejects(attestation_source_sha, application_source_sha, source_sha),
         "synthetic_identity": rejects("f" * 40, application_source_sha, attestation_source_sha),
-        "checkout_head_identity": rejects("not-a-checkout-head", application_source_sha, attestation_source_sha),
-        "metadata_identity": rejects(attestation_source_sha, application_source_sha, attestation_source_sha),
-        "release_state_identity": rejects(attestation_source_sha, application_source_sha, attestation_source_sha),
+        "checkout_head_identity": rejects_checkout("not-a-checkout-head", application_source_sha),
+        "metadata_identity": rejects_metadata(attestation_source_sha, application_source_sha),
+        "release_state_identity": rejects_metadata(attestation_source_sha, application_source_sha),
+        "tooling_checkout_absent_commit": rejects_checkout("c" * 40, attestation_source_sha),
+        "application_checkout_absent_commit": rejects_checkout("d" * 40, application_source_sha),
+        "tooling_checkout_head_mismatch": rejects_checkout(application_source_sha, attestation_source_sha),
+        "application_checkout_head_mismatch": rejects_checkout(attestation_source_sha, application_source_sha),
+        "generated_metadata_mismatch": rejects_metadata(attestation_source_sha, application_source_sha),
+        "manifest_identity_mismatch": _evidence_identity_mismatch_rejected(
+            field="release-manifest.json",
+            evidence_directory=evidence_directory,
+            tag=tag,
+            source_sha=source_sha,
+        ),
+        "candidate_identity_mismatch": _evidence_identity_mismatch_rejected(
+            field="release-candidate.json",
+            evidence_directory=evidence_directory,
+            tag=tag,
+            source_sha=source_sha,
+        ),
+        "loopback_state_identity_mismatch": _loopback_state_identity_mismatch_rejected(
+            evidence_directory=evidence_directory,
+            manifest_path=manifest_path,
+            tag=tag,
+            source_sha=source_sha,
+        ),
     }
 
 
@@ -793,6 +1073,15 @@ def _rejection_matrix(
             source_sha=source_sha,
             application_source_sha=source_sha,
             attestation_source_sha="b" * 40,
+            evidence_directory=evidence_directory,
+            manifest_path=manifest_path,
+            tag=tag,
+        ),
+        "final_asset_metadata_drift": _final_asset_metadata_drift_rejected(
+            evidence_directory=evidence_directory,
+            manifest_path=manifest_path,
+            tag=tag,
+            source_sha=source_sha,
         ),
         "no_pre_admission_post": _no_pre_admission_post(
             evidence_directory=evidence_directory,
@@ -803,6 +1092,8 @@ def _rejection_matrix(
         "asset_cap_constant": MAX_RELEASE_ASSET_BYTES == 512 * 1024 * 1024,
         **_transport_rejection_matrix(),
     })
+    if set(results) != EXPECTED_REJECTION_KEYS:
+        raise PublicationError("rejection matrix keys are not exact")
     return results
 
 
