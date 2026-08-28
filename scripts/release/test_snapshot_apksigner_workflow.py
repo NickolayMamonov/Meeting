@@ -4,6 +4,7 @@ from pathlib import Path
 
 WORKFLOW = Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml"
 RELEASE_WORKFLOW = Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
+RELEASE_PROOF_WORKFLOW = Path(__file__).parents[2] / ".github" / "workflows" / "release-proof.yml"
 
 
 class SnapshotApksignerWorkflowTest(unittest.TestCase):
@@ -34,6 +35,23 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         cls.stable_public_probe = cls.release_workflow[
             cls.release_workflow.index("  stable-public-probe:")
             : cls.release_workflow.index("  stable-mutate:")
+        ]
+        cls.release_proof_workflow = RELEASE_PROOF_WORKFLOW.read_text(encoding="utf-8")
+        cls.proof_sign = cls.release_proof_workflow[
+            cls.release_proof_workflow.index("  proof-sign:")
+            : cls.release_proof_workflow.index("  proof-evidence:")
+        ]
+        cls.proof_evidence = cls.release_proof_workflow[
+            cls.release_proof_workflow.index("  proof-evidence:")
+            : cls.release_proof_workflow.index("  proof-public-probe:")
+        ]
+        cls.proof_public_probe = cls.release_proof_workflow[
+            cls.release_proof_workflow.index("  proof-public-probe:")
+            : cls.release_proof_workflow.index("  proof-report:")
+        ]
+        cls.proof_report = cls.release_proof_workflow[
+            cls.release_proof_workflow.index("  proof-report:")
+            :
         ]
 
     def test_snapshot_sign_is_checkout_free_and_resolves_before_secret_decode(self):
@@ -221,6 +239,85 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertNotIn("continue-on-error", public_probe + mutation)
         self.assertNotIn("RELEASE_KEYSTORE", public_probe + mutation)
         self.assertNotIn("RELEASE_KEY_PASSWORD", public_probe + mutation)
+
+    def test_proof_signer_isolated_and_tooling_revision_bound(self):
+        self.assertIn('ref: ${{ github.sha }}', self.proof_sign)
+        self.assertIn("path: release-tooling", self.proof_sign)
+        self.assertNotIn("ref: ${{ inputs.application_sha }}", self.proof_sign)
+        self.assertNotIn("ref: ${{ needs.proof-build.outputs.application_sha }}", self.proof_sign)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apksigner", self.proof_sign)
+        self.assertIn("python-version: \"3.12\"", self.proof_sign)
+        self.assertIn("java-version: \"21\"", self.proof_sign)
+        self.assertLess(
+            self.proof_sign.index("Resolve production apksigner"),
+            self.proof_sign.index("Decode production keystore"),
+        )
+        self.assertIn('apksigner="$APKSIGNER_PATH"', self.proof_sign)
+        self.assertIn('"$apksigner" sign', self.proof_sign)
+        self.assertIn('"$apksigner" verify', self.proof_sign)
+        self.assertIn("jarsigner", self.proof_sign)
+        self.assertIn("signer-fingerprints.json", self.proof_sign)
+        for expression in (
+            "secrets.RELEASE_KEYSTORE_BASE64",
+            "secrets.RELEASE_KEYSTORE_PASSWORD",
+            "secrets.RELEASE_KEY_PASSWORD",
+        ):
+            self.assertIn(expression, self.proof_sign)
+            self.assertNotIn(expression, self.release_proof_workflow.replace(self.proof_sign, "", 1))
+        self.assertIn('if: ${{ always() }}', self.proof_sign)
+
+    def test_proof_evidence_uses_exact_application_and_attestation_identities(self):
+        self.assertIn('ref: ${{ inputs.application_sha }}', self.proof_evidence)
+        self.assertIn('ref: ${{ github.sha }}', self.proof_evidence)
+        self.assertIn("path: release-tooling", self.proof_evidence)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apksigner", self.proof_evidence)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apkanalyzer", self.proof_evidence)
+        verifier_call = self.proof_evidence[
+            self.proof_evidence.index("python release-tooling/scripts/release/verify_android_artifacts.py") :
+        ]
+        self.assertIn('--apksigner "$APKSIGNER_PATH"', verifier_call)
+        self.assertIn('--apkanalyzer "$APKANALYZER_PATH"', verifier_call)
+        self.assertIn("--expected-debuggable false", verifier_call)
+        self.assertIn("--aab", verifier_call)
+        self.assertIn("--bundletool-jar", verifier_call)
+        self.assertIn("--bundletool-sha256", verifier_call)
+        self.assertIn('--commit "${{ needs.proof-build.outputs.application_sha }}"', self.proof_evidence)
+        self.assertIn('--source-sha "${{ github.sha }}"', self.proof_evidence)
+        self.assertIn("collect_attestation_evidence.py", self.proof_evidence)
+        self.assertIn("actions/attest-build-provenance", self.proof_evidence)
+        self.assertIn("sha256sum --check SHA256SUMS", self.proof_evidence)
+        self.assertIn("verify_chain.py", self.proof_evidence)
+        self.assertIn("release-chain verification passed", self.proof_evidence)
+        verifier_position = self.proof_evidence.index(
+            "python release-tooling/scripts/release/verify_android_artifacts.py"
+        )
+        for downstream in (
+            "Prepare exact release evidence",
+            "actions/attest-build-provenance",
+            "Finalize and verify exact release evidence",
+            "actions/upload-artifact",
+        ):
+            self.assertGreater(self.proof_evidence.index(downstream), verifier_position)
+
+    def test_proof_probe_and_report_require_success_without_skips(self):
+        self.assertIn("needs: proof-evidence", self.proof_public_probe)
+        self.assertIn("if: ${{ needs.proof-evidence.result == 'success' }}", self.proof_public_probe)
+        self.assertIn("python release-tooling/scripts/release/public_backend_probe.py", self.proof_public_probe)
+        self.assertIn("public backend probe passed", self.proof_public_probe)
+        self.assertNotIn("continue-on-error", self.release_proof_workflow)
+        self.assertIn(
+            "needs: [proof-build, proof-sign, proof-evidence, proof-public-probe]",
+            self.proof_report,
+        )
+        for job in ("proof-build", "proof-sign", "proof-evidence", "proof-public-probe"):
+            self.assertIn(f"needs.{job}.result == 'success'", self.proof_report)
+        self.assertIn("proof-run.json", self.proof_report)
+        self.assertIn("workflow_tooling_sha", self.proof_report)
+        self.assertIn("GITHUB_RUN_ID", self.proof_report)
+        self.assertIn("GITHUB_RUN_ATTEMPT", self.proof_report)
+        self.assertIn("sha256sum --check SHA256SUMS", self.proof_report)
+        self.assertIn("verify_chain.py", self.proof_report)
+        self.assertIn("retention-days: 7", self.proof_report)
 
 
 if __name__ == "__main__":

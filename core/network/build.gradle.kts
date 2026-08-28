@@ -12,8 +12,7 @@ val releaseBuildRequested = gradle.startParameter.taskNames.any { requestedTask 
 fun requiredReleaseBaseUrl(): String {
     val baseUrl = providers.gradleProperty("BASE_URL_RELEASE").orNull
     check(baseUrl == "https://api.whysoezzy.online") {
-        "BASE_URL_RELEASE is required for release builds. " +
-            "Set it exactly to https://api.whysoezzy.online."
+        "BASE_URL_RELEASE must be exactly https://api.whysoezzy.online."
     }
 
     return requireNotNull(baseUrl)

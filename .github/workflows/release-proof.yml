@@ -1,0 +1,463 @@
+name: Android release proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_sha:
+        description: Exact 40-hex application commit on dev to prove
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  proof-build:
+    name: Build exact application revision
+    runs-on: ubuntu-latest
+    environment:
+      name: android-release
+    outputs:
+      application_sha: ${{ steps.identities.outputs.application_sha }}
+      tooling_sha: ${{ steps.identities.outputs.tooling_sha }}
+    steps:
+      - name: Checkout exact application revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.application_sha }}
+          path: application-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout workflow tooling revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Assert exact application and workflow identities
+        id: identities
+        env:
+          APPLICATION_SHA: ${{ inputs.application_sha }}
+          TOOLING_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$APPLICATION_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          printf '%s' "$TOOLING_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          test "$GITHUB_REF" = "refs/heads/dev"
+          test "$(git -C application-source rev-parse HEAD)" = "$APPLICATION_SHA"
+          test "$(git -C release-tooling rev-parse HEAD)" = "$TOOLING_SHA"
+          git -C application-source cat-file -e "$APPLICATION_SHA^{commit}"
+          git -C release-tooling cat-file -e "$TOOLING_SHA^{commit}"
+          git -C release-tooling fetch origin dev
+          git -C release-tooling merge-base --is-ancestor "$APPLICATION_SHA" "$TOOLING_SHA"
+          git -C release-tooling merge-base --is-ancestor "$APPLICATION_SHA" origin/dev
+          printf 'application_sha=%s\n' "$APPLICATION_SHA" >> "$GITHUB_OUTPUT"
+          printf 'tooling_sha=%s\n' "$TOOLING_SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4.4.2
+      - name: Provision production Firebase configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        working-directory: application-source
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$GOOGLE_SERVICES_JSON"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+      - name: Validate production Firebase configuration
+        working-directory: application-source
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "object" and
+            (.project_info | type == "object") and
+            (.client | type == "array" and length > 0) and
+            any(.client[];
+              type == "object" and
+              (.client_info | type == "object") and
+              (.client_info.android_client_info | type == "object") and
+              (.client_info.android_client_info.package_name == "dev.whysoezzy.meet")
+            )
+          ' app/google-services.json >/dev/null
+      - name: Build unsigned exact-revision APK and AAB
+        env:
+          ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ vars.BASE_URL_RELEASE }}
+          ORG_GRADLE_PROJECT_ANDROID_RELEASE_CERT_SHA256: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
+          ORG_GRADLE_PROJECT_RELEASE_COMMIT_SHA: ${{ inputs.application_sha }}
+          ORG_GRADLE_PROJECT_RELEASE_PUBLISHING: "true"
+        working-directory: application-source
+        run: |
+          set -euo pipefail
+          ./gradlew -PreleaseCommitSha="${{ inputs.application_sha }}" \
+            generateReleaseBuildMetadata validateReleasePublishingInputs ktlintCheck \
+            testDebugUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease
+          metadata="app/build/release-metadata/release-build.json"
+          jq -e \
+            --arg application_sha "${{ inputs.application_sha }}" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            '.channel == "release" and .applicationId == "dev.whysoezzy.meet" and
+             .releaseBaseUrl == "https://api.whysoezzy.online" and
+             .releaseHost == "api.whysoezzy.online" and
+             .commitSha == $application_sha and .workflow == $workflow and
+             (.expectedCertificateSha256 | type == "string") and
+             (.signingFingerprint | type == "string") and
+             .expectedCertificateSha256 == .signingFingerprint' \
+            "$metadata" >/dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-proof-unsigned-${{ inputs.application_sha }}-${{ github.run_attempt }}
+          path: |
+            application-source/app/build/outputs/apk/release/*.apk
+            application-source/app/build/outputs/bundle/release/*.aab
+            application-source/app/build/outputs/mapping/release/**
+            application-source/app/build/outputs/native-debug-symbols/release/**
+            application-source/app/build/release-metadata/release-build.json
+          retention-days: 1
+          if-no-files-found: error
+      - name: Remove Firebase configuration
+        if: ${{ always() }}
+        working-directory: application-source
+        run: rm -f app/google-services.json
+
+  proof-sign:
+    name: Sign exact artifacts on isolated runner
+    needs: proof-build
+    if: ${{ needs.proof-build.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: android-release
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Resolve production apksigner
+        run: |
+          set -euo pipefail
+          apksigner="$(python release-tooling/scripts/release/android_sdk_tools.py apksigner)"
+          test -x "$apksigner"
+          printf 'APKSIGNER_PATH=%s\n' "$apksigner" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-proof-unsigned-${{ needs.proof-build.outputs.application_sha }}-${{ github.run_attempt }}
+          path: unsigned
+      - name: Decode production keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$KEYSTORE_B64"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release-proof.jks"
+      - name: Sign and verify APK and AAB fingerprints
+        env:
+          STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          EXPECTED_CERT: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
+        run: |
+          set -euo pipefail
+          test -n "$STORE_PASSWORD" && test -n "$KEY_PASSWORD"
+          apk="$(find unsigned -type f -name '*.apk' -print -quit)"
+          aab="$(find unsigned -type f -name '*.aab' -print -quit)"
+          test -n "$apk" && test -n "$aab"
+          apksigner="$APKSIGNER_PATH"
+          umask 077
+          printf '%s' "$STORE_PASSWORD" > "$RUNNER_TEMP/release-proof-store-password"
+          printf '%s' "$KEY_PASSWORD" > "$RUNNER_TEMP/release-proof-key-password"
+          "$apksigner" sign --ks "$RUNNER_TEMP/release-proof.jks" --ks-key-alias meet-release \
+            --ks-pass "file:$RUNNER_TEMP/release-proof-store-password" \
+            --key-pass "file:$RUNNER_TEMP/release-proof-key-password" "$apk"
+          printf '%s\n%s\n' "$STORE_PASSWORD" "$KEY_PASSWORD" | \
+            jarsigner -keystore "$RUNNER_TEMP/release-proof.jks" "$aab" meet-release
+          "$apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/release-proof-apk-cert.txt"
+          keytool -printcert -jarfile "$aab" > "$RUNNER_TEMP/release-proof-aab-cert.txt"
+          grep -Eiq 'key algorithm: RSA' "$RUNNER_TEMP/release-proof-apk-cert.txt"
+          grep -Eiq 'key size( \(bits\))?: 4096' "$RUNNER_TEMP/release-proof-apk-cert.txt"
+          grep -Eiq 'Public Key Algorithm: 4096-bit RSA key' "$RUNNER_TEMP/release-proof-aab-cert.txt"
+          expected="$(printf '%s' "$EXPECTED_CERT" | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          printf '%s' "$expected" | grep -Eq '^[0-9a-f]{64}$'
+          test "$expected" = "b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f"
+          apk_actual="$(sed -n 's/.*SHA-256 digest: //p' "$RUNNER_TEMP/release-proof-apk-cert.txt" | head -n1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          aab_actual="$(sed -n 's/.*SHA256: //p' "$RUNNER_TEMP/release-proof-aab-cert.txt" | head -n1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          test "$apk_actual" = "$expected" && test "$aab_actual" = "$expected"
+          printf '{"apk":"%s","aab":"%s"}\n' "$apk_actual" "$aab_actual" > unsigned/signer-fingerprints.json
+          jq -e --arg expected "$expected" \
+            '.apk == $expected and .aab == $expected' unsigned/signer-fingerprints.json >/dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-proof-signed-${{ needs.proof-build.outputs.application_sha }}-${{ github.run_attempt }}
+          path: unsigned
+          retention-days: 1
+          if-no-files-found: error
+      - name: Remove production signing inputs
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/release-proof.jks" \
+          "$RUNNER_TEMP/release-proof-store-password" \
+          "$RUNNER_TEMP/release-proof-key-password"
+
+  proof-evidence:
+    name: Verify and attest exact release evidence
+    needs: [proof-build, proof-sign]
+    if: ${{ needs.proof-build.result == 'success' && needs.proof-sign.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.application_sha }}
+          path: application-source
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Resolve exact Android SDK tools
+        run: |
+          set -euo pipefail
+          apksigner="$(python release-tooling/scripts/release/android_sdk_tools.py apksigner)"
+          apkanalyzer="$(python release-tooling/scripts/release/android_sdk_tools.py apkanalyzer)"
+          test -x "$apksigner" && test -x "$apkanalyzer"
+          printf 'APKSIGNER_PATH=%s\n' "$apksigner" >> "$GITHUB_ENV"
+          printf 'APKANALYZER_PATH=%s\n' "$apkanalyzer" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-proof-signed-${{ needs.proof-build.outputs.application_sha }}-${{ github.run_attempt }}
+          path: signed
+      - name: Download and verify reviewed Bundletool
+        run: |
+          set -euo pipefail
+          readonly bundletool_version='1.18.3'
+          readonly bundletool_sha256='a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
+          curl --fail --location --silent --show-error \
+            "https://github.com/google/bundletool/releases/download/$bundletool_version/bundletool-all-$bundletool_version.jar" \
+            --output "$RUNNER_TEMP/release-proof-bundletool.jar"
+          echo "$bundletool_sha256  $RUNNER_TEMP/release-proof-bundletool.jar" | sha256sum --check
+      - name: Verify APK, AAB, package, version, and certificate identity
+        run: |
+          set -euo pipefail
+          metadata="$(find signed -name release-build.json -print -quit)"
+          apk="$(find signed -name '*.apk' -print -quit)"
+          aab="$(find signed -name '*.aab' -print -quit)"
+          test -n "$metadata" && test -n "$apk" && test -n "$aab"
+          python release-tooling/scripts/release/verify_android_artifacts.py \
+            --metadata "$metadata" --apk "$apk" --aab "$aab" \
+            --apksigner "$APKSIGNER_PATH" --apkanalyzer "$APKANALYZER_PATH" \
+            --expected-debuggable false \
+            --bundletool-jar "$RUNNER_TEMP/release-proof-bundletool.jar" \
+            --bundletool-sha256 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
+      - name: Prepare exact release evidence
+        run: |
+          set -euo pipefail
+          metadata="$(find signed -name release-build.json -print -quit)"
+          apk="$(find signed -name '*.apk' -print -quit)"
+          aab="$(find signed -name '*.aab' -print -quit)"
+          mapping="$(find signed -type f -path '*/mapping/release/*' -print -quit || true)"
+          symbols="$(find signed -type f -path '*/native-debug-symbols/release/*' -print -quit || true)"
+          mkdir -p release-output
+          args=(--metadata "$metadata" --output release-output --apk "$apk" --aab "$aab"
+            --commit "${{ needs.proof-build.outputs.application_sha }}" --source-branch dev
+            --workflow "${GITHUB_WORKFLOW}" --prepare-only)
+          test -z "$mapping" || args+=(--mapping "$mapping")
+          test -z "$symbols" || args+=(--symbols "$symbols")
+          python release-tooling/scripts/release/package_artifacts.py "${args[@]}"
+      - name: Attest every prepared evidence subject
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-path: release-output/*
+      - name: Collect exact current-run attestation evidence
+        env:
+          ATTESTATION_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python release-tooling/scripts/release/collect_attestation_evidence.py \
+            --directory release-output \
+            --output "$RUNNER_TEMP/release-proof-attestation-evidence.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-proof.yml" \
+            --source-ref refs/heads/dev --source-sha "${{ github.sha }}" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
+      - name: Finalize and verify exact release evidence
+        run: |
+          set -euo pipefail
+          metadata="$(find signed -name release-build.json -print -quit)"
+          apk="$(find signed -name '*.apk' -print -quit)"
+          aab="$(find signed -name '*.aab' -print -quit)"
+          mapping="$(find signed -type f -path '*/mapping/release/*' -print -quit || true)"
+          symbols="$(find signed -type f -path '*/native-debug-symbols/release/*' -print -quit || true)"
+          args=(--metadata "$metadata" --output release-output --apk "$apk" --aab "$aab"
+            --commit "${{ needs.proof-build.outputs.application_sha }}" --source-branch dev
+            --workflow "${GITHUB_WORKFLOW}"
+            --attestation-evidence "$RUNNER_TEMP/release-proof-attestation-evidence.json")
+          test -z "$mapping" || args+=(--mapping "$mapping")
+          test -z "$symbols" || args+=(--symbols "$symbols")
+          python release-tooling/scripts/release/package_artifacts.py "${args[@]}"
+          (cd release-output && sha256sum --check SHA256SUMS)
+          verification="$(python release-tooling/scripts/release/verify_chain.py release-output)"
+          printf '%s\n' "$verification"
+          grep -Fx 'release-chain verification passed' <<<"$verification"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-proof-evidence-${{ needs.proof-build.outputs.application_sha }}-${{ github.run_attempt }}
+          path: release-output
+          retention-days: 1
+          if-no-files-found: error
+
+  proof-public-probe:
+    name: Probe exact public backend
+    needs: proof-evidence
+    if: ${{ needs.proof-evidence.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: android-release
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.application_sha }}
+          path: application-source
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-proof-evidence-${{ inputs.application_sha }}-${{ github.run_attempt }}
+          path: release-output
+      - name: Assert exact probe identities
+        run: |
+          set -euo pipefail
+          test "$(git -C application-source rev-parse HEAD)" = "${{ inputs.application_sha }}"
+          test "$(git -C release-tooling rev-parse HEAD)" = "${{ github.sha }}"
+          test -f release-output/SHA256SUMS
+      - name: Probe public production backend
+        run: |
+          set -euo pipefail
+          probe="$(python release-tooling/scripts/release/public_backend_probe.py)"
+          printf '%s\n' "$probe"
+          grep -Fx 'public backend probe passed' <<<"$probe"
+
+  proof-report:
+    name: Retain exact release proof
+    needs: [proof-build, proof-sign, proof-evidence, proof-public-probe]
+    if: ${{ needs.proof-build.result == 'success' && needs.proof-sign.result == 'success' && needs.proof-evidence.result == 'success' && needs.proof-public-probe.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: release-tooling
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-proof-evidence-${{ inputs.application_sha }}-${{ github.run_attempt }}
+          path: report/release-output
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-proof-signed-${{ inputs.application_sha }}-${{ github.run_attempt }}
+          path: report/signer
+      - name: Verify retained signer and chain evidence
+        run: |
+          set -euo pipefail
+          expected='b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f'
+          test "$expected" = "b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f"
+          jq -e --arg expected "$expected" \
+            '.apk == $expected and .aab == $expected' \
+            report/signer/signer-fingerprints.json >/dev/null
+          (cd report/release-output && sha256sum --check SHA256SUMS)
+          verification="$(python release-tooling/scripts/release/verify_chain.py report/release-output)"
+          printf '%s\n' "$verification"
+          grep -Fx 'release-chain verification passed' <<<"$verification"
+      - name: Write retained proof identities
+        env:
+          APPLICATION_SHA: ${{ inputs.application_sha }}
+          TOOLING_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg workflow_sha "$TOOLING_SHA" \
+            --arg tooling_sha "$TOOLING_SHA" \
+            --arg application_sha "$APPLICATION_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg proof_build "${{ needs.proof-build.result }}" \
+            --arg proof_sign "${{ needs.proof-sign.result }}" \
+            --arg proof_evidence "${{ needs.proof-evidence.result }}" \
+            --arg proof_public_probe "${{ needs.proof-public-probe.result }}" \
+            '{
+              workflow: $workflow,
+              workflow_name: $workflow,
+              workflow_sha: $workflow_sha,
+              tooling_sha: $tooling_sha,
+              workflow_tooling_sha: $tooling_sha,
+              application_sha: $application_sha,
+              run_id: ($run_id | tonumber),
+              run_attempt: ($run_attempt | tonumber),
+              predecessor_results: {
+                "proof-build": $proof_build,
+                "proof-sign": $proof_sign,
+                "proof-evidence": $proof_evidence,
+                "proof-public-probe": $proof_public_probe
+              },
+              proof_jobs: {
+                "proof-build": $proof_build,
+                "proof-sign": $proof_sign,
+                "proof-evidence": $proof_evidence,
+                "proof-public-probe": $proof_public_probe
+              },
+              report_job: "proof-report",
+              job_name: "proof-report"
+            }' > report/proof-run.json
+          jq -e \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg workflow_sha "$TOOLING_SHA" \
+            --arg application_sha "$APPLICATION_SHA" \
+            '.workflow == $workflow and .workflow_sha == $workflow_sha and
+             .tooling_sha == $workflow_sha and .application_sha == $application_sha and
+             (.run_id | type == "number") and (.run_attempt | type == "number") and
+             .workflow_name == $workflow and
+             .workflow_tooling_sha == $workflow_sha and
+             .job_name == "proof-report" and .report_job == "proof-report" and
+             (.predecessor_results | to_entries | all(.[]; .value == "success")) and
+             (.proof_jobs | to_entries | all(.[]; .value == "success"))' \
+            report/proof-run.json >/dev/null
+          cp report/signer/signer-fingerprints.json report/signer-fingerprints.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-proof-${{ inputs.application_sha }}-${{ github.run_attempt }}
+          path: |
+            report/release-output
+            report/signer-fingerprints.json
+            report/proof-run.json
+          retention-days: 7
+          if-no-files-found: error

@@ -6,8 +6,8 @@
 - Release Please uses the repository `RELEASE_PLEASE_TOKEN` for its draft
   release, tag, and pull-request operations.
 - The protected `android-release` environment is used by stable build, signing,
-  public probe, and final publication. Its administrator bypass remains
-  disabled and its branch policy remains `dev`.
+  public probe, final publication, and the non-publishing release proof. Its
+  administrator bypass remains disabled and its branch policy remains `dev`.
 - No backend, VPS, Nginx, certificate, Google Play, device, or USB operation
   is part of Android publication.
 
@@ -32,6 +32,13 @@ Only the isolated `stable-sign` job receives the signing secrets. Build,
 evidence, public-probe, and publication jobs do not reference signing
 material. The credential audit must verify this boundary and must not print
 secret values.
+
+The dispatch-only `Android release proof` workflow has the same signer
+boundary: only `proof-sign` receives the production keystore and passwords.
+`proof-build` receives Firebase configuration and release URL/certificate
+variables, while `proof-evidence`, `proof-public-probe`, and `proof-report`
+receive no signing material. The proof workflow has no release API token and
+cannot create, mutate, publish, or upload a GitHub Release.
 
 ## Release networking
 
@@ -101,6 +108,49 @@ that atomically binds those values to the final PATCH. A mutation during the
 final request is therefore an explicitly excluded operator condition: if
 divergence is observed afterward, the result is indeterminate/manual
 investigation, with no retry, repair, delete, or rollback request.
+
+## Non-publishing exact release proof
+
+After the implementation is merged to `dev`, operators dispatch the protected
+proof from `dev` with the exact accepted application commit:
+
+```text
+gh workflow run release-proof.yml --ref dev -f application_sha=<accepted-40-hex-sha>
+```
+
+`application_sha` is the commit whose Android source is built, packaged, signed,
+and probed. `${{ github.sha }}` is recorded separately as the workflow/tooling
+commit: it supplies the proof workflow and release scripts used to verify the
+application artifact. The workflow requires the application commit to be a
+lowercase 40-hex commit, checks it out exactly, and proves it is an ancestor of
+the workflow commit and `origin/dev`.
+
+The five-job chain must complete successfully without skipped jobs:
+
+1. `proof-build` enters `android-release`, validates Firebase and the exact
+   production URL, then runs release metadata generation, validation, lint,
+   tests, APK, and AAB builds.
+2. `proof-sign` is the isolated production signer. It signs both formats,
+   verifies RSA-4096 identity, requires both normalized certificate SHA-256
+   values to equal
+   `b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f`, and
+   retains only those non-secret values in `signer-fingerprints.json`.
+3. `proof-evidence` verifies application identity, version, non-debuggable
+   state, signer identity, checksums, and exact current-run attestations. It
+   must print `release-chain verification passed`.
+4. `proof-public-probe` checks out the same application commit and runs the
+   fixed-origin public backend probe. It must print
+   `public backend probe passed`.
+5. `proof-report` rechecks the evidence chain and retains one seven-day
+   artifact named
+   `android-release-proof-<application_sha>-<run_attempt>`.
+
+The retained artifact contains `release-output`, `signer-fingerprints.json`,
+and `proof-run.json`. The run record includes the workflow name, workflow/tooling
+SHA, application SHA, run ID, run attempt, each predecessor job conclusion,
+and the report job name. The completed Actions run record supplies the final
+`proof-report` conclusion; acceptance requires all five named jobs to be
+successful and non-skipped.
 
 ## Credential and QA boundaries
 
