@@ -403,6 +403,163 @@ class PublicationGateTest(unittest.TestCase):
         ):
             self.assertIn(assertion, workflow)
 
+    def test_release_proof_is_dispatch_only_non_publishing_and_exactly_topologized(self):
+        workflow = (
+            Path(__file__).parents[2]
+            / ".github"
+            / "workflows"
+            / "release-proof.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("name: Android release proof", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
+        self.assertIn("application_sha:", workflow)
+        for forbidden in (
+            "\n  push:",
+            "\n  pull_request:",
+            "\n  schedule:",
+            "RELEASE_PLEASE_TOKEN",
+            "release-please",
+            "publish_release.py",
+            "gh api",
+            "release_id",
+            "gh release",
+            "git push",
+        ):
+            self.assertNotIn(forbidden, workflow)
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertEqual(workflow.count("id-token: write"), 1)
+        self.assertEqual(workflow.count("attestations: write"), 1)
+        jobs = (
+            "proof-build",
+            "proof-sign",
+            "proof-evidence",
+            "proof-public-probe",
+            "proof-report",
+        )
+        self.assertEqual(
+            [workflow.index(f"  {job}:") for job in jobs],
+            sorted(workflow.index(f"  {job}:") for job in jobs),
+        )
+        for job in jobs:
+            self.assertEqual(workflow.count(f"  {job}:"), 1)
+
+    def test_release_proof_binds_source_signer_evidence_and_probe(self):
+        workflow = (
+            Path(__file__).parents[2]
+            / ".github"
+            / "workflows"
+            / "release-proof.yml"
+        ).read_text(encoding="utf-8")
+        sections = {
+            "proof-build": workflow[
+                workflow.index("  proof-build:") : workflow.index("  proof-sign:")
+            ],
+            "proof-sign": workflow[
+                workflow.index("  proof-sign:") : workflow.index("  proof-evidence:")
+            ],
+            "proof-evidence": workflow[
+                workflow.index("  proof-evidence:") : workflow.index("  proof-public-probe:")
+            ],
+            "proof-public-probe": workflow[
+                workflow.index("  proof-public-probe:") : workflow.index("  proof-report:")
+            ],
+            "proof-report": workflow[workflow.index("  proof-report:") :],
+        }
+        build = sections["proof-build"]
+        self.assertIn("environment:\n      name: android-release", build)
+        self.assertIn("ref: ${{ inputs.application_sha }}", build)
+        self.assertIn('test "$(git -C application-source rev-parse HEAD)" = "$APPLICATION_SHA"', build)
+        self.assertIn('git -C application-source cat-file -e "$APPLICATION_SHA^{commit}"', build)
+        self.assertIn("git -C release-tooling merge-base --is-ancestor", build)
+        self.assertIn("ORG_GRADLE_PROJECT_RELEASE_COMMIT_SHA: ${{ inputs.application_sha }}", build)
+        self.assertIn("-PreleaseCommitSha=\"${{ inputs.application_sha }}\"", build)
+        self.assertIn(".applicationId == \"dev.whysoezzy.meet\"", build)
+        self.assertIn(".releaseBaseUrl == \"https://api.whysoezzy.online\"", build)
+        self.assertIn(".releaseHost == \"api.whysoezzy.online\"", build)
+        self.assertIn(".commitSha == $application_sha", build)
+        signer = sections["proof-sign"]
+        for expression in (
+            "secrets.RELEASE_KEYSTORE_BASE64",
+            "secrets.RELEASE_KEYSTORE_PASSWORD",
+            "secrets.RELEASE_KEY_PASSWORD",
+        ):
+            self.assertIn(expression, signer)
+            self.assertNotIn(expression, workflow.replace(signer, "", 1))
+        self.assertIn('environment:\n      name: android-release', signer)
+        self.assertIn('"$apksigner" sign', signer)
+        self.assertIn('"$apksigner" verify', signer)
+        self.assertIn("jarsigner", signer)
+        self.assertIn("signer-fingerprints.json", signer)
+        self.assertIn(
+            "b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f",
+            signer,
+        )
+        evidence = sections["proof-evidence"]
+        self.assertIn("id-token: write", evidence)
+        self.assertIn("attestations: write", evidence)
+        for script in (
+            "verify_android_artifacts.py",
+            "package_artifacts.py",
+            "collect_attestation_evidence.py",
+            "verify_chain.py",
+        ):
+            self.assertIn(f"release-tooling/scripts/release/{script}", evidence)
+        self.assertIn("actions/attest-build-provenance", evidence)
+        self.assertIn('--commit "${{ needs.proof-build.outputs.application_sha }}"', evidence)
+        self.assertIn('--source-sha "${{ github.sha }}"', evidence)
+        self.assertIn("sha256sum --check SHA256SUMS", evidence)
+        self.assertIn("release-chain verification passed", evidence)
+        self.assertIn("--expected-debuggable false", evidence)
+        self.assertIn("--aab", evidence)
+        self.assertIn("--bundletool-jar", evidence)
+        self.assertIn("--bundletool-sha256", evidence)
+        probe = sections["proof-public-probe"]
+        self.assertIn("needs: proof-evidence", probe)
+        self.assertIn("if: ${{ needs.proof-evidence.result == 'success' }}", probe)
+        self.assertIn("environment:\n      name: android-release", probe)
+        self.assertIn("public_backend_probe.py", probe)
+        self.assertIn("public backend probe passed", probe)
+        self.assertNotIn("continue-on-error", probe)
+
+    def test_release_proof_retains_all_revision_and_run_identities(self):
+        workflow = (
+            Path(__file__).parents[2]
+            / ".github"
+            / "workflows"
+            / "release-proof.yml"
+        ).read_text(encoding="utf-8")
+        report = workflow[workflow.index("  proof-report:") :]
+        self.assertIn(
+            "needs: [proof-build, proof-sign, proof-evidence, proof-public-probe]",
+            report,
+        )
+        for job in (
+            "proof-build",
+            "proof-sign",
+            "proof-evidence",
+            "proof-public-probe",
+        ):
+            self.assertIn(f"needs.{job}.result == 'success'", report)
+        for identity in (
+            "workflow_name",
+            "workflow_sha",
+            "tooling_sha",
+            "workflow_tooling_sha",
+            "application_sha",
+            "GITHUB_RUN_ID",
+            "GITHUB_RUN_ATTEMPT",
+            "proof-run.json",
+            "proof_jobs",
+            "report_job",
+        ):
+            self.assertIn(identity, report)
+        self.assertIn("retention-days: 7", report)
+        self.assertIn("android-release-proof-${{ inputs.application_sha }}-${{ github.run_attempt }}", report)
+        self.assertIn("report/release-output", report)
+        self.assertIn("report/signer-fingerprints.json", report)
+        self.assertIn("report/proof-run.json", report)
+
 
 if __name__ == "__main__":
     unittest.main()
