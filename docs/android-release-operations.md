@@ -152,7 +152,8 @@ unit tests, `:app:lintRelease`, `:app:assembleRelease`,
 `generateReleaseBuildMetadata`. Inspect generated XML, the merged manifest,
 release metadata, checksums, and attestation references. Search active
 source, workflows, tests, and docs for stale pin, device-evidence,
-or alternate-credential contracts.
+or alternate-credential contracts. For runtime verification after artifact
+identity is established, use the [Android release smoke checklist](android-release-smoke-checklist.md).
 
 Merge the correction normally, let Release Please refresh PR #67, merge that
 PR normally, and verify one public signed `v1.0.0` release. Confirm package
