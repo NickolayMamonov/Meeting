@@ -170,11 +170,11 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def make_analyzer_sdk(root, packages, launchers=("apkanalyzer",)):
         command_line_tools = root / "cmdline-tools"
         command_line_tools.mkdir()
-        for name, revision, valid in packages:
-            package = command_line_tools / name
+        for installation_directory, revision, package_path, valid in packages:
+            package = command_line_tools / installation_directory
             (package / "bin").mkdir(parents=True)
             (package / "source.properties").write_text(
-                f"Pkg.Revision = {revision}\nPkg.Path = cmdline-tools;{name}\n",
+                f"Pkg.Revision = {revision}\nPkg.Path = {package_path}\n",
                 encoding="utf-8",
             )
             if valid:
@@ -200,7 +200,10 @@ class AndroidSdkToolsTest(unittest.TestCase):
             root = Path(directory)
             self.make_analyzer_sdk(
                 root,
-                [("latest", "14.0.0", True), ("12.0.0", "12.0.0", True)],
+                [
+                    ("latest", "12.0", "cmdline-tools;12.0", True),
+                    ("11.0", "11.0", "cmdline-tools;11.0", True),
+                ],
             )
             with patch("android_sdk_tools.subprocess.run", self.successful_probe):
                 self.assertEqual(
@@ -211,11 +214,13 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_accepts_versioned_package_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("22.0", "22.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("12.0", "12.0", "cmdline-tools;12.0", True)]
+            )
             with patch("android_sdk_tools.subprocess.run", self.successful_probe):
                 self.assertEqual(
                     resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}),
-                    (root / "cmdline-tools/22.0/bin/apkanalyzer").resolve(),
+                    (root / "cmdline-tools/12.0/bin/apkanalyzer").resolve(),
                 )
 
     def test_apkanalyzer_non_windows_prefers_extensionless_launcher(self):
@@ -223,7 +228,7 @@ class AndroidSdkToolsTest(unittest.TestCase):
             root = Path(directory)
             self.make_analyzer_sdk(
                 root,
-                [("latest", "14.0.0", True)],
+                [("latest", "14.0.0", "cmdline-tools;14.0.0", True)],
                 launchers=("apkanalyzer", "apkanalyzer.bat"),
             )
             with patch("android_sdk_tools.subprocess.run", self.successful_probe):
@@ -235,7 +240,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_rejects_missing_package_path_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             metadata = root / "cmdline-tools/latest/source.properties"
             metadata.write_text("Pkg.Revision = 14.0.0\n", encoding="utf-8")
             with self.assertRaises(AndroidSdkToolError):
@@ -244,7 +251,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_rejects_mismatched_package_path_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             metadata = root / "cmdline-tools/latest/source.properties"
             metadata.write_text(
                 "Pkg.Revision = 14.0.0\nPkg.Path = cmdline-tools;21.0\n",
@@ -256,10 +265,46 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_rejects_alias_metadata_for_versioned_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("22.0", "22.0.0", True)])
-            metadata = root / "cmdline-tools/22.0/source.properties"
+            self.make_analyzer_sdk(
+                root, [("22.0", "22.0.0", "cmdline-tools;latest", True)]
+            )
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_rejects_normalized_equivalent_package_path_metadata(self):
+        for revision, package_path in (
+            ("12.0", "cmdline-tools;12.0.0"),
+            ("12.0.0", "cmdline-tools;12.0"),
+        ):
+            with self.subTest(revision=revision, package_path=package_path):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    self.make_analyzer_sdk(
+                        root, [("latest", revision, package_path, True)]
+                    )
+                    with self.assertRaises(AndroidSdkToolError):
+                        resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_rejects_malformed_package_path_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0 extra", True)]
+            )
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_rejects_duplicate_package_path_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
+            metadata = root / "cmdline-tools/latest/source.properties"
             metadata.write_text(
-                "Pkg.Revision = 22.0.0\nPkg.Path = cmdline-tools;latest\n",
+                "Pkg.Revision = 14.0.0\n"
+                "Pkg.Path = cmdline-tools;14.0.0\n"
+                "Pkg.Path = cmdline-tools;14.0.0\n",
                 encoding="utf-8",
             )
             with self.assertRaises(AndroidSdkToolError):
@@ -268,7 +313,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_accepts_crlf_identity_probe(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             result = type(
                 "Completed",
                 (),
@@ -286,7 +333,7 @@ class AndroidSdkToolsTest(unittest.TestCase):
             root = Path(directory)
             self.make_analyzer_sdk(
                 root,
-                [("latest", "14.0.0", True)],
+                [("latest", "14.0.0", "cmdline-tools;14.0.0", True)],
                 launchers=("apkanalyzer", "apkanalyzer.bat"),
             )
             batch_file = root / "cmdline-tools/latest/bin/apkanalyzer.bat"
@@ -311,7 +358,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_windows_does_not_fallback_to_extensionless_launcher(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             with patch.object(android_sdk_tools.sys, "platform", "win32"):
                 with patch(
                     "android_sdk_tools.subprocess.run",
@@ -331,7 +380,11 @@ class AndroidSdkToolsTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 self.make_analyzer_sdk(
-                    root, [("old", "13.0.0", True), ("latest", "14.0.0", True)]
+                    root,
+                    [
+                        ("old", "13.0.0", "cmdline-tools;13.0.0", True),
+                        ("latest", "14.0.0", "cmdline-tools;14.0.0", True),
+                    ],
                 )
                 with patch("android_sdk_tools.subprocess.run", return_value=result):
                     with self.assertRaises(AndroidSdkToolError):
@@ -343,7 +396,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_probe_timeout_and_launch_errors_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             for error in (OSError("launch"), UnicodeError("decode")):
                 with patch(
                     "android_sdk_tools.subprocess.run", side_effect=error
@@ -362,7 +417,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_probe_uses_exact_bounded_command(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             with patch(
                 "android_sdk_tools.subprocess.run", side_effect=self.successful_probe
             ) as probe:
@@ -379,7 +436,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
         for valid, executable_mode in ((False, None), (True, 0)):
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                self.make_analyzer_sdk(root, [("latest", "14.0.0", valid)])
+                self.make_analyzer_sdk(
+                    root, [("latest", "14.0.0", "cmdline-tools;14.0.0", valid)]
+                )
                 if executable_mode == 0:
                     tool = root / "cmdline-tools/latest/bin/apkanalyzer"
                     tool.chmod(tool.stat().st_mode & ~stat.S_IXUSR)
@@ -390,7 +449,11 @@ class AndroidSdkToolsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.make_analyzer_sdk(
-                root, [("one", "14.0.0", True), ("two", "14.0.0", True)]
+                root,
+                [
+                    ("one", "14.0.0", "cmdline-tools;14.0.0", True),
+                    ("two", "14.0.0", "cmdline-tools;14.0.0", True),
+                ],
             )
             with self.assertRaises(AndroidSdkToolError):
                 resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
@@ -404,7 +467,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
             root = Path(directory)
             outside_root = Path(outside)
-            self.make_analyzer_sdk(root, [("valid", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("valid", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             escaped = outside_root / "escaped"
             (escaped / "bin").mkdir(parents=True)
             (escaped / "source.properties").write_text(
@@ -425,7 +490,10 @@ class AndroidSdkToolsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
             root = Path(directory)
             outside_root = Path(outside)
-            self.make_analyzer_sdk(outside_root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                outside_root,
+                [("latest", "14.0.0", "cmdline-tools;14.0.0", True)],
+            )
             command_line_tools = root / "cmdline-tools"
             try:
                 command_line_tools.symlink_to(
@@ -440,7 +508,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
             root = Path(directory)
             outside_root = Path(outside)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             external_metadata = outside_root / "source.properties"
             external_metadata.write_text("Pkg.Revision = 15.0.0\n", encoding="utf-8")
             metadata = root / "cmdline-tools/latest/source.properties"
@@ -455,7 +525,9 @@ class AndroidSdkToolsTest(unittest.TestCase):
     def test_apkanalyzer_source_properties_symlink_loop_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            self.make_analyzer_sdk(
+                root, [("latest", "14.0.0", "cmdline-tools;14.0.0", True)]
+            )
             metadata = root / "cmdline-tools/latest/source.properties"
             metadata.unlink()
             try:

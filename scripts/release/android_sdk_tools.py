@@ -101,7 +101,7 @@ def _package_revision(
     directory: Path,
     package_name: str = "build-tools",
     containment_roots: tuple[Path, ...] = (),
-    expected_path: str | None = None,
+    require_matching_path: bool = False,
 ) -> tuple[int, ...]:
     properties = _contained_path(
         directory / "source.properties",
@@ -128,8 +128,9 @@ def _package_revision(
                 raise AndroidSdkToolError(
                     f"Android SDK {package_name} package revision is malformed"
                 )
-            matches.append(parse_revision(match.group(1)))
-        if expected_path is not None and stripped.startswith("Pkg.Path"):
+            raw_revision = match.group(1)
+            matches.append((parse_revision(raw_revision), raw_revision))
+        if require_matching_path and stripped.startswith("Pkg.Path"):
             match = _PACKAGE_PATH.fullmatch(stripped)
             if match is None:
                 raise AndroidSdkToolError(
@@ -140,16 +141,17 @@ def _package_revision(
         raise AndroidSdkToolError(
             f"Android SDK {package_name} package revision is not unique"
         )
-    if expected_path is not None:
+    normalized_revision, raw_revision = matches[0]
+    if require_matching_path:
         if len(path_matches) != 1:
             raise AndroidSdkToolError(
                 f"Android SDK {package_name} package path is not unique"
             )
-        if path_matches[0] != expected_path:
+        if path_matches[0] != f"{package_name};{raw_revision}":
             raise AndroidSdkToolError(
                 f"Android SDK {package_name} package path does not match expected identity"
             )
-    return matches[0]
+    return normalized_revision
 
 
 def _validated_executable(
@@ -233,7 +235,7 @@ def _selected_cmdline_tools(root: Path) -> tuple[tuple[int, ...], Path]:
                         package,
                         "cmdline-tools",
                         containment_roots=(canonical_root, root),
-                        expected_path=f"cmdline-tools;{child.name}",
+                        require_matching_path=True,
                     ),
                     package,
                 )
