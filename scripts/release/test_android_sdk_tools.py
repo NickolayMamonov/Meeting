@@ -7,6 +7,7 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+import android_sdk_tools
 from android_sdk_tools import (
     AndroidSdkToolError,
     _APKANALYZER_PROBE_TIMEOUT_SECONDS,
@@ -16,6 +17,11 @@ from android_sdk_tools import (
 
 
 class AndroidSdkToolsTest(unittest.TestCase):
+    def setUp(self):
+        self.platform = patch.object(android_sdk_tools.sys, "platform", "linux")
+        self.platform.start()
+        self.addCleanup(self.platform.stop)
+
     @staticmethod
     def make_sdk(root, versions):
         build_tools = root / "build-tools"
@@ -161,7 +167,7 @@ class AndroidSdkToolsTest(unittest.TestCase):
             resolve_apksigner({})
 
     @staticmethod
-    def make_analyzer_sdk(root, packages):
+    def make_analyzer_sdk(root, packages, launchers=("apkanalyzer",)):
         command_line_tools = root / "cmdline-tools"
         command_line_tools.mkdir()
         for name, revision, valid in packages:
@@ -171,9 +177,10 @@ class AndroidSdkToolsTest(unittest.TestCase):
                 f"Pkg.Revision = {revision}\n", encoding="utf-8"
             )
             if valid:
-                tool = package / "bin" / "apkanalyzer"
-                tool.write_text("#!/bin/sh\n", encoding="utf-8")
-                tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
+                for launcher in launchers:
+                    tool = package / "bin" / launcher
+                    tool.write_text("#!/bin/sh\n", encoding="utf-8")
+                    tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
 
     @staticmethod
     def successful_probe(*_args, **_kwargs):
@@ -191,7 +198,22 @@ class AndroidSdkToolsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.make_analyzer_sdk(
-                root, [("latest", "14.0.0", True), ("12.0.0", "12.0.0", True)]
+                root,
+                [("latest", "14.0.0", True), ("12.0.0", "12.0.0", True)],
+            )
+            with patch("android_sdk_tools.subprocess.run", self.successful_probe):
+                self.assertEqual(
+                    resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}),
+                    (root / "cmdline-tools/latest/bin/apkanalyzer").resolve(),
+                )
+
+    def test_apkanalyzer_non_windows_prefers_extensionless_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(
+                root,
+                [("latest", "14.0.0", True)],
+                launchers=("apkanalyzer", "apkanalyzer.bat"),
             )
             with patch("android_sdk_tools.subprocess.run", self.successful_probe):
                 self.assertEqual(
@@ -214,6 +236,46 @@ class AndroidSdkToolsTest(unittest.TestCase):
             )()
             with patch("android_sdk_tools.subprocess.run", return_value=result):
                 self.assertTrue(resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}).is_absolute())
+
+    def test_apkanalyzer_windows_prefers_bat_launcher_and_allows_batch_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(
+                root,
+                [("latest", "14.0.0", True)],
+                launchers=("apkanalyzer", "apkanalyzer.bat"),
+            )
+            batch_file = root / "cmdline-tools/latest/bin/apkanalyzer.bat"
+            batch_file.chmod(batch_file.stat().st_mode & ~stat.S_IXUSR)
+            with patch.object(android_sdk_tools.sys, "platform", "win32"):
+                with patch(
+                    "android_sdk_tools.subprocess.run",
+                    side_effect=self.successful_probe,
+                ) as probe:
+                    self.assertEqual(
+                        resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}),
+                        batch_file.resolve(),
+                    )
+            probe.assert_called_once_with(
+                [str(batch_file.resolve())],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=_APKANALYZER_PROBE_TIMEOUT_SECONDS,
+            )
+
+    def test_apkanalyzer_windows_does_not_fallback_to_extensionless_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            with patch.object(android_sdk_tools.sys, "platform", "win32"):
+                with patch(
+                    "android_sdk_tools.subprocess.run",
+                    side_effect=self.successful_probe,
+                ) as probe:
+                    with self.assertRaises(AndroidSdkToolError):
+                        resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+            probe.assert_not_called()
 
     def test_apkanalyzer_failures_are_rejected_without_downgrade(self):
         for result in (

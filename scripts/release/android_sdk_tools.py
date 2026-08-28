@@ -138,13 +138,16 @@ def _validated_executable(
     tool: str = "apksigner",
     relative_path: str | None = None,
     containment_roots: tuple[Path, ...] = (),
+    require_executable: bool = True,
 ) -> Path:
     executable = _contained_path(
         directory / (relative_path or tool),
         containment_roots + (directory.resolve(),),
         tool,
     )
-    if not executable.is_file() or not os.access(executable, os.X_OK):
+    if not executable.is_file() or (
+        require_executable and not os.access(executable, os.X_OK)
+    ):
         raise AndroidSdkToolError(f"{tool} is not a regular executable file")
     return executable
 
@@ -247,10 +250,11 @@ def resolve_apkanalyzer(environment: Mapping[str, str] | None = None) -> Path:
     try:
         root = sdk_root(environment)
         _, directory = _selected_cmdline_tools(root)
+        launcher = "bin/apkanalyzer.bat" if sys.platform == "win32" else "bin/apkanalyzer"
         executable = _validated_executable(
             directory,
             "apkanalyzer",
-            "bin/apkanalyzer",
+            launcher,
             containment_roots=(
                 _contained_path(
                     root / "cmdline-tools",
@@ -259,6 +263,7 @@ def resolve_apkanalyzer(environment: Mapping[str, str] | None = None) -> Path:
                 ),
                 root,
             ),
+            require_executable=sys.platform != "win32",
         )
         _probe_apkanalyzer(executable)
         return executable
