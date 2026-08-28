@@ -264,6 +264,7 @@ class PackageArtifactsTest(unittest.TestCase):
             candidate = json.loads((output / "release-candidate.json").read_text())
             envelope = json.loads((output / "attestation-index.json").read_text())
             self.assertEqual(manifest["tag"], "v1.0.0")
+            self.assertNotIn(b"\r", (output / "SHA256SUMS").read_bytes())
             self.assertNotIn("release-candidate.json", (output / "SHA256SUMS").read_text())
             self.assertNotIn("attestation-index.json", (output / "SHA256SUMS").read_text())
             self.assertEqual(
@@ -430,6 +431,13 @@ class PackageArtifactsTest(unittest.TestCase):
                 mapping=None, symbols=None, tag=None, commit=None,
                 source_branch=None, workflow=None,
                 attestation_evidence=None, prepare_only=True,
+            )
+            metadata.write_text(
+                json.dumps({
+                    **json.loads(metadata.read_text(encoding="utf-8")),
+                    "sourceBranch": "dev",
+                }),
+                encoding="utf-8",
             )
             package(arguments)
             apk.write_bytes(b"second")

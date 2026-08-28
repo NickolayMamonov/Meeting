@@ -34,6 +34,14 @@ from verify_remote_assets import AssetError, MAX_RELEASE_ASSET_BYTES, verify as 
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
+
+def _expected_source_branch(manifest_path: Path) -> str:
+    metadata = json.loads(manifest_path.read_text(encoding="utf-8"))
+    value = metadata.get("source_branch")
+    if not isinstance(value, str) or not value:
+        raise PublicationError("publication fixture source branch is missing")
+    return value
+
 EXPECTED_REJECTION_KEYS = frozenset({
     "missing_assets",
     "non_list_assets",
@@ -575,6 +583,7 @@ def _no_pre_admission_post(
             release_id=42,
             tag=tag,
             source_sha=source_sha,
+            expected_source_branch="dev",
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
         )
@@ -664,6 +673,7 @@ def _prepatch_divergence_rejected(
             release_id=42,
             tag=tag,
             source_sha=source_sha,
+            expected_source_branch="dev",
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
         )
@@ -676,9 +686,11 @@ def _evidence_identity_mismatch_rejected(
     *,
     field: str,
     evidence_directory: Path,
+    manifest_path: Path,
     tag: str,
     source_sha: str,
 ) -> bool:
+    expected_source_branch = _expected_source_branch(manifest_path)
     with tempfile.TemporaryDirectory(prefix="meet-identity-fixture-") as root:
         fixture = Path(root) / "release-output"
         shutil.copytree(evidence_directory, fixture)
@@ -693,7 +705,12 @@ def _evidence_identity_mismatch_rejected(
         path.write_text(json.dumps(value), encoding="utf-8")
         try:
             from release_mutation_gate import expected_release_asset_names
-            expected_release_asset_names(fixture, tag=tag, source_sha=source_sha)
+            expected_release_asset_names(
+                fixture,
+                tag=tag,
+                source_sha=source_sha,
+                expected_source_branch=expected_source_branch,
+            )
         except (MutationError, OSError, ValueError):
             return True
         return False
@@ -733,6 +750,7 @@ def _loopback_state_identity_mismatch_rejected(
             release_id=42,
             tag=tag,
             source_sha=source_sha,
+            expected_source_branch="dev",
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
         )
@@ -880,6 +898,7 @@ def _final_asset_metadata_drift_rejected(
     tag: str,
     source_sha: str,
 ) -> bool:
+    expected_source_branch = _expected_source_branch(manifest_path)
     from release_notes import render_release_notes
 
     apk = (evidence_directory / "Meet.apk").read_bytes()
@@ -961,6 +980,7 @@ def _final_asset_metadata_drift_rejected(
             release_id=42,
             tag=tag,
             source_sha=source_sha,
+            expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
         )
@@ -1085,19 +1105,21 @@ def _identity_rejection_matrix(
         "manifest_identity_mismatch": {
             "authority": "release-output/release-manifest.json:commit",
             "rejected": _evidence_identity_mismatch_rejected(
-            field="release-manifest.json",
-            evidence_directory=evidence_directory,
-            tag=tag,
-            source_sha=source_sha,
+                field="release-manifest.json",
+                evidence_directory=evidence_directory,
+                manifest_path=manifest_path,
+                tag=tag,
+                source_sha=source_sha,
             ),
         },
         "candidate_identity_mismatch": {
             "authority": "release-output/release-candidate.json:commit",
             "rejected": _evidence_identity_mismatch_rejected(
-            field="release-candidate.json",
-            evidence_directory=evidence_directory,
-            tag=tag,
-            source_sha=source_sha,
+                field="release-candidate.json",
+                evidence_directory=evidence_directory,
+                manifest_path=manifest_path,
+                tag=tag,
+                source_sha=source_sha,
             ),
         },
     }
@@ -1414,6 +1436,7 @@ def run_harness(
                     release_id=42,
                     tag=tag,
                     source_sha=source_sha,
+                    expected_source_branch="dev",
                     evidence_directory=evidence_directory,
                     manifest_path=manifest_path,
                     rendered_body_path=body_path,

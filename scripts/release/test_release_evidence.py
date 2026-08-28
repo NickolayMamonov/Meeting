@@ -25,7 +25,64 @@ from release_evidence import (
 )
 
 
-WORKFLOW_PATH = ".github/workflows/release-please-credential-audit.yml"
+PRODUCER_REPOSITORY = "NickolayMamonov/Meeting"
+PRODUCER_REPOSITORY_ID = 101
+PRODUCER_SHA = "a" * 40
+
+
+def producer_run(
+    *,
+    run_id: int,
+    run_number: int | None = None,
+    run_attempt: int = 1,
+    path: str = ".github/workflows/release-credential-audit.yml@master",
+    head_sha: str = PRODUCER_SHA,
+    event: str = "push",
+    head_branch: str = "master",
+    repository: str = PRODUCER_REPOSITORY,
+    head_repository: str = PRODUCER_REPOSITORY,
+    status: str = "completed",
+    conclusion: str = "success",
+) -> dict:
+    return {
+        "workflow_id": 330672623,
+        "path": path,
+        "id": run_id,
+        "run_number": run_id if run_number is None else run_number,
+        "run_attempt": run_attempt,
+        "event": event,
+        "head_branch": head_branch,
+        "head_sha": head_sha,
+        "repository": {"id": PRODUCER_REPOSITORY_ID, "full_name": repository},
+        "head_repository": {"id": PRODUCER_REPOSITORY_ID, "full_name": head_repository},
+        "status": status,
+        "conclusion": conclusion,
+    }
+
+
+def producer_artifact(
+    *,
+    artifact_id: int,
+    digest: str,
+    run_id: int = 10,
+    repository_id: int = PRODUCER_REPOSITORY_ID,
+    head_repository_id: int = PRODUCER_REPOSITORY_ID,
+    head_branch: str = "master",
+    head_sha: str = PRODUCER_SHA,
+) -> dict:
+    return {
+        "id": artifact_id,
+        "name": "credential-audit-evidence.json",
+        "digest": digest,
+        "expired": False,
+        "workflow_run": {
+            "id": run_id,
+            "repository_id": repository_id,
+            "head_repository_id": head_repository_id,
+            "head_branch": head_branch,
+            "head_sha": head_sha,
+        },
+    }
 
 
 class EvidenceTest(unittest.TestCase):
@@ -83,27 +140,48 @@ class EvidenceTest(unittest.TestCase):
                 {"labels": [{"name": "non-release"}], "body": "",
                  "head": {"ref": "feature"}},
                 {},
+                integration_branch="dev",
             ),
             "N/A",
         )
         with self.assertRaises(EvidenceError):
-            required_check_decision("pull_request", {"labels": [], "body": ""}, {})
+            required_check_decision(
+                "pull_request",
+                {"labels": [], "body": ""},
+                {},
+                integration_branch="dev",
+            )
 
     def test_pull_request_snapshots_are_exact_and_independent(self):
         event = self.pr()
         first = self.pr()
         second = self.pr()
         verified = verify_pull_request_snapshot(
-            event, first, second, repository="owner/repo"
+            event,
+            first,
+            second,
+            repository="owner/repo",
+            target_branch="dev",
         )
-        self.assertEqual(pull_request_tuple(verified), pull_request_tuple(event))
+        self.assertEqual(
+            pull_request_tuple(verified, integration_branch="dev"),
+            pull_request_tuple(event, integration_branch="dev"),
+        )
         with self.assertRaises(EvidenceError):
             verify_pull_request_snapshot(
-                event, first, self.pr(head_sha="moved"), repository="owner/repo"
+                event,
+                first,
+                self.pr(head_sha="moved"),
+                repository="owner/repo",
+                target_branch="dev",
             )
         with self.assertRaises(EvidenceError):
             verify_pull_request_snapshot(
-                event, first, first, repository="owner/repo"
+                event,
+                first,
+                first,
+                repository="owner/repo",
+                target_branch="dev",
             )
 
     def test_merge_queue_maps_exact_tuple_and_checks(self):
@@ -125,21 +203,26 @@ class EvidenceTest(unittest.TestCase):
                 "release-please-credential-audit": "success",
             },
         }
-        selected = effective_singleton_queue([rule], [entry])
+        selected = effective_singleton_queue([rule], [entry], "dev")
         mapped = map_merge_group_to_pr(
             {"queue_entry_id": "q1", "target_branch": "dev",
              "pr_tuple": (7, "head", "dev", "base")},
             [entry],
             {7: {"number": 7, "state": "open", "draft": False,
                  "head_sha": "head", "base_ref": "dev", "base_sha": "base"}},
+            target_branch="dev",
             required_checks=selected["required_checks"],
         )
         self.assertEqual(mapped["tuple"], (7, "head", "dev", "base"))
         with self.assertRaises(EvidenceError):
-            effective_singleton_queue([rule], [entry, {**entry, "id": "q2"}])
+            effective_singleton_queue(
+                [rule], [entry, {**entry, "id": "q2"}], "dev"
+            )
         with self.assertRaises(EvidenceError):
             effective_singleton_queue(
-                [{**rule, "required_checks": ["continuous-integration"]}], [entry]
+                [{**rule, "required_checks": ["continuous-integration"]}],
+                [entry],
+                "dev",
             )
         with self.assertRaises(EvidenceError):
             map_merge_group_to_pr(
@@ -148,6 +231,7 @@ class EvidenceTest(unittest.TestCase):
                 [{**entry, "head_sha": "moved"}],
                 {7: {"number": 7, "state": "open", "draft": False,
                      "head_sha": "head", "base_ref": "dev", "base_sha": "base"}},
+                target_branch="dev",
                 required_checks=rule["required_checks"],
             )
         with self.assertRaises(EvidenceError):
@@ -157,6 +241,7 @@ class EvidenceTest(unittest.TestCase):
                 [{**entry, "state": "DEQUEUED"}],
                 {7: {"number": 7, "state": "open", "draft": False,
                      "head_sha": "head", "base_ref": "dev", "base_sha": "base"}},
+                target_branch="dev",
                 required_checks=rule["required_checks"],
             )
 
@@ -182,7 +267,11 @@ class EvidenceTest(unittest.TestCase):
             "parents": [{"sha": "base"}, {"sha": "head"}],
         }
         verify_merge_group_event(
-            event, group, commit, repository="owner/repo"
+            event,
+            group,
+            commit,
+            repository="owner/repo",
+            target_branch="dev",
         )
         verify_two_parent_merge_commit(commit, "base", "head")
         with self.assertRaises(EvidenceError):
@@ -197,6 +286,7 @@ class EvidenceTest(unittest.TestCase):
                 group,
                 commit,
                 repository="owner/repo",
+                target_branch="dev",
             )
 
     def test_canonical_attestation_identity_uses_content_bytes(self):
@@ -468,71 +558,131 @@ class EvidenceTest(unittest.TestCase):
 
     def test_newer_failed_run_is_not_a_fallback(self):
         runs = [
-            {"workflow_id": 4, "path": WORKFLOW_PATH, "id": 10,
-             "run_number": 10, "run_attempt": 1, "ref": "refs/heads/master",
-             "status": "completed", "conclusion": "success"},
-            {"workflow_id": 4, "path": WORKFLOW_PATH, "id": 11,
-             "run_number": 11, "run_attempt": 1, "ref": "refs/heads/master",
-             "status": "completed", "conclusion": "failure"},
+            producer_run(run_id=10),
+            producer_run(run_id=11, status="completed", conclusion="failure"),
         ]
         with self.assertRaises(EvidenceError):
             select_latest_producer_evidence(
                 runs,
-                {10: [{"id": 1, "name": "credential-audit-evidence.json",
-                       "digest": "a" * 64}]},
-                workflow_id=4,
-                workflow_path=WORKFLOW_PATH,
+                {10: [producer_artifact(artifact_id=1, digest="a" * 64)]},
+                workflow_id=330672623,
+                workflow_path=".github/workflows/release-credential-audit.yml",
+                repository=PRODUCER_REPOSITORY,
+                protected_branch="master",
+                protected_ref="refs/heads/master",
+                head_sha=PRODUCER_SHA,
             )
 
     def test_rerun_attempt_supersedes_and_wrong_path_is_excluded(self):
         runs = [
-            {"workflow_id": 4, "path": WORKFLOW_PATH, "id": 10,
-             "run_number": 10, "run_attempt": 1, "ref": "refs/heads/master",
-             "status": "completed", "conclusion": "failure"},
-            {"workflow_id": 4, "path": WORKFLOW_PATH, "id": 10,
-             "run_number": 10, "run_attempt": 2, "ref": "refs/heads/master",
-             "status": "completed", "conclusion": "success"},
-            {"workflow_id": 4, "path": ".github/workflows/copied.yml", "id": 99,
-             "run_number": 99, "run_attempt": 1, "ref": "refs/heads/master",
-             "status": "completed", "conclusion": "success"},
+            producer_run(run_id=10, conclusion="failure"),
+            producer_run(run_id=10, run_attempt=2),
+            producer_run(run_id=99, path=".github/workflows/copied.yml@master"),
         ]
         selected = select_latest_producer_evidence(
             runs,
-            {10: [{"id": 8, "name": "credential-audit-evidence.json",
-                   "digest": "c" * 64}]},
-            workflow_id=4,
-            workflow_path=WORKFLOW_PATH,
+            {10: [producer_artifact(artifact_id=8, digest="c" * 64)]},
+            workflow_id=330672623,
+            workflow_path=".github/workflows/release-credential-audit.yml",
+            repository=PRODUCER_REPOSITORY,
+            protected_branch="master",
+            protected_ref="refs/heads/master",
+            head_sha=PRODUCER_SHA,
         )
         self.assertEqual(selected.run_attempt, 2)
         with self.assertRaises(EvidenceError):
             select_latest_producer_evidence(
                 [runs[1], dict(runs[1])],
-                {10: [{"id": 8, "name": "credential-audit-evidence.json",
-                       "digest": "c" * 64}]},
-                workflow_id=4,
-                workflow_path=WORKFLOW_PATH,
+                {10: [producer_artifact(artifact_id=8, digest="c" * 64)]},
+                workflow_id=330672623,
+                workflow_path=".github/workflows/release-credential-audit.yml",
+                repository=PRODUCER_REPOSITORY,
+                protected_branch="master",
+                protected_ref="refs/heads/master",
+                head_sha=PRODUCER_SHA,
             )
 
     def test_producer_selection_is_exhaustive_and_race_aware(self):
         runs = [
-            {
-                "workflow_id": 4, "path": WORKFLOW_PATH, "id": index,
-                "run_number": index, "run_attempt": 1,
-                "ref": "refs/heads/master", "status": "completed",
-                "conclusion": "success",
-            }
+            producer_run(run_id=index)
             for index in range(1, 121)
         ]
         selected = select_latest_producer_evidence(
             runs,
-            {120: [{"id": 9, "name": "credential-audit-evidence.json",
-                    "digest": "c" * 64}]},
-            workflow_id=4,
-            workflow_path=WORKFLOW_PATH,
+            {120: [producer_artifact(artifact_id=9, digest="c" * 64, run_id=120)]},
+            workflow_id=330672623,
+            workflow_path=".github/workflows/release-credential-audit.yml",
+            repository=PRODUCER_REPOSITORY,
+            protected_branch="master",
+            protected_ref="refs/heads/master",
+            head_sha=PRODUCER_SHA,
         )
         self.assertEqual(selected.run_number, 120)
         with self.assertRaises(EvidenceError):
             stable_read({"run": 120}, {"run": 119}, "producer snapshot")
+
+    def test_producer_selection_rejects_cross_role_and_incomplete_inputs(self):
+        base_run = producer_run(run_id=10)
+        base_artifact = producer_artifact(artifact_id=1, digest="a" * 64)
+
+        def select(run, artifact_map):
+            return select_latest_producer_evidence(
+                [run],
+                artifact_map,
+                workflow_id=330672623,
+                workflow_path=".github/workflows/release-credential-audit.yml",
+                repository=PRODUCER_REPOSITORY,
+                protected_branch="master",
+                protected_ref="refs/heads/master",
+                head_sha=PRODUCER_SHA,
+            )
+
+        invalid_runs = {
+            "repository": producer_run(
+                run_id=10,
+                repository="other/repository",
+            ),
+            "head_repository": producer_run(
+                run_id=10,
+                head_repository="other/repository",
+            ),
+            "event": producer_run(run_id=10, event="workflow_dispatch"),
+            "head_branch": producer_run(run_id=10, head_branch="dev"),
+            "stale_sha": producer_run(run_id=10, head_sha="b" * 40),
+        }
+        for label, run in invalid_runs.items():
+            with self.subTest(label=label), self.assertRaises(EvidenceError):
+                select(run, {10: [base_artifact]})
+
+        invalid_artifacts = {
+            "missing": {},
+            "expired": [{**base_artifact, "expired": True}],
+            "malformed_id": [{**base_artifact, "id": True}],
+            "missing_workflow_run": [
+                {key: value for key, value in base_artifact.items() if key != "workflow_run"}
+            ],
+            "cross_role_branch": [
+                {
+                    **base_artifact,
+                    "workflow_run": {
+                        **base_artifact["workflow_run"],
+                        "head_branch": "dev",
+                    },
+                }
+            ],
+            "cross_role_repository": [
+                {
+                    **base_artifact,
+                    "workflow_run": {
+                        **base_artifact["workflow_run"],
+                        "repository_id": PRODUCER_REPOSITORY_ID + 1,
+                    },
+                }
+            ],
+        }
+        for label, artifacts in invalid_artifacts.items():
+            with self.subTest(label=label), self.assertRaises(EvidenceError):
+                select(base_run, {10: artifacts})
 
 
 if __name__ == "__main__":

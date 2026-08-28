@@ -54,18 +54,20 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             :
         ]
 
-    def test_snapshot_sign_is_checkout_free_and_resolves_before_secret_decode(self):
-        self.assertNotIn("actions/checkout", self.snapshot_sign)
+    def test_snapshot_sign_checks_out_exact_tooling_and_admits_before_secret_decode(self):
+        self.assertIn("actions/checkout", self.snapshot_sign)
+        self.assertIn("path: release-tooling", self.snapshot_sign)
+        self.assertIn("test \"$(git -C release-tooling rev-parse HEAD)\" = \"$EXPECTED_SHA\"", self.snapshot_sign)
+        self.assertIn("assert-ref", self.snapshot_sign)
         self.assertIn("name: Resolve snapshot apksigner", self.snapshot_sign)
+        self.assertIn("name: Admit exact unsigned snapshot before keystore access", self.snapshot_sign)
         self.assertLess(
-            self.snapshot_sign.index("name: Resolve snapshot apksigner"),
+            self.snapshot_sign.index("name: Admit exact unsigned snapshot before keystore access"),
             self.snapshot_sign.index("name: Decode snapshot keystore"),
         )
-        self.assertIn("ANDROID_SDK_ROOT", self.snapshot_sign)
-        self.assertIn("ANDROID_HOME", self.snapshot_sign)
-        self.assertIn("source.properties", self.snapshot_sign)
-        self.assertIn("apksigner version", self.snapshot_sign)
-        self.assertIn("highest Android SDK build-tools version is ambiguous", self.snapshot_sign)
+        self.assertIn("--unsigned-apk", self.snapshot_sign)
+        self.assertIn("--expected-commit", self.snapshot_sign)
+        self.assertIn("--expected-source-branch", self.snapshot_sign)
 
     def test_snapshot_sign_reuses_one_quoted_resolved_path(self):
         self.assertIn('apksigner="$APKSIGNER_PATH"', self.snapshot_sign)
@@ -73,16 +75,16 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertIn('"$apksigner" verify', self.snapshot_sign)
         self.assertNotIn("\napksigner sign", self.snapshot_sign)
         self.assertNotIn("\napksigner verify", self.snapshot_sign)
-        self.assertEqual(self.snapshot_sign.count('"$apksigner"'), 2)
+        self.assertGreaterEqual(self.snapshot_sign.count('"$apksigner"'), 2)
 
     def test_snapshot_evidence_uses_checked_out_python_resolver_and_injects_output(self):
         self.assertIn("name: Resolve snapshot Android SDK tools", self.snapshot_evidence)
-        self.assertIn("python scripts/release/android_sdk_tools.py apksigner", self.snapshot_evidence)
-        self.assertIn("python scripts/release/android_sdk_tools.py apkanalyzer", self.snapshot_evidence)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apksigner", self.snapshot_evidence)
+        self.assertIn("python release-tooling/scripts/release/android_sdk_tools.py apkanalyzer", self.snapshot_evidence)
         self.assertIn('printf \'APKSIGNER_PATH=%s\\n\' "$apksigner"', self.snapshot_evidence)
         self.assertIn('printf \'APKANALYZER_PATH=%s\\n\' "$apkanalyzer"', self.snapshot_evidence)
         verifier_call = self.snapshot_evidence[
-            self.snapshot_evidence.index("python scripts/release/verify_android_artifacts.py") :
+            self.snapshot_evidence.index("python release-tooling/scripts/release/verify_android_artifacts.py") :
         ]
         self.assertIn('--apksigner "$APKSIGNER_PATH"', verifier_call)
         self.assertIn('--apkanalyzer "$APKANALYZER_PATH"', verifier_call)
@@ -147,7 +149,7 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             self.stable_evidence,
         )
         self.assertIn('--commit "$RELEASE_SHA"', self.stable_evidence)
-        self.assertIn('--source-ref refs/heads/dev', self.stable_evidence)
+        self.assertIn('--source-ref refs/heads/master', self.stable_evidence)
         self.assertIn('--source-sha "${{ github.sha }}"', self.stable_evidence)
         self.assertNotIn(
             '--source-sha "${{ needs.release-please.outputs.source_sha }}"',
@@ -158,7 +160,7 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         for workflow, verifier_script, downstream in (
             (
                 self.snapshot_evidence,
-                "python scripts/release/verify_android_artifacts.py",
+                "python release-tooling/scripts/release/verify_android_artifacts.py",
                 (
                     "Prepare snapshot evidence",
                     "Attest snapshot subjects",

@@ -95,8 +95,8 @@ class ReleasePleaseConfigTest(unittest.TestCase):
             f"googleapis/release-please-action@{ACTION_SHA} # v4.2.0",
             self.workflow,
         )
-        self.assertIn("branches: [dev]", self.workflow)
-        self.assertIn("target-branch: dev", self.workflow)
+        self.assertIn("branches: [master]", self.workflow)
+        self.assertIn("target-branch: master", self.workflow)
         self.assertIn("config-file: release-please-config.json", self.workflow)
         self.assertIn("manifest-file: .release-please-manifest.json", self.workflow)
         self.assertEqual(
@@ -108,7 +108,7 @@ class ReleasePleaseConfigTest(unittest.TestCase):
         self.assertTrue(self.config["include-v-in-tag"])
         self.assertEqual(self.config["initial-version"], "1.0.0")
         self.assertTrue(self.config["draft"])
-        self.assertEqual(self.config["target-branch"], "dev")
+        self.assertEqual(self.config["target-branch"], "master")
         self.assertEqual(self.config["changelog-path"], "CHANGELOG.md")
         self.assertEqual(self.config["bootstrap-sha"], BOOTSTRAP_SHA)
 

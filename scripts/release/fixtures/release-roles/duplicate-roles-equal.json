@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "roles": {
+    "integration": {"branch": "dev"},
+    "stable": {"branch": "master"}
+  },
+  "roles": {
+    "integration": {"branch": "dev"},
+    "stable": {"branch": "master"}
+  }
+}

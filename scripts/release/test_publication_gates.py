@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -128,6 +129,7 @@ class PublicationGateTest(unittest.TestCase):
                     "channel": "release",
                     "tag": "v1.0.0",
                     "commit": "a" * 40,
+                    "source_branch": "dev",
                     "artifacts": [
                         {"name": "Meet.apk", "type": "apk", "size": 3,
                          "sha256": "dd37c2d7274f7ea982cb83390c36918fee9ce8889073c44b68cdc00bdb8c3e04"},
@@ -138,23 +140,44 @@ class PublicationGateTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (directory / "release-candidate.json").write_text(
-                json.dumps({"tag": "v1.0.0", "commit": "a" * 40}),
+                json.dumps({"tag": "v1.0.0", "commit": "a" * 40, "source_branch": "dev"}),
                 encoding="utf-8",
             )
+            authority_bytes = json.dumps(
+                {
+                    "schema": 1,
+                    "kind": "release-authority",
+                    "channel": "release",
+                    "tag": "v1.0.0",
+                    "commit": "a" * 40,
+                    "source_branch": "dev",
+                }
+            ).encode("utf-8")
+            (directory / "release-authority.json").write_bytes(authority_bytes)
             (directory / "attestation-index.json").write_text(
-                json.dumps({"attestations": [{"name": "Meet.apk.attestation.json"}]}),
+                json.dumps(
+                    {
+                        "attestations": [{"name": "Meet.apk.attestation.json"}],
+                        "authority": {
+                            "name": "release-authority.json",
+                            "sha256": hashlib.sha256(authority_bytes).hexdigest(),
+                        },
+                    }
+                ),
                 encoding="utf-8",
             )
             self.assertEqual(
                 expected_release_asset_names(
-                    directory, tag="v1.0.0", source_sha="a" * 40
+                    directory, tag="v1.0.0", source_sha="a" * 40,
+                    expected_source_branch="dev",
                 ),
                 {"Meet.apk"},
             )
             (directory / "operator-note.txt").write_text("unexpected", encoding="utf-8")
             with self.assertRaisesRegex(MutationError, "unreferenced"):
                 expected_release_asset_names(
-                    directory, tag="v1.0.0", source_sha="a" * 40
+                    directory, tag="v1.0.0", source_sha="a" * 40,
+                    expected_source_branch="dev",
                 )
 
     def test_workflow_has_public_probe_before_protected_one_shot_mutation(self):
@@ -338,9 +361,9 @@ class PublicationGateTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("  pull_request:\n    branches: [dev]", workflow)
-        self.assertIn("  push:\n    branches: [dev]", workflow)
+        self.assertIn("  push:\n    branches: [dev, master]", workflow)
         self.assertIn("  workflow_dispatch:", workflow)
-        self.assertEqual(workflow.count("permissions:"), 3)
+        self.assertEqual(workflow.count("permissions:"), 4)
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertIn(
             "ref: ${{ github.event.pull_request.head.sha || github.sha }}",

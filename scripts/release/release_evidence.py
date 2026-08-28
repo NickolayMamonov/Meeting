@@ -95,15 +95,58 @@ def _strict_sha256(value: Any, what: str) -> str:
     return value
 
 
-def pull_request_tuple(pr: Mapping[str, Any]) -> tuple[Any, ...]:
+def _git_sha(value: Any, what: str) -> str:
+    _require(
+        isinstance(value, str)
+        and len(value) == 40
+        and all(character in "0123456789abcdef" for character in value),
+        f"invalid {what} Git SHA",
+    )
+    return value
+
+
+def _positive_int(value: Any, what: str) -> int:
+    _require(
+        isinstance(value, int) and not isinstance(value, bool) and value > 0,
+        f"invalid {what}",
+    )
+    return value
+
+
+def _producer_repository_name(value: Any, what: str) -> str:
+    _require(isinstance(value, Mapping), f"{what} is missing")
+    name = value.get("full_name")
+    _require(isinstance(name, str) and name, f"{what} full_name is missing")
+    return name
+
+
+def _producer_repository_id(value: Any, what: str) -> int:
+    _require(isinstance(value, Mapping), f"{what} is missing")
+    return _positive_int(value.get("id"), f"{what} ID")
+
+
+def _role_branch(value: Any, what: str) -> str:
+    _require(isinstance(value, str) and value, f"{what} is required")
+    return value
+
+
+def pull_request_tuple(
+    pr: Mapping[str, Any],
+    *,
+    integration_branch: str,
+) -> tuple[Any, ...]:
     """Return the complete mutable PR identity used by race checks."""
 
+    _role_branch(integration_branch, "integration branch")
     head = pr.get("head", {})
     base = pr.get("base", {})
     head_repository = head.get("repo") or {}
     base_repository = base.get("repo") or {}
     labels = tuple(sorted(str(label.get("name", "")).strip().lower() for label in pr.get("labels", [])))
-    classification = classify_pull_request(pr)
+    classification = classify_pull_request(
+        pr,
+        integration_branch=integration_branch,
+    )
     return (
         int(pr["number"]),
         str(head.get("sha", pr.get("head_sha", ""))),
@@ -125,13 +168,13 @@ def verify_pull_request_snapshot(
     second: Mapping[str, Any],
     *,
     repository: str,
-    target_branch: str = "dev",
+    target_branch: str,
 ) -> Mapping[str, Any]:
     """Bind a pull_request event to two independent live API reads."""
 
-    event_tuple = pull_request_tuple(event_pr)
-    first_tuple = pull_request_tuple(first)
-    second_tuple = pull_request_tuple(second)
+    event_tuple = pull_request_tuple(event_pr, integration_branch=target_branch)
+    first_tuple = pull_request_tuple(first, integration_branch=target_branch)
+    second_tuple = pull_request_tuple(second, integration_branch=target_branch)
     _require(first is not second, "live PR snapshots are not independent")
     _require(first_tuple == second_tuple, "live PR tuple changed between verification reads")
     _require(event_tuple == first_tuple, "event PR tuple disagrees with live PR")
@@ -157,13 +200,18 @@ def verify_pull_request_snapshot(
     return first
 
 
-def classify_pull_request(pr: Mapping[str, Any]) -> str:
+def classify_pull_request(
+    pr: Mapping[str, Any],
+    *,
+    integration_branch: str,
+) -> str:
     """Return the explicit release classification required by the audit.
 
     Missing classification is release-relevant. It must never be interpreted
     as N/A merely because the PR has no obvious release files.
     """
 
+    _role_branch(integration_branch, "integration branch")
     labels = {str(label.get("name", "")).strip().lower() for label in pr.get("labels", [])}
     body = str(pr.get("body", ""))
     marker = "release-classification:"
@@ -180,7 +228,10 @@ def classify_pull_request(pr: Mapping[str, Any]) -> str:
     if "non-release" in labels:
         classifications.append("non-release")
     head_ref = str(pr.get("head", {}).get("ref", ""))
-    if "autorelease: pending" in labels or head_ref.startswith("release-please--branches--dev"):
+    if (
+        "autorelease: pending" in labels
+        or head_ref.startswith(f"release-please--branches--{integration_branch}")
+    ):
         classifications.append("release")
     _require(classifications, "PR has no explicit release classification")
     _require(
@@ -194,6 +245,8 @@ def required_check_decision(
     event_name: str,
     pr: Mapping[str, Any] | None,
     evidence: Mapping[str, Any],
+    *,
+    integration_branch: str,
 ) -> str:
     """Compute PASS/N/A while keeping the check unconditional.
 
@@ -207,7 +260,10 @@ def required_check_decision(
     if event_name not in {"pull_request", "merge_group"}:
         raise EvidenceError("credential audit only supports pull_request and merge_group")
     if event_name == "pull_request" and pr is not None:
-        classification = classify_pull_request(pr)
+        classification = classify_pull_request(
+            pr,
+            integration_branch=integration_branch,
+        )
         if classification == "non-release":
             return "N/A"
     _require(bool(evidence.get("verified")), "release credential evidence was not verified")
@@ -217,22 +273,23 @@ def required_check_decision(
 def effective_singleton_queue(
     repository_rules: Sequence[Mapping[str, Any]],
     queue_entries: Sequence[Mapping[str, Any]],
-    target_branch: str = "dev",
+    target_branch: str,
 ) -> Mapping[str, Any]:
     """Prove the effective queue is singleton and contains exhaustive entries."""
 
+    _role_branch(target_branch, "merge queue target branch")
     matching = [
         rule
         for rule in repository_rules
         if rule.get("target_branch") == target_branch
         and rule.get("enabled", True)
     ]
-    _require(len(matching) == 1, "effective dev merge queue configuration is not singleton")
+    _require(len(matching) == 1, "effective merge queue configuration is not singleton")
     rule = matching[0]
-    _require(rule.get("max_entries") == 1, "dev merge queue max_entries must be one")
-    _require(rule.get("min_entries") == 1, "dev merge queue min_entries must be one")
-    _require(rule.get("batch_size") == 1, "dev merge queue batch_size must be one")
-    _require(rule.get("grouping") in {"NONE", "none"}, "dev queue batching is enabled")
+    _require(rule.get("max_entries") == 1, "merge queue max_entries must be one")
+    _require(rule.get("min_entries") == 1, "merge queue min_entries must be one")
+    _require(rule.get("batch_size") == 1, "merge queue batch_size must be one")
+    _require(rule.get("grouping") in {"NONE", "none"}, "merge queue batching is enabled")
     _require(rule.get("entries_exhaustive") is True, "merge queue entries were not exhaustively enumerated")
     required_checks = [str(value) for value in rule.get("required_checks", [])]
     _require(required_checks, "effective queue has no required checks")
@@ -245,7 +302,7 @@ def effective_singleton_queue(
         "effective queue does not require release-please-credential-audit",
     )
     _require(len(queue_entries) <= int(rule["max_entries"]), "effective queue exceeds max_entries")
-    _require(len(queue_entries) == 1, "effective queue does not contain exactly one active entry")
+    _require(len(queue_entries) == 1, "effective merge queue does not contain exactly one active entry")
     _require(
         all(entry.get("target_branch") == target_branch for entry in queue_entries),
         "queue entries contain another target branch",
@@ -262,10 +319,12 @@ def map_merge_group_to_pr(
     queue_entries: Sequence[Mapping[str, Any]],
     live_prs: Mapping[int, Mapping[str, Any]],
     *,
+    target_branch: str,
     required_checks: Sequence[str] = ("release-please-credential-audit",),
 ) -> Mapping[str, Any]:
     """Map a synthetic merge group to exactly one live PR."""
 
+    _role_branch(target_branch, "merge group target branch")
     entry_id = group.get("queue_entry_id")
     matches = [entry for entry in queue_entries if entry.get("id") == entry_id]
     _require(len(matches) == 1, "merge group queue entry is absent or ambiguous")
@@ -278,8 +337,8 @@ def map_merge_group_to_pr(
         entry.get("state") in ACTIVE_MERGE_QUEUE_STATES,
         "merge queue entry is not active",
     )
-    target_branch = str(group.get("target_branch", ""))
-    _require(target_branch == "dev", "merge group target branch mismatch")
+    observed_target_branch = str(group.get("target_branch", ""))
+    _require(observed_target_branch == target_branch, "merge group target branch mismatch")
     _require(entry.get("target_branch") == target_branch, "queue entry target branch mismatch")
     pr_numbers = [int(number) for number in entry.get("pull_request_numbers", [])]
     _require(len(pr_numbers) == 1, "merge group does not contain exactly one PR")
@@ -326,10 +385,11 @@ def verify_merge_group_event(
     commit: Mapping[str, Any],
     *,
     repository: str,
-    target_branch: str = "dev",
+    target_branch: str,
 ) -> Mapping[str, str]:
     """Bind adapter evidence and the synthetic commit to the triggering event."""
 
+    _role_branch(target_branch, "merge group target branch")
     _require(event.get("action") == "checks_requested", "unexpected merge_group action")
     event_repository = str(event.get("repository", {}).get("full_name", ""))
     _require(event_repository == repository, "merge_group repository mismatch")
@@ -753,9 +813,9 @@ class ProducerEvidence:
 
 def _producer_key(run: Mapping[str, Any]) -> tuple[int, int, int]:
     return (
-        int(run.get("run_number", -1)),
-        int(run.get("id", -1)),
-        int(run.get("run_attempt", -1)),
+        _positive_int(run.get("run_number"), "producer run number"),
+        _positive_int(run.get("id"), "producer run ID"),
+        _positive_int(run.get("run_attempt"), "producer run attempt"),
     )
 
 
@@ -765,8 +825,10 @@ def select_latest_producer_evidence(
     *,
     workflow_id: int,
     workflow_path: str,
-    protected_ref: str = "refs/heads/master",
-    head_sha: str | None = None,
+    repository: str,
+    protected_branch: str,
+    protected_ref: str,
+    head_sha: str,
     artifact_name: str = "credential-audit-evidence.json",
 ) -> ProducerEvidence:
     """Select exact evidence without fallback from a newer bad run.
@@ -776,44 +838,141 @@ def select_latest_producer_evidence(
     artifact metadata at that run fails closed.
     """
 
-    matching = [
-        run
-        for run in runs
-        if int(run.get("workflow_id", -1)) == workflow_id
-        and run.get("path") == workflow_path
-        and run.get("ref") == protected_ref
-        and (head_sha is None or run.get("head_sha") == head_sha)
-    ]
+    _require(
+        isinstance(workflow_id, int) and not isinstance(workflow_id, bool) and workflow_id > 0,
+        "invalid producer workflow ID",
+    )
+    _require(
+        isinstance(workflow_path, str)
+        and workflow_path.startswith(".github/workflows/")
+        and "@" not in workflow_path,
+        "producer workflow path must be a resolved bare path",
+    )
+    _require(isinstance(repository, str) and repository, "producer repository is required")
+    _require(
+        isinstance(protected_branch, str) and protected_branch,
+        "producer protected branch is required",
+    )
+    _require(
+        isinstance(protected_ref, str)
+        and protected_ref == f"refs/heads/{protected_branch}",
+        "producer protected ref does not match protected branch",
+    )
+    expected_run_path = f"{workflow_path}@{protected_branch}"
+    current_sha = _git_sha(head_sha, "current protected branch")
+    matching: list[Mapping[str, Any]] = []
+    for run in runs:
+        _require(isinstance(run, Mapping), "producer workflow run is malformed")
+        run_workflow_id = run.get("workflow_id")
+        if (
+            not isinstance(run_workflow_id, int)
+            or isinstance(run_workflow_id, bool)
+            or run_workflow_id != workflow_id
+        ):
+            continue
+        if (
+            run.get("path") != expected_run_path
+            or run.get("event") != "push"
+            or run.get("head_branch") != protected_branch
+            or run.get("head_sha") != current_sha
+        ):
+            continue
+        run_repository = run.get("repository")
+        run_head_repository = run.get("head_repository")
+        if (
+            _producer_repository_name(run_repository, "producer run repository")
+            != repository
+            or _producer_repository_name(
+                run_head_repository, "producer run head_repository"
+            )
+            != repository
+        ):
+            continue
+        run_repository_id = _producer_repository_id(run_repository, "producer run repository")
+        run_head_repository_id = _producer_repository_id(
+            run_head_repository,
+            "producer run head_repository",
+        )
+        matching.append(run)
     _require(matching, "no exact protected-master producer runs found")
     run_keys = [_producer_key(run) for run in matching]
     _require(len(run_keys) == len(set(run_keys)), "duplicate producer execution identity")
     latest = max(matching, key=_producer_key)
     _require(latest.get("status") == "completed", "newest producer run is incomplete")
     _require(latest.get("conclusion") == "success", "newest producer run did not succeed")
-    artifacts = [
-        artifact
-        for artifact in artifacts_by_run.get(int(latest["id"]), [])
-        if artifact.get("name") == artifact_name
-    ]
+    latest_run_id = _positive_int(latest.get("id"), "producer run ID")
+    _require(
+        isinstance(artifact_name, str) and artifact_name,
+        "producer artifact name is required",
+    )
+    raw_artifacts = artifacts_by_run.get(latest_run_id)
+    _require(isinstance(raw_artifacts, Sequence), "newest producer artifacts are missing")
+    artifacts: list[Mapping[str, Any]] = []
+    for artifact in raw_artifacts:
+        _require(isinstance(artifact, Mapping), "producer artifact metadata is malformed")
+        if artifact.get("name") == artifact_name:
+            artifacts.append(artifact)
     _require(len(artifacts) == 1, "newest producer run has missing or duplicate evidence")
     artifact = artifacts[0]
-    _require(not artifact.get("expired", False), "newest producer evidence is expired")
+    _require(artifact.get("expired") is False, "newest producer evidence is expired")
+    workflow_run = artifact.get("workflow_run")
+    _require(isinstance(workflow_run, Mapping), "producer artifact workflow run is missing")
+    _require(
+        workflow_run.get("id") == latest_run_id
+        and workflow_run.get("head_branch") == protected_branch
+        and workflow_run.get("head_sha") == current_sha,
+        "producer artifact workflow run identity mismatch",
+    )
+    _require(
+        _positive_int(workflow_run.get("repository_id"), "producer artifact repository")
+        == run_repository_id
+        and _positive_int(
+            workflow_run.get("head_repository_id"),
+            "producer artifact head_repository",
+        )
+        == run_head_repository_id,
+        "producer artifact repository identity mismatch",
+    )
     digest = str(artifact.get("digest", ""))
     if digest.startswith("sha256:"):
         digest = digest.removeprefix("sha256:")
     digest = _sha256(digest, "evidence")
     return ProducerEvidence(
-        run_number=int(latest["run_number"]),
-        run_id=int(latest["id"]),
-        run_attempt=int(latest.get("run_attempt", 1)),
+        run_number=_positive_int(latest.get("run_number"), "producer run number"),
+        run_id=latest_run_id,
+        run_attempt=_positive_int(latest.get("run_attempt"), "producer run attempt"),
         artifact_name=artifact_name,
         artifact_digest=digest,
-        artifact_id=int(artifact["id"]),
-        head_sha=str(latest.get("head_sha", "")),
+        artifact_id=_positive_int(artifact.get("id"), "producer artifact ID"),
+        head_sha=current_sha,
     )
 
 
-def verify_producer_snapshot(first: Mapping[str, Any], second: Mapping[str, Any]) -> None:
+def verify_producer_snapshot(
+    first: Mapping[str, Any],
+    second: Mapping[str, Any],
+    *,
+    master_sha: str,
+) -> None:
+    """Require two independent snapshots and stable reads of the protected ref."""
+
+    _require(isinstance(first, Mapping), "producer snapshot is malformed")
+    _require(isinstance(second, Mapping), "producer snapshot is malformed")
+    expected_sha = _git_sha(master_sha, "current protected branch")
+    _require(first is not second, "producer snapshots are not independent")
+    _require(
+        first.get("runs") is not second.get("runs"),
+        "producer run snapshots are not independent",
+    )
+    _require(
+        first.get("artifacts") is not second.get("artifacts"),
+        "producer artifact snapshots are not independent",
+    )
+    for snapshot in (first, second):
+        before = _git_sha(snapshot.get("git_ref_before"), "producer git ref")
+        after = _git_sha(snapshot.get("git_ref_after"), "producer git ref")
+        _require(before == expected_sha, "producer git ref disagrees with current master")
+        _require(after == expected_sha, "producer git ref changed during enumeration")
     stable_read(first, second, "producer workflow/artifact enumeration")
 
 
@@ -823,17 +982,34 @@ def verify_producer_artifact(
     *,
     repository: str,
     workflow_path: str,
+    protected_branch: str,
+    protected_ref: str,
 ) -> None:
     """Bind the downloaded protected-master artifact to its selected run."""
 
+    _require(isinstance(payload, Mapping), "producer evidence is not an object")
     _require(payload.get("schema") == 1, "producer evidence schema is unsupported")
     _require(payload.get("repository") == repository, "producer artifact repository mismatch")
     _require(payload.get("workflow_path") == workflow_path, "producer artifact workflow mismatch")
-    _require(payload.get("ref") == "refs/heads/master", "producer artifact ref is not protected master")
-    if selected.head_sha:
-        _require(payload.get("sha") == selected.head_sha, "producer artifact commit SHA mismatch")
-    _require(int(payload.get("run_id", -1)) == selected.run_id, "producer artifact run ID mismatch")
-    _require(int(payload.get("run_number", -1)) == selected.run_number, "producer artifact run number mismatch")
-    _require(int(payload.get("run_attempt", -1)) == selected.run_attempt, "producer artifact attempt mismatch")
+    _require(
+        protected_ref == f"refs/heads/{protected_branch}",
+        "producer protected ref does not match protected branch",
+    )
+    _require(payload.get("ref") == protected_ref, "producer artifact ref is not protected")
+    _require(payload.get("sha") == selected.head_sha, "producer artifact commit SHA mismatch")
+    _require(
+        _positive_int(payload.get("run_id"), "producer artifact run ID") == selected.run_id,
+        "producer artifact run ID mismatch",
+    )
+    _require(
+        _positive_int(payload.get("run_number"), "producer artifact run number")
+        == selected.run_number,
+        "producer artifact run number mismatch",
+    )
+    _require(
+        _positive_int(payload.get("run_attempt"), "producer artifact attempt")
+        == selected.run_attempt,
+        "producer artifact attempt mismatch",
+    )
     _require(payload.get("status") == "completed", "producer artifact producer status is not completed")
     _require(payload.get("conclusion") == "success", "producer artifact producer conclusion is not success")

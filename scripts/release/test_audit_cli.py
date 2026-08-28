@@ -9,11 +9,22 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from audit_cli import GitHubApi, _queue_entries, run
+from audit_cli import (
+    GitHubApi,
+    PRODUCER_REPOSITORY,
+    PRODUCER_REF,
+    PRODUCER_BRANCH,
+    PRODUCER_WORKFLOW_ID,
+    PRODUCER_WORKFLOW_PATH,
+    _producer_evidence,
+    _queue_entries,
+    run,
+)
 from release_evidence import EvidenceError
 
 
-WORKFLOW_PATH = ".github/workflows/release-please-credential-audit.yml"
+PRODUCER_SHA = "a" * 40
+PRODUCER_REPOSITORY_ID = 101
 BOOTSTRAP_FIXTURE = (
     Path(__file__).parent / "fixtures" / "missing-verifier-pull-request-target.json"
 )
@@ -41,12 +52,22 @@ def pr(*, classification="release", head_sha="h", base_sha="base"):
 
 def producer():
     runs = [{
-        "workflow_id": 4,
-        "path": WORKFLOW_PATH,
+        "workflow_id": PRODUCER_WORKFLOW_ID,
+        "path": f"{PRODUCER_WORKFLOW_PATH}@{PRODUCER_BRANCH}",
         "id": 10,
         "run_number": 10,
         "run_attempt": 1,
-        "ref": "refs/heads/master",
+        "event": "push",
+        "head_branch": PRODUCER_BRANCH,
+        "head_sha": PRODUCER_SHA,
+        "repository": {
+            "id": PRODUCER_REPOSITORY_ID,
+            "full_name": PRODUCER_REPOSITORY,
+        },
+        "head_repository": {
+            "id": PRODUCER_REPOSITORY_ID,
+            "full_name": PRODUCER_REPOSITORY,
+        },
         "status": "completed",
         "conclusion": "success",
     }]
@@ -55,11 +76,24 @@ def producer():
             "id": 1,
             "name": "credential-audit-evidence.json",
             "digest": "a" * 64,
+            "expired": False,
+            "workflow_run": {
+                "id": 10,
+                "repository_id": PRODUCER_REPOSITORY_ID,
+                "head_repository_id": PRODUCER_REPOSITORY_ID,
+                "head_branch": PRODUCER_BRANCH,
+                "head_sha": PRODUCER_SHA,
+            },
         }]
     }
     return {
-        "producer_workflow_id": 4,
-        "producer_workflow_path": WORKFLOW_PATH,
+        "producer_workflow_id": PRODUCER_WORKFLOW_ID,
+        "producer_workflow_path": PRODUCER_WORKFLOW_PATH,
+        "producer_master_sha": PRODUCER_SHA,
+        "producer_git_ref_first_before": PRODUCER_SHA,
+        "producer_git_ref_first_after": PRODUCER_SHA,
+        "producer_git_ref_second_before": PRODUCER_SHA,
+        "producer_git_ref_second_after": PRODUCER_SHA,
         "producer_runs_first": runs,
         "producer_runs_second": json.loads(json.dumps(runs)),
         "producer_artifacts_first": artifacts,
@@ -68,6 +102,138 @@ def producer():
 
 
 class AuditCliTest(unittest.TestCase):
+    def test_live_producer_adapter_uses_direct_run_identity_and_bracketed_refs(self):
+        run_record = {
+            "workflow_id": PRODUCER_WORKFLOW_ID,
+            "path": f"{PRODUCER_WORKFLOW_PATH}@{PRODUCER_BRANCH}",
+            "id": 10,
+            "run_number": 10,
+            "run_attempt": 1,
+            "event": "push",
+            "head_branch": PRODUCER_BRANCH,
+            "head_sha": PRODUCER_SHA,
+            "repository": {
+                "id": PRODUCER_REPOSITORY_ID,
+                "full_name": PRODUCER_REPOSITORY,
+            },
+            "head_repository": {
+                "id": PRODUCER_REPOSITORY_ID,
+                "full_name": PRODUCER_REPOSITORY,
+            },
+            "status": "completed",
+            "conclusion": "success",
+            "ref": "refs/heads/not-master",
+            "referenced_workflows": [{"path": "untrusted.yml@master"}],
+        }
+        artifact = {
+            "id": 1,
+            "name": "credential-audit-evidence.json",
+            "digest": "a" * 64,
+            "expired": False,
+            "workflow_run": {
+                "id": 10,
+                "repository_id": PRODUCER_REPOSITORY_ID,
+                "head_repository_id": PRODUCER_REPOSITORY_ID,
+                "head_branch": PRODUCER_BRANCH,
+                "head_sha": PRODUCER_SHA,
+            },
+        }
+        payload = {
+            "schema": 1,
+            "repository": PRODUCER_REPOSITORY,
+            "workflow_path": PRODUCER_WORKFLOW_PATH,
+            "ref": PRODUCER_REF,
+            "sha": PRODUCER_SHA,
+            "run_id": 10,
+            "run_number": 10,
+            "run_attempt": 1,
+            "status": "completed",
+            "conclusion": "success",
+        }
+
+        class FakeApi(GitHubApi):
+            def __init__(self):
+                super().__init__(PRODUCER_REPOSITORY, "token")
+                self.ref_reads = [PRODUCER_SHA] * 4
+
+            def resolve_workflow_path(self, workflow_id):
+                if workflow_id != PRODUCER_WORKFLOW_ID:
+                    raise AssertionError("unexpected producer workflow ID")
+                return PRODUCER_WORKFLOW_PATH
+
+            def current_ref_sha(self, branch):
+                if branch != PRODUCER_BRANCH:
+                    raise AssertionError("unexpected producer branch")
+                return self.ref_reads.pop(0)
+
+            def all_pages(self, path, query=None, **kwargs):
+                if path.endswith(f"/actions/workflows/{PRODUCER_WORKFLOW_ID}/runs"):
+                    if query["branch"] != PRODUCER_BRANCH:
+                        raise AssertionError("unexpected producer query branch")
+                    return [run_record]
+                if path != "/actions/runs/10/artifacts":
+                    raise AssertionError("unexpected producer artifact path")
+                return [artifact]
+
+            def download_artifact_json(self, artifact_id, expected_name, expected_digest):
+                if (
+                    artifact_id != 1
+                    or expected_name != "credential-audit-evidence.json"
+                    or expected_digest != "a" * 64
+                ):
+                    raise AssertionError("unexpected producer artifact identity")
+                return payload
+
+        selected = _producer_evidence(
+            FakeApi(),
+            None,
+            protected_branch=PRODUCER_BRANCH,
+            protected_ref=PRODUCER_REF,
+        )
+        self.assertEqual(selected["head_sha"], PRODUCER_SHA)
+
+    def test_live_producer_adapter_rejects_ref_move_inside_snapshot(self):
+        class FakeApi(GitHubApi):
+            def __init__(self):
+                super().__init__(PRODUCER_REPOSITORY, "token")
+                self.ref_reads = [PRODUCER_SHA, "b" * 40, "b" * 40, "b" * 40]
+
+            def resolve_workflow_path(self, workflow_id):
+                return PRODUCER_WORKFLOW_PATH
+
+            def current_ref_sha(self, branch):
+                return self.ref_reads.pop(0)
+
+            def all_pages(self, path, query=None, **kwargs):
+                return []
+
+        with self.assertRaises(EvidenceError):
+            _producer_evidence(
+                FakeApi(),
+                None,
+                protected_branch=PRODUCER_BRANCH,
+                protected_ref=PRODUCER_REF,
+            )
+
+    def test_fixture_producer_identity_fields_and_payloads_are_fail_closed(self):
+        base = {
+            "event": {"event_name": "pull_request", "pull_request": pr()},
+            "live_pr_first": pr(),
+            "live_pr_second": pr(),
+            **producer(),
+        }
+        for field in ("producer_workflow_id", "producer_workflow_path"):
+            fixture = dict(base)
+            fixture.pop(field)
+            with self.subTest(field=field), self.assertRaises(EvidenceError):
+                self.fixture_run(fixture)
+
+        for payloads in ({}, {"first": {}}, {"first": {}, "second": {}, "extra": {}}):
+            fixture = dict(base)
+            fixture["producer_artifact_payloads"] = payloads
+            with self.subTest(payloads=payloads), self.assertRaises(EvidenceError):
+                self.fixture_run(fixture)
+
     def fixture_run(self, value):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "fixture.json"

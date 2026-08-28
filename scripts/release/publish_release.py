@@ -22,6 +22,7 @@ from release_mutation_gate import (
     verify_uploaded_assets,
 )
 from release_notes import render_release_notes
+from release_roles import ReleaseRole, load_release_roles
 from verify_remote_assets import MAX_RELEASE_ASSET_BYTES, verify as verify_remote_assets
 
 
@@ -476,6 +477,7 @@ def run(
     release_id: int,
     tag: str,
     source_sha: str,
+    expected_source_branch: str,
     evidence_directory: Path,
     manifest_path: Path,
     rendered_body_path: Path | None = None,
@@ -488,7 +490,12 @@ def run(
 ) -> dict[str, Any]:
     """Execute the exact one-POST/one-PATCH publication state machine."""
     try:
-        allowed = expected_release_asset_names(evidence_directory, tag=tag, source_sha=source_sha)
+        allowed = expected_release_asset_names(
+            evidence_directory,
+            tag=tag,
+            source_sha=source_sha,
+            expected_source_branch=expected_source_branch,
+        )
         if allowed != {"Meet.apk"}:
             raise PublicationError("public asset projection is not exactly Meet.apk")
         from verify_chain import verify as verify_chain
@@ -666,6 +673,7 @@ def main() -> int:
     parser.add_argument("--release-id", required=True, type=int)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--expected-source-branch", required=True)
     parser.add_argument("--evidence-directory", required=True, type=Path)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--rendered-body", required=True, type=Path)
@@ -680,6 +688,13 @@ def main() -> int:
     try:
         if not os.environ.get("ATTESTATION_TOKEN"):
             raise PublicationError("ATTESTATION_TOKEN is required")
+        stable = load_release_roles().authority(ReleaseRole.STABLE)
+        if os.environ.get("GITHUB_REF") != stable.head_ref:
+            raise PublicationError("GITHUB_REF is not the stable role ref")
+        if args.attestation_source_ref != stable.head_ref:
+            raise PublicationError("attestation source ref is not the stable role ref")
+        if args.expected_source_branch != stable.branch:
+            raise PublicationError("expected source branch is not the stable role")
         client = GitHubReleaseClient(args.repository)
         metadata = json.loads(args.manifest.read_text(encoding="utf-8"))
         if not isinstance(metadata, dict):
@@ -718,6 +733,7 @@ def main() -> int:
             release_id=args.release_id,
             tag=args.tag,
             source_sha=args.source_sha,
+            expected_source_branch=args.expected_source_branch,
             evidence_directory=args.evidence_directory,
             manifest_path=args.manifest,
             rendered_body_path=args.rendered_body,

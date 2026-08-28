@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -26,6 +27,7 @@ FIXED_RELEASE_FILENAMES = frozenset(
 RELEASE_ARTIFACT_TYPES = frozenset({"apk", "aab", "mapping", "native-symbols"})
 PUBLIC_RELEASE_ASSET_NAMES = frozenset({"Meet.apk"})
 MAX_RELEASE_ASSET_BYTES = 512 * 1024 * 1024
+_COMMIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
 
 
 def _require(condition: bool, message: str) -> None:
@@ -33,11 +35,20 @@ def _require(condition: bool, message: str) -> None:
         raise MutationError(message)
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def expected_release_asset_names(
     directory: Path,
     *,
     tag: str,
     source_sha: str,
+    expected_source_branch: str,
 ) -> set[str]:
     """Validate protected evidence and return the fixed public projection."""
 
@@ -50,12 +61,37 @@ def expected_release_asset_names(
     _require(isinstance(manifest, Mapping), "release manifest is malformed")
     _require(isinstance(candidate, Mapping), "release candidate is malformed")
     _require(isinstance(index, Mapping), "attestation index is malformed")
+    _require(_COMMIT_SHA.fullmatch(source_sha) is not None, "expected release source commit is invalid")
+    _require(isinstance(expected_source_branch, str) and expected_source_branch, "expected source branch is invalid")
+    authority_path = directory / "release-authority.json"
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    _require(isinstance(authority, Mapping), "release authority is malformed")
+    _require(
+        authority.get("schema") == 1
+        and authority.get("kind") == "release-authority"
+        and authority.get("channel") == "release"
+        and authority.get("tag") == tag
+        and authority.get("commit") == source_sha
+        and authority.get("source_branch") == expected_source_branch,
+        "release authority identity changed",
+    )
     _require(manifest.get("schema") == 1 and manifest.get("channel") == "release",
              "release manifest schema is invalid")
     _require(manifest.get("tag") == tag and manifest.get("commit") == source_sha,
              "release manifest identity changed")
+    _require(manifest.get("source_branch") == expected_source_branch,
+             "release manifest source branch changed")
     _require(candidate.get("tag") == tag and candidate.get("commit") == source_sha,
              "release candidate identity changed")
+    _require(candidate.get("source_branch") == expected_source_branch,
+             "release candidate source branch changed")
+    authority_reference = index.get("authority")
+    _require(
+        isinstance(authority_reference, Mapping)
+        and authority_reference.get("name") == authority_path.name
+        and authority_reference.get("sha256") == _file_sha256(authority_path),
+        "attestation authority reference changed",
+    )
     artifacts = manifest.get("artifacts")
     _require(isinstance(artifacts, list) and artifacts, "release manifest artifacts are missing")
     artifact_names: list[str] = []

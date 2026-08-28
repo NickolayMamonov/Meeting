@@ -17,6 +17,9 @@ class ArtifactError(ValueError):
     pass
 
 
+_COMMIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
+
+
 def parse_expected_debuggable(value: str) -> bool:
     if value == "true":
         return True
@@ -44,11 +47,38 @@ def file_digest(path: Path) -> str:
 
 
 def metadata_value(metadata: dict, *names: str) -> str:
-    for name in names:
-        value = metadata.get(name)
-        if value is not None and str(value):
-            return str(value)
-    raise ArtifactError(f"metadata field is missing: {names[0]}")
+    present = [(name, metadata[name]) for name in names if name in metadata]
+    if not present:
+        raise ArtifactError(f"metadata field is missing: {names[0]}")
+    if any(value is None or not str(value) for _, value in present):
+        raise ArtifactError(f"metadata field is invalid: {names[0]}")
+    if len({str(value) for _, value in present}) != 1:
+        raise ArtifactError(f"metadata aliases conflict: {', '.join(names)}")
+    return str(present[0][1])
+
+
+def metadata_identity(metadata: dict) -> tuple[str, str]:
+    commit = metadata_value(metadata, "commitSha", "commit")
+    if _COMMIT_SHA.fullmatch(commit) is None:
+        raise ArtifactError("metadata commit must be exactly 40 lowercase hexadecimal characters")
+    return commit, metadata_value(metadata, "sourceBranch", "source_branch")
+
+
+def verify_expected_identity(
+    metadata: dict,
+    *,
+    expected_commit: str,
+    expected_source_branch: str,
+) -> None:
+    if _COMMIT_SHA.fullmatch(expected_commit) is None:
+        raise ArtifactError("expected commit must be exactly 40 lowercase hexadecimal characters")
+    if not expected_source_branch:
+        raise ArtifactError("expected source branch must not be empty")
+    commit, branch = metadata_identity(metadata)
+    if commit != expected_commit:
+        raise ArtifactError("expected commit does not match canonical metadata")
+    if branch != expected_source_branch:
+        raise ArtifactError("expected source branch does not match canonical metadata")
 
 
 def normalized_digest(value: str) -> str:
@@ -96,7 +126,17 @@ def verify_apk(
     apksigner: Path,
     apkanalyzer: Path,
     expected_debuggable: bool,
+    expected_commit: str | None = None,
+    expected_source_branch: str | None = None,
 ) -> None:
+    if (expected_commit is None) != (expected_source_branch is None):
+        raise ArtifactError("expected commit and source branch must be provided together")
+    if expected_commit is not None:
+        verify_expected_identity(
+            metadata,
+            expected_commit=expected_commit,
+            expected_source_branch=expected_source_branch,
+        )
     output = run([str(apksigner), "verify", "--verbose", "--print-certs", str(apk)])
     verify_rsa4096_signer(output)
     digests = re.findall(r"SHA-256 digest:\s*([0-9a-f: ]+)", output, flags=re.IGNORECASE)
@@ -113,6 +153,15 @@ def verify_apk(
     if normalized_digest(digests[0]) != expected:
         raise ArtifactError("APK certificate does not match canonical metadata")
 
+    verify_apk_identity(apk, metadata, apkanalyzer, expected_debuggable)
+
+
+def verify_apk_identity(
+    apk: Path,
+    metadata: dict,
+    apkanalyzer: Path,
+    expected_debuggable: bool,
+) -> None:
     analyzer = str(apkanalyzer)
     application_id = run([analyzer, "manifest", "application-id", str(apk)]).strip()
     version_name = run([analyzer, "manifest", "version-name", str(apk)]).strip()
@@ -131,6 +180,23 @@ def verify_apk(
             "APK debuggable value does not match expected value: "
             f"expected {expected_debuggable}, actual {actual_debuggable}"
         )
+
+
+def verify_unsigned_apk(
+    apk: Path,
+    metadata: dict,
+    apkanalyzer: Path,
+    expected_debuggable: bool,
+    *,
+    expected_commit: str,
+    expected_source_branch: str,
+) -> None:
+    verify_expected_identity(
+        metadata,
+        expected_commit=expected_commit,
+        expected_source_branch=expected_source_branch,
+    )
+    verify_apk_identity(apk, metadata, apkanalyzer, expected_debuggable)
 
 
 _JARSIGNER_VERIFIED = re.compile(r"(?im)^\s*jar verified\.\s*$")
@@ -194,30 +260,57 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--apk", type=Path, required=True)
-    parser.add_argument("--apksigner", required=True)
+    parser.add_argument("--apksigner")
     parser.add_argument("--apkanalyzer", required=True)
     parser.add_argument(
         "--expected-debuggable", type=parse_expected_debuggable, required=True
     )
+    parser.add_argument("--expected-commit")
+    parser.add_argument("--expected-source-branch")
+    parser.add_argument("--unsigned-apk", action="store_true")
     parser.add_argument("--aab", type=Path)
     parser.add_argument("--bundletool-jar", type=Path)
     parser.add_argument("--bundletool-sha256")
     try:
         args = parser.parse_args()
-        if args.apksigner == "":
+        if args.unsigned_apk:
+            if (
+                args.apksigner is not None
+                or args.aab is not None
+                or args.bundletool_jar is not None
+                or args.bundletool_sha256 is not None
+            ):
+                raise ArtifactError("--unsigned-apk forbids signer, AAB, and Bundletool inputs")
+        elif args.apksigner == "":
             raise ArtifactError("--apksigner must not be empty")
+        elif args.apksigner is None:
+            raise ArtifactError("--apksigner is required for signed APK verification")
         if args.apkanalyzer == "":
             raise ArtifactError("--apkanalyzer must not be empty")
+        if args.expected_commit is None or args.expected_source_branch is None:
+            raise ArtifactError("--expected-commit and --expected-source-branch are required")
         metadata = json.loads(args.metadata.read_text(encoding="utf-8"))
         if not isinstance(metadata, dict):
             raise ArtifactError("metadata must be an object")
-        verify_apk(
-            args.apk,
+        verify_expected_identity(
             metadata,
-            Path(args.apksigner),
-            Path(args.apkanalyzer),
-            args.expected_debuggable,
+            expected_commit=args.expected_commit,
+            expected_source_branch=args.expected_source_branch,
         )
+        if args.unsigned_apk:
+            verify_apk_identity(
+                args.apk, metadata, Path(args.apkanalyzer), args.expected_debuggable
+            )
+        else:
+            verify_apk(
+                args.apk,
+                metadata,
+                Path(args.apksigner),
+                Path(args.apkanalyzer),
+                args.expected_debuggable,
+                args.expected_commit,
+                args.expected_source_branch,
+            )
         if args.aab is not None:
             if args.bundletool_jar is None:
                 raise ArtifactError("bundletool JAR is required for AAB verification")

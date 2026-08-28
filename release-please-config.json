@@ -6,7 +6,7 @@
   "initial-version": "1.0.0",
   "bootstrap-sha": "a4defd547446ea83fae3e6d87a906818ecac4630",
   "draft": true,
-  "target-branch": "dev",
+  "target-branch": "master",
   "changelog-path": "CHANGELOG.md",
   "packages": {
     ".": {

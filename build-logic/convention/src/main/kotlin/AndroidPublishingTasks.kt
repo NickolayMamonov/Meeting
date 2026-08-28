@@ -28,6 +28,9 @@ abstract class ValidateSnapshotPublishingInputsTask : DefaultTask() {
     @get:InputFile
     abstract val versionFile: RegularFileProperty
 
+    @get:InputFile
+    abstract val releaseRolesFile: RegularFileProperty
+
     @get:Input
     @get:Optional
     abstract val runNumber: Property<String>
@@ -49,6 +52,7 @@ abstract class ValidateSnapshotPublishingInputsTask : DefaultTask() {
 
     @TaskAction
     fun validate() {
+        ReleaseBranchRoles.parseJson(releaseRolesFile.get().asFile.readText(Charsets.UTF_8))
         SnapshotVersion.parse(
             stableVersion = versionFile.get().asFile.readAndroidVersion(),
             runNumber = runNumber.orNull,
@@ -66,6 +70,9 @@ abstract class ValidateReleasePublishingInputsTask : DefaultTask() {
     @get:InputFile
     abstract val versionFile: RegularFileProperty
 
+    @get:InputFile
+    abstract val releaseRolesFile: RegularFileProperty
+
     @get:Input
     @get:Optional
     abstract val baseUrl: Property<String>
@@ -76,6 +83,7 @@ abstract class ValidateReleasePublishingInputsTask : DefaultTask() {
 
     @TaskAction
     fun validate() {
+        ReleaseBranchRoles.parseJson(releaseRolesFile.get().asFile.readText(Charsets.UTF_8))
         versionFile.get().asFile.readAndroidVersion()
         ReleaseNetworkConfig.parse(baseUrl.orNull)
         AndroidSigningInputs.normalizeCertificateFingerprint(expectedCertificateSha256.orNull)
@@ -110,6 +118,9 @@ abstract class GenerateSnapshotBuildMetadataTask : DefaultTask() {
     @get:InputFile
     abstract val versionFile: RegularFileProperty
 
+    @get:InputFile
+    abstract val releaseRolesFile: RegularFileProperty
+
     @get:Input
     abstract val runNumber: Property<String>
 
@@ -130,6 +141,10 @@ abstract class GenerateSnapshotBuildMetadataTask : DefaultTask() {
 
     @TaskAction
     fun generate() {
+        val integrationBranch =
+            ReleaseBranchRoles.parseJson(releaseRolesFile.get().asFile.readText(Charsets.UTF_8))
+                .authority(ReleaseBranchRole.INTEGRATION)
+                .branch
         val snapshot =
             SnapshotVersion.parse(
                 stableVersion = versionFile.get().asFile.readAndroidVersion(),
@@ -148,7 +163,7 @@ abstract class GenerateSnapshotBuildMetadataTask : DefaultTask() {
                 "versionName" to snapshot.name,
                 "versionCode" to snapshot.code,
                 "commitSha" to snapshot.commitSha,
-                "sourceBranch" to "dev",
+                "sourceBranch" to integrationBranch,
                 "workflow" to workflowName.get(),
                 "runNumber" to snapshot.runNumber,
                 "runAttempt" to snapshot.runAttempt,
@@ -162,6 +177,9 @@ abstract class GenerateSnapshotBuildMetadataTask : DefaultTask() {
 abstract class GenerateReleaseBuildMetadataTask : DefaultTask() {
     @get:InputFile
     abstract val versionFile: RegularFileProperty
+
+    @get:InputFile
+    abstract val releaseRolesFile: RegularFileProperty
 
     @get:Input
     abstract val baseUrl: Property<String>
@@ -180,6 +198,10 @@ abstract class GenerateReleaseBuildMetadataTask : DefaultTask() {
 
     @TaskAction
     fun generate() {
+        val stableBranch =
+            ReleaseBranchRoles.parseJson(releaseRolesFile.get().asFile.readText(Charsets.UTF_8))
+                .authority(ReleaseBranchRole.STABLE)
+                .branch
         val version = versionFile.get().asFile.readAndroidVersion()
         val network = ReleaseNetworkConfig.parse(baseUrl.orNull)
         require(fullReleaseCommitShaPattern.matches(commitSha.get())) {
@@ -196,7 +218,7 @@ abstract class GenerateReleaseBuildMetadataTask : DefaultTask() {
                 "versionName" to version.name,
                 "versionCode" to version.code,
                 "commitSha" to commitSha.get(),
-                "sourceBranch" to "dev",
+                "sourceBranch" to stableBranch,
                 "workflow" to workflowName.get(),
                 "releaseHost" to network.host,
                 "releaseBaseUrl" to network.baseUrl,
