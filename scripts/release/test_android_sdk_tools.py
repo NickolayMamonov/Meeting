@@ -174,7 +174,7 @@ class AndroidSdkToolsTest(unittest.TestCase):
             package = command_line_tools / name
             (package / "bin").mkdir(parents=True)
             (package / "source.properties").write_text(
-                f"Pkg.Revision = {revision}\nPkg.Path = cmdline-tools;22.0\n",
+                f"Pkg.Revision = {revision}\nPkg.Path = cmdline-tools;{name}\n",
                 encoding="utf-8",
             )
             if valid:
@@ -208,6 +208,16 @@ class AndroidSdkToolsTest(unittest.TestCase):
                     (root / "cmdline-tools/latest/bin/apkanalyzer").resolve(),
                 )
 
+    def test_apkanalyzer_accepts_versioned_package_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("22.0", "22.0.0", True)])
+            with patch("android_sdk_tools.subprocess.run", self.successful_probe):
+                self.assertEqual(
+                    resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}),
+                    (root / "cmdline-tools/22.0/bin/apkanalyzer").resolve(),
+                )
+
     def test_apkanalyzer_non_windows_prefers_extensionless_launcher(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -238,6 +248,18 @@ class AndroidSdkToolsTest(unittest.TestCase):
             metadata = root / "cmdline-tools/latest/source.properties"
             metadata.write_text(
                 "Pkg.Revision = 14.0.0\nPkg.Path = cmdline-tools;21.0\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_rejects_alias_metadata_for_versioned_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("22.0", "22.0.0", True)])
+            metadata = root / "cmdline-tools/22.0/source.properties"
+            metadata.write_text(
+                "Pkg.Revision = 22.0.0\nPkg.Path = cmdline-tools;latest\n",
                 encoding="utf-8",
             )
             with self.assertRaises(AndroidSdkToolError):
