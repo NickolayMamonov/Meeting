@@ -12,6 +12,6 @@
 - [x] Re-run targeted negatives and the full required verification matrix on one exact head.
 - [x] Remediate CR-008 through CR-011 and ICR-001/ICR-002 only.
 - [x] Re-run targeted negatives and the full required verification matrix on one exact head.
-- [ ] Update the same implementation manifest and recompute its SHA-256.
-- [ ] Commit, push, and verify the updated PR head and all identity gates.
-- [ ] Add exactly one rework Implementation result comment and complete the implementation node.
+- [x] Update the same implementation manifest and recompute its SHA-256.
+- [x] Commit, push, and verify the updated PR head and all identity gates.
+- [x] Add exactly one rework Implementation result comment and complete the implementation node.
