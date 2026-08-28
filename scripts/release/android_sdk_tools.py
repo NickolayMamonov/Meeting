@@ -233,7 +233,7 @@ def _selected_cmdline_tools(root: Path) -> tuple[tuple[int, ...], Path]:
                         package,
                         "cmdline-tools",
                         containment_roots=(canonical_root, root),
-                        expected_path="cmdline-tools;22.0",
+                        expected_path=f"cmdline-tools;{child.name}",
                     ),
                     package,
                 )
