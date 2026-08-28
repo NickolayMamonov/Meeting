@@ -8,6 +8,7 @@ import base64
 import binascii
 import hashlib
 import json
+import os
 import ssl
 import subprocess
 from pathlib import Path
@@ -18,6 +19,13 @@ from release_evidence import (
     EvidenceError,
     attestation_group_identity,
     verify_attestation_groups,
+)
+from github_attestation import (
+    AttestationError,
+    AttestationPolicy,
+    SLSA_PROVENANCE_V1,
+    parse_verified_result,
+    verify_file,
 )
 
 
@@ -58,42 +66,43 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def run_gh(path: Path, repo: str, signer_workflow: str, source_ref: str, source_sha: str) -> dict[str, Any]:
-    command = [
-        "gh",
-        "attestation",
-        "verify",
-        str(path),
-        "--repo",
-        repo,
-        "--format",
-        "json",
-        "--predicate-type",
-        "https://slsa.dev/provenance/v1",
-        "--signer-workflow",
-        signer_workflow,
-        "--source-ref",
-        source_ref,
-        "--source-digest",
-        source_sha,
-        "--limit",
-        "100",
-    ]
+def run_gh(
+    path: Path,
+    repo: str,
+    signer_workflow: str,
+    source_ref: str,
+    source_sha: str,
+    *,
+    attestation_token: str | None = None,
+    run_id: int | None = None,
+    run_attempt: int | None = None,
+) -> dict[str, Any]:
+    """Compatibility adapter returning the raw one-result CLI record."""
+
     try:
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-        value = json.loads(result.stdout)
-    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
-        raise CollectionError(f"gh attestation verification failed for {path.name}") from error
-    if not isinstance(value, list) or not value:
-        raise CollectionError(f"no verified attestations were returned for {path.name}")
-    verified = [item for item in value if isinstance(item, dict)]
-    if len(verified) != 1:
-        raise CollectionError(
-            f"ambiguous verified attestations were returned for {path.name}: {len(verified)}"
+        policy = AttestationPolicy(
+            repository=repo,
+            signer_workflow=signer_workflow,
+            source_ref=source_ref,
+            source_digest=source_sha,
+            predicate_type=SLSA_PROVENANCE_V1,
+            result_limit=100,
         )
-    if len(value) >= 100:
-        raise CollectionError(f"attestation result reached its pagination limit for {path.name}")
-    return next(iter(verified))
+        verified = verify_file(
+            path,
+            policy,
+            token=(
+                os.environ.get("ATTESTATION_TOKEN")
+                or os.environ.get("GH_TOKEN", "")
+                if attestation_token is None
+                else attestation_token
+            ),
+            run_id=run_id,
+            run_attempt=run_attempt,
+        )
+    except AttestationError as error:
+        raise CollectionError(str(error)) from error
+    return dict(verified.raw_result)
 
 
 def _certificate_base64(value: Any) -> str:
@@ -436,25 +445,13 @@ def _record_unwrapped(
         verified_statement, sort_keys=True, separators=(",", ":")
     ):
         raise CollectionError(f"DSSE payload and parsed statement differ for {path.name}")
-    subjects = statement_raw.get("subject", [])
-    if not isinstance(subjects, list):
-        raise CollectionError(f"verified statement subjects are malformed for {path.name}")
+    try:
+        canonical_subjects = parse_verified_result(verified)
+    except AttestationError as error:
+        raise CollectionError(f"verified statement subjects are malformed for {path.name}") from error
     expected_digest = sha256_bytes(path.read_bytes())
-    expected_subject = {"name": path.name, "sha256": expected_digest}
-    signed_members: list[dict[str, str]] = []
-    for subject in subjects:
-        if not isinstance(subject, Mapping):
-            raise CollectionError(f"verified statement subject is malformed for {path.name}")
-        digest = subject.get("digest")
-        if not isinstance(digest, Mapping) or set(digest) != {"sha256"}:
-            raise CollectionError(f"verified statement subject digest is malformed for {path.name}")
-        try:
-            signed_members.append(
-                AttestedSubject(subject.get("name", ""), digest["sha256"]).to_mapping()
-            )
-        except EvidenceError as error:
-            raise CollectionError(f"verified statement subject is malformed for {path.name}") from error
-    if expected_subject not in signed_members:
+    expected_subject = AttestedSubject(path.name, expected_digest)
+    if expected_subject not in canonical_subjects:
         raise CollectionError(f"verified attestation does not cover {path.name}")
     signature = result.get("signature", {})
     if not isinstance(signature, Mapping):
@@ -578,7 +575,15 @@ def collect(args: argparse.Namespace) -> None:
     files = sorted(path for path in Path(args.directory).iterdir() if path.is_file())
     records: list[dict[str, Any]] = []
     for path in files:
-        verified = run_gh(path, args.repo, args.signer_workflow, args.source_ref, args.source_sha)
+        verified = run_gh(
+            path,
+            args.repo,
+            args.signer_workflow,
+            args.source_ref,
+            args.source_sha,
+            run_id=args.run_id,
+            run_attempt=args.run_attempt,
+        )
         records.append(
             _record(
                 path,

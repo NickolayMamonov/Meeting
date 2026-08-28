@@ -47,6 +47,20 @@ def _artifact(path: Path, artifact_type: str) -> dict[str, Any]:
     }
 
 
+def _copy_artifact(source_path: Path, target: Path) -> dict[str, Any]:
+    target.unlink(missing_ok=True)
+    shutil.copyfile(source_path, target)
+    source_size = source_path.stat().st_size
+    target_size = target.stat().st_size
+    if source_size != target_size:
+        raise SystemExit(f"canonical artifact size changed while copying {source_path.name}")
+    source_digest = _digest_file(source_path)
+    target_digest = _digest_file(target)
+    if source_digest != target_digest:
+        raise SystemExit(f"canonical artifact digest changed while copying {source_path.name}")
+    return _artifact(target, "apk")
+
+
 def package(args: argparse.Namespace) -> None:
     out = Path(args.output).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -54,6 +68,16 @@ def package(args: argparse.Namespace) -> None:
     previous_index = out / "attestation-index.json"
     if previous_index.is_file():
         previous = _read_json(previous_index)
+        previous_manifest_name = (
+            "snapshot-manifest.json"
+            if (out / "snapshot-manifest.json").is_file()
+            else "release-manifest.json"
+        )
+        previous_manifest = _read_json(out / previous_manifest_name)
+        for artifact in previous_manifest.get("artifacts", []):
+            name = artifact.get("name")
+            if isinstance(name, str) and Path(name).name == name:
+                (out / name).unlink(missing_ok=True)
         for reference in previous.get("attestations", []):
             name = reference.get("name")
             if isinstance(name, str) and Path(name).name == name:
@@ -108,10 +132,13 @@ def package(args: argparse.Namespace) -> None:
         source_path = Path(source)
         if not source_path.is_file():
             raise SystemExit(f"missing declared artifact: {source}")
-        target = out / source_path.name
-        target.unlink(missing_ok=True)
-        shutil.copyfile(source_path, target)
-        outputs.append(_artifact(target, artifact_type))
+        target = out / ("Meet.apk" if metadata["channel"] == "release" and artifact_type == "apk" else source_path.name)
+        if metadata["channel"] == "release" and artifact_type == "apk":
+            outputs.append(_copy_artifact(source_path, target))
+        else:
+            target.unlink(missing_ok=True)
+            shutil.copyfile(source_path, target)
+            outputs.append(_artifact(target, artifact_type))
     required_types = {"apk"} if metadata["channel"] == "snapshot" else {"apk", "aab"}
     if required_types - {item["type"] for item in outputs}:
         raise SystemExit("required distributable artifact is missing")
