@@ -34,7 +34,7 @@ class ReleaseBranchAuthority:
     def __post_init__(self) -> None:
         if not isinstance(self.role, ReleaseRole):
             raise ReleaseRolesError("release role is not recognized")
-        _validate_branch(self.branch)
+        validate_canonical_branch(self.branch)
 
     @property
     def head_ref(self) -> str:
@@ -93,7 +93,13 @@ def _reject_json_constant(value: str) -> NoReturn:
     raise ReleaseRolesError(f"invalid JSON constant: {value}")
 
 
-def _validate_branch(branch: str) -> str:
+def validate_canonical_branch(branch: Any) -> str:
+    """Validate and return one canonical Git branch name.
+
+    Release identity callers use this same in-process grammar instead of
+    trusting a role file or a repeated caller assertion to have validated it.
+    """
+
     if not isinstance(branch, str):
         raise ReleaseRolesError("branch must be a string")
     if _BRANCH_PATTERN.fullmatch(branch) is None or branch.startswith("refs/"):
@@ -140,7 +146,7 @@ def _authority(value: Any, role: ReleaseRole) -> ReleaseBranchAuthority:
     branch = mapping["branch"]
     if not isinstance(branch, str):
         raise ReleaseRolesError(f"{role.value} branch must be a string")
-    return ReleaseBranchAuthority(role, _validate_branch(branch))
+    return ReleaseBranchAuthority(role, validate_canonical_branch(branch))
 
 
 def load_release_roles(path: Path | None = None) -> ReleaseBranchRoles:

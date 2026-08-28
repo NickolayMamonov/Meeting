@@ -126,6 +126,38 @@ class PublicationGateTest(unittest.TestCase):
                     expected_source_branch="dev",
                 )
 
+    def test_release_identity_boundary_rejects_repeated_malformed_branches(self):
+        from test_package_artifacts import PackageArtifactsTest
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = PackageArtifactsTest.package_release(Path(temporary))
+            for expected_branch in ("refs/heads/dev", "dev/.hidden", "dev/build.lock", 1):
+                with self.subTest(expected_branch=expected_branch):
+                    with self.assertRaises(MutationError):
+                        expected_release_asset_names(
+                            source,
+                            tag="v1.0.0",
+                            source_sha="a" * 40,
+                            expected_source_branch=expected_branch,
+                        )
+
+    def test_release_identity_boundary_rejects_malformed_manifest_branch(self):
+        from test_package_artifacts import PackageArtifactsTest
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = PackageArtifactsTest.package_release(Path(temporary))
+            manifest_path = source / "release-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["source_branch"] = 1
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaises(MutationError):
+                expected_release_asset_names(
+                    source,
+                    tag="v1.0.0",
+                    source_sha="a" * 40,
+                    expected_source_branch="dev",
+                )
+
     def test_candidate_and_attestation_index_identities_are_exact(self):
         from test_package_artifacts import PackageArtifactsTest
 

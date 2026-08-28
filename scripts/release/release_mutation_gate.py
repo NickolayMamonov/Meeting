@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from release_roles import ReleaseRolesError, validate_canonical_branch
 from release_evidence import EvidenceError, verify_attestation_link
 
 
@@ -36,6 +37,21 @@ _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise MutationError(message)
+
+
+def _canonical_branch(value: Any, description: str) -> str:
+    try:
+        return validate_canonical_branch(value)
+    except ReleaseRolesError as error:
+        raise MutationError(f"{description} is invalid") from error
+
+
+def _commit_identity(value: Any, description: str) -> str:
+    _require(
+        isinstance(value, str) and _COMMIT_SHA.fullmatch(value) is not None,
+        f"{description} is invalid",
+    )
+    return value
 
 
 def _file_sha256(path: Path) -> str:
@@ -199,18 +215,19 @@ def admit_release_evidence(
     manifest = _read_object(manifest_path, "release manifest")
     candidate = _read_object(candidate_path, "release candidate")
     index = _read_object(index_path, "attestation index")
-    _require(_COMMIT_SHA.fullmatch(source_sha) is not None, "expected release source commit is invalid")
+    _commit_identity(source_sha, "expected release source commit")
     _require(isinstance(tag, str) and tag, "expected release tag is invalid")
     authority_path = directory / "release-authority.json"
     authority = _read_object(authority_path, "release authority")
-    source_branch = manifest.get("source_branch")
-    _require(isinstance(source_branch, str) and source_branch, "release source branch is missing")
+    source_branch = _canonical_branch(manifest.get("source_branch"), "release source branch")
     if expected_source_branch is not None:
-        _require(
-            isinstance(expected_source_branch, str) and expected_source_branch,
-            "expected source branch is invalid",
+        expected_source_branch = _canonical_branch(
+            expected_source_branch,
+            "expected source branch",
         )
         _require(source_branch == expected_source_branch, "release source branch changed")
+    _commit_identity(authority.get("commit"), "release authority commit")
+    _canonical_branch(authority.get("source_branch"), "release authority source branch")
     _require(
         authority.get("schema") == 1
         and authority.get("kind") == "release-authority"
@@ -219,6 +236,12 @@ def admit_release_evidence(
         and authority.get("commit") == source_sha
         and authority.get("source_branch") == source_branch,
         "release authority identity changed",
+    )
+    _require(
+        isinstance(manifest.get("commit"), str)
+        and _COMMIT_SHA.fullmatch(manifest["commit"]) is not None
+        and isinstance(manifest.get("source_branch"), str),
+        "release manifest identity metadata is invalid",
     )
     _require(
         manifest.get("schema") == 1
@@ -234,6 +257,13 @@ def admit_release_evidence(
         digest=_file_sha256(authority_path),
         description="release manifest authority reference",
     )
+    _require(
+        isinstance(candidate.get("commit"), str)
+        and _COMMIT_SHA.fullmatch(candidate["commit"]) is not None
+        and isinstance(candidate.get("source_branch"), str),
+        "release candidate identity metadata is invalid",
+    )
+    _canonical_branch(candidate.get("source_branch"), "release candidate source branch")
     _require(
         candidate.get("schema") == 1
         and candidate.get("kind") == "release-candidate"

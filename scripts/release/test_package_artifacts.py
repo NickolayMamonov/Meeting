@@ -6,7 +6,7 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
-from package_artifacts import package
+from package_artifacts import _metadata_identity, package
 from release_evidence import (
     attestation_group_identity,
     attest_identity,
@@ -19,6 +19,46 @@ from verify_remote_assets import verify as verify_remote_assets
 
 
 class PackageArtifactsTest(unittest.TestCase):
+    def test_identity_boundary_rejects_non_string_and_noncanonical_metadata(self):
+        valid_commit = "a" * 40
+        invalid_metadata = (
+            {"commitSha": int("1" * 40), "sourceBranch": "dev"},
+            {"commitSha": valid_commit, "sourceBranch": 1},
+            {"commitSha": valid_commit, "sourceBranch": "refs/heads/dev"},
+            {"commitSha": valid_commit, "sourceBranch": "dev/.hidden"},
+            {"commitSha": valid_commit, "sourceBranch": "dev/build.lock"},
+        )
+        for metadata in invalid_metadata:
+            with self.subTest(metadata=metadata):
+                with self.assertRaises(SystemExit):
+                    _metadata_identity(metadata)
+
+    def test_assertion_only_caller_branch_is_canonical_before_comparison(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            metadata = root_path / "metadata.json"
+            metadata.write_text(
+                json.dumps({"commitSha": "a" * 40, "sourceBranch": "dev"}),
+                encoding="utf-8",
+            )
+            arguments = Namespace(
+                metadata=str(metadata),
+                output=str(root_path / "out"),
+                apk=str(root_path / "app.apk"),
+                aab=None,
+                mapping=None,
+                symbols=None,
+                tag=None,
+                commit="a" * 40,
+                source_branch="refs/heads/dev",
+                workflow=None,
+                attestation_evidence=None,
+                prepare_only=True,
+            )
+            with self.assertRaisesRegex(SystemExit, "canonical"):
+                package(arguments)
+            self.assertFalse((root_path / "out").exists())
+
     @staticmethod
     def _write_evidence(output: Path, path: Path) -> None:
         manifest_path = (

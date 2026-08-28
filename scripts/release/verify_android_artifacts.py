@@ -12,6 +12,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Sequence
 
+from release_roles import ReleaseRolesError, validate_canonical_branch
+
 
 class ArtifactError(ValueError):
     pass
@@ -46,22 +48,46 @@ def file_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
-def metadata_value(metadata: dict, *names: str) -> str:
+def _metadata_aliases(metadata: dict, *names: str) -> list[tuple[str, object]]:
+    if not isinstance(metadata, dict):
+        raise ArtifactError("metadata must be an object")
     present = [(name, metadata[name]) for name in names if name in metadata]
     if not present:
         raise ArtifactError(f"metadata field is missing: {names[0]}")
-    if any(value is None or not str(value) for _, value in present):
+    return present
+
+
+def metadata_value(metadata: dict, *names: str) -> str:
+    present = _metadata_aliases(metadata, *names)
+    if any(not isinstance(value, str) or not value for _, value in present):
         raise ArtifactError(f"metadata field is invalid: {names[0]}")
-    if len({str(value) for _, value in present}) != 1:
+    if len({value for _, value in present}) != 1:
         raise ArtifactError(f"metadata aliases conflict: {', '.join(names)}")
+    return present[0][1]
+
+
+def metadata_version_code(metadata: dict) -> str:
+    present = _metadata_aliases(metadata, "versionCode", "version_code")
+    if any(isinstance(value, bool) or not isinstance(value, int) for _, value in present):
+        raise ArtifactError("metadata field is invalid: versionCode")
+    if len({value for _, value in present}) != 1:
+        raise ArtifactError("metadata aliases conflict: versionCode, version_code")
     return str(present[0][1])
+
+
+def canonical_identity_branch(value: object, *, description: str) -> str:
+    try:
+        return validate_canonical_branch(value)
+    except ReleaseRolesError as error:
+        raise ArtifactError(f"{description} is invalid") from error
 
 
 def metadata_identity(metadata: dict) -> tuple[str, str]:
     commit = metadata_value(metadata, "commitSha", "commit")
     if _COMMIT_SHA.fullmatch(commit) is None:
         raise ArtifactError("metadata commit must be exactly 40 lowercase hexadecimal characters")
-    return commit, metadata_value(metadata, "sourceBranch", "source_branch")
+    branch = metadata_value(metadata, "sourceBranch", "source_branch")
+    return commit, canonical_identity_branch(branch, description="metadata source branch")
 
 
 def verify_expected_identity(
@@ -70,10 +96,12 @@ def verify_expected_identity(
     expected_commit: str,
     expected_source_branch: str,
 ) -> None:
-    if _COMMIT_SHA.fullmatch(expected_commit) is None:
+    if not isinstance(expected_commit, str) or _COMMIT_SHA.fullmatch(expected_commit) is None:
         raise ArtifactError("expected commit must be exactly 40 lowercase hexadecimal characters")
-    if not expected_source_branch:
-        raise ArtifactError("expected source branch must not be empty")
+    expected_source_branch = canonical_identity_branch(
+        expected_source_branch,
+        description="expected source branch",
+    )
     commit, branch = metadata_identity(metadata)
     if commit != expected_commit:
         raise ArtifactError("expected commit does not match canonical metadata")
@@ -129,6 +157,7 @@ def verify_apk(
     expected_commit: str | None = None,
     expected_source_branch: str | None = None,
 ) -> None:
+    metadata_identity(metadata)
     if (expected_commit is None) != (expected_source_branch is None):
         raise ArtifactError("expected commit and source branch must be provided together")
     if expected_commit is not None:
@@ -162,6 +191,7 @@ def verify_apk_identity(
     apkanalyzer: Path,
     expected_debuggable: bool,
 ) -> None:
+    metadata_identity(metadata)
     analyzer = str(apkanalyzer)
     application_id = run([analyzer, "manifest", "application-id", str(apk)]).strip()
     version_name = run([analyzer, "manifest", "version-name", str(apk)]).strip()
@@ -170,7 +200,7 @@ def verify_apk_identity(
         raise ArtifactError("APK application ID does not match canonical metadata")
     if version_name != metadata_value(metadata, "versionName", "version_name"):
         raise ArtifactError("APK version name does not match canonical metadata")
-    if version_code != metadata_value(metadata, "versionCode", "version_code"):
+    if version_code != metadata_version_code(metadata):
         raise ArtifactError("APK version code does not match canonical metadata")
     actual_debuggable = decode_debuggable_output(
         run([analyzer, "manifest", "debuggable", str(apk)])
@@ -217,6 +247,7 @@ def verify_jarsigner_bundle(aab: Path) -> str:
 
 
 def verify_bundle_identity(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
+    metadata_identity(metadata)
     output = run(["java", "-jar", str(bundletool_jar), "dump", "manifest", f"--bundle={aab}"])
     start = output.find("<manifest")
     end = output.rfind("</manifest>")
@@ -230,15 +261,14 @@ def verify_bundle_identity(aab: Path, metadata: dict, bundletool_jar: Path) -> N
         metadata, "versionName", "version_name"
     ):
         raise ArtifactError("AAB version name does not match canonical metadata")
-    if root.attrib.get(android_namespace + "versionCode") != metadata_value(
-        metadata, "versionCode", "version_code"
-    ):
+    if root.attrib.get(android_namespace + "versionCode") != metadata_version_code(metadata):
         raise ArtifactError("AAB version code does not match canonical metadata")
     if root.attrib.get(android_namespace + "debuggable", "false").lower() == "true":
         raise ArtifactError("AAB is debuggable")
 
 
 def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
+    metadata_identity(metadata)
     verify_jarsigner_bundle(aab)
     signer_output = run(["keytool", "-printcert", "-jarfile", str(aab)])
     verify_rsa4096_signer(signer_output)

@@ -10,8 +10,10 @@ import verify_android_artifacts
 from verify_android_artifacts import (
     ArtifactError,
     decode_debuggable_output,
+    metadata_identity,
     parse_expected_debuggable,
     run,
+    verify_expected_identity,
     verify_jarsigner_bundle,
     verify_rsa4096_signer,
 )
@@ -59,6 +61,8 @@ class JarsignerVerificationTest(unittest.TestCase):
             "applicationId": "example.app",
             "versionName": "1.0",
             "versionCode": 1,
+            "commitSha": "a" * 40,
+            "sourceBranch": "dev",
         }
         manifest = (
             '<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
@@ -115,6 +119,31 @@ class JarsignerVerificationTest(unittest.TestCase):
 
 
 class ApksignerInjectionTest(unittest.TestCase):
+    def test_identity_metadata_requires_strings_and_canonical_branch(self):
+        valid_commit = "a" * 40
+        invalid_metadata = (
+            {"commitSha": int("1" * 40), "sourceBranch": "dev"},
+            {"commitSha": valid_commit, "sourceBranch": 1},
+            {"commitSha": valid_commit, "sourceBranch": "refs/heads/dev"},
+            {"commitSha": valid_commit, "sourceBranch": "dev/.hidden"},
+            {"commitSha": valid_commit, "sourceBranch": "dev/build.lock"},
+        )
+        for metadata in invalid_metadata:
+            with self.subTest(metadata=metadata):
+                with self.assertRaises(ArtifactError):
+                    metadata_identity(metadata)
+
+    def test_repeated_caller_identity_requires_canonical_branch(self):
+        metadata = {"commitSha": "a" * 40, "sourceBranch": "dev"}
+        for branch in ("refs/heads/dev", "dev/.hidden", "dev/build.lock", 1):
+            with self.subTest(branch=branch):
+                with self.assertRaises(ArtifactError):
+                    verify_expected_identity(
+                        metadata,
+                        expected_commit="a" * 40,
+                        expected_source_branch=branch,
+                    )
+
     def test_apksigner_argument_is_required(self):
         with patch(
             "sys.argv",
@@ -184,6 +213,8 @@ class ApksignerInjectionTest(unittest.TestCase):
             "applicationId": "example.app",
             "versionName": "1.0",
             "versionCode": 1,
+            "commitSha": "a" * 40,
+            "sourceBranch": "dev",
         }
         calls = []
 

@@ -15,3 +15,8 @@
 - [x] Update the same implementation manifest and recompute its SHA-256.
 - [x] Commit, push, and verify the updated PR head and all identity gates.
 - [x] Add exactly one rework Implementation result comment and complete the implementation node.
+- [x] Recheck the canonical plan digest and baseline/worktree identity before CR-012 edits.
+- [x] Add one shared strict canonical-branch boundary and apply it to verifier, packaging, mutation, and harness provenance.
+- [x] Add negative coverage for malformed full refs, dot/.lock components, non-string identity metadata, and repeated malformed caller identity.
+- [x] Run the complete Python/convention/Gradle/artifact/package/source-policy verification matrix on one exact repaired head.
+- [ ] Refresh the same implementation manifest and digest, commit/push/update PR, add one result comment, and complete the node.
