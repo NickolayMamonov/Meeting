@@ -19,4 +19,5 @@
 - [x] Add one shared strict canonical-branch boundary and apply it to verifier, packaging, mutation, and harness provenance.
 - [x] Add negative coverage for malformed full refs, dot/.lock components, non-string identity metadata, and repeated malformed caller identity.
 - [x] Run the complete Python/convention/Gradle/artifact/package/source-policy verification matrix on one exact repaired head.
-- [ ] Refresh the same implementation manifest and digest, commit/push/update PR, add one result comment, and complete the node.
+- [x] Remediate QA-001 by consuming the uppercase `RELEASE_COMMIT_SHA` Gradle project property and re-run the required exact-head release verification.
+- [x] Refresh the same implementation manifest and digest, commit/push/update PR, add one result comment, and complete the node.
