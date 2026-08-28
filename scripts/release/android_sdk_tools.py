@@ -18,6 +18,7 @@ class AndroidSdkToolError(ValueError):
 
 _REVISION = re.compile(r"[0-9]+(?:\.[0-9]+)*\Z")
 _PACKAGE_REVISION = re.compile(r"Pkg\.Revision\s*=\s*([^\s]+)\Z")
+_PACKAGE_PATH = re.compile(r"Pkg\.Path\s*=\s*([^\s]+)\Z")
 _APKANALYZER_PROBE_TIMEOUT_SECONDS = 30
 _APKANALYZER_USAGE = re.compile(
     r"(?m)^Usage:\r?\n"
@@ -100,6 +101,7 @@ def _package_revision(
     directory: Path,
     package_name: str = "build-tools",
     containment_roots: tuple[Path, ...] = (),
+    expected_path: str | None = None,
 ) -> tuple[int, ...]:
     properties = _contained_path(
         directory / "source.properties",
@@ -117,6 +119,7 @@ def _package_revision(
             f"Android SDK {package_name} package metadata is unreadable"
         ) from error
     matches = []
+    path_matches = []
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("Pkg.Revision"):
@@ -126,10 +129,26 @@ def _package_revision(
                     f"Android SDK {package_name} package revision is malformed"
                 )
             matches.append(parse_revision(match.group(1)))
+        if expected_path is not None and stripped.startswith("Pkg.Path"):
+            match = _PACKAGE_PATH.fullmatch(stripped)
+            if match is None:
+                raise AndroidSdkToolError(
+                    f"Android SDK {package_name} package path is malformed"
+                )
+            path_matches.append(match.group(1))
     if len(matches) != 1:
         raise AndroidSdkToolError(
             f"Android SDK {package_name} package revision is not unique"
         )
+    if expected_path is not None:
+        if len(path_matches) != 1:
+            raise AndroidSdkToolError(
+                f"Android SDK {package_name} package path is not unique"
+            )
+        if path_matches[0] != expected_path:
+            raise AndroidSdkToolError(
+                f"Android SDK {package_name} package path does not match expected identity"
+            )
     return matches[0]
 
 
@@ -138,13 +157,16 @@ def _validated_executable(
     tool: str = "apksigner",
     relative_path: str | None = None,
     containment_roots: tuple[Path, ...] = (),
+    require_executable: bool = True,
 ) -> Path:
     executable = _contained_path(
         directory / (relative_path or tool),
         containment_roots + (directory.resolve(),),
         tool,
     )
-    if not executable.is_file() or not os.access(executable, os.X_OK):
+    if not executable.is_file() or (
+        require_executable and not os.access(executable, os.X_OK)
+    ):
         raise AndroidSdkToolError(f"{tool} is not a regular executable file")
     return executable
 
@@ -211,6 +233,7 @@ def _selected_cmdline_tools(root: Path) -> tuple[tuple[int, ...], Path]:
                         package,
                         "cmdline-tools",
                         containment_roots=(canonical_root, root),
+                        expected_path="cmdline-tools;22.0",
                     ),
                     package,
                 )
@@ -247,10 +270,11 @@ def resolve_apkanalyzer(environment: Mapping[str, str] | None = None) -> Path:
     try:
         root = sdk_root(environment)
         _, directory = _selected_cmdline_tools(root)
+        launcher = "bin/apkanalyzer.bat" if sys.platform == "win32" else "bin/apkanalyzer"
         executable = _validated_executable(
             directory,
             "apkanalyzer",
-            "bin/apkanalyzer",
+            launcher,
             containment_roots=(
                 _contained_path(
                     root / "cmdline-tools",
@@ -259,6 +283,7 @@ def resolve_apkanalyzer(environment: Mapping[str, str] | None = None) -> Path:
                 ),
                 root,
             ),
+            require_executable=sys.platform != "win32",
         )
         _probe_apkanalyzer(executable)
         return executable
