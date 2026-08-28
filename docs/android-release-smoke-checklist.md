@@ -289,11 +289,11 @@ user to external registration.
 | # | Action | Expected result / evidence |
 | --- | --- | --- |
 | 5.1 | Open the meeting details and record its initial membership/button state. | The fixture is the intended internal meeting and the initial state is observable. |
-| 5.2 | Tap Join and wait for the request/result state. | The button/count changes to the joined state only after the app's success behavior; no duplicate action is shown during the request. |
+| 5.2 | Tap Join and observe the state while the request is in flight and after it completes. | The button changes to the joined state immediately as an optimistic update; after a successful request it remains joined. |
 | 5.3 | Force-stop and relaunch, then re-open the same meeting. | The joined membership persists from a fresh load and agrees with the backend. |
-| 5.4 | Tap Leave and wait for completion. | The button/count returns to the not-joined state and the success is observable. |
+| 5.4 | Tap Leave and observe the state while the request is in flight and after it completes. | The button changes immediately to the not-joined state as an optimistic update; after a successful request it remains not joined. |
 | 5.5 | Force-stop and relaunch, then re-open the meeting. | The leave persists after reload and the backend/UI agree. |
-| 5.6 | Record the current state, disable networking or otherwise induce one join/leave request failure, then perform the opposite action. | The optimistic button/count change is rolled back to the recorded prior state when the request fails; the error is visible and the membership is not falsely committed. |
+| 5.6 | Record the current state, disable networking or otherwise induce one join/leave request failure, then perform the opposite action. | The optimistic button state rolls back to the recorded prior state when the request fails; the rollback is the required UI evidence, while the failure injection and request outcome are recorded separately. |
 | 5.7 | Restore networking and re-fetch the meeting. | The backend state and displayed state agree; record any intentional fixture change for cleanup. |
 
 Rollback proof is mandatory: a failure that leaves the optimistic state visible
@@ -309,11 +309,11 @@ Use the community details action and record the initial membership and count.
 | # | Action | Expected result / evidence |
 | --- | --- | --- |
 | 6.1 | Open community details from the supported app action. | The intended community fixture opens and its initial subscribe state/count are visible. |
-| 6.2 | Tap Subscribe and wait for the request/result state. | The button and subscriber count reflect the subscribed state after success; duplicate submission is prevented while pending. |
+| 6.2 | Tap Subscribe and observe the state while the request is in flight and after it completes. | The button and subscriber count immediately reflect the subscribed state as an optimistic update; after a successful request they remain subscribed. |
 | 6.3 | Force-stop and relaunch, then re-open community details. | Subscription persists after reload and agrees with the backend/count. |
-| 6.4 | Tap Unsubscribe and wait for completion. | The button/count return to the unsubscribed state and success is visible. |
+| 6.4 | Tap Unsubscribe and observe the state while the request is in flight and after it completes. | The button and subscriber count immediately return to the unsubscribed state as an optimistic update; after a successful request they remain unsubscribed. |
 | 6.5 | Force-stop and relaunch, then re-open community details. | Unsubscription persists after reload. |
-| 6.6 | Record the current state, disable networking or induce one subscribe/unsubscribe request failure, then perform the opposite action. | The optimistic button/count update rolls back to the recorded prior state; the error is visible and no false membership remains. |
+| 6.6 | Record the current state, disable networking or induce one subscribe/unsubscribe request failure, then perform the opposite action. | The optimistic button and subscriber-count update rolls back to the recorded prior state when the request fails; the rollback is the required UI evidence, while the failure injection and request outcome are recorded separately. |
 | 6.7 | Restore networking and re-fetch the community. | Backend and UI membership/count agree; record any fixture residue for cleanup. |
 
 Rollback proof is mandatory and has the same `FAIL` rule as Case 5.
