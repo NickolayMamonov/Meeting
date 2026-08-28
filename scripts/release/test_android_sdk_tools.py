@@ -201,8 +201,8 @@ class AndroidSdkToolsTest(unittest.TestCase):
             self.make_analyzer_sdk(
                 root,
                 [
-                    ("latest", "14.0.0", "cmdline-tools;14.0.0", True),
-                    ("12.0.0", "12.0.0", "cmdline-tools;12.0.0", True),
+                    ("latest", "12.0", "cmdline-tools;12.0", True),
+                    ("11.0", "11.0", "cmdline-tools;11.0", True),
                 ],
             )
             with patch("android_sdk_tools.subprocess.run", self.successful_probe):
@@ -215,12 +215,12 @@ class AndroidSdkToolsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.make_analyzer_sdk(
-                root, [("22.0", "22.0.0", "cmdline-tools;22.0.0", True)]
+                root, [("12.0", "12.0", "cmdline-tools;12.0", True)]
             )
             with patch("android_sdk_tools.subprocess.run", self.successful_probe):
                 self.assertEqual(
                     resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}),
-                    (root / "cmdline-tools/22.0/bin/apkanalyzer").resolve(),
+                    (root / "cmdline-tools/12.0/bin/apkanalyzer").resolve(),
                 )
 
     def test_apkanalyzer_non_windows_prefers_extensionless_launcher(self):
