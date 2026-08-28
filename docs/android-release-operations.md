@@ -28,17 +28,16 @@ The `android-release` environment contains:
 - Non-secret `BASE_URL_RELEASE`, exactly
   `https://api.whysoezzy.online`.
 
-Only the isolated `stable-sign` job receives the signing secrets. Build,
-evidence, public-probe, and publication jobs do not reference signing
-material. The credential audit must verify this boundary and must not print
-secret values.
-
-The dispatch-only `Android release proof` workflow has the same signer
-boundary: only `proof-sign` receives the production keystore and passwords.
-`proof-build` receives Firebase configuration and release URL/certificate
-variables, while `proof-evidence`, `proof-public-probe`, and `proof-report`
-receive no signing material. The proof workflow has no release API token and
-cannot create, mutate, publish, or upload a GitHub Release.
+The stable publication workflow gives signing secrets only to the isolated
+`stable-sign` job. Its build, evidence, public-probe, and publication jobs do
+not reference signing material. The dispatch-only `Android release proof`
+workflow has a separate signer boundary: only `proof-sign` receives the
+production keystore and passwords. In that workflow, `proof-build` receives
+Firebase configuration and release URL/certificate variables, while
+`proof-evidence`, `proof-public-probe`, and `proof-report` receive no signing
+material. The credential audit must verify both boundaries and must not print
+secret values. The proof workflow has no release API token and cannot create,
+mutate, publish, or upload a GitHub Release.
 
 ## Release networking
 
