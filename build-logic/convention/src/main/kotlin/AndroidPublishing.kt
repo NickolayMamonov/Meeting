@@ -17,8 +17,8 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             publishingInput(name).orNull
         }
     val releaseCommitSha =
-        publishingInput("releaseCommitSha", "GITHUB_SHA")
-            .orElse(publishingInput("RELEASE_COMMIT_SHA"))
+        publishingInput("releaseCommitSha", "RELEASE_COMMIT_SHA")
+            .orElse(publishingInput("GITHUB_SHA"))
     val baseUrl = publishingInput("BASE_URL_RELEASE")
     val expectedCertificate = publishingInput("ANDROID_RELEASE_CERT_SHA256")
     val snapshotExpectedCertificate = publishingInput("ANDROID_SNAPSHOT_CERT_SHA256")

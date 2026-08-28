@@ -138,6 +138,7 @@ class PublicationGateTest(unittest.TestCase):
             ("release-candidate.json", "source_branch", "other"),
             ("attestation-index.json", "schema", 2),
             ("attestation-index.json", "kind", "other-index"),
+            ("attestation-index.json", "channel", "snapshot"),
         )
         with tempfile.TemporaryDirectory() as temporary:
             source = PackageArtifactsTest.package_release(Path(temporary))

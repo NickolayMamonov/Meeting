@@ -216,25 +216,7 @@ def verify_jarsigner_bundle(aab: Path) -> str:
     return output
 
 
-def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
-    verify_jarsigner_bundle(aab)
-    signer_output = run(["keytool", "-printcert", "-jarfile", str(aab)])
-    verify_rsa4096_signer(signer_output)
-    signer_digests = re.findall(
-        r"SHA256:\s*([0-9a-f: ]+)", signer_output, flags=re.IGNORECASE
-    )
-    if not signer_digests:
-        raise ArtifactError("AAB signer output did not contain a SHA-256 certificate digest")
-    expected = normalized_digest(
-        metadata_value(
-            metadata,
-            "expectedCertificateSha256",
-            "signingFingerprint",
-            "signing_fingerprint",
-        )
-    )
-    if normalized_digest(signer_digests[0]) != expected:
-        raise ArtifactError("AAB certificate does not match canonical metadata")
+def verify_bundle_identity(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
     output = run(["java", "-jar", str(bundletool_jar), "dump", "manifest", f"--bundle={aab}"])
     start = output.find("<manifest")
     end = output.rfind("</manifest>")
@@ -256,6 +238,28 @@ def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
         raise ArtifactError("AAB is debuggable")
 
 
+def verify_bundle(aab: Path, metadata: dict, bundletool_jar: Path) -> None:
+    verify_jarsigner_bundle(aab)
+    signer_output = run(["keytool", "-printcert", "-jarfile", str(aab)])
+    verify_rsa4096_signer(signer_output)
+    signer_digests = re.findall(
+        r"SHA256:\s*([0-9a-f: ]+)", signer_output, flags=re.IGNORECASE
+    )
+    if not signer_digests:
+        raise ArtifactError("AAB signer output did not contain a SHA-256 certificate digest")
+    expected = normalized_digest(
+        metadata_value(
+            metadata,
+            "expectedCertificateSha256",
+            "signingFingerprint",
+            "signing_fingerprint",
+        )
+    )
+    if normalized_digest(signer_digests[0]) != expected:
+        raise ArtifactError("AAB certificate does not match canonical metadata")
+    verify_bundle_identity(aab, metadata, bundletool_jar)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--metadata", type=Path, required=True)
@@ -267,7 +271,9 @@ def main() -> int:
     )
     parser.add_argument("--expected-commit")
     parser.add_argument("--expected-source-branch")
-    parser.add_argument("--unsigned-apk", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--unsigned-apk", action="store_true")
+    mode.add_argument("--unsigned-release", action="store_true")
     parser.add_argument("--aab", type=Path)
     parser.add_argument("--bundletool-jar", type=Path)
     parser.add_argument("--bundletool-sha256")
@@ -281,6 +287,15 @@ def main() -> int:
                 or args.bundletool_sha256 is not None
             ):
                 raise ArtifactError("--unsigned-apk forbids signer, AAB, and Bundletool inputs")
+        elif args.unsigned_release:
+            if args.apksigner is not None:
+                raise ArtifactError("--unsigned-release forbids signer input")
+            if args.aab is None:
+                raise ArtifactError("--unsigned-release requires an AAB")
+            if args.bundletool_jar is None or args.bundletool_sha256 is None:
+                raise ArtifactError(
+                    "--unsigned-release requires Bundletool inputs"
+                )
         elif args.apksigner == "":
             raise ArtifactError("--apksigner must not be empty")
         elif args.apksigner is None:
@@ -301,6 +316,16 @@ def main() -> int:
             verify_apk_identity(
                 args.apk, metadata, Path(args.apkanalyzer), args.expected_debuggable
             )
+        elif args.unsigned_release:
+            if metadata.get("channel") != "release":
+                raise ArtifactError("--unsigned-release requires release metadata")
+            verify_apk_identity(
+                args.apk, metadata, Path(args.apkanalyzer), args.expected_debuggable
+            )
+            expected_bundletool_digest = normalized_digest(args.bundletool_sha256)
+            if file_digest(args.bundletool_jar) != expected_bundletool_digest:
+                raise ArtifactError("Bundletool digest does not match the pinned SHA-256")
+            verify_bundle_identity(args.aab, metadata, args.bundletool_jar)
         else:
             verify_apk(
                 args.apk,
@@ -311,7 +336,7 @@ def main() -> int:
                 args.expected_commit,
                 args.expected_source_branch,
             )
-        if args.aab is not None:
+        if args.aab is not None and not args.unsigned_release:
             if args.bundletool_jar is None:
                 raise ArtifactError("bundletool JAR is required for AAB verification")
             if args.bundletool_sha256 is None:

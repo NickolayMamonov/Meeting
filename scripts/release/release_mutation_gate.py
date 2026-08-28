@@ -85,7 +85,8 @@ def _validate_attestation_index(
 ) -> None:
     _require(
         index.get("schema") == 1
-        and index.get("kind") == "attestation-index",
+        and index.get("kind") == "attestation-index"
+        and index.get("channel") == "release",
         "attestation index schema or kind is invalid",
     )
     _require_reference(

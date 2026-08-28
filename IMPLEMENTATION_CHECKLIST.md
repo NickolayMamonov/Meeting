@@ -10,6 +10,8 @@
 - [x] Record initial implementation manifest and deliver PR #86.
 - [x] Remediate CR-001/COM-001 through CR-007/COM-004 only.
 - [x] Re-run targeted negatives and the full required verification matrix on one exact head.
+- [x] Remediate CR-008 through CR-011 and ICR-001/ICR-002 only.
+- [x] Re-run targeted negatives and the full required verification matrix on one exact head.
 - [ ] Update the same implementation manifest and recompute its SHA-256.
 - [ ] Commit, push, and verify the updated PR head and all identity gates.
 - [ ] Add exactly one rework Implementation result comment and complete the implementation node.

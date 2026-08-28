@@ -127,6 +127,12 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertNotIn("continue-on-error", self.unit_tests)
 
     def test_stable_call_site_requires_false_and_keeps_aab_contract(self):
+        self.assertNotIn("--unsigned-apk", self.stable_sign)
+        self.assertIn("--unsigned-release", self.stable_sign)
+        self.assertIn("--aab", self.stable_sign)
+        self.assertIn("--bundletool-jar", self.stable_sign)
+        self.assertNotIn("--unsigned-apk", self.release_workflow)
+        self.assertNotIn("--unsigned-apk", self.release_proof_workflow)
         verifier_call = self.stable_evidence[
             self.stable_evidence.index("python release-tooling/scripts/release/verify_android_artifacts.py") :
         ]
@@ -192,6 +198,11 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
             workflow.index("  stable-build:") : workflow.index("  stable-sign:")
         ]
         self.assertIn('ref: ${{ needs.release-please.outputs.source_sha }}', stable_build)
+        self.assertIn('test "$(git rev-parse HEAD)" = "$RELEASE_SHA"', stable_build)
+        self.assertIn(
+            '-PreleaseCommitSha="${{ needs.release-please.outputs.source_sha }}"',
+            stable_build,
+        )
         self.assertNotIn('ref: ${{ needs.release-please.outputs.tag_name }}', stable_build)
 
         for section in (self.stable_sign, self.stable_evidence, self.stable_public_probe):
@@ -243,6 +254,10 @@ class SnapshotApksignerWorkflowTest(unittest.TestCase):
         self.assertNotIn("RELEASE_KEY_PASSWORD", public_probe + mutation)
 
     def test_proof_signer_isolated_and_tooling_revision_bound(self):
+        self.assertNotIn("--unsigned-apk", self.proof_sign)
+        self.assertIn("--unsigned-release", self.proof_sign)
+        self.assertIn("--aab", self.proof_sign)
+        self.assertIn("--bundletool-jar", self.proof_sign)
         self.assertIn('ref: ${{ github.sha }}', self.proof_sign)
         self.assertIn("path: release-tooling", self.proof_sign)
         self.assertNotIn("ref: ${{ inputs.application_sha }}", self.proof_sign)

@@ -233,6 +233,7 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew generateReleaseBuildMetadata validateReleasePublishingInputs ktlintCheck \
+            -PreleaseCommitSha="${{ needs.release-please.outputs.source_sha }}" \
             testDebugUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -285,6 +286,15 @@ jobs:
         with:
           name: android-release-unsigned-${{ needs.release-please.outputs.tag_name }}
           path: unsigned
+      - name: Download and verify reviewed Bundletool
+        run: |
+          set -euo pipefail
+          readonly bundletool_version='1.18.3'
+          readonly bundletool_sha256='a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
+          curl --fail --location --silent --show-error \
+            "https://github.com/google/bundletool/releases/download/$bundletool_version/bundletool-all-$bundletool_version.jar" \
+            --output "$RUNNER_TEMP/stable-sign-bundletool.jar"
+          echo "$bundletool_sha256  $RUNNER_TEMP/stable-sign-bundletool.jar" | sha256sum --check
       - name: Admit exact unsigned stable artifacts before keystore access
         env:
           EXPECTED_COMMIT: ${{ needs.release-please.outputs.source_sha }}
@@ -297,13 +307,15 @@ jobs:
           test "${#apk_files[@]}" -eq 1
           test "${#aab_files[@]}" -eq 1
           python release-tooling/scripts/release/verify_android_artifacts.py \
-            --metadata "${metadata_files[0]}" \
-            --apk "${apk_files[0]}" \
+            --metadata "${metadata_files[0]}" --apk "${apk_files[0]}" \
+            --aab "${aab_files[0]}" \
             --apkanalyzer "$APKANALYZER_PATH" \
             --expected-debuggable false \
             --expected-commit "$EXPECTED_COMMIT" \
             --expected-source-branch master \
-            --unsigned-apk
+            --unsigned-release \
+            --bundletool-jar "$RUNNER_TEMP/stable-sign-bundletool.jar" \
+            --bundletool-sha256 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
       - name: Decode release keystore
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}

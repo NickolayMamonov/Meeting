@@ -55,6 +55,33 @@ class JarsignerVerificationTest(unittest.TestCase):
             ["jarsigner", "-verify", "-verbose", "-certs", "app.aab"],
         )
         self.assertNotIn("-strict", command)
+        metadata = {
+            "applicationId": "example.app",
+            "versionName": "1.0",
+            "versionCode": 1,
+        }
+        manifest = (
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
+            'package="example.app" android:versionName="1.0" '
+            'android:versionCode="1"></manifest>'
+        )
+        with patch.object(
+            verify_android_artifacts, "run", return_value=manifest
+        ) as identity_run:
+            verify_android_artifacts.verify_bundle_identity(
+                Path("app.aab"), metadata, Path("bundletool.jar")
+            )
+        self.assertEqual(
+            identity_run.call_args.args[0],
+            [
+                "java",
+                "-jar",
+                "bundletool.jar",
+                "dump",
+                "manifest",
+                "--bundle=app.aab",
+            ],
+        )
 
     def test_rejects_missing_verification_success(self):
         with self.assertRaisesRegex(ArtifactError, "did not report"):
@@ -220,6 +247,8 @@ class ApksignerInjectionTest(unittest.TestCase):
                         "applicationId": "example.app",
                         "versionName": "1.0",
                         "versionCode": 1,
+                        "commitSha": "a" * 40,
+                        "sourceBranch": "dev",
                     }
                 ),
                 encoding="utf-8",
@@ -257,6 +286,10 @@ class ApksignerInjectionTest(unittest.TestCase):
                             "apkanalyzer",
                             "--expected-debuggable",
                             "true",
+                            "--expected-commit",
+                            "a" * 40,
+                            "--expected-source-branch",
+                            "dev",
                         ],
                     ), patch.object(
                         verify_android_artifacts, "run", side_effect=fake_run
@@ -266,6 +299,32 @@ class ApksignerInjectionTest(unittest.TestCase):
                             "Android artifact verification failed",
                             output.call_args.args[0],
                         )
+
+            with patch(
+                "sys.argv",
+                [
+                    "verify_android_artifacts.py",
+                    "--metadata",
+                    str(metadata),
+                    "--apk",
+                    str(root_path / "app.apk"),
+                    "--apksigner",
+                    "apksigner",
+                    "--apkanalyzer",
+                    "apkanalyzer",
+                    "--expected-debuggable",
+                    "false",
+                    "--expected-commit",
+                    "b" * 40,
+                    "--expected-source-branch",
+                    "dev",
+                ],
+            ), patch("builtins.print") as output:
+                self.assertEqual(verify_android_artifacts.main(), 1)
+                self.assertIn(
+                    "expected commit does not match canonical metadata",
+                    output.call_args.args[0],
+                )
 
     def test_empty_apksigner_is_rejected_before_path_normalization(self):
         with tempfile.TemporaryDirectory() as root:
