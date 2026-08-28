@@ -109,52 +109,108 @@ class PublicationGateTest(unittest.TestCase):
     def test_release_asset_allowlist_rejects_unreferenced_extra(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            names = {
-                "release-authority.json",
-                "release-manifest.json",
-                "SHA256SUMS",
-                "release-candidate.json",
-                "attestation-index.json",
-                "Meet.apk",
-                "app.aab",
-                "Meet.apk.attestation.json",
-            }
-            for name in names:
-                (directory / name).write_text("{}", encoding="utf-8")
-            (directory / "Meet.apk").write_bytes(b"apk")
-            (directory / "release-manifest.json").write_text(
-                json.dumps({
-                    "schema": 1,
-                    "channel": "release",
-                    "tag": "v1.0.0",
-                    "commit": "a" * 40,
-                    "artifacts": [
-                        {"name": "Meet.apk", "type": "apk", "size": 3,
-                         "sha256": "dd37c2d7274f7ea982cb83390c36918fee9ce8889073c44b68cdc00bdb8c3e04"},
-                        {"name": "app.aab", "type": "aab", "size": 2,
-                         "sha256": "441a7149f2ecf1fca813f9e0c6c1d7f6e4f0f7f2d6e1a0e2b8c7e3d1f5a4b2c1"},
-                    ],
-                }),
-                encoding="utf-8",
-            )
-            (directory / "release-candidate.json").write_text(
-                json.dumps({"tag": "v1.0.0", "commit": "a" * 40}),
-                encoding="utf-8",
-            )
-            (directory / "attestation-index.json").write_text(
-                json.dumps({"attestations": [{"name": "Meet.apk.attestation.json"}]}),
-                encoding="utf-8",
-            )
+            from test_package_artifacts import PackageArtifactsTest
+
+            source = PackageArtifactsTest.package_release(directory)
             self.assertEqual(
                 expected_release_asset_names(
-                    directory, tag="v1.0.0", source_sha="a" * 40
+                    source, tag="v1.0.0", source_sha="a" * 40,
+                    expected_source_branch="dev",
                 ),
                 {"Meet.apk"},
             )
-            (directory / "operator-note.txt").write_text("unexpected", encoding="utf-8")
+            (source / "operator-note.txt").write_text("unexpected", encoding="utf-8")
             with self.assertRaisesRegex(MutationError, "unreferenced"):
                 expected_release_asset_names(
-                    directory, tag="v1.0.0", source_sha="a" * 40
+                    source, tag="v1.0.0", source_sha="a" * 40,
+                    expected_source_branch="dev",
+                )
+
+    def test_release_identity_boundary_rejects_repeated_malformed_branches(self):
+        from test_package_artifacts import PackageArtifactsTest
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = PackageArtifactsTest.package_release(Path(temporary))
+            for expected_branch in ("refs/heads/dev", "dev/.hidden", "dev/build.lock", 1):
+                with self.subTest(expected_branch=expected_branch):
+                    with self.assertRaises(MutationError):
+                        expected_release_asset_names(
+                            source,
+                            tag="v1.0.0",
+                            source_sha="a" * 40,
+                            expected_source_branch=expected_branch,
+                        )
+
+    def test_release_identity_boundary_rejects_malformed_manifest_branch(self):
+        from test_package_artifacts import PackageArtifactsTest
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = PackageArtifactsTest.package_release(Path(temporary))
+            manifest_path = source / "release-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["source_branch"] = 1
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaises(MutationError):
+                expected_release_asset_names(
+                    source,
+                    tag="v1.0.0",
+                    source_sha="a" * 40,
+                    expected_source_branch="dev",
+                )
+
+    def test_candidate_and_attestation_index_identities_are_exact(self):
+        from test_package_artifacts import PackageArtifactsTest
+
+        mutations = (
+            ("release-candidate.json", "schema", 2),
+            ("release-candidate.json", "kind", "other-candidate"),
+            ("release-candidate.json", "channel", "snapshot"),
+            ("release-candidate.json", "tag", "v9.9.9"),
+            ("release-candidate.json", "commit", "c" * 40),
+            ("release-candidate.json", "source_branch", "other"),
+            ("attestation-index.json", "schema", 2),
+            ("attestation-index.json", "kind", "other-index"),
+            ("attestation-index.json", "channel", "snapshot"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            source = PackageArtifactsTest.package_release(Path(temporary))
+            for filename, field, value in mutations:
+                with self.subTest(filename=filename, field=field):
+                    fixture = Path(temporary) / f"{filename}-{field}"
+                    import shutil
+
+                    shutil.copytree(source, fixture)
+                    path = fixture / filename
+                    document = json.loads(path.read_text(encoding="utf-8"))
+                    document[field] = value
+                    path.write_text(json.dumps(document), encoding="utf-8")
+                    with self.assertRaises(MutationError):
+                        expected_release_asset_names(
+                            fixture,
+                            tag="v1.0.0",
+                            source_sha="a" * 40,
+                            expected_source_branch="dev",
+                        )
+
+    def test_attestation_index_references_are_bound_to_admitted_objects(self):
+        from test_package_artifacts import PackageArtifactsTest
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = PackageArtifactsTest.package_release(Path(temporary))
+            fixture = Path(temporary) / "tampered-index"
+            import shutil
+
+            shutil.copytree(source, fixture)
+            path = fixture / "attestation-index.json"
+            index = json.loads(path.read_text(encoding="utf-8"))
+            index["candidate"]["name"] = "release-manifest.json"
+            path.write_text(json.dumps(index), encoding="utf-8")
+            with self.assertRaisesRegex(MutationError, "candidate reference"):
+                expected_release_asset_names(
+                    fixture,
+                    tag="v1.0.0",
+                    source_sha="a" * 40,
+                    expected_source_branch="dev",
                 )
 
     def test_workflow_has_public_probe_before_protected_one_shot_mutation(self):
@@ -338,9 +394,9 @@ class PublicationGateTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("  pull_request:\n    branches: [dev]", workflow)
-        self.assertIn("  push:\n    branches: [dev]", workflow)
+        self.assertIn("  push:\n    branches: [dev, master]", workflow)
         self.assertIn("  workflow_dispatch:", workflow)
-        self.assertEqual(workflow.count("permissions:"), 3)
+        self.assertEqual(workflow.count("permissions:"), 4)
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertIn(
             "ref: ${{ github.event.pull_request.head.sha || github.sha }}",

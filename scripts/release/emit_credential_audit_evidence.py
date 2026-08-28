@@ -13,6 +13,8 @@ import json
 import os
 from pathlib import Path
 
+from release_roles import ReleaseRole, load_release_roles
+
 
 def required(name: str) -> str:
     value = os.environ.get(name, "")
@@ -38,8 +40,8 @@ def main() -> int:
         "status": "completed",
         "conclusion": "success",
     }
-    if payload["ref"] != "refs/heads/master":
-        raise SystemExit("producer evidence must be emitted only from protected master")
+    if payload["ref"] != load_release_roles().authority(ReleaseRole.STABLE).head_ref:
+        raise SystemExit("producer evidence must be emitted only from the stable role")
     output.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
     return 0
 

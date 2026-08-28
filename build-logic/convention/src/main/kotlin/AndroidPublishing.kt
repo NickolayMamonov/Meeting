@@ -7,6 +7,7 @@ import org.gradle.kotlin.dsl.register
 
 internal fun Project.configureAndroidPublishing(applicationExtension: ApplicationExtension) {
     val versionFile = rootProject.layout.projectDirectory.file("version.json")
+    val releaseRolesFile = rootProject.layout.projectDirectory.file("release-roles.json")
     val stableVersion = versionFile.asFile.readAndroidVersion()
     val snapshotRunNumber = publishingInput("snapshotRunNumber")
     val snapshotRunAttempt = publishingInput("snapshotRunAttempt")
@@ -16,8 +17,9 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             publishingInput(name).orNull
         }
     val releaseCommitSha =
-        publishingInput("releaseCommitSha", "GITHUB_SHA")
-            .orElse(publishingInput("RELEASE_COMMIT_SHA"))
+        providers.gradleProperty("RELEASE_COMMIT_SHA")
+            .orElse(publishingInput("releaseCommitSha", "RELEASE_COMMIT_SHA"))
+            .orElse(publishingInput("GITHUB_SHA"))
     val baseUrl = publishingInput("BASE_URL_RELEASE")
     val expectedCertificate = publishingInput("ANDROID_RELEASE_CERT_SHA256")
     val snapshotExpectedCertificate = publishingInput("ANDROID_SNAPSHOT_CERT_SHA256")
@@ -75,6 +77,7 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             group = "verification"
             description = "Validates snapshot workflow provenance and expected signer inputs."
             this.versionFile.set(versionFile)
+            this.releaseRolesFile.set(releaseRolesFile)
             runNumber.convention(snapshotRunNumber)
             runAttempt.convention(snapshotRunAttempt)
             commitSha.convention(snapshotCommitSha)
@@ -88,6 +91,7 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             group = "verification"
             description = "Validates stable TLS configuration and the release signing identity."
             this.versionFile.set(versionFile)
+            this.releaseRolesFile.set(releaseRolesFile)
             this.baseUrl.convention(baseUrl)
             expectedCertificateSha256.convention(expectedCertificate)
             dependsOn(validateVersion)
@@ -105,6 +109,7 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
         group = "build"
         description = "Generates canonical metadata for the unsigned snapshot APK."
         this.versionFile.set(versionFile)
+        this.releaseRolesFile.set(releaseRolesFile)
         runNumber.convention(snapshotRunNumber)
         runAttempt.convention(snapshotRunAttempt)
         commitSha.convention(snapshotCommitSha)
@@ -118,6 +123,7 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
         group = "build"
         description = "Generates canonical metadata for stable release artifacts."
         this.versionFile.set(versionFile)
+        this.releaseRolesFile.set(releaseRolesFile)
         this.baseUrl.convention(baseUrl)
         commitSha.convention(releaseCommitSha)
         expectedCertificateSha256.convention(expectedCertificate)

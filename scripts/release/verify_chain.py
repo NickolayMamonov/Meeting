@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import Any, Mapping
 
 from release_evidence import (
     EvidenceError,
@@ -35,12 +36,39 @@ def read(path: Path) -> dict:
     return value
 
 
+def require_reference(
+    value: Any,
+    *,
+    name: str,
+    path: Path,
+    description: str,
+) -> None:
+    if not isinstance(value, Mapping):
+        raise ChainError(f"{description} is malformed")
+    if value.get("name") != name:
+        raise ChainError(f"{description} name mismatch")
+    if value.get("sha256") != digest(path):
+        raise ChainError(f"{description} digest mismatch")
+
+
 def verify(directory: Path) -> None:
     manifest_name = "snapshot-manifest.json" if (directory / "snapshot-manifest.json").exists() else "release-manifest.json"
     manifest_path = directory / manifest_name
     manifest = read(manifest_path)
     authority_path = directory / "release-authority.json"
-    read(authority_path)
+    authority = read(authority_path)
+    channel = manifest.get("channel")
+    if manifest.get("schema") != 1 or channel not in {"release", "snapshot"}:
+        raise ChainError("manifest schema or channel is invalid")
+    if (
+        authority.get("schema") != 1
+        or authority.get("kind") != "release-authority"
+        or authority.get("channel") != channel
+        or authority.get("tag") != manifest.get("tag")
+        or authority.get("commit") != manifest.get("commit")
+        or authority.get("source_branch") != manifest.get("source_branch")
+    ):
+        raise ChainError("release authority identity mismatch")
     checksums_path = directory / "SHA256SUMS"
     checksum_lines = checksums_path.read_text(encoding="utf-8").splitlines()
     checksum_names = [line.split("  ", 1)[1] for line in checksum_lines]
@@ -53,29 +81,65 @@ def verify(directory: Path) -> None:
         actual = digest(directory / name)
         if actual != expected:
             raise ChainError(f"checksum mismatch for {name}")
-    authority_ref = manifest.get("authority", {})
-    if authority_ref.get("name") != authority_path.name or authority_ref.get("sha256") != digest(authority_path):
-        raise ChainError("manifest authority reference mismatch")
+    require_reference(
+        manifest.get("authority"),
+        name=authority_path.name,
+        path=authority_path,
+        description="manifest authority reference",
+    )
     for item in manifest.get("artifacts", []):
         artifact = directory / item["name"]
         if not artifact.is_file() or digest(artifact) != item["sha256"] or artifact.stat().st_size != item["size"]:
             raise ChainError(f"manifest artifact mismatch for {item['name']}")
     candidate = read(directory / "release-candidate.json")
-    if candidate.get("manifest", {}).get("sha256") != digest(manifest_path):
-        raise ChainError("candidate manifest reference mismatch")
-    if candidate.get("checksums", {}).get("sha256") != digest(checksums_path):
-        raise ChainError("candidate checksum reference mismatch")
+    if (
+        candidate.get("schema") != 1
+        or candidate.get("kind") != "release-candidate"
+        or candidate.get("channel") != channel
+        or candidate.get("tag") != manifest.get("tag")
+        or candidate.get("commit") != manifest.get("commit")
+        or candidate.get("source_branch") != manifest.get("source_branch")
+    ):
+        raise ChainError("release candidate schema or identity mismatch")
+    require_reference(
+        candidate.get("manifest"),
+        name=manifest_path.name,
+        path=manifest_path,
+        description="candidate manifest reference",
+    )
+    require_reference(
+        candidate.get("checksums"),
+        name=checksums_path.name,
+        path=checksums_path,
+        description="candidate checksum reference",
+    )
     index = read(directory / "attestation-index.json")
-    if index.get("candidate", {}).get("sha256") != digest(directory / "release-candidate.json"):
-        raise ChainError("attestation index candidate reference mismatch")
-    if index.get("authority", {}).get("name") != authority_path.name or index.get("authority", {}).get("sha256") != digest(authority_path):
-        raise ChainError("attestation index authority reference mismatch")
-    if "attestation-index.json" not in index.get("excluded_from_coverage", []):
+    if (
+        index.get("schema") != 1
+        or index.get("kind") != "attestation-index"
+        or index.get("channel") != channel
+    ):
+        raise ChainError("attestation index schema, kind, or channel is invalid")
+    require_reference(
+        index.get("candidate"),
+        name="release-candidate.json",
+        path=directory / "release-candidate.json",
+        description="attestation index candidate reference",
+    )
+    require_reference(
+        index.get("authority"),
+        name=authority_path.name,
+        path=authority_path,
+        description="attestation index authority reference",
+    )
+    if index.get("excluded_from_coverage") != ["release-candidate.json", "attestation-index.json"]:
         raise ChainError("attestation index is not excluded from coverage")
     references = index.get("attestations", [])
     if not isinstance(references, list):
         raise ChainError("attestation references are not a list")
-    reference_names = [reference.get("name") for reference in references]
+    if not all(isinstance(reference, Mapping) for reference in references):
+        raise ChainError("attestation reference is malformed")
+    reference_names = [reference["name"] for reference in references]
     if len(reference_names) != len(set(reference_names)):
         raise ChainError("duplicate attestation reference")
     expected_subjects = {

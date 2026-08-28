@@ -2,14 +2,39 @@
 
 ## Scope and authority
 
-- `dev` is the release source and pull-request target.
+- `dev` is the integration, snapshot, beta, and pre-promotion-smoke
+  authority. Ordinary feature and product pull requests target `dev`.
+- `master` is the sole stable Release Please, production build/signing,
+  evidence, non-publishing proof, and publication authority.
+- `release-roles.json` is the source-controlled branch-role authority; workflow
+  literals and generated metadata are checked against these two roles.
 - Release Please uses the repository `RELEASE_PLEASE_TOKEN` for its draft
   release, tag, and pull-request operations.
 - The protected `android-release` environment is used by stable build, signing,
   public probe, final publication, and the non-publishing release proof. Its
-  administrator bypass remains disabled and its branch policy remains `dev`.
+  administrator bypass remains disabled and its branch policy remains `master`.
 - No backend, VPS, Nginx, certificate, Google Play, device, or USB operation
   is part of Android publication.
+
+## Three-stage promotion
+
+The source-controlled contract has three ordered stages:
+
+1. **`dev` integration:** feature work, normal CI, signed snapshots, beta use,
+   and pre-promotion smoke verification remain on `dev`. A snapshot is admitted
+   only for a successful push whose exact ref is `refs/heads/dev`.
+2. **MEE3-64 promotion gate:** a separately reviewed operator process selects
+   an exact `dev` candidate and performs the one-time protected promotion.
+   MEE3-63 does not move or create refs, change protections or credentials,
+   dispatch workflows, prove a release, or mutate release state.
+3. **`master` stable release:** only the exact reviewed commit present on
+   `master` can enter stable Release Please, production build/signing,
+   evidence, proof, or later publication. A commit that exists only on `dev`
+   remains ineligible for every stable path.
+
+Merging this code-only contract into `dev` does not itself publish or mutate
+stable state. No live mutation is part of this task; failures stop at the
+applicable reviewed gate for manual investigation.
 
 ## Exact protected inventory
 
@@ -36,7 +61,9 @@ production keystore and passwords. In that workflow, `proof-build` receives
 Firebase configuration and release URL/certificate variables, while
 `proof-evidence`, `proof-public-probe`, and `proof-report` receive no signing
 material. The credential audit must verify both boundaries and must not print
-secret values. The proof workflow has no release API token and cannot create,
+secret values. Its `protected-producer` job runs only on a successful `master`
+push, has contents-read permission, and emits no signing or release
+credentials. The proof workflow has no release API token and cannot create,
 mutate, publish, or upload a GitHub Release.
 
 ## Release networking
@@ -64,7 +91,9 @@ The protected Actions artifact `android-release-evidence-${tag}` remains the
 complete auditor chain. It contains the canonical `Meet.apk`, the signed AAB,
 optional mapping/native-symbol outputs, authority, manifest, checksums,
 candidate, attestation index, and every individual attestation. The AAB and
-evidence files never cross the public upload boundary.
+evidence files never cross the public upload boundary. The credential audit's
+separate `credential-audit-evidence` artifact contains only the protected
+master producer run identity.
 
 Release notes preserve Release Please's text and add one deterministic
 `meet-android-verification` section with the version/code, `Meet.apk` SHA-256,
@@ -110,11 +139,11 @@ investigation, with no retry, repair, delete, or rollback request.
 
 ## Non-publishing exact release proof
 
-After the implementation is merged to `dev`, operators dispatch the protected
-proof from `dev` with the exact accepted application commit:
+After MEE3-64 promotes the exact reviewed candidate, operators may dispatch the
+protected proof from `master` with the exact accepted application commit:
 
 ```text
-gh workflow run release-proof.yml --ref dev -f application_sha=<accepted-40-hex-sha>
+gh workflow run release-proof.yml --ref master -f application_sha=<accepted-40-hex-sha>
 ```
 
 `application_sha` is the commit whose Android source is built, packaged, signed,
@@ -122,9 +151,10 @@ and probed. `${{ github.sha }}` is recorded separately as the workflow/tooling
 commit: it supplies the proof workflow and release scripts used to verify the
 application artifact. The workflow requires the application commit to be a
 lowercase 40-hex commit, checks it out exactly, and proves it is an ancestor of
-the workflow commit and `origin/dev`.
+the workflow commit and `origin/master`.
 
-The five-job chain must complete successfully without skipped jobs:
+The five-job chain must complete successfully without skipped jobs, and the
+dispatch ref must be exactly `refs/heads/master`:
 
 1. `proof-build` enters `android-release`, validates Firebase and the exact
    production URL, then runs release metadata generation, validation, lint,
@@ -166,6 +196,13 @@ The exact-head non-production audit is run with:
 gh workflow run release-credential-audit.yml --ref <PR-branch> -f publication_harness=true -f expected_sha=<40-hex-PR-head>
 ```
 
+Pull requests and `dev` pushes retain the static audit and QA harness
+boundaries. A successful `master` push additionally runs the credential-free
+`protected-producer` job, which records the exact workflow run/ref/SHA and
+uploads only `credential-audit-evidence.json`; it receives no Environment,
+signing, Firebase, or release credentials. QA cannot emit this protected
+producer artifact.
+
 The QA workflow checks out the requested tooling head separately from the
 fixed reviewed application source commit
 `1670aa6b9a415c7638c9b5b348d9ecd991b736c8`, requires both checkout HEADs and
@@ -203,9 +240,12 @@ release metadata, checksums, and attestation references. Search active
 source, workflows, tests, and docs for stale pin, device-evidence,
 or alternate-credential contracts.
 
-Merge the correction normally, let Release Please refresh PR #67, merge that
-PR normally, and verify one public signed `v1.0.0` release. Confirm package
-`dev.whysoezzy.meet`, version name/code, non-debuggable release state, the
-existing RSA-4096 certificate fingerprint
+For MEE3-63, run only repository-local and exact-head verification. Review and
+merge the code-only change into `dev`; do not dispatch proof, publish, mutate
+the existing draft/releases/assets, move refs, or change repository settings.
+MEE3-64 must separately establish the protected promotion and master producer
+before any stable proof or publication. After that gate, a future stable run
+must confirm package `dev.whysoezzy.meet`, version name/code,
+non-debuggable release state, the existing RSA-4096 certificate fingerprint
 `b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f`, exact
 checksums, manifests, optional outputs, attestations, and production URL.

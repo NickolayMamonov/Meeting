@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -36,6 +37,16 @@ from release_evidence import (
     verify_producer_artifact,
     verify_two_parent_merge_commit,
 )
+from release_roles import ReleaseRole, load_release_roles
+
+
+PRODUCER_REPOSITORY = "NickolayMamonov/Meeting"
+PRODUCER_WORKFLOW_ID = 330672623
+PRODUCER_WORKFLOW_PATH = ".github/workflows/release-credential-audit.yml"
+PRODUCER_ARTIFACT_NAME = "credential-audit-evidence.json"
+PRODUCER_BRANCH = "master"
+PRODUCER_REF = "refs/heads/master"
+_GIT_SHA_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
 
 
 class GitHubApi:
@@ -94,6 +105,39 @@ class GitHubApi:
             "base_sha": value.get("base", {}).get("sha"),
         }
 
+    def current_ref_sha(self, branch: str) -> str:
+        """Read one exact branch ref from the repository Git database."""
+
+        value = self.get(
+            f"/git/ref/heads/{urllib.parse.quote(branch, safe='')}"
+        )
+        if not isinstance(value, dict) or value.get("ref") != f"refs/heads/{branch}":
+            raise EvidenceError("GitHub branch ref response is not exact")
+        target = value.get("object")
+        if not isinstance(target, dict) or target.get("type") != "commit":
+            raise EvidenceError("GitHub branch ref does not resolve to a commit")
+        sha = target.get("sha") if isinstance(target, dict) else None
+        if not isinstance(sha, str) or _GIT_SHA_PATTERN.fullmatch(sha) is None:
+            raise EvidenceError("GitHub branch ref SHA is not lowercase")
+        return sha
+
+    def resolve_workflow_path(self, workflow_id: int) -> str:
+        """Resolve and verify the repository-owned workflow's bare path."""
+
+        encoded_path = urllib.parse.quote(PRODUCER_WORKFLOW_PATH, safe="")
+        value = self.get(f"/actions/workflows/{encoded_path}")
+        if (
+            not isinstance(value, dict)
+            or not isinstance(workflow_id, int)
+            or isinstance(workflow_id, bool)
+            or workflow_id <= 0
+            or value.get("id") != workflow_id
+            or value.get("path") != PRODUCER_WORKFLOW_PATH
+            or value.get("state") != "active"
+        ):
+            raise EvidenceError("producer workflow identity is not exact")
+        return PRODUCER_WORKFLOW_PATH
+
     def _merge_queue_snapshot_legacy(
         self,
         *,
@@ -149,7 +193,7 @@ class GitHubApi:
             )
             queue = ((data.get("repository") or {}).get("mergeQueue"))
             if not isinstance(queue, dict):
-                raise EvidenceError("dev merge queue is not configured")
+                raise EvidenceError("merge queue is not configured")
             configuration = queue.get("configuration")
             entries = queue.get("entries")
             if not isinstance(entries, dict):
@@ -177,7 +221,7 @@ class GitHubApi:
         ):
             raise EvidenceError("merge queue enumeration is not exhaustive")
         if len(nodes) != 1:
-            raise EvidenceError("effective dev merge queue is not singleton")
+            raise EvidenceError("effective merge queue is not singleton")
         raw_entry = nodes[0]
         pull = raw_entry.get("pullRequest")
         if not isinstance(pull, dict):
@@ -296,7 +340,7 @@ class GitHubApi:
             )
             queue = ((data.get("repository") or {}).get("mergeQueue"))
             if not isinstance(queue, dict):
-                raise EvidenceError("dev merge queue is not configured")
+                raise EvidenceError("merge queue is not configured")
             configuration = queue.get("configuration")
             connection = queue.get("entries")
             if not isinstance(connection, dict):
@@ -318,7 +362,7 @@ class GitHubApi:
         if not isinstance(configuration, dict) or total_count != len(nodes) or not exhaustive:
             raise EvidenceError("merge queue enumeration is not exhaustive")
         if len(nodes) != 1:
-            raise EvidenceError("effective dev merge queue does not contain exactly one entry")
+            raise EvidenceError("effective merge queue does not contain exactly one entry")
         config = configuration
         entry_raw = nodes[0]
         pull = entry_raw.get("pullRequest")
@@ -413,14 +457,20 @@ class GitHubApi:
         path: str,
         query: dict[str, Any] | None = None,
         *,
+        response_key: str | None = None,
         max_entries: int = 10_000,
     ) -> list[Any]:
         page = 1
         result: list[Any] = []
         while True:
             payload = self.get(path, {**(query or {}), "per_page": 100, "page": page})
-            values = payload if isinstance(payload, list) else payload.get("workflow_runs", payload.get("artifacts", []))
-            if not isinstance(values, list):
+            if response_key is None and isinstance(payload, list):
+                values = payload
+            elif isinstance(payload, dict) and response_key is not None and response_key in payload:
+                values = payload[response_key]
+            else:
+                values = None
+            if not isinstance(values, list) or any(not isinstance(item, dict) for item in values):
                 raise EvidenceError(f"unexpected paginated response for {path}")
             if len(result) + len(values) > max_entries:
                 raise EvidenceError(f"paginated response for {path} exceeds max_entries")
@@ -444,8 +494,62 @@ def _event() -> dict[str, Any]:
     return _fixture(event_path)
 
 
-def _producer_evidence(api: GitHubApi, fixture: dict[str, Any] | None) -> dict[str, Any]:
+def _producer_snapshot(
+    api: GitHubApi,
+    *,
+    protected_branch: str,
+    workflow_id: int,
+) -> dict[str, Any]:
+    """Enumerate producer runs and artifacts while pinning the protected ref."""
+
+    git_ref_before = api.current_ref_sha(protected_branch)
+    runs = api.all_pages(
+        f"/actions/workflows/{workflow_id}/runs",
+        {
+            "branch": protected_branch,
+            "event": "push",
+            "head_sha": git_ref_before,
+        },
+        response_key="workflow_runs",
+    )
+    artifacts_by_run: dict[int, list[Any]] = {}
+    for run in runs:
+        run_id = run.get("id") if isinstance(run, dict) else None
+        if isinstance(run_id, bool) or not isinstance(run_id, int) or run_id <= 0:
+            raise EvidenceError("producer run ID is missing or invalid")
+        artifacts_by_run[run_id] = api.all_pages(
+            f"/actions/runs/{run_id}/artifacts",
+            response_key="artifacts",
+        )
+    git_ref_after = api.current_ref_sha(protected_branch)
+    return {
+        "runs": runs,
+        "artifacts": artifacts_by_run,
+        "git_ref_before": git_ref_before,
+        "git_ref_after": git_ref_after,
+    }
+
+
+def _producer_evidence(
+    api: GitHubApi | None,
+    fixture: dict[str, Any] | None,
+    *,
+    protected_branch: str,
+    protected_ref: str,
+) -> dict[str, Any]:
+    producer_path = PRODUCER_WORKFLOW_PATH
     if fixture is not None:
+        if (
+            fixture.get("producer_workflow_id") != PRODUCER_WORKFLOW_ID
+            or "producer_workflow_id" not in fixture
+        ):
+            raise EvidenceError("fixture producer workflow ID is not source-controlled")
+        if (
+            fixture.get("producer_workflow_path") != producer_path
+            or "producer_workflow_path" not in fixture
+        ):
+            raise EvidenceError("fixture producer workflow path is not source-controlled")
+        master_sha = fixture["producer_master_sha"]
         runs_first = fixture["producer_runs_first"]
         artifacts_first = {
             int(run_id): values
@@ -456,75 +560,88 @@ def _producer_evidence(api: GitHubApi, fixture: dict[str, Any] | None) -> dict[s
             int(run_id): values
             for run_id, values in fixture["producer_artifacts_second"].items()
         }
-        first_snapshot = {"runs": runs_first, "artifacts": artifacts_first}
-        second_snapshot = {"runs": runs_second, "artifacts": artifacts_second}
+        first_snapshot = {
+            "runs": runs_first,
+            "artifacts": artifacts_first,
+            "git_ref_before": fixture["producer_git_ref_first_before"],
+            "git_ref_after": fixture["producer_git_ref_first_after"],
+        }
+        second_snapshot = {
+            "runs": runs_second,
+            "artifacts": artifacts_second,
+            "git_ref_before": fixture["producer_git_ref_second_before"],
+            "git_ref_after": fixture["producer_git_ref_second_after"],
+        }
         if (
             runs_first is runs_second
             or fixture["producer_artifacts_first"] is fixture["producer_artifacts_second"]
         ):
             raise EvidenceError("producer snapshots are not independent")
-        verify_producer_snapshot(first_snapshot, second_snapshot)
+        verify_producer_snapshot(
+            first_snapshot,
+            second_snapshot,
+            master_sha=master_sha,
+        )
         selected = select_latest_producer_evidence(
             runs_first,
             artifacts_first,
-            workflow_id=int(fixture["producer_workflow_id"]),
-            workflow_path=fixture["producer_workflow_path"],
-            protected_ref="refs/heads/master",
-            artifact_name=fixture.get("producer_artifact_name", "credential-audit-evidence.json"),
+            workflow_id=PRODUCER_WORKFLOW_ID,
+            workflow_path=producer_path,
+            repository=PRODUCER_REPOSITORY,
+            protected_branch=protected_branch,
+            protected_ref=protected_ref,
+            head_sha=master_sha,
+            artifact_name=PRODUCER_ARTIFACT_NAME,
         )
-        payloads = fixture.get("producer_artifact_payloads")
-        if payloads:
-            verify_producer_artifact(
-                payloads["first"],
-                selected,
-                repository="owner/repo",
-                workflow_path=fixture["producer_workflow_path"],
-            )
-            verify_producer_artifact(
-                payloads["second"],
-                selected,
-                repository="owner/repo",
-                workflow_path=fixture["producer_workflow_path"],
-            )
+        if "producer_artifact_payloads" in fixture:
+            payloads = fixture["producer_artifact_payloads"]
+            if (
+                not isinstance(payloads, dict)
+                or set(payloads) != {"first", "second"}
+            ):
+                raise EvidenceError("fixture producer artifact payloads are malformed")
+            for payload in (payloads["first"], payloads["second"]):
+                verify_producer_artifact(
+                    payload,
+                    selected,
+                    repository=PRODUCER_REPOSITORY,
+                    workflow_path=producer_path,
+                    protected_branch=protected_branch,
+                    protected_ref=protected_ref,
+                )
         return selected.__dict__
 
-    workflow_id = os.environ.get("PRODUCER_WORKFLOW_ID")
-    if not workflow_id:
-        raise EvidenceError("PRODUCER_WORKFLOW_ID repository variable is required")
-    workflow_path = os.environ.get("PRODUCER_WORKFLOW_PATH")
-    if not workflow_path:
-        raise EvidenceError("PRODUCER_WORKFLOW_PATH repository variable is required")
-    runs_first = api.all_pages(
-        f"/actions/workflows/{workflow_id}/runs",
-        {"branch": "master"},
+    if api is None:
+        raise EvidenceError("producer API adapter is required")
+    if api.repository != PRODUCER_REPOSITORY:
+        raise EvidenceError("producer API adapter repository is not source-controlled")
+    workflow_path = api.resolve_workflow_path(PRODUCER_WORKFLOW_ID)
+    first_snapshot = _producer_snapshot(
+        api,
+        protected_branch=protected_branch,
+        workflow_id=PRODUCER_WORKFLOW_ID,
     )
-    artifact_map_first = {
-        int(run["id"]): api.all_pages(f"/actions/runs/{run['id']}/artifacts")
-        for run in runs_first
-        if run.get("ref") == "refs/heads/master"
-    }
-    selected = select_latest_producer_evidence(
-        runs_first,
-        artifact_map_first,
-        workflow_id=int(workflow_id),
-        workflow_path=workflow_path,
-        protected_ref="refs/heads/master",
-        artifact_name=os.environ.get(
-            "PRODUCER_ARTIFACT_NAME", "credential-audit-evidence.json"
-        ),
+    second_snapshot = _producer_snapshot(
+        api,
+        protected_branch=protected_branch,
+        workflow_id=PRODUCER_WORKFLOW_ID,
     )
-    runs_second = api.all_pages(
-        f"/actions/workflows/{workflow_id}/runs",
-        {"branch": "master"},
-    )
-    artifact_map_second = {
-        int(run["id"]): api.all_pages(f"/actions/runs/{run['id']}/artifacts")
-        for run in runs_second
-        if run.get("ref") == "refs/heads/master"
-    }
+    master_sha = first_snapshot["git_ref_before"]
     verify_producer_snapshot(
-        {"runs": runs_first, "artifacts": artifact_map_first},
-        {"runs": runs_second, "artifacts": artifact_map_second},
+        first_snapshot,
+        second_snapshot,
+        master_sha=master_sha,
+    )
+    selected = select_latest_producer_evidence(
+        first_snapshot["runs"],
+        first_snapshot["artifacts"],
+        workflow_id=PRODUCER_WORKFLOW_ID,
+        workflow_path=workflow_path,
+        repository=PRODUCER_REPOSITORY,
+        protected_branch=protected_branch,
+        protected_ref=protected_ref,
+        head_sha=master_sha,
+        artifact_name=PRODUCER_ARTIFACT_NAME,
     )
     payload = api.download_artifact_json(
         selected.artifact_id,
@@ -534,8 +651,10 @@ def _producer_evidence(api: GitHubApi, fixture: dict[str, Any] | None) -> dict[s
     verify_producer_artifact(
         payload,
         selected,
-        repository=api.repository,
+        repository=PRODUCER_REPOSITORY,
         workflow_path=workflow_path,
+        protected_branch=protected_branch,
+        protected_ref=protected_ref,
     )
     return selected.__dict__
 
@@ -544,6 +663,8 @@ def _queue_evidence(
     api: GitHubApi | None,
     fixture: dict[str, Any] | None,
     event: dict[str, Any] | None = None,
+    *,
+    target_branch: str,
 ) -> dict[str, Any]:
     if fixture is not None and "queue" in fixture:
         return fixture["queue"]
@@ -560,10 +681,10 @@ def _queue_evidence(
         raise EvidenceError("MERGE_QUEUE_EVIDENCE_JSON must contain an object")
     if value.get("source") != "github-api":
         raise EvidenceError("merge queue evidence must declare github-api as its source")
-    branch = value.get("branch", "dev")
+    branch = value.get("branch")
     required_checks = value.get("required_checks", ["release-please-credential-audit"])
-    if not isinstance(branch, str) or branch != "dev":
-        raise EvidenceError("merge queue adapter must target dev")
+    if not isinstance(branch, str) or branch != target_branch:
+        raise EvidenceError("merge queue adapter target branch is not the integration role")
     if (
         not isinstance(required_checks, list)
         or not required_checks
@@ -642,6 +763,11 @@ def _fixture_pr_reads(
 
 
 def run(fixture_path: str | None) -> str:
+    roles = load_release_roles()
+    integration = roles.authority(ReleaseRole.INTEGRATION)
+    stable = roles.authority(ReleaseRole.STABLE)
+    if stable.branch != PRODUCER_BRANCH or stable.head_ref != PRODUCER_REF:
+        raise EvidenceError("stable release role is not the source-controlled producer branch")
     fixture = _fixture(fixture_path) if fixture_path else None
     event = fixture["event"] if fixture else _event()
     event_name = os.environ.get("GITHUB_EVENT_NAME", event.get("event_name", ""))
@@ -650,6 +776,7 @@ def run(fixture_path: str | None) -> str:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     token = os.environ.get("GITHUB_TOKEN", "")
     api = GitHubApi(repository, token) if not fixture else None
+    producer_api = GitHubApi(PRODUCER_REPOSITORY, token) if not fixture else None
     pr = event.get("pull_request") if event_name == "pull_request" else None
     live_pr_first: dict[str, Any] | None = None
     live_pr_second: dict[str, Any] | None = None
@@ -669,25 +796,52 @@ def run(fixture_path: str | None) -> str:
             pr,
             live_pr_first,
             live_pr_second,
-            repository=repository or pull_request_tuple(live_pr_first)[3],
-            target_branch="dev",
+            repository=repository
+            or pull_request_tuple(
+                live_pr_first,
+                integration_branch=integration.branch,
+            )[3],
+            target_branch=integration.branch,
         )
-        classification = classify_pull_request(verified_pr)
+        classification = classify_pull_request(
+            verified_pr,
+            integration_branch=integration.branch,
+        )
         if classification != "non-release":
-            evidence = _producer_evidence(api, fixture)
+            evidence = _producer_evidence(
+                producer_api,
+                fixture,
+                protected_branch=stable.branch,
+                protected_ref=stable.head_ref,
+            )
         else:
             evidence = {}
         if classification == "non-release":
-            return required_check_decision(event_name, verified_pr, evidence)
+            return required_check_decision(
+                event_name,
+                verified_pr,
+                evidence,
+                integration_branch=integration.branch,
+            )
         pr = verified_pr
     else:
-        evidence = _producer_evidence(api, fixture)
+        evidence = _producer_evidence(
+            producer_api,
+            fixture,
+            protected_branch=stable.branch,
+            protected_ref=stable.head_ref,
+        )
     if event_name == "merge_group":
-        queue = _queue_evidence(api, fixture, event)
+        queue = _queue_evidence(
+            api,
+            fixture,
+            event,
+            target_branch=integration.branch,
+        )
         entries_first = _queue_entries(queue, "first")
         entries_second = _queue_entries(queue, "second")
         rule = effective_singleton_queue(
-            queue["rules_first"], entries_first, "dev"
+            queue["rules_first"], entries_first, integration.branch
         )
         group_first = queue["group_first"]
         group_second = queue["group_second"]
@@ -695,6 +849,7 @@ def run(fixture_path: str | None) -> str:
             group_first,
             entries_first,
             {int(number): value for number, value in queue["live_prs_first"].items()},
+            target_branch=integration.branch,
             required_checks=rule["required_checks"],
         )
         event_group = verify_merge_group_event(
@@ -702,6 +857,7 @@ def run(fixture_path: str | None) -> str:
             group_first,
             queue["commit_first"],
             repository=repository,
+            target_branch=integration.branch,
         )
         if mapped["pr"]["base_sha"] != event_group["base_sha"]:
             raise EvidenceError("live PR base SHA disagrees with merge_group event")
@@ -715,7 +871,12 @@ def run(fixture_path: str | None) -> str:
         stable_read(group_first, group_second, "merge group")
         stable_read(queue["live_prs_first"], queue["live_prs_second"], "live PR tuple")
         stable_read(queue["commit_first"], queue["commit_second"], "synthetic merge commit")
-    return required_check_decision(event_name, pr, {"verified": bool(evidence)})
+    return required_check_decision(
+        event_name,
+        pr,
+        {"verified": bool(evidence)},
+        integration_branch=integration.branch,
+    )
 
 
 def main() -> int:

@@ -17,11 +17,12 @@ from typing import Any, Callable, Mapping
 
 from release_mutation_gate import (
     MutationError,
-    expected_release_asset_names,
+    admit_release_evidence,
     verify_release_state,
     verify_uploaded_assets,
 )
 from release_notes import render_release_notes
+from release_roles import ReleaseRole, load_release_roles
 from verify_remote_assets import MAX_RELEASE_ASSET_BYTES, verify as verify_remote_assets
 
 
@@ -63,13 +64,7 @@ class ReleaseSnapshot:
     prerelease: bool
 
 
-def _manifest_installer(manifest_path: Path, apk: Path) -> tuple[int, str]:
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise PublicationError("release manifest cannot be read") from error
-    if not isinstance(manifest, Mapping):
-        raise PublicationError("release manifest is malformed")
+def _manifest_installer(manifest: Mapping[str, Any], apk: Path) -> tuple[int, str]:
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, list):
         raise PublicationError("release manifest artifacts are malformed")
@@ -476,6 +471,7 @@ def run(
     release_id: int,
     tag: str,
     source_sha: str,
+    expected_source_branch: str,
     evidence_directory: Path,
     manifest_path: Path,
     rendered_body_path: Path | None = None,
@@ -488,15 +484,24 @@ def run(
 ) -> dict[str, Any]:
     """Execute the exact one-POST/one-PATCH publication state machine."""
     try:
-        allowed = expected_release_asset_names(evidence_directory, tag=tag, source_sha=source_sha)
-        if allowed != {"Meet.apk"}:
-            raise PublicationError("public asset projection is not exactly Meet.apk")
+        canonical_manifest_path = (evidence_directory / "release-manifest.json").resolve()
+        supplied_manifest_path = manifest_path.resolve()
+        if supplied_manifest_path != canonical_manifest_path:
+            raise PublicationError(
+                "manifest path must be the canonical release evidence manifest"
+            )
+        admitted_manifest = admit_release_evidence(
+            evidence_directory,
+            tag=tag,
+            source_sha=source_sha,
+            expected_source_branch=expected_source_branch,
+        )
         from verify_chain import verify as verify_chain
         verify_chain(evidence_directory)
     except (MutationError, OSError, ValueError) as error:
         raise PublicationError(f"protected evidence admission failed: {error}") from error
     apk = evidence_directory / "Meet.apk"
-    expected_size, expected_digest = _manifest_installer(manifest_path, apk)
+    expected_size, expected_digest = _manifest_installer(admitted_manifest, apk)
     state = client.get_release(release_id)
     try:
         verify_release_state(state, release_id=release_id, tag=tag, allowed_names={"Meet.apk"})
@@ -504,8 +509,7 @@ def run(
         raise PublicationError(f"empty draft admission failed: {error}") from error
     original = _snapshot(state)
     _validate_snapshot(original, release_id=release_id, tag=tag, source_sha=source_sha)
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    body = render_release_notes(original.body, manifest)
+    body = render_release_notes(original.body, admitted_manifest)
     if rendered_body_path is None:
         rendered_body_path = Path(tempfile.mkstemp(prefix="meet-release-notes-", suffix=".md")[1])
     rendered_body_path.write_text(body, encoding="utf-8")
@@ -666,6 +670,7 @@ def main() -> int:
     parser.add_argument("--release-id", required=True, type=int)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--expected-source-branch", required=True)
     parser.add_argument("--evidence-directory", required=True, type=Path)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--rendered-body", required=True, type=Path)
@@ -680,10 +685,25 @@ def main() -> int:
     try:
         if not os.environ.get("ATTESTATION_TOKEN"):
             raise PublicationError("ATTESTATION_TOKEN is required")
+        stable = load_release_roles().authority(ReleaseRole.STABLE)
+        if os.environ.get("GITHUB_REF") != stable.head_ref:
+            raise PublicationError("GITHUB_REF is not the stable role ref")
+        if args.attestation_source_ref != stable.head_ref:
+            raise PublicationError("attestation source ref is not the stable role ref")
+        if args.expected_source_branch != stable.branch:
+            raise PublicationError("expected source branch is not the stable role")
+        canonical_manifest_path = (args.evidence_directory / "release-manifest.json").resolve()
+        if args.manifest.resolve() != canonical_manifest_path:
+            raise PublicationError(
+                "manifest path must be the canonical release evidence manifest"
+            )
+        metadata = admit_release_evidence(
+            args.evidence_directory,
+            tag=args.tag,
+            source_sha=args.source_sha,
+            expected_source_branch=args.expected_source_branch,
+        )
         client = GitHubReleaseClient(args.repository)
-        metadata = json.loads(args.manifest.read_text(encoding="utf-8"))
-        if not isinstance(metadata, dict):
-            raise PublicationError("release manifest is malformed")
         from github_attestation import AttestationPolicy, verify_file
         from verify_android_artifacts import verify_apk
         policy = AttestationPolicy(
@@ -718,6 +738,7 @@ def main() -> int:
             release_id=args.release_id,
             tag=args.tag,
             source_sha=args.source_sha,
+            expected_source_branch=args.expected_source_branch,
             evidence_directory=args.evidence_directory,
             manifest_path=args.manifest,
             rendered_body_path=args.rendered_body,

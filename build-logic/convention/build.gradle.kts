@@ -24,6 +24,7 @@ dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.compose.compiler.gradlePlugin)
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
 }
 

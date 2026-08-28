@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       application_sha:
-        description: Exact 40-hex application commit on dev to prove
+        description: Exact 40-hex application commit on master to prove
         required: true
         type: string
 
@@ -44,14 +44,17 @@ jobs:
           set -euo pipefail
           printf '%s' "$APPLICATION_SHA" | grep -Eq '^[0-9a-f]{40}$'
           printf '%s' "$TOOLING_SHA" | grep -Eq '^[0-9a-f]{40}$'
-          test "$GITHUB_REF" = "refs/heads/dev"
+          test "$GITHUB_REF" = "refs/heads/master"
           test "$(git -C application-source rev-parse HEAD)" = "$APPLICATION_SHA"
           test "$(git -C release-tooling rev-parse HEAD)" = "$TOOLING_SHA"
           git -C application-source cat-file -e "$APPLICATION_SHA^{commit}"
           git -C release-tooling cat-file -e "$TOOLING_SHA^{commit}"
-          git -C release-tooling fetch origin dev
+          git -C release-tooling fetch origin master
           git -C release-tooling merge-base --is-ancestor "$APPLICATION_SHA" "$TOOLING_SHA"
-          git -C release-tooling merge-base --is-ancestor "$APPLICATION_SHA" origin/dev
+          git -C release-tooling merge-base --is-ancestor "$APPLICATION_SHA" origin/master
+          cmp -s application-source/release-roles.json release-tooling/release-roles.json
+          python release-tooling/scripts/release/release_roles.py assert-ref \
+            --role stable --ref "$GITHUB_REF"
           printf 'application_sha=%s\n' "$APPLICATION_SHA" >> "$GITHUB_OUTPUT"
           printf 'tooling_sha=%s\n' "$TOOLING_SHA" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
@@ -137,6 +140,8 @@ jobs:
           path: release-tooling
           fetch-depth: 1
           persist-credentials: false
+      - name: Assert stable workflow role
+        run: python release-tooling/scripts/release/release_roles.py assert-ref --role stable --ref "$GITHUB_REF"
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
@@ -148,12 +153,44 @@ jobs:
         run: |
           set -euo pipefail
           apksigner="$(python release-tooling/scripts/release/android_sdk_tools.py apksigner)"
-          test -x "$apksigner"
+          apkanalyzer="$(python release-tooling/scripts/release/android_sdk_tools.py apkanalyzer)"
+          test -x "$apksigner" && test -x "$apkanalyzer"
           printf 'APKSIGNER_PATH=%s\n' "$apksigner" >> "$GITHUB_ENV"
+          printf 'APKANALYZER_PATH=%s\n' "$apkanalyzer" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: android-release-proof-unsigned-${{ needs.proof-build.outputs.application_sha }}-${{ github.run_attempt }}
           path: unsigned
+      - name: Download and verify reviewed Bundletool
+        run: |
+          set -euo pipefail
+          readonly bundletool_version='1.18.3'
+          readonly bundletool_sha256='a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
+          curl --fail --location --silent --show-error \
+            "https://github.com/google/bundletool/releases/download/$bundletool_version/bundletool-all-$bundletool_version.jar" \
+            --output "$RUNNER_TEMP/release-proof-sign-bundletool.jar"
+          echo "$bundletool_sha256  $RUNNER_TEMP/release-proof-sign-bundletool.jar" | sha256sum --check
+      - name: Admit exact unsigned proof artifacts before keystore access
+        env:
+          EXPECTED_COMMIT: ${{ needs.proof-build.outputs.application_sha }}
+        run: |
+          set -euo pipefail
+          metadata_files=($(find unsigned -type f -name release-build.json -print))
+          apk_files=($(find unsigned -type f -name '*.apk' -print))
+          aab_files=($(find unsigned -type f -name '*.aab' -print))
+          test "${#metadata_files[@]}" -eq 1
+          test "${#apk_files[@]}" -eq 1
+          test "${#aab_files[@]}" -eq 1
+          python release-tooling/scripts/release/verify_android_artifacts.py \
+            --metadata "${metadata_files[0]}" --apk "${apk_files[0]}" \
+            --aab "${aab_files[0]}" \
+            --apkanalyzer "$APKANALYZER_PATH" \
+            --expected-debuggable false \
+            --expected-commit "$EXPECTED_COMMIT" \
+            --expected-source-branch master \
+            --unsigned-release \
+            --bundletool-jar "$RUNNER_TEMP/release-proof-sign-bundletool.jar" \
+            --bundletool-sha256 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
       - name: Decode production keystore
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -230,6 +267,11 @@ jobs:
           path: release-tooling
           fetch-depth: 1
           persist-credentials: false
+      - name: Assert stable workflow role and role-file identity
+        run: |
+          set -euo pipefail
+          python release-tooling/scripts/release/release_roles.py assert-ref --role stable --ref "$GITHUB_REF"
+          cmp -s application-source/release-roles.json release-tooling/release-roles.json
       - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
@@ -259,6 +301,8 @@ jobs:
             --output "$RUNNER_TEMP/release-proof-bundletool.jar"
           echo "$bundletool_sha256  $RUNNER_TEMP/release-proof-bundletool.jar" | sha256sum --check
       - name: Verify APK, AAB, package, version, and certificate identity
+        env:
+          EXPECTED_COMMIT: ${{ needs.proof-build.outputs.application_sha }}
         run: |
           set -euo pipefail
           metadata="$(find signed -name release-build.json -print -quit)"
@@ -269,6 +313,8 @@ jobs:
             --metadata "$metadata" --apk "$apk" --aab "$aab" \
             --apksigner "$APKSIGNER_PATH" --apkanalyzer "$APKANALYZER_PATH" \
             --expected-debuggable false \
+            --expected-commit "$EXPECTED_COMMIT" \
+            --expected-source-branch master \
             --bundletool-jar "$RUNNER_TEMP/release-proof-bundletool.jar" \
             --bundletool-sha256 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
       - name: Prepare exact release evidence
@@ -281,7 +327,7 @@ jobs:
           symbols="$(find signed -type f -path '*/native-debug-symbols/release/*' -print -quit || true)"
           mkdir -p release-output
           args=(--metadata "$metadata" --output release-output --apk "$apk" --aab "$aab"
-            --commit "${{ needs.proof-build.outputs.application_sha }}" --source-branch dev
+            --commit "${{ needs.proof-build.outputs.application_sha }}" --source-branch master
             --workflow "${GITHUB_WORKFLOW}" --prepare-only)
           test -z "$mapping" || args+=(--mapping "$mapping")
           test -z "$symbols" || args+=(--symbols "$symbols")
@@ -300,7 +346,7 @@ jobs:
             --output "$RUNNER_TEMP/release-proof-attestation-evidence.json" \
             --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-proof.yml" \
-            --source-ref refs/heads/dev --source-sha "${{ github.sha }}" \
+            --source-ref refs/heads/master --source-sha "${{ github.sha }}" \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
       - name: Finalize and verify exact release evidence
         run: |
@@ -311,7 +357,7 @@ jobs:
           mapping="$(find signed -type f -path '*/mapping/release/*' -print -quit || true)"
           symbols="$(find signed -type f -path '*/native-debug-symbols/release/*' -print -quit || true)"
           args=(--metadata "$metadata" --output release-output --apk "$apk" --aab "$aab"
-            --commit "${{ needs.proof-build.outputs.application_sha }}" --source-branch dev
+            --commit "${{ needs.proof-build.outputs.application_sha }}" --source-branch master
             --workflow "${GITHUB_WORKFLOW}"
             --attestation-evidence "$RUNNER_TEMP/release-proof-attestation-evidence.json")
           test -z "$mapping" || args+=(--mapping "$mapping")
@@ -348,6 +394,8 @@ jobs:
           path: release-tooling
           fetch-depth: 1
           persist-credentials: false
+      - name: Assert stable workflow role
+        run: python release-tooling/scripts/release/release_roles.py assert-ref --role stable --ref "$GITHUB_REF"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: android-release-proof-evidence-${{ inputs.application_sha }}-${{ github.run_attempt }}
@@ -377,6 +425,8 @@ jobs:
           path: release-tooling
           fetch-depth: 1
           persist-credentials: false
+      - name: Assert stable workflow role
+        run: python release-tooling/scripts/release/release_roles.py assert-ref --role stable --ref "$GITHUB_REF"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: android-release-proof-evidence-${{ inputs.application_sha }}-${{ github.run_attempt }}

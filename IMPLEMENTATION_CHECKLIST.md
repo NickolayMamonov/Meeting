@@ -1,0 +1,23 @@
+# MEE3-63 implementation checkpoint
+
+- [x] Verify canonical plan identity and digest.
+- [x] Fast-forward task branch to `origin/dev` at `385f6eccc8f7f82657db2901b50afa2a13e93a05`.
+- [x] Add strict Python/Kotlin role adapters, canonical `release-roles.json`, duplicate fixtures, and tests.
+- [x] Align workflows, Release Please target, docs, and stable producer contract.
+- [x] Add metadata provenance, unsigned APK admission, package/mutation identity checks.
+- [x] Fix remaining convention compilation and focused test issues.
+- [x] Run initial exact-head verification and inspect final diff/status.
+- [x] Record initial implementation manifest and deliver PR #86.
+- [x] Remediate CR-001/COM-001 through CR-007/COM-004 only.
+- [x] Re-run targeted negatives and the full required verification matrix on one exact head.
+- [x] Remediate CR-008 through CR-011 and ICR-001/ICR-002 only.
+- [x] Re-run targeted negatives and the full required verification matrix on one exact head.
+- [x] Update the same implementation manifest and recompute its SHA-256.
+- [x] Commit, push, and verify the updated PR head and all identity gates.
+- [x] Add exactly one rework Implementation result comment and complete the implementation node.
+- [x] Recheck the canonical plan digest and baseline/worktree identity before CR-012 edits.
+- [x] Add one shared strict canonical-branch boundary and apply it to verifier, packaging, mutation, and harness provenance.
+- [x] Add negative coverage for malformed full refs, dot/.lock components, non-string identity metadata, and repeated malformed caller identity.
+- [x] Run the complete Python/convention/Gradle/artifact/package/source-policy verification matrix on one exact repaired head.
+- [x] Remediate QA-001 by consuming the uppercase `RELEASE_COMMIT_SHA` Gradle project property and re-run the required exact-head release verification.
+- [x] Refresh the same implementation manifest and digest, commit/push/update PR, add one result comment, and complete the node.

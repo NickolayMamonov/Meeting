@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
 
+from release_roles import ReleaseRolesError, validate_canonical_branch
 from release_evidence import (
     AttestationGroupIdentity,
     canonical_json,
@@ -61,10 +63,52 @@ def _copy_artifact(source_path: Path, target: Path) -> dict[str, Any]:
     return _artifact(target, "apk")
 
 
+_COMMIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
+
+
+def _metadata_alias(metadata: dict[str, Any], *names: str) -> str:
+    if not isinstance(metadata, dict):
+        raise SystemExit("metadata must be an object")
+    present = [(name, metadata[name]) for name in names if name in metadata]
+    if not present:
+        raise SystemExit(f"metadata field is missing: {names[0]}")
+    if any(not isinstance(value, str) or not value for _, value in present):
+        raise SystemExit(f"metadata field is invalid: {names[0]}")
+    if len({value for _, value in present}) != 1:
+        raise SystemExit(f"metadata aliases conflict: {', '.join(names)}")
+    return present[0][1]
+
+
+def _metadata_identity(metadata: dict[str, Any]) -> tuple[str, str]:
+    commit = _metadata_alias(metadata, "commitSha", "commit")
+    if _COMMIT_SHA.fullmatch(commit) is None:
+        raise SystemExit("metadata commit must be exactly 40 lowercase hexadecimal characters")
+    source_branch = _metadata_alias(metadata, "sourceBranch", "source_branch")
+    try:
+        source_branch = validate_canonical_branch(source_branch)
+    except ReleaseRolesError as error:
+        raise SystemExit("metadata source branch is not canonical") from error
+    return commit, source_branch
+
+
 def package(args: argparse.Namespace) -> None:
+    metadata = _read_json(Path(args.metadata))
+    commit, source_branch = _metadata_identity(metadata)
+    if args.commit is not None:
+        if not isinstance(args.commit, str) or _COMMIT_SHA.fullmatch(args.commit) is None:
+            raise SystemExit("--commit is not a valid lowercase 40-hex commit")
+        if args.commit != commit:
+            raise SystemExit("--commit does not match canonical metadata")
+    if args.source_branch is not None:
+        try:
+            caller_branch = validate_canonical_branch(args.source_branch)
+        except ReleaseRolesError as error:
+            raise SystemExit("--source-branch is not canonical") from error
+        if caller_branch != source_branch:
+            raise SystemExit("--source-branch does not match canonical metadata")
+
     out = Path(args.output).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    metadata = _read_json(Path(args.metadata))
     previous_index = out / "attestation-index.json"
     if previous_index.is_file():
         previous = _read_json(previous_index)
@@ -91,8 +135,6 @@ def package(args: argparse.Namespace) -> None:
         "attestation-index.json",
     ):
         (out / owned).unlink(missing_ok=True)
-    commit = args.commit or metadata.get("commit", metadata.get("commitSha"))
-    source_branch = args.source_branch or metadata.get("source_branch", metadata.get("sourceBranch", "dev"))
     workflow = args.workflow or metadata.get("workflow", "local")
     signing_fingerprint = metadata.get(
         "signing_fingerprint",
@@ -184,9 +226,11 @@ def package(args: argparse.Namespace) -> None:
     checksum_items.append((sha256_bytes(authority_bytes), authority_path.name))
     checksum_items.append((sha256_bytes(manifest_bytes), manifest_path.name))
     checksum_path = out / "SHA256SUMS"
-    checksum_path.write_text(
-        "".join(f"{digest}  {name}\n" for digest, name in sorted(checksum_items, key=lambda item: item[1])),
-        encoding="utf-8",
+    checksum_path.write_bytes(
+        "".join(
+            f"{digest}  {name}\n"
+            for digest, name in sorted(checksum_items, key=lambda item: item[1])
+        ).encode("utf-8")
     )
     checksum_digest = _digest_file(checksum_path)
 
@@ -343,6 +387,7 @@ def package(args: argparse.Namespace) -> None:
     index = {
         "schema": 1,
         "kind": "attestation-index",
+        "channel": metadata["channel"],
         "candidate": {"name": candidate_path.name, "sha256": sha256_bytes(candidate_bytes)},
         "attestations": attestations,
         "authority": {"name": authority_path.name, "sha256": sha256_bytes(authority_bytes)},

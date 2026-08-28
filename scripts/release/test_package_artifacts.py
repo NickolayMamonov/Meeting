@@ -6,7 +6,7 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
-from package_artifacts import package
+from package_artifacts import _metadata_identity, package
 from release_evidence import (
     attestation_group_identity,
     attest_identity,
@@ -19,6 +19,46 @@ from verify_remote_assets import verify as verify_remote_assets
 
 
 class PackageArtifactsTest(unittest.TestCase):
+    def test_identity_boundary_rejects_non_string_and_noncanonical_metadata(self):
+        valid_commit = "a" * 40
+        invalid_metadata = (
+            {"commitSha": int("1" * 40), "sourceBranch": "dev"},
+            {"commitSha": valid_commit, "sourceBranch": 1},
+            {"commitSha": valid_commit, "sourceBranch": "refs/heads/dev"},
+            {"commitSha": valid_commit, "sourceBranch": "dev/.hidden"},
+            {"commitSha": valid_commit, "sourceBranch": "dev/build.lock"},
+        )
+        for metadata in invalid_metadata:
+            with self.subTest(metadata=metadata):
+                with self.assertRaises(SystemExit):
+                    _metadata_identity(metadata)
+
+    def test_assertion_only_caller_branch_is_canonical_before_comparison(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            metadata = root_path / "metadata.json"
+            metadata.write_text(
+                json.dumps({"commitSha": "a" * 40, "sourceBranch": "dev"}),
+                encoding="utf-8",
+            )
+            arguments = Namespace(
+                metadata=str(metadata),
+                output=str(root_path / "out"),
+                apk=str(root_path / "app.apk"),
+                aab=None,
+                mapping=None,
+                symbols=None,
+                tag=None,
+                commit="a" * 40,
+                source_branch="refs/heads/dev",
+                workflow=None,
+                attestation_evidence=None,
+                prepare_only=True,
+            )
+            with self.assertRaisesRegex(SystemExit, "canonical"):
+                package(arguments)
+            self.assertFalse((root_path / "out").exists())
+
     @staticmethod
     def _write_evidence(output: Path, path: Path) -> None:
         manifest_path = (
@@ -264,6 +304,7 @@ class PackageArtifactsTest(unittest.TestCase):
             candidate = json.loads((output / "release-candidate.json").read_text())
             envelope = json.loads((output / "attestation-index.json").read_text())
             self.assertEqual(manifest["tag"], "v1.0.0")
+            self.assertNotIn(b"\r", (output / "SHA256SUMS").read_bytes())
             self.assertNotIn("release-candidate.json", (output / "SHA256SUMS").read_text())
             self.assertNotIn("attestation-index.json", (output / "SHA256SUMS").read_text())
             self.assertEqual(
@@ -431,6 +472,13 @@ class PackageArtifactsTest(unittest.TestCase):
                 source_branch=None, workflow=None,
                 attestation_evidence=None, prepare_only=True,
             )
+            metadata.write_text(
+                json.dumps({
+                    **json.loads(metadata.read_text(encoding="utf-8")),
+                    "sourceBranch": "dev",
+                }),
+                encoding="utf-8",
+            )
             package(arguments)
             apk.write_bytes(b"second")
             package(arguments)
@@ -450,6 +498,34 @@ class PackageArtifactsTest(unittest.TestCase):
             attestation_path.write_bytes(encoded)
             reference["sha256"] = sha256_bytes(encoded)
             envelope_path.write_bytes(canonical_json(envelope))
+            with self.assertRaises(ChainError):
+                verify(output)
+
+    def test_candidate_and_index_schema_kind_channel_are_exact(self):
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_release(Path(root))
+            candidate_path = output / "release-candidate.json"
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            candidate["schema"] = 2
+            candidate_path.write_bytes(canonical_json(candidate))
+            with self.assertRaises(ChainError):
+                verify(output)
+
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_release(Path(root))
+            index_path = output / "attestation-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index["kind"] = "copied-index"
+            index_path.write_bytes(canonical_json(index))
+            with self.assertRaises(ChainError):
+                verify(output)
+
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_release(Path(root))
+            index_path = output / "attestation-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index["channel"] = "snapshot"
+            index_path.write_bytes(canonical_json(index))
             with self.assertRaises(ChainError):
                 verify(output)
 
