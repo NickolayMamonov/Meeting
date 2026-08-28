@@ -174,7 +174,8 @@ class AndroidSdkToolsTest(unittest.TestCase):
             package = command_line_tools / name
             (package / "bin").mkdir(parents=True)
             (package / "source.properties").write_text(
-                f"Pkg.Revision = {revision}\n", encoding="utf-8"
+                f"Pkg.Revision = {revision}\nPkg.Path = cmdline-tools;22.0\n",
+                encoding="utf-8",
             )
             if valid:
                 for launcher in launchers:
@@ -220,6 +221,27 @@ class AndroidSdkToolsTest(unittest.TestCase):
                     resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)}),
                     (root / "cmdline-tools/latest/bin/apkanalyzer").resolve(),
                 )
+
+    def test_apkanalyzer_rejects_missing_package_path_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            metadata = root / "cmdline-tools/latest/source.properties"
+            metadata.write_text("Pkg.Revision = 14.0.0\n", encoding="utf-8")
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apkanalyzer_rejects_mismatched_package_path_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_analyzer_sdk(root, [("latest", "14.0.0", True)])
+            metadata = root / "cmdline-tools/latest/source.properties"
+            metadata.write_text(
+                "Pkg.Revision = 14.0.0\nPkg.Path = cmdline-tools;21.0\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(AndroidSdkToolError):
+                resolve_apkanalyzer({"ANDROID_SDK_ROOT": str(root)})
 
     def test_apkanalyzer_accepts_crlf_identity_probe(self):
         with tempfile.TemporaryDirectory() as directory:
