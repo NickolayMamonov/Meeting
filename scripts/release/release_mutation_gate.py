@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from release_evidence import EvidenceError, verify_attestation_link
+
 
 class MutationError(ValueError):
     pass
@@ -28,6 +30,7 @@ RELEASE_ARTIFACT_TYPES = frozenset({"apk", "aab", "mapping", "native-symbols"})
 PUBLIC_RELEASE_ASSET_NAMES = frozenset({"Meet.apk"})
 MAX_RELEASE_ASSET_BYTES = 512 * 1024 * 1024
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def _require(condition: bool, message: str) -> None:
@@ -43,59 +46,217 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def expected_release_asset_names(
+def _read_object(path: Path, description: str) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    _require(isinstance(value, dict), f"{description} is malformed")
+    return value
+
+
+def _require_sha256(value: Any, description: str) -> str:
+    _require(isinstance(value, str) and _SHA256.fullmatch(value) is not None,
+             f"{description} is invalid")
+    return value
+
+
+def _require_reference(
+    value: Any,
+    *,
+    name: str,
+    digest: str,
+    description: str,
+) -> None:
+    _require(isinstance(value, Mapping), f"{description} is malformed")
+    _require(value.get("name") == name, f"{description} name changed")
+    _require(
+        _require_sha256(value.get("sha256"), f"{description} digest") == digest,
+        f"{description} digest changed",
+    )
+
+
+def _validate_attestation_index(
+    directory: Path,
+    *,
+    index: Mapping[str, Any],
+    authority_path: Path,
+    candidate_path: Path,
+    manifest_path: Path,
+    checksums_path: Path,
+    artifact_names: set[str],
+) -> None:
+    _require(
+        index.get("schema") == 1
+        and index.get("kind") == "attestation-index",
+        "attestation index schema or kind is invalid",
+    )
+    _require_reference(
+        index.get("candidate"),
+        name=candidate_path.name,
+        digest=_file_sha256(candidate_path),
+        description="attestation index candidate reference",
+    )
+    _require_reference(
+        index.get("authority"),
+        name=authority_path.name,
+        digest=_file_sha256(authority_path),
+        description="attestation index authority reference",
+    )
+    _require(
+        index.get("excluded_from_coverage")
+        == ["release-candidate.json", "attestation-index.json"],
+        "attestation index coverage exclusions are invalid",
+    )
+    references = index.get("attestations")
+    _require(
+        isinstance(references, list) and references,
+        "attestation index references are missing",
+    )
+
+    expected_subjects = {
+        authority_path.name,
+        manifest_path.name,
+        checksums_path.name,
+        candidate_path.name,
+        *artifact_names,
+    }
+    covered_subjects: set[str] = set()
+    reference_names: set[str] = set()
+    for reference in references:
+        _require(isinstance(reference, Mapping), "attestation index reference is malformed")
+        name = reference.get("name")
+        _require(
+            isinstance(name, str)
+            and Path(name).name == name
+            and name.endswith(".attestation.json"),
+            "attestation index attestation name is invalid",
+        )
+        _require(name not in reference_names, "attestation index has duplicate attestations")
+        reference_names.add(name)
+        attestation_path = directory / name
+        _require(attestation_path.is_file(), f"attestation evidence is missing for {name}")
+        _require(
+            _require_sha256(
+                reference.get("sha256"),
+                f"attestation index reference {name} digest",
+            )
+            == _file_sha256(attestation_path),
+            f"attestation index reference digest changed for {name}",
+        )
+        attestation = _read_object(attestation_path, f"attestation {name}")
+        _require(
+            attestation.get("schema") == 1
+            and attestation.get("kind") == "individual-attestation",
+            f"attestation {name} schema or kind is invalid",
+        )
+        subject = attestation.get("subject")
+        _require(isinstance(subject, Mapping), f"attestation {name} subject is malformed")
+        subject_name = subject.get("name")
+        _require(
+            isinstance(subject_name, str)
+            and Path(subject_name).name == subject_name,
+            f"attestation {name} subject name is invalid",
+        )
+        _require(subject_name in expected_subjects, f"attestation {name} subject is unknown")
+        _require(subject_name not in covered_subjects,
+                 f"attestation coverage is duplicated for {subject_name}")
+        subject_path = directory / subject_name
+        _require(subject_path.is_file(), f"attestation subject is missing for {name}")
+        subject_digest = _require_sha256(
+            subject.get("sha256"),
+            f"attestation {name} subject digest",
+        )
+        _require(subject_digest == _file_sha256(subject_path),
+                 f"attestation subject digest changed for {name}")
+        covered_subjects.add(subject_name)
+        try:
+            linked = verify_attestation_link(
+                attestation["producer"],
+                attestation["authoritative"],
+            )
+        except (EvidenceError, KeyError, TypeError, ValueError) as error:
+            raise MutationError(f"attestation identity is invalid for {name}") from error
+        for identity_name, identity_value in linked.items():
+            _require(
+                attestation.get(identity_name) == identity_value
+                and reference.get(identity_name) == identity_value,
+                f"attestation {identity_name} reference changed for {name}",
+            )
+    _require(covered_subjects == expected_subjects, "attestation coverage is not exact")
+
+
+def admit_release_evidence(
     directory: Path,
     *,
     tag: str,
     source_sha: str,
-    expected_source_branch: str,
-) -> set[str]:
-    """Validate protected evidence and return the fixed public projection."""
-
+    expected_source_branch: str | None = None,
+) -> dict[str, Any]:
+    """Validate the complete protected release evidence chain before mutation."""
     manifest_path = directory / "release-manifest.json"
     index_path = directory / "attestation-index.json"
     candidate_path = directory / "release-candidate.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
-    index = json.loads(index_path.read_text(encoding="utf-8"))
-    _require(isinstance(manifest, Mapping), "release manifest is malformed")
-    _require(isinstance(candidate, Mapping), "release candidate is malformed")
-    _require(isinstance(index, Mapping), "attestation index is malformed")
+    checksums_path = directory / "SHA256SUMS"
+    manifest = _read_object(manifest_path, "release manifest")
+    candidate = _read_object(candidate_path, "release candidate")
+    index = _read_object(index_path, "attestation index")
     _require(_COMMIT_SHA.fullmatch(source_sha) is not None, "expected release source commit is invalid")
-    _require(isinstance(expected_source_branch, str) and expected_source_branch, "expected source branch is invalid")
+    _require(isinstance(tag, str) and tag, "expected release tag is invalid")
     authority_path = directory / "release-authority.json"
-    authority = json.loads(authority_path.read_text(encoding="utf-8"))
-    _require(isinstance(authority, Mapping), "release authority is malformed")
+    authority = _read_object(authority_path, "release authority")
+    source_branch = manifest.get("source_branch")
+    _require(isinstance(source_branch, str) and source_branch, "release source branch is missing")
+    if expected_source_branch is not None:
+        _require(
+            isinstance(expected_source_branch, str) and expected_source_branch,
+            "expected source branch is invalid",
+        )
+        _require(source_branch == expected_source_branch, "release source branch changed")
     _require(
         authority.get("schema") == 1
         and authority.get("kind") == "release-authority"
         and authority.get("channel") == "release"
         and authority.get("tag") == tag
         and authority.get("commit") == source_sha
-        and authority.get("source_branch") == expected_source_branch,
+        and authority.get("source_branch") == source_branch,
         "release authority identity changed",
     )
-    _require(manifest.get("schema") == 1 and manifest.get("channel") == "release",
-             "release manifest schema is invalid")
-    _require(manifest.get("tag") == tag and manifest.get("commit") == source_sha,
-             "release manifest identity changed")
-    _require(manifest.get("source_branch") == expected_source_branch,
-             "release manifest source branch changed")
-    _require(candidate.get("tag") == tag and candidate.get("commit") == source_sha,
-             "release candidate identity changed")
-    _require(candidate.get("source_branch") == expected_source_branch,
-             "release candidate source branch changed")
-    authority_reference = index.get("authority")
     _require(
-        isinstance(authority_reference, Mapping)
-        and authority_reference.get("name") == authority_path.name
-        and authority_reference.get("sha256") == _file_sha256(authority_path),
-        "attestation authority reference changed",
+        manifest.get("schema") == 1
+        and manifest.get("channel") == "release"
+        and manifest.get("tag") == tag
+        and manifest.get("commit") == source_sha
+        and manifest.get("source_branch") == source_branch,
+        "release manifest identity changed",
+    )
+    _require_reference(
+        manifest.get("authority"),
+        name=authority_path.name,
+        digest=_file_sha256(authority_path),
+        description="release manifest authority reference",
+    )
+    _require(
+        candidate.get("schema") == 1
+        and candidate.get("kind") == "release-candidate"
+        and candidate.get("channel") == "release"
+        and candidate.get("tag") == tag
+        and candidate.get("commit") == source_sha
+        and candidate.get("source_branch") == source_branch,
+        "release candidate identity changed",
+    )
+    _require_reference(
+        candidate.get("manifest"),
+        name=manifest_path.name,
+        digest=_file_sha256(manifest_path),
+        description="release candidate manifest reference",
+    )
+    _require_reference(
+        candidate.get("checksums"),
+        name=checksums_path.name,
+        digest=_file_sha256(checksums_path),
+        description="release candidate checksum reference",
     )
     artifacts = manifest.get("artifacts")
     _require(isinstance(artifacts, list) and artifacts, "release manifest artifacts are missing")
     artifact_names: list[str] = []
-    artifact_types: set[str] = set()
     for artifact in artifacts:
         _require(isinstance(artifact, Mapping), "release manifest artifact is malformed")
         name = artifact.get("name")
@@ -105,10 +266,19 @@ def expected_release_asset_names(
             "release manifest artifact name is invalid",
         )
         _require(artifact_type in RELEASE_ARTIFACT_TYPES, "release manifest artifact type is invalid")
+        _require_sha256(
+            artifact.get("sha256"),
+            f"release manifest artifact {name} digest",
+        )
+        artifact_size = artifact.get("size")
+        _require(
+            isinstance(artifact_size, int)
+            and not isinstance(artifact_size, bool)
+            and 0 < artifact_size <= MAX_RELEASE_ASSET_BYTES,
+            f"release manifest artifact {name} size is invalid",
+        )
         _require(name not in artifact_names, "release manifest contains duplicate artifacts")
         artifact_names.append(name)
-        artifact_types.add(str(artifact_type))
-    _require(artifact_types <= RELEASE_ARTIFACT_TYPES, "release manifest artifact type is invalid")
     apk_artifacts = [item for item in artifacts if item["type"] == "apk"]
     aab_artifacts = [item for item in artifacts if item["type"] == "aab"]
     _require(len(apk_artifacts) == 1 and apk_artifacts[0]["name"] == "Meet.apk",
@@ -132,23 +302,60 @@ def expected_release_asset_names(
             digest.update(chunk)
     _require(digest.hexdigest() == apk_artifacts[0].get("sha256"),
              "Meet.apk digest does not match manifest")
-    references = index.get("attestations")
-    _require(isinstance(references, list) and references, "attestation index references are missing")
-    attestation_names: list[str] = []
-    for reference in references:
-        _require(isinstance(reference, Mapping), "attestation index reference is malformed")
-        name = reference.get("name")
-        _require(
-            isinstance(name, str)
-            and Path(name).name == name
-            and name.endswith(".attestation.json"),
-            "attestation index attestation name is invalid",
-        )
-        _require(name not in attestation_names, "attestation index has duplicate attestations")
-        attestation_names.append(name)
+    _validate_attestation_index(
+        directory,
+        index=index,
+        authority_path=authority_path,
+        candidate_path=candidate_path,
+        manifest_path=manifest_path,
+        checksums_path=checksums_path,
+        artifact_names=set(artifact_names),
+    )
+    expected_candidate_digests = [
+        {
+            "name": item["name"],
+            "sha256": item["sha256"],
+            "split_digest": hashlib.sha256(
+                b"release-candidate-split\x00" + item["sha256"].encode("ascii")
+            ).hexdigest(),
+        }
+        for item in sorted(artifacts, key=lambda item: item["name"])
+    ]
+    _require(
+        candidate.get("distributable_digests") == expected_candidate_digests,
+        "release candidate distributable references changed",
+    )
+    attestation_names = [reference["name"] for reference in index["attestations"]]
     expected = set(FIXED_RELEASE_FILENAMES) | set(artifact_names) | set(attestation_names)
     actual = {path.name for path in directory.iterdir() if path.is_file()}
     _require(actual == expected, "release output contains unreferenced or missing files")
+    return manifest
+
+
+def validated_source_branch(directory: Path, *, tag: str, source_sha: str) -> str:
+    """Return the branch from an admitted release fixture's provenance."""
+
+    manifest = admit_release_evidence(directory, tag=tag, source_sha=source_sha)
+    source_branch = manifest.get("source_branch")
+    _require(isinstance(source_branch, str) and source_branch, "release source branch is missing")
+    return source_branch
+
+
+def expected_release_asset_names(
+    directory: Path,
+    *,
+    tag: str,
+    source_sha: str,
+    expected_source_branch: str,
+) -> set[str]:
+    """Validate protected evidence and return the fixed public projection."""
+
+    admit_release_evidence(
+        directory,
+        tag=tag,
+        source_sha=source_sha,
+        expected_source_branch=expected_source_branch,
+    )
     return set(PUBLIC_RELEASE_ASSET_NAMES)
 
 

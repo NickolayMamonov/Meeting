@@ -370,6 +370,7 @@ def package(args: argparse.Namespace) -> None:
     index = {
         "schema": 1,
         "kind": "attestation-index",
+        "channel": metadata["channel"],
         "candidate": {"name": candidate_path.name, "sha256": sha256_bytes(candidate_bytes)},
         "attestations": attestations,
         "authority": {"name": authority_path.name, "sha256": sha256_bytes(authority_bytes)},

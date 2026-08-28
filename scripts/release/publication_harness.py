@@ -28,19 +28,33 @@ from publish_release import (
     _NoRedirect,
     run,
 )
-from release_mutation_gate import MutationError, verify_release_state, verify_uploaded_assets
+from release_mutation_gate import (
+    MutationError,
+    admit_release_evidence,
+    validated_source_branch,
+    verify_release_state,
+    verify_uploaded_assets,
+)
 from verify_remote_assets import AssetError, MAX_RELEASE_ASSET_BYTES, verify as verify_remote_assets
 
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
-def _expected_source_branch(manifest_path: Path) -> str:
-    metadata = json.loads(manifest_path.read_text(encoding="utf-8"))
-    value = metadata.get("source_branch")
-    if not isinstance(value, str) or not value:
-        raise PublicationError("publication fixture source branch is missing")
-    return value
+def _expected_source_branch(
+    evidence_directory: Path,
+    *,
+    tag: str,
+    source_sha: str,
+) -> str:
+    try:
+        return validated_source_branch(
+            evidence_directory,
+            tag=tag,
+            source_sha=source_sha,
+        )
+    except (MutationError, OSError, ValueError) as error:
+        raise PublicationError("publication fixture provenance is invalid") from error
 
 EXPECTED_REJECTION_KEYS = frozenset({
     "missing_assets",
@@ -557,6 +571,11 @@ def _no_pre_admission_post(
     tag: str,
     source_sha: str,
 ) -> bool:
+    expected_source_branch = _expected_source_branch(
+        evidence_directory,
+        tag=tag,
+        source_sha=source_sha,
+    )
     class AdmissionClient:
         post_count = 0
 
@@ -583,7 +602,7 @@ def _no_pre_admission_post(
             release_id=42,
             tag=tag,
             source_sha=source_sha,
-            expected_source_branch="dev",
+            expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
         )
@@ -600,6 +619,11 @@ def _prepatch_divergence_rejected(
     tag: str,
     source_sha: str,
 ) -> bool:
+    expected_source_branch = _expected_source_branch(
+        evidence_directory,
+        tag=tag,
+        source_sha=source_sha,
+    )
     apk = (evidence_directory / "Meet.apk").read_bytes()
     installer = {
         "id": 9001,
@@ -673,7 +697,7 @@ def _prepatch_divergence_rejected(
             release_id=42,
             tag=tag,
             source_sha=source_sha,
-            expected_source_branch="dev",
+            expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
         )
@@ -690,7 +714,11 @@ def _evidence_identity_mismatch_rejected(
     tag: str,
     source_sha: str,
 ) -> bool:
-    expected_source_branch = _expected_source_branch(manifest_path)
+    expected_source_branch = _expected_source_branch(
+        evidence_directory,
+        tag=tag,
+        source_sha=source_sha,
+    )
     with tempfile.TemporaryDirectory(prefix="meet-identity-fixture-") as root:
         fixture = Path(root) / "release-output"
         shutil.copytree(evidence_directory, fixture)
@@ -723,6 +751,11 @@ def _loopback_state_identity_mismatch_rejected(
     tag: str,
     source_sha: str,
 ) -> bool:
+    expected_source_branch = _expected_source_branch(
+        evidence_directory,
+        tag=tag,
+        source_sha=source_sha,
+    )
     class MismatchedClient:
         post_count = 0
 
@@ -750,7 +783,7 @@ def _loopback_state_identity_mismatch_rejected(
             release_id=42,
             tag=tag,
             source_sha=source_sha,
-            expected_source_branch="dev",
+            expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
         )
@@ -898,7 +931,11 @@ def _final_asset_metadata_drift_rejected(
     tag: str,
     source_sha: str,
 ) -> bool:
-    expected_source_branch = _expected_source_branch(manifest_path)
+    expected_source_branch = _expected_source_branch(
+        evidence_directory,
+        tag=tag,
+        source_sha=source_sha,
+    )
     from release_notes import render_release_notes
 
     apk = (evidence_directory / "Meet.apk").read_bytes()
@@ -1367,6 +1404,20 @@ def run_harness(
         application_source_sha=application_source_sha,
         attestation_source_sha=attestation_source_sha,
     )
+    canonical_manifest_path = (evidence_directory / "release-manifest.json").resolve()
+    if manifest_path.resolve() != canonical_manifest_path:
+        raise PublicationError(
+            "publication manifest path must be the canonical release evidence manifest"
+        )
+    try:
+        admitted_manifest = admit_release_evidence(
+            evidence_directory,
+            tag=tag,
+            source_sha=source_sha,
+        )
+    except (MutationError, OSError, ValueError) as error:
+        raise PublicationError("publication fixture provenance is invalid") from error
+    expected_source_branch = admitted_manifest["source_branch"]
     if not all(
         isinstance(value, str) and value
         for value in (
@@ -1401,9 +1452,8 @@ def run_harness(
     if android_verifier is None:
         from verify_android_artifacts import verify_apk
 
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         android_verifier = lambda path: verify_apk(
-            path, manifest, apksigner, apkanalyzer, False
+            path, admitted_manifest, apksigner, apkanalyzer, False
         )
 
     apk = (evidence_directory / "Meet.apk").read_bytes()
@@ -1436,7 +1486,7 @@ def run_harness(
                     release_id=42,
                     tag=tag,
                     source_sha=source_sha,
-                    expected_source_branch="dev",
+                    expected_source_branch=expected_source_branch,
                     evidence_directory=evidence_directory,
                     manifest_path=manifest_path,
                     rendered_body_path=body_path,

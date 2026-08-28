@@ -819,6 +819,40 @@ def _producer_key(run: Mapping[str, Any]) -> tuple[int, int, int]:
     )
 
 
+def _validate_producer_artifact(
+    artifact: Mapping[str, Any],
+    *,
+    run_id: int,
+    repository_id: int,
+    head_repository_id: int,
+    protected_branch: str,
+    current_sha: str,
+) -> str:
+    _require(isinstance(artifact, Mapping), "producer artifact metadata is malformed")
+    _positive_int(artifact.get("id"), "producer artifact ID")
+    _require(
+        isinstance(artifact.get("name"), str) and bool(artifact["name"]),
+        "producer artifact name is missing",
+    )
+    digest = artifact.get("digest")
+    _require(isinstance(digest, str), "producer artifact digest is malformed")
+    if digest.startswith("sha256:"):
+        digest = digest.removeprefix("sha256:")
+    digest = _sha256(digest, "evidence")
+    _require(isinstance(artifact.get("expired"), bool), "producer artifact expiration is malformed")
+    workflow_run = artifact.get("workflow_run")
+    _require(isinstance(workflow_run, Mapping), "producer artifact workflow run is missing")
+    _require(
+        _positive_int(workflow_run.get("id"), "producer artifact workflow run ID") == run_id
+        and _positive_int(workflow_run.get("repository_id"), "producer artifact repository") == repository_id
+        and _positive_int(workflow_run.get("head_repository_id"), "producer artifact head_repository") == head_repository_id
+        and workflow_run.get("head_branch") == protected_branch
+        and workflow_run.get("head_sha") == current_sha,
+        "producer artifact workflow run identity mismatch",
+    )
+    return digest
+
+
 def select_latest_producer_evidence(
     runs: Iterable[Mapping[str, Any]],
     artifacts_by_run: Mapping[int, Sequence[Mapping[str, Any]]],
@@ -864,30 +898,23 @@ def select_latest_producer_evidence(
     for run in runs:
         _require(isinstance(run, Mapping), "producer workflow run is malformed")
         run_workflow_id = run.get("workflow_id")
-        if (
-            not isinstance(run_workflow_id, int)
-            or isinstance(run_workflow_id, bool)
-            or run_workflow_id != workflow_id
-        ):
-            continue
-        if (
-            run.get("path") != expected_run_path
-            or run.get("event") != "push"
-            or run.get("head_branch") != protected_branch
-            or run.get("head_sha") != current_sha
-        ):
-            continue
+        _require(
+            isinstance(run_workflow_id, int)
+            and not isinstance(run_workflow_id, bool)
+            and run_workflow_id == workflow_id,
+            "producer workflow run identity is not exact",
+        )
+        _require(run.get("path") == expected_run_path, "producer workflow run path is not exact")
+        _require(run.get("event") == "push", "producer workflow run event is not exact")
+        _require(run.get("head_branch") == protected_branch, "producer workflow run branch is not exact")
+        _require(run.get("head_sha") == current_sha, "producer workflow run SHA is not exact")
         run_repository = run.get("repository")
         run_head_repository = run.get("head_repository")
-        if (
-            _producer_repository_name(run_repository, "producer run repository")
-            != repository
-            or _producer_repository_name(
-                run_head_repository, "producer run head_repository"
-            )
-            != repository
-        ):
-            continue
+        _require(
+            _producer_repository_name(run_repository, "producer run repository") == repository
+            and _producer_repository_name(run_head_repository, "producer run head_repository") == repository,
+            "producer workflow run repository is not exact",
+        )
         run_repository_id = _producer_repository_id(run_repository, "producer run repository")
         run_head_repository_id = _producer_repository_id(
             run_head_repository,
@@ -897,6 +924,33 @@ def select_latest_producer_evidence(
     _require(matching, "no exact protected-master producer runs found")
     run_keys = [_producer_key(run) for run in matching]
     _require(len(run_keys) == len(set(run_keys)), "duplicate producer execution identity")
+    _require(isinstance(artifacts_by_run, Mapping), "producer artifact enumeration is malformed")
+    matching_by_id = {
+        _positive_int(run.get("id"), "producer run ID"): run
+        for run in matching
+    }
+    for raw_run_id, raw_artifacts in artifacts_by_run.items():
+        _require(
+            isinstance(raw_run_id, int)
+            and not isinstance(raw_run_id, bool)
+            and raw_run_id in matching_by_id,
+            "producer artifacts were returned for an unexpected run",
+        )
+        _require(isinstance(raw_artifacts, Sequence), "producer artifact enumeration is malformed")
+        run = matching_by_id[raw_run_id]
+        repository_id = _producer_repository_id(run["repository"], "producer run repository")
+        head_repository_id = _producer_repository_id(
+            run["head_repository"], "producer run head_repository"
+        )
+        for artifact in raw_artifacts:
+            _validate_producer_artifact(
+                artifact,
+                run_id=raw_run_id,
+                repository_id=repository_id,
+                head_repository_id=head_repository_id,
+                protected_branch=protected_branch,
+                current_sha=current_sha,
+            )
     latest = max(matching, key=_producer_key)
     _require(latest.get("status") == "completed", "newest producer run is incomplete")
     _require(latest.get("conclusion") == "success", "newest producer run did not succeed")
@@ -915,28 +969,14 @@ def select_latest_producer_evidence(
     _require(len(artifacts) == 1, "newest producer run has missing or duplicate evidence")
     artifact = artifacts[0]
     _require(artifact.get("expired") is False, "newest producer evidence is expired")
-    workflow_run = artifact.get("workflow_run")
-    _require(isinstance(workflow_run, Mapping), "producer artifact workflow run is missing")
-    _require(
-        workflow_run.get("id") == latest_run_id
-        and workflow_run.get("head_branch") == protected_branch
-        and workflow_run.get("head_sha") == current_sha,
-        "producer artifact workflow run identity mismatch",
+    digest = _validate_producer_artifact(
+        artifact,
+        run_id=latest_run_id,
+        repository_id=run_repository_id,
+        head_repository_id=run_head_repository_id,
+        protected_branch=protected_branch,
+        current_sha=current_sha,
     )
-    _require(
-        _positive_int(workflow_run.get("repository_id"), "producer artifact repository")
-        == run_repository_id
-        and _positive_int(
-            workflow_run.get("head_repository_id"),
-            "producer artifact head_repository",
-        )
-        == run_head_repository_id,
-        "producer artifact repository identity mismatch",
-    )
-    digest = str(artifact.get("digest", ""))
-    if digest.startswith("sha256:"):
-        digest = digest.removeprefix("sha256:")
-    digest = _sha256(digest, "evidence")
     return ProducerEvidence(
         run_number=_positive_int(latest.get("run_number"), "producer run number"),
         run_id=latest_run_id,

@@ -130,6 +130,8 @@ class ReleaseRolesTest(unittest.TestCase):
             "dev.",
             "dev with-space",
             "dev\\child",
+            "refs/tags/dev",
+            "refs/remotes/origin/dev",
         )
         for branch in invalid_branches:
             with self.subTest(branch=branch), self.assertRaises(ReleaseRolesError):

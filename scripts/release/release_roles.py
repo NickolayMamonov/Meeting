@@ -96,7 +96,7 @@ def _reject_json_constant(value: str) -> NoReturn:
 def _validate_branch(branch: str) -> str:
     if not isinstance(branch, str):
         raise ReleaseRolesError("branch must be a string")
-    if _BRANCH_PATTERN.fullmatch(branch) is None or branch.startswith("refs/heads/"):
+    if _BRANCH_PATTERN.fullmatch(branch) is None or branch.startswith("refs/"):
         raise ReleaseRolesError(f"branch is not Git-compatible: {branch!r}")
     if (
         branch.endswith("/")

@@ -573,11 +573,10 @@ class EvidenceTest(unittest.TestCase):
                 head_sha=PRODUCER_SHA,
             )
 
-    def test_rerun_attempt_supersedes_and_wrong_path_is_excluded(self):
+    def test_rerun_attempt_supersedes_and_wrong_path_is_rejected(self):
         runs = [
             producer_run(run_id=10, conclusion="failure"),
             producer_run(run_id=10, run_attempt=2),
-            producer_run(run_id=99, path=".github/workflows/copied.yml@master"),
         ]
         selected = select_latest_producer_evidence(
             runs,
@@ -592,8 +591,21 @@ class EvidenceTest(unittest.TestCase):
         self.assertEqual(selected.run_attempt, 2)
         with self.assertRaises(EvidenceError):
             select_latest_producer_evidence(
-                [runs[1], dict(runs[1])],
+                [runs[1], producer_run(run_id=99, path=".github/workflows/copied.yml@dev")],
                 {10: [producer_artifact(artifact_id=8, digest="c" * 64)]},
+                workflow_id=330672623,
+                workflow_path=".github/workflows/release-credential-audit.yml",
+                repository=PRODUCER_REPOSITORY,
+                protected_branch="master",
+                protected_ref="refs/heads/master",
+                head_sha=PRODUCER_SHA,
+            )
+
+    def test_mixed_valid_and_invalid_producer_entries_fail_closed(self):
+        with self.assertRaises(EvidenceError):
+            select_latest_producer_evidence(
+                [producer_run(run_id=10), producer_run(run_id=11, event="workflow_dispatch")],
+                {10: [producer_artifact(artifact_id=1, digest="a" * 64)]},
                 workflow_id=330672623,
                 workflow_path=".github/workflows/release-credential-audit.yml",
                 repository=PRODUCER_REPOSITORY,

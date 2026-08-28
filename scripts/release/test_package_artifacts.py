@@ -461,6 +461,34 @@ class PackageArtifactsTest(unittest.TestCase):
             with self.assertRaises(ChainError):
                 verify(output)
 
+    def test_candidate_and_index_schema_kind_channel_are_exact(self):
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_release(Path(root))
+            candidate_path = output / "release-candidate.json"
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            candidate["schema"] = 2
+            candidate_path.write_bytes(canonical_json(candidate))
+            with self.assertRaises(ChainError):
+                verify(output)
+
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_release(Path(root))
+            index_path = output / "attestation-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index["kind"] = "copied-index"
+            index_path.write_bytes(canonical_json(index))
+            with self.assertRaises(ChainError):
+                verify(output)
+
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_release(Path(root))
+            index_path = output / "attestation-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index["channel"] = "snapshot"
+            index_path.write_bytes(canonical_json(index))
+            with self.assertRaises(ChainError):
+                verify(output)
+
     def test_recomputed_producer_bundle_cannot_replace_authoritative_bundle(self):
         with tempfile.TemporaryDirectory() as root:
             output = self.package_release(Path(root))

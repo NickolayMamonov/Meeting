@@ -1,9 +1,15 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from publication_harness import EXPECTED_REJECTION_KEYS, run_harness
-from publish_release import GitHubReleaseClient, MAX_RELEASE_ASSET_BYTES, PublicationError
+from publish_release import (
+    GitHubReleaseClient,
+    MAX_RELEASE_ASSET_BYTES,
+    PublicationError,
+    run,
+)
 from test_package_artifacts import PackageArtifactsTest
 
 
@@ -112,6 +118,49 @@ class PublishReleaseTest(unittest.TestCase):
             options["application_source_sha"] = "c" * 40
             with self.assertRaisesRegex(PublicationError, "bound to application"):
                 run_harness(**options)
+
+    def test_noncanonical_manifest_is_rejected_before_client_state_read(self):
+        with tempfile.TemporaryDirectory() as root:
+            evidence = PackageArtifactsTest.package_release(Path(root))
+            alternate = Path(root) / "alternate-manifest.json"
+            alternate.write_bytes((evidence / "release-manifest.json").read_bytes())
+
+            class NoStateReadClient:
+                def get_release(self, _release_id):
+                    raise AssertionError("client state must not be read")
+
+            with self.assertRaisesRegex(PublicationError, "canonical release evidence manifest"):
+                run(
+                    client=NoStateReadClient(),
+                    release_id=42,
+                    tag="v1.0.0",
+                    source_sha="a" * 40,
+                    expected_source_branch="dev",
+                    evidence_directory=evidence,
+                    manifest_path=alternate,
+                )
+
+    def test_harness_passes_branch_from_validated_fixture_provenance(self):
+        with tempfile.TemporaryDirectory() as root:
+            evidence = PackageArtifactsTest.package_release(Path(root))
+            options = self.harness_options(evidence)
+            calls = []
+
+            def injected_run(**kwargs):
+                calls.append(kwargs)
+                return {"published": True}
+
+            with (
+                patch(
+                    "publication_harness.admit_release_evidence",
+                    return_value={"source_branch": "fixture-branch"},
+                ),
+                patch("publication_harness.run", side_effect=injected_run),
+            ):
+                run_harness(**options)
+
+            self.assertTrue(calls)
+            self.assertEqual(calls[0]["expected_source_branch"], "fixture-branch")
 
     def test_upload_size_cap_is_checked_before_opening_asset_body(self):
         with tempfile.TemporaryDirectory() as root:

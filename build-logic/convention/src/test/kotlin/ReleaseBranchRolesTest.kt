@@ -77,6 +77,8 @@ class ReleaseBranchRolesTest {
             rolesJson(integration = "dev/", stable = "master"),
             rolesJson(integration = "dev.", stable = "master"),
             rolesJson(integration = "dev", stable = "master/.lock/child"),
+            rolesJson(integration = "refs/tags/dev", stable = "master"),
+            rolesJson(integration = "refs/remotes/origin/dev", stable = "master"),
         ).forEach { json ->
             assertThrows(json, IllegalArgumentException::class.java) {
                 ReleaseBranchRoles.parseJson(json)

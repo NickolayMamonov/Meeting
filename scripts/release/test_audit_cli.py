@@ -102,6 +102,38 @@ def producer():
 
 
 class AuditCliTest(unittest.TestCase):
+    def test_current_ref_requires_commit_object(self):
+        api = GitHubApi(PRODUCER_REPOSITORY, "token")
+        for object_value in (
+            {"type": "tag", "sha": PRODUCER_SHA},
+            {"type": "tree", "sha": PRODUCER_SHA},
+        ):
+            api.get = lambda path, query=None, object_value=object_value: {
+                "ref": PRODUCER_REF,
+                "object": object_value,
+            }
+            with self.subTest(object_value=object_value), self.assertRaises(EvidenceError):
+                api.current_ref_sha(PRODUCER_BRANCH)
+
+    def test_workflow_resolution_requires_encoded_active_canonical_workflow(self):
+        api = GitHubApi(PRODUCER_REPOSITORY, "token")
+        observed = []
+        valid = {
+            "id": PRODUCER_WORKFLOW_ID,
+            "path": PRODUCER_WORKFLOW_PATH,
+            "state": "active",
+        }
+        api.get = lambda path, query=None: observed.append(path) or valid
+        self.assertEqual(api.resolve_workflow_path(PRODUCER_WORKFLOW_ID), PRODUCER_WORKFLOW_PATH)
+        self.assertEqual(
+            observed,
+            ["/actions/workflows/.github%2Fworkflows%2Frelease-credential-audit.yml"],
+        )
+        for key, value in (("state", "disabled"), ("path", ".github/workflows/copied.yml")):
+            api.get = lambda path, query=None, key=key, value=value: {**valid, key: value}
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                api.resolve_workflow_path(PRODUCER_WORKFLOW_ID)
+
     def test_live_producer_adapter_uses_direct_run_identity_and_bracketed_refs(self):
         run_record = {
             "workflow_id": PRODUCER_WORKFLOW_ID,
@@ -168,8 +200,12 @@ class AuditCliTest(unittest.TestCase):
 
             def all_pages(self, path, query=None, **kwargs):
                 if path.endswith(f"/actions/workflows/{PRODUCER_WORKFLOW_ID}/runs"):
-                    if query["branch"] != PRODUCER_BRANCH:
-                        raise AssertionError("unexpected producer query branch")
+                    if query != {
+                        "branch": PRODUCER_BRANCH,
+                        "event": "push",
+                        "head_sha": PRODUCER_SHA,
+                    }:
+                        raise AssertionError("unexpected producer query")
                     return [run_record]
                 if path != "/actions/runs/10/artifacts":
                     raise AssertionError("unexpected producer artifact path")

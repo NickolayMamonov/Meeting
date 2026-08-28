@@ -114,6 +114,8 @@ class GitHubApi:
         if not isinstance(value, dict) or value.get("ref") != f"refs/heads/{branch}":
             raise EvidenceError("GitHub branch ref response is not exact")
         target = value.get("object")
+        if not isinstance(target, dict) or target.get("type") != "commit":
+            raise EvidenceError("GitHub branch ref does not resolve to a commit")
         sha = target.get("sha") if isinstance(target, dict) else None
         if not isinstance(sha, str) or _GIT_SHA_PATTERN.fullmatch(sha) is None:
             raise EvidenceError("GitHub branch ref SHA is not lowercase")
@@ -122,13 +124,19 @@ class GitHubApi:
     def resolve_workflow_path(self, workflow_id: int) -> str:
         """Resolve and verify the repository-owned workflow's bare path."""
 
-        value = self.get(f"/actions/workflows/{workflow_id}")
-        if not isinstance(value, dict) or value.get("id") != workflow_id:
+        encoded_path = urllib.parse.quote(PRODUCER_WORKFLOW_PATH, safe="")
+        value = self.get(f"/actions/workflows/{encoded_path}")
+        if (
+            not isinstance(value, dict)
+            or not isinstance(workflow_id, int)
+            or isinstance(workflow_id, bool)
+            or workflow_id <= 0
+            or value.get("id") != workflow_id
+            or value.get("path") != PRODUCER_WORKFLOW_PATH
+            or value.get("state") != "active"
+        ):
             raise EvidenceError("producer workflow identity is not exact")
-        path = value.get("path")
-        if path != PRODUCER_WORKFLOW_PATH:
-            raise EvidenceError("producer workflow path is not repository-controlled")
-        return path
+        return PRODUCER_WORKFLOW_PATH
 
     def _merge_queue_snapshot_legacy(
         self,
@@ -449,14 +457,20 @@ class GitHubApi:
         path: str,
         query: dict[str, Any] | None = None,
         *,
+        response_key: str | None = None,
         max_entries: int = 10_000,
     ) -> list[Any]:
         page = 1
         result: list[Any] = []
         while True:
             payload = self.get(path, {**(query or {}), "per_page": 100, "page": page})
-            values = payload if isinstance(payload, list) else payload.get("workflow_runs", payload.get("artifacts", []))
-            if not isinstance(values, list):
+            if response_key is None and isinstance(payload, list):
+                values = payload
+            elif isinstance(payload, dict) and response_key is not None and response_key in payload:
+                values = payload[response_key]
+            else:
+                values = None
+            if not isinstance(values, list) or any(not isinstance(item, dict) for item in values):
                 raise EvidenceError(f"unexpected paginated response for {path}")
             if len(result) + len(values) > max_entries:
                 raise EvidenceError(f"paginated response for {path} exceeds max_entries")
@@ -491,14 +505,22 @@ def _producer_snapshot(
     git_ref_before = api.current_ref_sha(protected_branch)
     runs = api.all_pages(
         f"/actions/workflows/{workflow_id}/runs",
-        {"branch": protected_branch},
+        {
+            "branch": protected_branch,
+            "event": "push",
+            "head_sha": git_ref_before,
+        },
+        response_key="workflow_runs",
     )
     artifacts_by_run: dict[int, list[Any]] = {}
     for run in runs:
         run_id = run.get("id") if isinstance(run, dict) else None
         if isinstance(run_id, bool) or not isinstance(run_id, int) or run_id <= 0:
             raise EvidenceError("producer run ID is missing or invalid")
-        artifacts_by_run[run_id] = api.all_pages(f"/actions/runs/{run_id}/artifacts")
+        artifacts_by_run[run_id] = api.all_pages(
+            f"/actions/runs/{run_id}/artifacts",
+            response_key="artifacts",
+        )
     git_ref_after = api.current_ref_sha(protected_branch)
     return {
         "runs": runs,

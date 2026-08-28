@@ -131,7 +131,7 @@ private fun requireCanonicalBranch(branch: String) {
     require(canonicalBranchPattern.matches(branch)) {
         "Branch must use the canonical Git-compatible branch grammar (got '$branch')."
     }
-    require(!branch.startsWith("refs/heads/")) {
+    require(!branch.startsWith("refs/")) {
         "Branch must be a branch name, not a full ref (got '$branch')."
     }
     require(!branch.contains("..")) {
