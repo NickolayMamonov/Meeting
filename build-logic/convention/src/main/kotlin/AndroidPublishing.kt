@@ -17,7 +17,8 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             publishingInput(name).orNull
         }
     val releaseCommitSha =
-        publishingInput("releaseCommitSha", "RELEASE_COMMIT_SHA")
+        providers.gradleProperty("RELEASE_COMMIT_SHA")
+            .orElse(publishingInput("releaseCommitSha", "RELEASE_COMMIT_SHA"))
             .orElse(publishingInput("GITHUB_SHA"))
     val baseUrl = publishingInput("BASE_URL_RELEASE")
     val expectedCertificate = publishingInput("ANDROID_RELEASE_CERT_SHA256")
