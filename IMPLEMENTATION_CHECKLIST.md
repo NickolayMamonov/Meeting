@@ -7,4 +7,4 @@
 - [x] Add metadata provenance, unsigned APK admission, package/mutation identity checks.
 - [x] Fix remaining convention compilation and focused test issues.
 - [x] Run exact-head verification and inspect final diff/status.
-- [ ] Write implementation manifest, commit, push branch, create PR targeting `dev`, add exactly one task comment, and complete task.
+- [x] Write implementation manifest, commit, push branch, create PR targeting `dev`, add exactly one task comment, and complete task.
