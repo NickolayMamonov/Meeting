@@ -235,7 +235,12 @@ jobs:
             type == "object"
             and (.project_info | type == "object")
             and (.client | type == "array" and length > 0)
-            and any(.client[]; .client_info.package_name == "dev.whysoezzy.meet.snapshot")
+            and any(.client[];
+              type == "object"
+              and (.client_info | type == "object")
+              and (.client_info.android_client_info | type == "object")
+              and (.client_info.android_client_info.package_name == "dev.whysoezzy.meet.snapshot")
+            )
           ' app/google-services.json >/dev/null
       - name: Build unsigned snapshot
         env:
