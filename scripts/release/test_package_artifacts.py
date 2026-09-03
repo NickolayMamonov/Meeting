@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import base64
 import json
+import sys
 import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from unittest.mock import patch
 
 from package_artifacts import _metadata_identity, package
 from release_evidence import (
@@ -14,7 +16,12 @@ from release_evidence import (
     sha256_bytes,
     verify_attestation_link,
 )
-from verify_chain import ChainError, verify
+from verify_chain import (
+    ChainError,
+    ExpectedAttestationPolicy,
+    main as verify_chain_main,
+    verify,
+)
 from verify_remote_assets import verify as verify_remote_assets
 
 
@@ -122,7 +129,17 @@ class PackageArtifactsTest(unittest.TestCase):
         path.write_text(json.dumps({"records": records}), encoding="utf-8")
 
     @staticmethod
-    def _write_five_subject_group_evidence(output: Path, path: Path) -> None:
+    def _write_five_subject_group_evidence(
+        output: Path,
+        path: Path,
+        *,
+        source_repository: str = "owner/repo",
+        signer: str = "owner/repo/.github/workflows/release.yml",
+        source_ref: str = "refs/heads/dev",
+        source_sha: str = "a" * 40,
+        run_id: int = 101,
+        run_attempt: int = 1,
+    ) -> None:
         manifest_path = (
             output / "snapshot-manifest.json"
             if (output / "snapshot-manifest.json").exists()
@@ -162,12 +179,12 @@ class PackageArtifactsTest(unittest.TestCase):
             statement = {
                 "subject": canonical_subject,
                 "predicate": signed_statement["predicate"],
-                "source_repository": "owner/repo",
-                "signer": "owner/repo/.github/workflows/release.yml",
-                "source_ref": "refs/heads/dev",
-                "source_sha": "a" * 40,
-                "run_id": 101,
-                "run_attempt": 1,
+                "source_repository": source_repository,
+                "signer": signer,
+                "source_ref": source_ref,
+                "source_sha": source_sha,
+                "run_id": run_id,
+                "run_attempt": run_attempt,
                 "payload_sha256": sha256_bytes(payload),
                 "certificate_sha256": sha256_bytes(certificate_bytes),
                 "rekor": rekor,
@@ -236,7 +253,11 @@ class PackageArtifactsTest(unittest.TestCase):
         return output
 
     @classmethod
-    def package_five_subject_group_release(cls, root_path: Path) -> Path:
+    def package_five_subject_group_release(
+        cls,
+        root_path: Path,
+        **identity: object,
+    ) -> Path:
         metadata = root_path / "metadata.json"
         metadata.write_text(
             json.dumps({
@@ -265,7 +286,7 @@ class PackageArtifactsTest(unittest.TestCase):
         )
         package(arguments)
         evidence = root_path / "attestation-evidence.json"
-        cls._write_five_subject_group_evidence(output, evidence)
+        cls._write_five_subject_group_evidence(output, evidence, **identity)
         arguments.attestation_evidence = str(evidence)
         arguments.prepare_only = False
         package(arguments)
@@ -344,6 +365,130 @@ class PackageArtifactsTest(unittest.TestCase):
                 len({reference["rekor_identity"] for reference in envelope["attestations"]}),
                 1,
             )
+
+    def test_policy_binds_each_group_to_the_expected_execution_identity(self):
+        policy = ExpectedAttestationPolicy(
+            source_repository="owner/repo",
+            signer_workflow="owner/repo/.github/workflows/release.yml",
+            source_ref="refs/heads/dev",
+            source_sha="a" * 40,
+            run_id=101,
+            run_attempt=1,
+        )
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_five_subject_group_release(Path(root))
+            verify(output, policy)
+
+    def test_policy_rejects_legacy_and_mixed_group_evidence(self):
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_release(Path(root))
+            policy = ExpectedAttestationPolicy(
+                source_repository="owner/repo",
+                signer_workflow="owner/repo/.github/workflows/release.yml",
+                source_ref="refs/heads/dev",
+                source_sha="a" * 40,
+                run_id=100,
+                run_attempt=2,
+            )
+            with self.assertRaises(ChainError):
+                verify(output, policy)
+
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_five_subject_group_release(Path(root))
+            envelope_path = output / "attestation-index.json"
+            envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+            reference = envelope["attestations"][0]
+            attestation_path = output / reference["name"]
+            attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+            attestation.pop("attestation_group")
+            encoded = canonical_json(attestation)
+            attestation_path.write_bytes(encoded)
+            reference.pop("attestation_group")
+            reference["sha256"] = sha256_bytes(encoded)
+            envelope_path.write_bytes(canonical_json(envelope))
+            policy = ExpectedAttestationPolicy(
+                source_repository="owner/repo",
+                signer_workflow="owner/repo/.github/workflows/release.yml",
+                source_ref="refs/heads/dev",
+                source_sha="a" * 40,
+                run_id=101,
+                run_attempt=1,
+            )
+            with self.assertRaises(ChainError):
+                verify(output, policy)
+
+    def test_policy_rejects_each_mismatched_identity_field(self):
+        expected = {
+            "source_repository": "owner/repo",
+            "signer_workflow": "owner/repo/.github/workflows/release.yml",
+            "source_ref": "refs/heads/dev",
+            "source_sha": "a" * 40,
+            "run_id": 101,
+            "run_attempt": 1,
+        }
+        replacements = {
+            "source_repository": "other/repo",
+            "signer": "other/repo/.github/workflows/release.yml",
+            "source_ref": "refs/heads/other",
+            "source_sha": "b" * 40,
+            "run_id": 102,
+            "run_attempt": 2,
+        }
+        for field, replacement in replacements.items():
+            with self.subTest(field=field):
+                with tempfile.TemporaryDirectory() as root:
+                    output = self.package_five_subject_group_release(
+                        Path(root), **{field: replacement}
+                    )
+                    with self.assertRaises(ChainError):
+                        verify(
+                            output,
+                            ExpectedAttestationPolicy(**expected),
+                        )
+
+    def test_policy_rejects_cross_pair_chain_substitution(self):
+        with tempfile.TemporaryDirectory() as first_root, tempfile.TemporaryDirectory() as second_root:
+            first = self.package_five_subject_group_release(
+                Path(first_root),
+                source_repository="first/repo",
+                signer="first/repo/.github/workflows/release.yml",
+                run_id=201,
+            )
+            second = self.package_five_subject_group_release(
+                Path(second_root),
+                source_repository="second/repo",
+                signer="second/repo/.github/workflows/release.yml",
+                run_id=202,
+            )
+            verify(first)
+            verify(second)
+            with self.assertRaises(ChainError):
+                verify(
+                    second,
+                    ExpectedAttestationPolicy(
+                        source_repository="first/repo",
+                        signer_workflow="first/repo/.github/workflows/release.yml",
+                        source_ref="refs/heads/dev",
+                        source_sha="a" * 40,
+                        run_id=201,
+                        run_attempt=1,
+                    ),
+                )
+
+    def test_policy_cli_requires_all_identity_arguments(self):
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_five_subject_group_release(Path(root))
+            with patch.object(
+                sys,
+                "argv",
+                [
+                    "verify_chain.py",
+                    str(output),
+                    "--expected-source-repository",
+                    "owner/repo",
+                ],
+            ):
+                self.assertEqual(verify_chain_main(), 1)
 
     def test_shared_rekor_partial_group_fails_package_boundary(self):
         with tempfile.TemporaryDirectory() as root:
