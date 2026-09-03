@@ -347,6 +347,39 @@ class PublicationGateTest(unittest.TestCase):
         self.assertNotIn("echo", validation_step)
         self.assertIn("if: ${{ always() }}", stable_build)
 
+    def test_snapshot_firebase_validation_precedes_gradle_and_cleanup(self):
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+        snapshot_build = workflow[
+            workflow.index("  snapshot-build:") : workflow.index("  snapshot-sign:")
+        ]
+        provision = snapshot_build.index("Provision snapshot Firebase configuration")
+        validation = snapshot_build.index("Validate snapshot Firebase configuration")
+        gradle = snapshot_build.index("./gradlew")
+        cleanup = snapshot_build.index("Remove snapshot Firebase configuration")
+        self.assertLess(provision, validation)
+        self.assertLess(validation, gradle)
+        self.assertLess(gradle, cleanup)
+        provision_step = snapshot_build[provision:validation]
+        self.assertIn("set -euo pipefail", provision_step)
+        self.assertIn("umask 077", provision_step)
+        self.assertIn('test -n "$FIREBASE_JSON_B64"', provision_step)
+        self.assertIn("test -s app/google-services.json", provision_step)
+        validation_step = snapshot_build[validation:gradle]
+        self.assertIn("jq -e", validation_step)
+        self.assertIn('type == "object"', validation_step)
+        self.assertIn('(.project_info | type == "object")', validation_step)
+        self.assertIn('(.client | type == "array" and length > 0)', validation_step)
+        self.assertIn(
+            'package_name == "dev.whysoezzy.meet.snapshot"', validation_step
+        )
+        self.assertIn("app/google-services.json >/dev/null", validation_step)
+        self.assertNotIn("FIREBASE_JSON_B64", validation_step)
+        self.assertNotIn("echo", validation_step)
+        self.assertIn("if: ${{ always() }}", snapshot_build[cleanup:])
+        self.assertIn("rm -f app/google-services.json", snapshot_build[cleanup:])
+
     def test_mutation_is_sha_bound_create_only_then_publish_and_verify(self):
         workflow = (
             Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
