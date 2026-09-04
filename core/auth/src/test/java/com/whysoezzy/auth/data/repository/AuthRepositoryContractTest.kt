@@ -4,8 +4,17 @@ import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.data.api.AuthApiKtor
 import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.AuthOutcome
+import com.whysoezzy.auth.domain.models.AuthCredentialIdentity
+import com.whysoezzy.auth.domain.models.AuthCredentialRead
+import com.whysoezzy.auth.domain.models.AuthCredentialSnapshot
+import com.whysoezzy.auth.domain.models.AuthOperationPermit
+import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
+import com.whysoezzy.auth.domain.models.AuthSaveResult
+import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.models.CredentialVersion
+import com.whysoezzy.auth.domain.models.OwnerSaveReservation
+import com.whysoezzy.auth.domain.models.PersistedTokenPair
 import com.whysoezzy.network.KtorNetworkModule
-import com.whysoezzy.network.TokenSnapshot
 import com.whysoezzy.network.error.ApiException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -25,10 +34,39 @@ import org.junit.Test
 
 class AuthRepositoryContractTest {
     private val tokenManager = mockk<TokenManager>(relaxed = true)
+    private val refreshPermit = AuthOperationPermit(
+        generation = 0L,
+        identity = AuthCredentialIdentity(
+            userId = 7L,
+            stage = AuthSession.Stage.Ready,
+            credentialVersion = CredentialVersion("epoch", 0L),
+            refreshToken = "old-refresh",
+        ),
+    )
+    private val refreshSnapshot = AuthCredentialSnapshot(
+        accessToken = "old-access",
+        refreshToken = "old-refresh",
+        userId = 7L,
+        stage = AuthSession.Stage.Ready,
+        credentialVersion = CredentialVersion("epoch", 0L),
+    )
+
+    private fun stubRefresh() {
+        coEvery { tokenManager.readCredentialSnapshot(refreshPermit) } returns
+            AuthCredentialRead.Present(refreshSnapshot, refreshPermit)
+        coEvery { tokenManager.saveRefreshedTokens(refreshPermit, any(), any()) } returns
+            AuthRefreshSaveResult.Persisted(PersistedTokenPair("new-access", "new-refresh"))
+    }
 
     @Test
     fun `real auth API maps nested verification response and persists session`() = runTest {
         every { tokenManager.isLoggedInFlow } returns MutableStateFlow(false)
+        val ownerPermit = AuthOperationPermit(1L, null)
+        val ownerReservation = OwnerSaveReservation(1L, 1L, ownerPermit)
+        every { tokenManager.reserveOwnerSave() } returns ownerReservation
+        coEvery {
+            tokenManager.saveAuthenticated(ownerReservation, any(), any(), any(), any())
+        } returns AuthSaveResult.Persisted
         val engine = MockEngine {
             respond(
                 content =
@@ -49,8 +87,6 @@ class AuthRepositoryContractTest {
                 headers = jsonHeaders,
             )
         }
-        coEvery { tokenManager.loadTokens() } returns TokenSnapshot("old-access", "old-refresh")
-
         withClient(engine) { client ->
             val result = repository(client).verifyEmailOtp("ada@example.com", "123456")
 
@@ -65,6 +101,7 @@ class AuthRepositoryContractTest {
     @Test
     fun `401 and 403 are unauthorized while other status preserves server metadata`() = runTest {
         every { tokenManager.isLoggedInFlow } returns MutableStateFlow(false)
+        stubRefresh()
 
         for (status in listOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden)) {
             val engine = MockEngine {
@@ -97,8 +134,10 @@ class AuthRepositoryContractTest {
             )
         }
         withClient(engine) { client ->
-            val result = repository(client).refreshToken()
-            val exception = result.exceptionOrNull()
+            val result = repository(client).refreshToken(refreshPermit)
+            assertTrue(result is com.whysoezzy.auth.domain.models.RefreshOutcome.TransientFailure)
+            val exception =
+                (result as com.whysoezzy.auth.domain.models.RefreshOutcome.TransientFailure).error
             assertTrue(exception is ApiException.ServerError)
             assertEquals(422, (exception as ApiException.ServerError).metadata.status)
             assertEquals("EMAIL_BLOCKED", exception.metadata.code)

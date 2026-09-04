@@ -8,4 +8,7 @@ class LogoutUseCase(
     suspend operator fun invoke() {
         authRepository.logout()
     }
+
+    suspend fun requestServerLogout(): Result<Unit> =
+        authRepository.requestServerLogout()
 }

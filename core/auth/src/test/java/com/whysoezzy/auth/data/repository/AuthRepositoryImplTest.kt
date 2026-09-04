@@ -7,9 +7,21 @@ import com.whysoezzy.auth.data.dto.AuthUserDto
 import com.whysoezzy.auth.data.dto.RefreshTokenResponse
 import com.whysoezzy.auth.data.dto.SendOtpResponse
 import com.whysoezzy.auth.domain.models.AuthOutcome
+import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.AuthResult
 import com.whysoezzy.auth.domain.models.AuthSession
-import com.whysoezzy.network.TokenSnapshot
+import com.whysoezzy.auth.domain.models.AuthCredentialIdentity
+import com.whysoezzy.auth.domain.models.AuthCredentialRead
+import com.whysoezzy.auth.domain.models.AuthCredentialSnapshot
+import com.whysoezzy.auth.domain.models.AuthOperationPermit
+import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
+import com.whysoezzy.auth.domain.models.AuthSaveResult
+import com.whysoezzy.auth.domain.models.AuthClearResult
+import com.whysoezzy.auth.domain.models.ClearReservation
+import com.whysoezzy.auth.domain.models.CredentialVersion
+import com.whysoezzy.auth.domain.models.OwnerSaveReservation
+import com.whysoezzy.auth.domain.models.PersistedTokenPair
+import com.whysoezzy.auth.domain.models.RefreshOutcome
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
@@ -37,10 +49,38 @@ class AuthRepositoryImplTest {
 
     private val authApi: AuthApi = mockk()
     private val tokenManager: TokenManager = mockk(relaxed = true)
+    private val refreshPermit = AuthOperationPermit(
+        generation = 2L,
+        identity = AuthCredentialIdentity(
+            userId = 1L,
+            stage = AuthSession.Stage.Ready,
+            credentialVersion = CredentialVersion("epoch", 0L),
+            refreshToken = "oldRefresh",
+        ),
+    )
+    private val refreshSnapshot = AuthCredentialSnapshot(
+        accessToken = "oldAccess",
+        refreshToken = "oldRefresh",
+        userId = 1L,
+        stage = AuthSession.Stage.Ready,
+        credentialVersion = CredentialVersion("epoch", 0L),
+    )
+    private val ownerPermit = AuthOperationPermit(1L, null)
+    private val ownerReservation = OwnerSaveReservation(1L, 1L, ownerPermit)
+    private val clearReservation = ClearReservation(3L, 3L, refreshPermit.identity)
 
     private fun repository(): AuthRepositoryImpl {
         // isLoggedInFlow нужен для делегирования в isLoggedInFlow property
         every { tokenManager.isLoggedInFlow } returns MutableStateFlow(false)
+        every { tokenManager.captureAuthOperationPermit() } returns refreshPermit
+        coEvery { tokenManager.readCredentialSnapshot(refreshPermit) } returns
+            AuthCredentialRead.Present(refreshSnapshot, refreshPermit)
+        every { tokenManager.reserveOwnerSave() } returns ownerReservation
+        coEvery {
+            tokenManager.saveAuthenticated(ownerReservation, any(), any(), any(), any())
+        } returns AuthSaveResult.Persisted
+        every { tokenManager.reserveClear(refreshPermit) } returns clearReservation
+        coEvery { tokenManager.clearReserved(clearReservation) } returns AuthClearResult.Cleared
         return AuthRepositoryImpl(authApi, tokenManager)
     }
 
@@ -69,7 +109,9 @@ class AuthRepositoryImplTest {
     @Test
     fun `email verification success saves tokens and returns AuthResult`() = runTest {
         coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns successAuthResponse()
-        coEvery { tokenManager.saveAuthenticated(any(), any(), any(), any()) } just runs
+        coEvery {
+            tokenManager.saveAuthenticated(ownerReservation, any(), any(), any(), any())
+        } returns AuthSaveResult.Persisted
 
         val result = repository().verifyEmailOtp("person@example.com", "123456")
 
@@ -82,6 +124,7 @@ class AuthRepositoryImplTest {
         // Проверяем что saveTokens вызван с правильными токенами
         coVerify {
             tokenManager.saveAuthenticated(
+                ownerReservation,
                 "access123",
                 "refresh456",
                 1L,
@@ -93,10 +136,13 @@ class AuthRepositoryImplTest {
     @Test
     fun `token persistence cancellation is propagated`() = runTest {
         coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns successAuthResponse()
-        coEvery { tokenManager.saveAuthenticated(any(), any(), any(), any()) } throws CancellationException("cancelled")
+        val repository = repository()
+        coEvery {
+            tokenManager.saveAuthenticated(ownerReservation, any(), any(), any(), any())
+        } throws CancellationException("cancelled")
 
         try {
-            repository().verifyEmailOtp("person@example.com", "123456")
+            repository.verifyEmailOtp("person@example.com", "123456")
             org.junit.Assert.fail("CancellationException must propagate")
         } catch (_: CancellationException) {
             // expected
@@ -107,9 +153,12 @@ class AuthRepositoryImplTest {
     fun `email verification isNewUser=true propagates to AuthResult`() = runTest {
         coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns
             successAuthResponse(isNewUser = true)
-        coEvery { tokenManager.saveAuthenticated(any(), any(), any(), any()) } just runs
+        val repository = repository()
+        coEvery {
+            tokenManager.saveAuthenticated(ownerReservation, any(), any(), any(), any())
+        } returns AuthSaveResult.Persisted
 
-        val result = repository().verifyEmailOtp("person@example.com", "123456")
+        val result = repository.verifyEmailOtp("person@example.com", "123456")
 
         assertTrue((result as AuthOutcome.Success).value.isNewUser)
     }
@@ -122,43 +171,49 @@ class AuthRepositoryImplTest {
         val result = repository().verifyEmailOtp("person@example.com", "000000")
 
         assertTrue(result is AuthOutcome.Failure)
-        coVerify(exactly = 0) { tokenManager.saveAuthenticated(any(), any(), any(), any()) }
+        coVerify(exactly = 0) {
+            tokenManager.saveAuthenticated(ownerReservation, any(), any(), any(), any())
+        }
     }
 
     // ==================== refreshToken ====================
 
     @Test
     fun `refreshToken success saves new tokens and returns access token`() = runTest {
-        coEvery { tokenManager.loadTokens() } returns TokenSnapshot("oldAccess", "oldRefresh")
-        coEvery { tokenManager.getUserId() } returns 1L
         coEvery { authApi.refreshToken("oldRefresh") } returns
             RefreshTokenResponse(accessToken = "newAccess", refreshToken = "newRefresh")
-        coEvery { tokenManager.saveTokens(any(), any(), any()) } just runs
+        coEvery { tokenManager.saveRefreshedTokens(refreshPermit, any(), any()) } returns
+            AuthRefreshSaveResult.Persisted(PersistedTokenPair("newAccess", "newRefresh"))
 
-        val result = repository().refreshToken()
+        val result = repository().refreshToken(refreshPermit)
 
-        assertTrue(result.isSuccess)
-        assertEquals("newAccess", result.getOrThrow())
-        coVerify { tokenManager.saveTokens("newAccess", "newRefresh", 1L) }
+        assertTrue(result is RefreshOutcome.Refreshed)
+        assertEquals(
+            PersistedTokenPair("newAccess", "newRefresh"),
+            (result as RefreshOutcome.Refreshed).pair,
+        )
+        coVerify {
+            tokenManager.saveRefreshedTokens(refreshPermit, "newAccess", "newRefresh")
+        }
     }
 
     @Test
     fun `refreshToken with null stored token returns failure`() = runTest {
-        coEvery { tokenManager.loadTokens() } returns null
-        val result = repository().refreshToken()
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is ApiException.UnauthorizedError)
+        val repository = repository()
+        coEvery { tokenManager.readCredentialSnapshot(refreshPermit) } returns
+            AuthCredentialRead.Missing(refreshPermit)
+        val result = repository.refreshToken(refreshPermit)
+        assertTrue(result is RefreshOutcome.Missing)
         coVerify(exactly = 0) { authApi.refreshToken(any()) }
     }
 
     @Test
     fun `refreshToken API failure returns Result failure`() = runTest {
-        coEvery { tokenManager.loadTokens() } returns TokenSnapshot("oldAccess", "oldRefresh")
         coEvery { authApi.refreshToken(any()) } throws RuntimeException("Server error")
 
-        val result = repository().refreshToken()
+        val result = repository().refreshToken(refreshPermit)
 
-        assertTrue(result.isFailure)
+        assertTrue(result is RefreshOutcome.TransientFailure)
     }
 
     // ==================== logout ====================
@@ -167,21 +222,49 @@ class AuthRepositoryImplTest {
     fun `logout always clears tokens even if API call fails`() = runTest {
         // Сервер вернул ошибку — токены всё равно должны быть удалены
         coEvery { authApi.logout() } throws RuntimeException("Server error")
-        coEvery { tokenManager.clearTokens() } just runs
-
         repository().logout()
 
-        coVerify(exactly = 1) { tokenManager.clearTokens() }
+        coVerify(exactly = 1) { tokenManager.clearReserved(clearReservation) }
     }
 
     @Test
     fun `logout on success also clears tokens`() = runTest {
         coEvery { authApi.logout() } returns mapOf("message" to "ok")
-        coEvery { tokenManager.clearTokens() } just runs
-
         repository().logout()
 
-        coVerify(exactly = 1) { tokenManager.clearTokens() }
+        coVerify(exactly = 1) { tokenManager.clearReserved(clearReservation) }
+    }
+
+    @Test
+    fun `verification persistence failure makes one generation-safe clear reservation`() = runTest {
+        val repository = repository()
+        val failedClearReservation = ClearReservation(2L, 2L, ownerPermit.identity)
+        every { tokenManager.reserveClear(ownerPermit) } returns failedClearReservation
+        coEvery { tokenManager.clearReserved(failedClearReservation) } returns AuthClearResult.Cleared
+        coEvery {
+            tokenManager.saveAuthenticated(ownerReservation, any(), any(), any(), any())
+        } throws IllegalStateException("persistence failed")
+        coEvery { authApi.verifyEmailOtp(any(), any(), any(), any()) } returns successAuthResponse()
+
+        val result = repository.verifyEmailOtp("person@example.com", "123456")
+
+        assertEquals(
+            AuthFailure.SessionPersistenceFailure,
+            (result as AuthOutcome.Failure).reason,
+        )
+        coVerify(exactly = 1) { tokenManager.reserveClear(ownerPermit) }
+        coVerify(exactly = 1) { tokenManager.clearReserved(failedClearReservation) }
+    }
+
+    @Test
+    fun `server-only logout never clears local credentials`() = runTest {
+        coEvery { authApi.logout() } returns mapOf("message" to "ok")
+
+        val result = repository().requestServerLogout()
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { tokenManager.reserveClear(any()) }
+        coVerify(exactly = 0) { tokenManager.clearReserved(any()) }
     }
 
     // ==================== isLoggedInFlow ====================
@@ -203,14 +286,12 @@ class AuthRepositoryImplTest {
             kotlinx.coroutines.delay(10_000)
             mapOf("message" to "ok")
         }
-        coEvery { tokenManager.clearTokens() } just runs
-
         val job = launch { repository().logout() }
         advanceTimeBy(100)
         job.cancelAndJoin()
 
         // clearTokens должен выполниться несмотря на отмену (NonCancellable в finally)
-        coVerify(exactly = 1) { tokenManager.clearTokens() }
+        coVerify(exactly = 1) { tokenManager.clearReserved(clearReservation) }
     }
 
     // ==================== Fixtures ====================

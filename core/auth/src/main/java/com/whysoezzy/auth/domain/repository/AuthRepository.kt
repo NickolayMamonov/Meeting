@@ -2,6 +2,8 @@ package com.whysoezzy.auth.domain.repository
 
 import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.auth.domain.models.AuthOperationPermit
+import com.whysoezzy.auth.domain.models.RefreshOutcome
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
@@ -14,9 +16,11 @@ interface AuthRepository {
         surname: String? = null,
     ): AuthOutcome<AuthResult>
 
-    suspend fun refreshToken(): Result<String>
+    suspend fun refreshToken(operationPermit: AuthOperationPermit): RefreshOutcome
 
     suspend fun logout()
+
+    suspend fun requestServerLogout(): Result<Unit>
 
     val isLoggedInFlow: Flow<Boolean>
 }
