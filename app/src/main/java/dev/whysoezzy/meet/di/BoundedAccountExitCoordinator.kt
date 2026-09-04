@@ -1,16 +1,10 @@
 package dev.whysoezzy.meet.di
 
-import com.whysoezzy.auth.domain.models.AuthClearResult
-import com.whysoezzy.auth.domain.models.AuthOperationPermit
-import com.whysoezzy.auth.domain.models.ClearReservation
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.auth.domain.usecase.LogoutUseCase
-import com.whysoezzy.domain.models.PushInstallationDeleteResult
 import com.whysoezzy.domain.usecase.AccountExitCoordinator
 import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
-import dev.whysoezzy.meet.push.AccountExitLease
 import dev.whysoezzy.meet.push.PushRegistrationCoordinator
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -20,7 +14,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Owns the short user-facing account-exit window while all actual writes/effects
@@ -73,9 +66,11 @@ internal class BoundedAccountExitCoordinator(
         val lease = pushRegistrationCoordinator.beginAccountExitLease()
         try {
             val installationId = awaitWithin(
-                submit { pushRegistrationCoordinator.clearAccountState(
-                    retainInstallationCleanup = deleteInstallation,
-                ) },
+                submit {
+                    pushRegistrationCoordinator.clearAccountState(
+                        retainInstallationCleanup = deleteInstallation,
+                    )
+                },
                 timeoutMillis = remainingMillis(startedAt, STATE_CLEAR_BUDGET_MILLIS),
             ).getOrNull()
 

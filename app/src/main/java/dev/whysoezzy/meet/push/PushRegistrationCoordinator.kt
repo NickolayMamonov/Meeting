@@ -179,7 +179,7 @@ internal class PushRegistrationCoordinator(
      * This is intentionally non-suspending. It only changes ownership under the monitor
      * and submits cancellation work to the independent completion scope.
      */
-    internal fun beginAccountExit(): Unit {
+    internal fun beginAccountExit() {
         val lease = beginAccountExitLease()
         synchronized(monitor) { legacyLeases.addLast(lease) }
     }
@@ -244,7 +244,8 @@ internal class PushRegistrationCoordinator(
         val validFid = runCatching { PushInstallationFid(fid).value }.getOrNull() ?: return
         val command = synchronized(monitor) {
             val command = firebaseCommand
-            if (command != null && command.kind == FirebaseKind.REGISTER &&
+            if (command != null &&
+                command.kind == FirebaseKind.REGISTER &&
                 command.epoch == epoch &&
                 !command.stale &&
                 command.state != RemoteHandleState.COMPLETED &&
@@ -519,84 +520,84 @@ internal class PushRegistrationCoordinator(
     private fun launchCredentialObservation(credentialState: com.whysoezzy.auth.domain.models.AuthCredentialState) {
         completionScope.launch {
             observationMutex.withLock {
-            val userId = credentialState.session.userId
-                ?.takeIf { credentialState.session.stage != AuthSession.Stage.LoggedOut }
-            val state = readState()
-            val oldOwner = state.registration.owner
-            val pendingCleanup = state.accountCleanup
-                ?.takeIf { it.terminal == RegistrationTerminal.NONE }
-            val replacement = userId == null ||
-                (oldOwner != null && oldOwner.userId != userId) ||
-                pendingCleanup != null
-            if (replacement) {
-                val lease = beginAccountExitLease()
-                try {
-                    if (pendingCleanup != null && userId != null) {
-                        val result = remote(
-                            RemoteGeneration(
-                                pendingCleanup.owner,
-                                lease.epoch,
-                                RegistrationOperation.DELETE,
-                                null,
-                                pendingCleanup.installationId,
-                            ),
-                            allowDuringExit = true,
-                        ) {
-                            installationRepository.delete(
-                                PushInstallationId(pendingCleanup.installationId),
-                            )
-                        }.await()
-                        if (result.isAcknowledged()) {
-                            writeState(lease.epoch, true, authorityEpoch = lease.epoch) {
-                                PushStateReducer.acknowledgeAccountCleanup(
-                                    it,
+                val userId = credentialState.session.userId
+                    ?.takeIf { credentialState.session.stage != AuthSession.Stage.LoggedOut }
+                val state = readState()
+                val oldOwner = state.registration.owner
+                val pendingCleanup = state.accountCleanup
+                    ?.takeIf { it.terminal == RegistrationTerminal.NONE }
+                val replacement = userId == null ||
+                    (oldOwner != null && oldOwner.userId != userId) ||
+                    pendingCleanup != null
+                if (replacement) {
+                    val lease = beginAccountExitLease()
+                    try {
+                        if (pendingCleanup != null && userId != null) {
+                            val result = remote(
+                                RemoteGeneration(
                                     pendingCleanup.owner,
+                                    lease.epoch,
+                                    RegistrationOperation.DELETE,
+                                    null,
                                     pendingCleanup.installationId,
+                                ),
+                                allowDuringExit = true,
+                            ) {
+                                installationRepository.delete(
+                                    PushInstallationId(pendingCleanup.installationId),
                                 )
                             }.await()
-                        } else {
-                            recordAccountCleanupFailure(
-                                pendingCleanup.owner,
-                                pendingCleanup.installationId,
-                                result,
-                            )
+                            if (result.isAcknowledged()) {
+                                writeState(lease.epoch, true, authorityEpoch = lease.epoch) {
+                                    PushStateReducer.acknowledgeAccountCleanup(
+                                        it,
+                                        pendingCleanup.owner,
+                                        pendingCleanup.installationId,
+                                    )
+                                }.await()
+                            } else {
+                                recordAccountCleanupFailure(
+                                    pendingCleanup.owner,
+                                    pendingCleanup.installationId,
+                                    result,
+                                )
+                            }
                         }
-                    }
-                    val oldInstallation = oldOwner
-                        ?.takeIf { userId != null && it.userId != userId }
-                        ?.let { state.registration.installationId }
-                    if (oldInstallation != null && oldOwner != null) {
-                        val result = remote(
-                            RemoteGeneration(
-                                oldOwner,
-                                lease.epoch,
-                                RegistrationOperation.DELETE,
-                                null,
-                                oldInstallation,
-                            ),
-                            allowDuringExit = true,
-                        ) {
-                            installationRepository.delete(PushInstallationId(oldInstallation))
-                        }.await()
-                        if (!result.isAcknowledged()) {
-                            recordAccountCleanupFailure(oldOwner, oldInstallation, result)
+                        val oldInstallation = oldOwner
+                            ?.takeIf { userId != null && it.userId != userId }
+                            ?.let { state.registration.installationId }
+                        if (oldInstallation != null && oldOwner != null) {
+                            val result = remote(
+                                RemoteGeneration(
+                                    oldOwner,
+                                    lease.epoch,
+                                    RegistrationOperation.DELETE,
+                                    null,
+                                    oldInstallation,
+                                ),
+                                allowDuringExit = true,
+                            ) {
+                                installationRepository.delete(PushInstallationId(oldInstallation))
+                            }.await()
+                            if (!result.isAcknowledged()) {
+                                recordAccountCleanupFailure(oldOwner, oldInstallation, result)
+                            }
                         }
+                    } finally {
+                        endAccountExit(lease)
                     }
-                } finally {
-                    endAccountExit(lease)
+                } else if (userId != null) {
+                    val open = synchronized(monitor) {
+                        phase == PushLifecyclePhase.OPEN && activeLeases == 0
+                    }
+                    if (open) enqueueScheduler(captureExitEpoch())
+                } else {
+                    val lease = beginAccountExitLease()
+                    try {
+                    } finally {
+                        endAccountExit(lease)
+                    }
                 }
-            } else if (userId != null) {
-                val open = synchronized(monitor) {
-                    phase == PushLifecyclePhase.OPEN && activeLeases == 0
-                }
-                if (open) enqueueScheduler(captureExitEpoch())
-            } else {
-                val lease = beginAccountExitLease()
-                try {
-                } finally {
-                    endAccountExit(lease)
-                }
-            }
             }
         }
     }
@@ -1355,9 +1356,13 @@ internal class PushRegistrationCoordinator(
 
     private fun invokeEffect(record: EffectRecord) {
         val authorized = synchronized(monitor) {
-            if (record.allowDuringExit) true
-            else if (record.epoch == null) false
-            else isEpochAuthorizedLocked(record.epoch, allowActivation = record.allowActivation)
+            if (record.allowDuringExit) {
+                true
+            } else if (record.epoch == null) {
+                false
+            } else {
+                isEpochAuthorizedLocked(record.epoch, allowActivation = record.allowActivation)
+            }
         }
         if (!authorized) {
             record.completion.complete(Result.failure(IllegalStateException("Suppressed lifecycle effect")))
@@ -1367,11 +1372,13 @@ internal class PushRegistrationCoordinator(
             beforeEffectInvocation(record.kind)
             val stillAuthorized = synchronized(monitor) {
                 record.allowDuringExit ||
-                    (record.epoch != null &&
-                        isEpochAuthorizedLocked(
-                            record.epoch,
-                            allowActivation = record.allowActivation,
-                        ))
+                    (
+                        record.epoch != null &&
+                            isEpochAuthorizedLocked(
+                                record.epoch,
+                                allowActivation = record.allowActivation,
+                            )
+                    )
             }
             check(stillAuthorized) { "Suppressed lifecycle effect" }
             record.action()
@@ -1446,9 +1453,13 @@ internal class PushRegistrationCoordinator(
             val result = runCatching {
                 storeMutex.withLock {
                     stateStore.update { current ->
-                        val authorized = (allowDuringExit &&
-                            (authorityEpoch == null ||
-                                synchronized(monitor) { isExitAuthorityLocked(authorityEpoch) })) ||
+                        val authorized = (
+                            allowDuringExit &&
+                                (
+                                    authorityEpoch == null ||
+                                        synchronized(monitor) { isExitAuthorityLocked(authorityEpoch) }
+                                )
+                        ) ||
                             synchronized(monitor) {
                                 isEpochAuthorizedLocked(epoch, allowActivation = true)
                             }
@@ -1494,8 +1505,10 @@ internal class PushRegistrationCoordinator(
         completionScope.launch {
             synchronized(monitor) {
                 val staleExitAuthority = record.allowDuringExit &&
-                    (record.generation.epoch != epoch ||
-                        phase != PushLifecyclePhase.EXITING)
+                    (
+                        record.generation.epoch != epoch ||
+                            phase != PushLifecyclePhase.EXITING
+                    )
                 if (record.state == RemoteHandleState.SUPPRESSED || staleExitAuthority) {
                     record.state = RemoteHandleState.SUPPRESSED
                     completion.complete(Result.failure(IllegalStateException("Suppressed remote operation")))
