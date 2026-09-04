@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -142,8 +141,13 @@ internal class PushRegistrationCoordinator(
     private var firebaseCommand: FirebaseCommand? = null
     private var callbackDebt: CompletableDeferred<Unit>? = null
     private var callbackDebtSatisfied = false
+    private var registerCallbackDebt = 0
     private var unregisterTaskSucceeded = false
     private var lastUnregisterCompletion: Deferred<Result<Unit>>? = null
+    private var drainBlockedCredentialVersion: CredentialVersion? = null
+    private var lastObservedCredentialVersion: CredentialVersion? = null
+    private var lastDrainRearmVersion: CredentialVersion? = null
+    private val pendingNotificationCancellationIds = LinkedHashSet<String>()
 
     internal val lifecyclePhase: PushLifecyclePhase
         get() = synchronized(monitor) { phase }
@@ -157,8 +161,8 @@ internal class PushRegistrationCoordinator(
             observationJob = observationScope.launch {
                 authSessionRepository.credentialState
                     .distinctUntilChanged()
-                    .collectLatest { credentialState ->
-                        launchCredentialObservation(credentialState)
+                    .collect { credentialState ->
+                        observeCredentialState(credentialState)
                     }
             }
         }
@@ -174,6 +178,7 @@ internal class PushRegistrationCoordinator(
             children.clear()
             localWrites.clear()
             remoteHandles.clear()
+            pendingNotificationCancellationIds.clear()
             phase = PushLifecyclePhase.DRAIN_BLOCKED
         }
     }
@@ -246,6 +251,10 @@ internal class PushRegistrationCoordinator(
     fun onRegistered(fid: String) {
         val validFid = runCatching { PushInstallationFid(fid).value }.getOrNull() ?: return
         val command = synchronized(monitor) {
+            if (registerCallbackDebt > 0) {
+                registerCallbackDebt--
+                return@synchronized null
+            }
             val command = firebaseCommand
             if (command != null &&
                 command.kind == FirebaseKind.REGISTER &&
@@ -530,105 +539,127 @@ internal class PushRegistrationCoordinator(
         }
     }
 
-    private fun launchCredentialObservation(credentialState: com.whysoezzy.auth.domain.models.AuthCredentialState) {
-        completionScope.launch {
-            observationMutex.withLock {
-                val userId = credentialState.session.userId
-                    ?.takeIf { credentialState.session.stage != AuthSession.Stage.LoggedOut }
-                val state = readState()
-                val oldOwner = state.registration.owner
-                val pendingCleanup = state.accountCleanup
-                    ?.takeIf { it.terminal == RegistrationTerminal.NONE }
-                val replacement = userId == null ||
-                    (oldOwner != null && oldOwner.userId != userId) ||
-                    pendingCleanup != null
-                if (replacement) {
-                    val lease = beginAccountExitLease()
-                    try {
-                        if (pendingCleanup != null && userId != null) {
-                            val result = remote(
-                                RemoteGeneration(
+    private suspend fun observeCredentialState(
+        credentialState: com.whysoezzy.auth.domain.models.AuthCredentialState,
+    ) {
+        val shouldRearmDrain = synchronized(monitor) {
+            val blockedVersion = drainBlockedCredentialVersion
+            val rearm = phase == PushLifecyclePhase.DRAIN_BLOCKED &&
+                blockedVersion != null &&
+                credentialState.credentialVersion.isAdvancedFrom(blockedVersion) &&
+                credentialState.credentialVersion != lastDrainRearmVersion
+            if (rearm) {
+                lastDrainRearmVersion = credentialState.credentialVersion
+                drainFailure = null
+                drainStarted = false
+                drainId++
+                phase = PushLifecyclePhase.DRAINING
+            }
+            lastObservedCredentialVersion = credentialState.credentialVersion
+            rearm
+        }
+        if (shouldRearmDrain) launchDrain()
+
+        observationMutex.withLock {
+            val userId = credentialState.session.userId
+                ?.takeIf { credentialState.session.stage != AuthSession.Stage.LoggedOut }
+            val state = readState()
+            val oldOwner = state.registration.owner
+            val pendingCleanup = state.accountCleanup
+                ?.takeIf { it.terminal == RegistrationTerminal.NONE }
+            val replacement = userId == null ||
+                (oldOwner != null && oldOwner.userId != userId) ||
+                pendingCleanup != null
+            if (replacement) {
+                val lease = beginAccountExitLease()
+                try {
+                    if (pendingCleanup != null && userId != null) {
+                        val result = remote(
+                            RemoteGeneration(
+                                pendingCleanup.owner,
+                                lease.epoch,
+                                RegistrationOperation.DELETE,
+                                null,
+                                pendingCleanup.installationId,
+                            ),
+                            allowDuringExit = true,
+                        ) {
+                            installationRepository.delete(
+                                PushInstallationId(pendingCleanup.installationId),
+                            )
+                        }.await()
+                        if (result.isAcknowledged()) {
+                            writeState(lease.epoch, true, authorityEpoch = lease.epoch) {
+                                PushStateReducer.acknowledgeAccountCleanup(
+                                    it,
                                     pendingCleanup.owner,
-                                    lease.epoch,
-                                    RegistrationOperation.DELETE,
-                                    null,
                                     pendingCleanup.installationId,
-                                ),
-                                allowDuringExit = true,
-                            ) {
-                                installationRepository.delete(
-                                    PushInstallationId(pendingCleanup.installationId),
                                 )
                             }.await()
-                            if (result.isAcknowledged()) {
-                                writeState(lease.epoch, true, authorityEpoch = lease.epoch) {
-                                    PushStateReducer.acknowledgeAccountCleanup(
-                                        it,
-                                        pendingCleanup.owner,
-                                        pendingCleanup.installationId,
-                                    )
-                                }.await()
-                            } else {
-                                recordAccountCleanupFailure(
-                                    pendingCleanup.owner,
-                                    pendingCleanup.installationId,
-                                    result,
-                                )
-                            }
-                        }
-                        val oldInstallation = oldOwner
-                            ?.takeIf { userId != null && it.userId != userId }
-                            ?.let { state.registration.installationId }
-                        if (oldInstallation != null && oldOwner != null) {
-                            val result = remote(
-                                RemoteGeneration(
-                                    oldOwner,
-                                    lease.epoch,
-                                    RegistrationOperation.DELETE,
-                                    null,
-                                    oldInstallation,
-                                ),
-                                allowDuringExit = true,
-                            ) {
-                                installationRepository.delete(PushInstallationId(oldInstallation))
-                            }.await()
-                            if (!result.isAcknowledged()) {
-                                recordAccountCleanupFailure(oldOwner, oldInstallation, result)
-                            }
-                        }
-                    } finally {
-                        endAccountExit(lease)
-                    }
-                } else if (userId != null) {
-                    val activating = oldOwner == null ||
-                        state.registration.pendingFid == null ||
-                        state.registration.installationId == null ||
-                        state.registration.terminal != RegistrationTerminal.NONE
-                    val shouldEnqueue = synchronized(monitor) {
-                        if (activeLeases != 0) {
-                            false
-                        } else if (activating) {
-                            currentActivationUser = userId
-                            if (phase == PushLifecyclePhase.OPEN) {
-                                phase = PushLifecyclePhase.ACTIVATING_CURRENT
-                            }
-                            phase == PushLifecyclePhase.ACTIVATING_CURRENT
                         } else {
-                            phase == PushLifecyclePhase.OPEN
+                            recordAccountCleanupFailure(
+                                pendingCleanup.owner,
+                                pendingCleanup.installationId,
+                                result,
+                            )
                         }
                     }
-                    if (shouldEnqueue) {
-                        enqueueScheduler(
-                            captureExitEpoch(),
-                            allowActivation = activating,
-                        )
+                    val oldInstallation = oldOwner
+                        ?.takeIf { userId != null && it.userId != userId }
+                        ?.let { state.registration.installationId }
+                    if (oldInstallation != null) {
+                        val result = remote(
+                            RemoteGeneration(
+                                requireNotNull(oldOwner),
+                                lease.epoch,
+                                RegistrationOperation.DELETE,
+                                null,
+                                oldInstallation,
+                            ),
+                            allowDuringExit = true,
+                        ) {
+                            installationRepository.delete(PushInstallationId(oldInstallation))
+                        }.await()
+                        if (!result.isAcknowledged()) {
+                            recordAccountCleanupFailure(
+                                requireNotNull(oldOwner),
+                                oldInstallation,
+                                result,
+                            )
+                        }
                     }
-                } else {
-                    val lease = beginAccountExitLease()
-                    try {
-                    } finally {
-                        endAccountExit(lease)
+                } finally {
+                    endAccountExit(lease)
+                }
+            } else {
+                val currentUserId = requireNotNull(userId)
+                val activating = oldOwner == null ||
+                    state.registration.pendingFid == null ||
+                    state.registration.installationId == null ||
+                    state.registration.terminal != RegistrationTerminal.NONE
+                val credentialRearm = oldOwner?.userId == currentUserId &&
+                    state.registration.terminal == RegistrationTerminal.BLOCKED_AUTH &&
+                    credentialState.credentialVersion.isAdvancedFrom(state.registration)
+                val shouldEnqueue = synchronized(monitor) {
+                    if (activeLeases != 0) {
+                        false
+                    } else if (credentialRearm || activating) {
+                        currentActivationUser = currentUserId
+                        if (phase == PushLifecyclePhase.OPEN ||
+                            phase == PushLifecyclePhase.DRAIN_BLOCKED
+                        ) {
+                            phase = PushLifecyclePhase.ACTIVATING_CURRENT
+                        }
+                        phase == PushLifecyclePhase.ACTIVATING_CURRENT
+                    } else {
+                        phase == PushLifecyclePhase.OPEN
                     }
+                }
+                if (shouldEnqueue) {
+                    enqueueScheduler(
+                        captureExitEpoch(),
+                        allowActivation = activating || credentialRearm,
+                    )
                 }
             }
         }
@@ -1020,16 +1051,21 @@ internal class PushRegistrationCoordinator(
             }
         }
         completionScope.launch {
-            val suppressedBeforeStart = synchronized(monitor) {
-                command.stale ||
+            val started = synchronized(monitor) {
+                if (command.stale ||
                     (kind == FirebaseKind.REGISTER && command.epoch != epoch)
+                ) {
+                    false
+                } else {
+                    command.state = RemoteHandleState.STARTED
+                    true
+                }
             }
-            if (suppressedBeforeStart) {
+            if (!started) {
                 completion.complete(Result.failure(IllegalStateException("Suppressed Firebase command")))
                 finishFirebase(command)
                 return@launch
             }
-            command.state = RemoteHandleState.STARTED
             val task = runCatching {
                 if (kind == FirebaseKind.REGISTER) fcm.register() else fcm.unregister()
             }.getOrElse {
@@ -1049,6 +1085,9 @@ internal class PushRegistrationCoordinator(
                     command.callback.await()
                 }
                 if (callback == null || command.fid == null) {
+                    synchronized(monitor) {
+                        registerCallbackDebt++
+                    }
                     completion.complete(
                         Result.failure(IllegalStateException("Firebase register callback missing")),
                     )
@@ -1099,7 +1138,9 @@ internal class PushRegistrationCoordinator(
                 if (!isCurrentDrain(currentDrain)) return@launch
                 val scrub = scrubWithRetry(currentDrain) ?: return@launch
                 if (!isCurrentDrain(currentDrain)) return@launch
-                val events = scrub.eventIds
+                val events = synchronized(monitor) {
+                    (scrub.eventIds + pendingNotificationCancellationIds).distinct()
+                }
                 if (!cancelSchedulerWithRetry(currentDrain)) return@launch
                 if (!isCurrentDrain(currentDrain)) return@launch
                 if (!cancelNotificationsWithRetry(currentDrain, events)) return@launch
@@ -1263,6 +1304,9 @@ internal class PushRegistrationCoordinator(
                 )
                 if (effect?.completion?.await()?.isSuccess == true) {
                     succeeded = true
+                    synchronized(monitor) {
+                        pendingNotificationCancellationIds.remove(eventId)
+                    }
                     break
                 }
                 if (attempt == MAX_ATTEMPTS - 1) {
@@ -1287,6 +1331,7 @@ internal class PushRegistrationCoordinator(
         synchronized(monitor) {
             if (ticket.drainId != drainId) return
             drainFailure = ticket
+            drainBlockedCredentialVersion = lastObservedCredentialVersion
             phase = PushLifecyclePhase.DRAIN_BLOCKED
             drainStarted = false
         }
@@ -1348,7 +1393,16 @@ internal class PushRegistrationCoordinator(
             }
         }.await()
         if (result.isFailure) return ScrubResult(false, installationId, emptyList())
-        return ScrubResult(true, installationId, discarded)
+        val tombstoned = result
+            .getOrThrow()
+            .ledger
+            .filterIsInstance<LedgerRecord.DedupeTombstone>()
+            .map { it.eventId }
+        val eventIds = (discarded + tombstoned).distinct()
+        synchronized(monitor) {
+            pendingNotificationCancellationIds += eventIds
+        }
+        return ScrubResult(true, installationId, eventIds)
     }
 
     private fun maybeOpenActivatedOwner(owner: OwnerSnapshot) {
@@ -1740,6 +1794,9 @@ internal class PushRegistrationCoordinator(
         val blockedRevision = registration.blockedCredentialRevision ?: return true
         return epoch != blockedEpoch || revision > blockedRevision
     }
+
+    private fun CredentialVersion.isAdvancedFrom(previous: CredentialVersion): Boolean =
+        epoch != previous.epoch || revision > previous.revision
 
     private fun Throwable?.httpStatus(): Int? =
         when (this) {

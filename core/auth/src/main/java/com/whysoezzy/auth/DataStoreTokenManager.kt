@@ -175,8 +175,7 @@ internal class DataStoreTokenManager(
         if (persisted) {
             val stillCurrent = synchronized(authMonitor) {
                 reservation.generation == authOwnerGeneration &&
-                    latestReservationId == reservation.reservationId &&
-                    knownIdentity == reservation.clearPermit.identity
+                    latestReservationId == reservation.reservationId
             }
             if (!stillCurrent) {
                 dataStore.edit { preferences ->
@@ -242,8 +241,7 @@ internal class DataStoreTokenManager(
         val version = requireNotNull(persistedVersion)
         val stillCurrent = synchronized(authMonitor) {
             permit.generation == authOwnerGeneration &&
-                latestReservationId == null &&
-                knownIdentity == permit.identity
+                latestReservationId == null
         }
         if (!stillCurrent) {
             dataStore.edit { preferences ->

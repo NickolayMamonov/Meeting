@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -358,6 +359,52 @@ class PushRegistrationCoordinatorTest {
         }
 
     @Test
+    fun `late timed out register callback is quarantined before the next callback`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val registerGate = CompletableDeferred<Unit>()
+            val firebase = RecordingFirebase(registerGate = registerGate)
+            val installations = RecordingInstallations()
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = RecordingAuth(
+                    AuthSession(7L, AuthSession.Stage.Ready),
+                ),
+                installationRepository = installations,
+                fcm = firebase,
+                stateStore = RecordingStateStore(PushStateV1()),
+                workScheduler = RecordingScheduler(),
+                dispatcher = dispatcher,
+            )
+
+            val first = async(start = CoroutineStart.UNDISPATCHED) {
+                coordinator.reconcileCurrent()
+            }
+            runCurrent()
+            registerGate.complete(Unit)
+            advanceTimeBy(2_000L)
+            runCurrent()
+            first.await()
+
+            val second = async(start = CoroutineStart.UNDISPATCHED) {
+                coordinator.reconcileCurrent()
+            }
+            runCurrent()
+            assertEquals(2, firebase.registers)
+
+            coordinator.onRegistered("fid-a")
+            runCurrent()
+            assertFalse(second.isCompleted)
+
+            coordinator.onRegistered("fid-b")
+            runCurrent()
+            second.await()
+            coordinator.reconcileCurrent()
+
+            assertEquals(listOf("fid-b"), installations.createdFids)
+            coordinator.close()
+        }
+
+    @Test
     fun `same-owner stale credential-version completions are no-ops and current version converges`() =
         runTest {
             val outcomes = listOf(
@@ -557,6 +604,42 @@ class PushRegistrationCoordinatorTest {
             assertEquals(6, store.updateAttempts)
             assertEquals(31_000L, testScheduler.currentTime)
             assertEquals(PushLifecyclePhase.DRAIN_BLOCKED, coordinator.lifecyclePhase)
+            coordinator.close()
+        }
+
+    @Test
+    fun `advanced same-owner credentials rearm a blocked drain exactly once`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val auth = RecordingAuth(
+                initial = AuthSession(7L, AuthSession.Stage.Ready),
+                initialCredentialVersion = CredentialVersion("epoch", 0L),
+            )
+            val store = RecordingStateStore(PushStateV1(), updateFailures = 6)
+            val scheduler = RecordingScheduler()
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = auth,
+                installationRepository = RecordingInstallations(),
+                fcm = RecordingFirebase(),
+                stateStore = store,
+                workScheduler = scheduler,
+                dispatcher = dispatcher,
+            )
+            coordinator.start()
+            runCurrent()
+            scheduler.enqueues = 0
+
+            releaseDrain(coordinator)
+            advanceUntilIdle()
+            assertEquals(PushLifecyclePhase.DRAIN_BLOCKED, coordinator.lifecyclePhase)
+            val attemptsBeforeRearm = store.updateAttempts
+
+            auth.setCredentialVersion(CredentialVersion("epoch", 1L))
+            runCurrent()
+            advanceUntilIdle()
+
+            assertTrue(store.updateAttempts > attemptsBeforeRearm)
+            assertEquals(PushLifecyclePhase.ACTIVATING_CURRENT, coordinator.lifecyclePhase)
             coordinator.close()
         }
 
