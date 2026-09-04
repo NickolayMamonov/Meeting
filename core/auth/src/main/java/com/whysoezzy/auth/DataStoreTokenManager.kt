@@ -148,6 +148,9 @@ internal class DataStoreTokenManager(
         require(stage != AuthSession.Stage.LoggedOut)
         var persisted = false
         var persistedVersion: CredentialVersion? = null
+        var writtenAccess: String? = null
+        var writtenRefresh: String? = null
+        var writtenUserId: String? = null
         dataStore.edit { preferences ->
             val current = synchronized(authMonitor) {
                 reservation.generation == authOwnerGeneration &&
@@ -157,12 +160,12 @@ internal class DataStoreTokenManager(
 
             val version = advance(ensureCredentialVersion(preferences))
             clearAuthKeys(preferences)
-            preferences[KEY_ACCESS_TOKEN] =
-                crypto.encrypt(accessToken, KEY_ACCESS_TOKEN.name)
-            preferences[KEY_REFRESH_TOKEN] =
-                crypto.encrypt(refreshToken, KEY_REFRESH_TOKEN.name)
-            preferences[KEY_USER_ID] =
-                crypto.encrypt(userId.toString(), KEY_USER_ID.name)
+            writtenAccess = crypto.encrypt(accessToken, KEY_ACCESS_TOKEN.name)
+            writtenRefresh = crypto.encrypt(refreshToken, KEY_REFRESH_TOKEN.name)
+            writtenUserId = crypto.encrypt(userId.toString(), KEY_USER_ID.name)
+            preferences[KEY_ACCESS_TOKEN] = requireNotNull(writtenAccess)
+            preferences[KEY_REFRESH_TOKEN] = requireNotNull(writtenRefresh)
+            preferences[KEY_USER_ID] = requireNotNull(writtenUserId)
             preferences[KEY_STAGE] = crypto.encrypt(stage.name, KEY_STAGE.name)
             writeCredentialVersion(preferences, version)
             persistedVersion = version
@@ -170,20 +173,31 @@ internal class DataStoreTokenManager(
         }
 
         if (persisted) {
-            synchronized(authMonitor) {
-                if (reservation.generation == authOwnerGeneration &&
+            val stillCurrent = synchronized(authMonitor) {
+                reservation.generation == authOwnerGeneration &&
                     latestReservationId == reservation.reservationId &&
                     knownIdentity == reservation.clearPermit.identity
-                ) {
-                    knownIdentity =
-                        com.whysoezzy.auth.domain.models.AuthCredentialIdentity(
-                            userId,
-                            stage,
-                            requireNotNull(persistedVersion),
-                            refreshToken,
-                        )
-                    latestReservationId = null
+            }
+            if (!stillCurrent) {
+                dataStore.edit { preferences ->
+                    if (preferences[KEY_ACCESS_TOKEN] == writtenAccess &&
+                        preferences[KEY_REFRESH_TOKEN] == writtenRefresh &&
+                        preferences[KEY_USER_ID] == writtenUserId
+                    ) {
+                        clearAuthKeys(preferences)
+                    }
                 }
+                return AuthSaveResult.StaleSkipped
+            }
+            synchronized(authMonitor) {
+                knownIdentity =
+                    com.whysoezzy.auth.domain.models.AuthCredentialIdentity(
+                        userId,
+                        stage,
+                        requireNotNull(persistedVersion),
+                        refreshToken,
+                    )
+                latestReservationId = null
             }
             return AuthSaveResult.Persisted
         }
@@ -197,6 +211,8 @@ internal class DataStoreTokenManager(
     ): AuthRefreshSaveResult {
         var persisted = false
         var persistedVersion: CredentialVersion? = null
+        var writtenAccess: String? = null
+        var writtenRefresh: String? = null
         try {
             dataStore.edit { preferences ->
                 val state = resolve(preferences)
@@ -208,10 +224,10 @@ internal class DataStoreTokenManager(
                 if (!current) return@edit
 
                 val version = advance(ensureCredentialVersion(preferences))
-                preferences[KEY_ACCESS_TOKEN] =
-                    crypto.encrypt(accessToken, KEY_ACCESS_TOKEN.name)
-                preferences[KEY_REFRESH_TOKEN] =
-                    crypto.encrypt(refreshToken, KEY_REFRESH_TOKEN.name)
+                writtenAccess = crypto.encrypt(accessToken, KEY_ACCESS_TOKEN.name)
+                writtenRefresh = crypto.encrypt(refreshToken, KEY_REFRESH_TOKEN.name)
+                preferences[KEY_ACCESS_TOKEN] = requireNotNull(writtenAccess)
+                preferences[KEY_REFRESH_TOKEN] = requireNotNull(writtenRefresh)
                 writeCredentialVersion(preferences, version)
                 persistedVersion = version
                 persisted = true
@@ -224,16 +240,27 @@ internal class DataStoreTokenManager(
 
         if (!persisted) return AuthRefreshSaveResult.StaleSkipped
         val version = requireNotNull(persistedVersion)
-        synchronized(authMonitor) {
-            if (permit.generation == authOwnerGeneration &&
+        val stillCurrent = synchronized(authMonitor) {
+            permit.generation == authOwnerGeneration &&
                 latestReservationId == null &&
                 knownIdentity == permit.identity
-            ) {
-                knownIdentity = requireNotNull(permit.identity).copy(
-                    credentialVersion = version,
-                    refreshToken = refreshToken,
-                )
+        }
+        if (!stillCurrent) {
+            dataStore.edit { preferences ->
+                if (preferences[KEY_ACCESS_TOKEN] == writtenAccess &&
+                    preferences[KEY_REFRESH_TOKEN] == writtenRefresh
+                ) {
+                    preferences.remove(KEY_ACCESS_TOKEN)
+                    preferences.remove(KEY_REFRESH_TOKEN)
+                }
             }
+            return AuthRefreshSaveResult.StaleSkipped
+        }
+        synchronized(authMonitor) {
+            knownIdentity = requireNotNull(permit.identity).copy(
+                credentialVersion = version,
+                refreshToken = refreshToken,
+            )
         }
         return AuthRefreshSaveResult.Persisted(
             PersistedTokenPair(accessToken, refreshToken),

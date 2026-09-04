@@ -15,7 +15,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -97,7 +98,13 @@ class BoundedAccountExitCoordinatorTest {
 
     @Test
     fun `noncooperative state cleanup cannot hold the caller past the exit deadline`() = runTest {
-        coEvery { push.clearAccountState() } coAnswers { awaitCancellation() }
+        val cleanupGate = CompletableDeferred<Unit>()
+        coEvery { push.clearAccountState() } coAnswers {
+            withContext(NonCancellable) {
+                cleanupGate.await()
+            }
+            null
+        }
 
         val started = System.nanoTime()
         coordinator().forcedLogout()
@@ -106,5 +113,18 @@ class BoundedAccountExitCoordinatorTest {
         assertTrue("exit exceeded deadline: ${elapsedMillis}ms", elapsedMillis < 4_750L)
         verify(exactly = 1) { push.endAccountExit(lease) }
         coVerify(exactly = 1) { auth.clearReserved(clearReservation) }
+        cleanupGate.complete(Unit)
+    }
+
+    @Test
+    fun `reservation setup failure still releases the account exit lease`() = runTest {
+        coEvery { push.clearAccountState() } returns null
+        val exitCoordinator = coordinator()
+        every { auth.reserveClear(permit) } throws IllegalStateException("reservation failed")
+
+        exitCoordinator.forcedLogout()
+
+        verify(exactly = 1) { push.endAccountExit(lease) }
+        coVerify(exactly = 0) { auth.clearReserved(any()) }
     }
 }

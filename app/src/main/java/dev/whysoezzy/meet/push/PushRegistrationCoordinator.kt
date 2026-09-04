@@ -12,6 +12,7 @@ import com.whysoezzy.network.error.ApiException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +29,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.coroutineContext
 
 internal enum class PushLifecyclePhase {
     OPEN,
@@ -86,6 +88,7 @@ internal data class RemoteGeneration(
     val operation: RegistrationOperation,
     val fid: String?,
     val installationId: String?,
+    val credentialVersion: CredentialVersion? = null,
 )
 
 internal data class DrainTicket(
@@ -297,7 +300,7 @@ internal class PushRegistrationCoordinator(
             onComplete()
             return
         }
-        completionScope.launch {
+        val child = completionScope.launch(start = CoroutineStart.LAZY) {
             try {
                 processDataMessage(data, hasNotificationBlock, permit.epoch)
             } finally {
@@ -305,6 +308,8 @@ internal class PushRegistrationCoordinator(
                 onComplete()
             }
         }
+        linkChild(permit, child)
+        child.start()
     }
 
     override suspend fun handleDataMessage(
@@ -312,7 +317,7 @@ internal class PushRegistrationCoordinator(
         hasNotificationBlock: Boolean,
         ingressExitEpoch: Long,
     ) {
-        val permit = admitIngress(ingressExitEpoch) ?: return
+        val permit = admitIngress(ingressExitEpoch, job = coroutineContext[Job]) ?: return
         try {
             processDataMessage(data, hasNotificationBlock, permit.epoch)
         } finally {
@@ -321,7 +326,11 @@ internal class PushRegistrationCoordinator(
     }
 
     internal suspend fun reconcileCurrent(): Boolean {
-        val permit = admitIngress(captureExitEpoch(), allowActivation = true) ?: return true
+        val permit = admitIngress(
+            captureExitEpoch(),
+            allowActivation = true,
+            job = coroutineContext[Job],
+        ) ?: return true
         return try {
             reconciliationMutex.withLock {
                 val credentialState = authSessionRepository.credentialState.first()
@@ -336,7 +345,7 @@ internal class PushRegistrationCoordinator(
     }
 
     internal suspend fun claimTap(command: PushTapCommand): Boolean {
-        val permit = admitIngress(captureExitEpoch()) ?: return false
+        val permit = admitIngress(captureExitEpoch(), job = coroutineContext[Job]) ?: return false
         return try {
             val session = authSessionRepository.read()
             val state = readState()
@@ -370,7 +379,7 @@ internal class PushRegistrationCoordinator(
         isAlreadyAtDestination: () -> Boolean,
         navigate: () -> Unit,
     ): Boolean {
-        val permit = admitIngress(captureExitEpoch()) ?: return false
+        val permit = admitIngress(captureExitEpoch(), job = coroutineContext[Job]) ?: return false
         try {
             val session = authSessionRepository.read()
             val state = readState()
@@ -420,7 +429,7 @@ internal class PushRegistrationCoordinator(
     }
 
     internal suspend fun completeTap(command: PushTapCommand) {
-        val permit = admitIngress(captureExitEpoch()) ?: return
+        val permit = admitIngress(captureExitEpoch(), job = coroutineContext[Job]) ?: return
         try {
             val session = authSessionRepository.read()
             val state = readState()
@@ -436,7 +445,11 @@ internal class PushRegistrationCoordinator(
     }
 
     internal suspend fun drainPendingDisplays() {
-        val permit = admitIngress(captureExitEpoch(), allowActivation = true) ?: return
+        val permit = admitIngress(
+            captureExitEpoch(),
+            allowActivation = true,
+            job = coroutineContext[Job],
+        ) ?: return
         try {
             val session = authSessionRepository.read()
             val state = readState()
@@ -587,10 +600,29 @@ internal class PushRegistrationCoordinator(
                         endAccountExit(lease)
                     }
                 } else if (userId != null) {
-                    val open = synchronized(monitor) {
-                        phase == PushLifecyclePhase.OPEN && activeLeases == 0
+                    val activating = oldOwner == null ||
+                        state.registration.pendingFid == null ||
+                        state.registration.installationId == null ||
+                        state.registration.terminal != RegistrationTerminal.NONE
+                    val shouldEnqueue = synchronized(monitor) {
+                        if (activeLeases != 0) {
+                            false
+                        } else if (activating) {
+                            currentActivationUser = userId
+                            if (phase == PushLifecyclePhase.OPEN) {
+                                phase = PushLifecyclePhase.ACTIVATING_CURRENT
+                            }
+                            phase == PushLifecyclePhase.ACTIVATING_CURRENT
+                        } else {
+                            phase == PushLifecyclePhase.OPEN
+                        }
                     }
-                    if (open) enqueueScheduler(captureExitEpoch())
+                    if (shouldEnqueue) {
+                        enqueueScheduler(
+                            captureExitEpoch(),
+                            allowActivation = activating,
+                        )
+                    }
                 } else {
                     val lease = beginAccountExitLease()
                     try {
@@ -681,20 +713,21 @@ internal class PushRegistrationCoordinator(
         }
         val fid = registration.pendingFid
         return if (fid == null) {
-            ensureFirebaseRegistered(owner, ingressEpoch)
+            ensureFirebaseRegistered(owner, credentialVersion, ingressEpoch)
         } else {
-            reconcileWithFid(fid, owner, ingressEpoch)
+            reconcileWithFid(fid, owner, credentialVersion, ingressEpoch)
         }
     }
 
     private suspend fun ensureFirebaseRegistered(
         owner: OwnerSnapshot,
+        credentialVersion: CredentialVersion,
         ingressEpoch: Long,
     ): Boolean {
         val request = readState().registration
         if (!isEpochAuthorized(ingressEpoch, allowActivation = true)) return true
         if (request.owner != owner) return true
-        val command = launchFirebase(FirebaseKind.REGISTER, ingressEpoch)
+        val command = launchFirebase(FirebaseKind.REGISTER, ingressEpoch, credentialVersion)
         val result = command.completion.await()
         if (result.isFailure) {
             val current = readState()
@@ -720,6 +753,9 @@ internal class PushRegistrationCoordinator(
         }
         if (!isEpochAuthorized(ingressEpoch, allowActivation = true)) return true
         val callbackFid = command.command.fid ?: return true
+        if (authSessionRepository.credentialState.first().credentialVersion != credentialVersion) {
+            return true
+        }
         val staged = writeState(ingressEpoch, false) {
             PushStateReducer.stageFid(it, callbackFid)
         }.await()
@@ -727,13 +763,14 @@ internal class PushRegistrationCoordinator(
         writeState(ingressEpoch, false) {
             PushStateReducer.resetFirebaseRetry(it)
         }.await()
-        enqueueScheduler(ingressEpoch)
+        enqueueScheduler(ingressEpoch, allowActivation = true)
         return true
     }
 
     private suspend fun reconcileWithFid(
         fid: String,
         owner: OwnerSnapshot,
+        credentialVersion: CredentialVersion,
         ingressEpoch: Long,
     ): Boolean {
         if (!isEpochAuthorized(ingressEpoch, allowActivation = true)) return true
@@ -759,7 +796,14 @@ internal class PushRegistrationCoordinator(
         }.await()
         if (started.isFailure) return true
         val result = remote(
-            RemoteGeneration(owner, ingressEpoch, operation, fid, registration.installationId),
+            RemoteGeneration(
+                owner,
+                ingressEpoch,
+                operation,
+                fid,
+                registration.installationId,
+                credentialVersion,
+            ),
         ) {
             when (operation) {
                 RegistrationOperation.CREATE ->
@@ -781,6 +825,7 @@ internal class PushRegistrationCoordinator(
         if (!isEpochAuthorized(ingressEpoch, allowActivation = true)) return true
         val latest = readState()
         val latestSession = authSessionRepository.read()
+        val latestCredentialVersion = authSessionRepository.credentialState.first().credentialVersion
         val request = PushRegistrationRequestFence(
             owner,
             fid,
@@ -789,8 +834,9 @@ internal class PushRegistrationCoordinator(
             nonce,
             latest.registration.terminalNonce,
             ingressEpoch,
+            credentialVersion,
         )
-        if (!request.matches(latestSession, latest)) return true
+        if (!request.matches(latestSession, latestCredentialVersion, latest)) return true
         val error = result.exceptionOrNull()
         val status = error.httpStatus()
         return if (result.isSuccess) {
@@ -831,14 +877,13 @@ internal class PushRegistrationCoordinator(
             }.await()
             false
         } else if (status == 401) {
-            val version = authSessionRepository.credentialState.first().credentialVersion
             writeState(ingressEpoch, false) {
                 PushStateReducer.recordBlockedAuth(
                     it,
                     owner,
                     nonce,
-                    version.epoch,
-                    version.revision,
+                    credentialVersion.epoch,
+                    credentialVersion.revision,
                 )
             }.await()
             true
@@ -946,12 +991,17 @@ internal class PushRegistrationCoordinator(
         }
     }
 
-    private fun launchFirebase(kind: FirebaseKind, requestedEpoch: Long?): FirebaseHandle {
+    private fun launchFirebase(
+        kind: FirebaseKind,
+        requestedEpoch: Long?,
+        credentialVersion: CredentialVersion? = null,
+    ): FirebaseHandle {
         val completion = CompletableDeferred<Result<Unit>>()
         val command = FirebaseCommand(
             id = ids.incrementAndGet(),
             kind = kind,
             epoch = requestedEpoch ?: synchronized(monitor) { epoch },
+            credentialVersion = credentialVersion,
             completion = completion,
         )
         synchronized(monitor) {
@@ -1041,33 +1091,62 @@ internal class PushRegistrationCoordinator(
         }
         completionScope.launch {
             val currentDrain = synchronized(monitor) { drainId }
-            if (!isCurrentDrain(currentDrain)) return@launch
-            awaitStaleOperations(currentDrain)
-            if (!isCurrentDrain(currentDrain)) return@launch
-            if (!confirmUnregistered(currentDrain)) return@launch
-            if (!isCurrentDrain(currentDrain)) return@launch
-            val scrub = scrubWithRetry(currentDrain) ?: return@launch
-            if (!isCurrentDrain(currentDrain)) return@launch
-            val events = scrub.eventIds
-            if (!cancelSchedulerWithRetry(currentDrain)) return@launch
-            if (!isCurrentDrain(currentDrain)) return@launch
-            if (!cancelNotificationsWithRetry(currentDrain, events)) return@launch
-            val current = authSessionRepository.read()
-            val userId = current.userId
-                ?.takeIf { current.stage != AuthSession.Stage.LoggedOut }
-            synchronized(monitor) {
-                if (phase != PushLifecyclePhase.DRAINING || activeLeases != 0) return@synchronized
-                if (userId == null) {
-                    currentActivationUser = null
-                    phase = PushLifecyclePhase.OPEN
-                } else {
-                    currentActivationUser = userId
-                    phase = PushLifecyclePhase.ACTIVATING_CURRENT
+            try {
+                if (!isCurrentDrain(currentDrain)) return@launch
+                awaitStaleOperations(currentDrain)
+                if (!isCurrentDrain(currentDrain)) return@launch
+                if (!confirmUnregistered(currentDrain)) return@launch
+                if (!isCurrentDrain(currentDrain)) return@launch
+                val scrub = scrubWithRetry(currentDrain) ?: return@launch
+                if (!isCurrentDrain(currentDrain)) return@launch
+                val events = scrub.eventIds
+                if (!cancelSchedulerWithRetry(currentDrain)) return@launch
+                if (!isCurrentDrain(currentDrain)) return@launch
+                if (!cancelNotificationsWithRetry(currentDrain, events)) return@launch
+                val current = readAccountForDrain(currentDrain) ?: return@launch
+                val userId = current.userId
+                    ?.takeIf { current.stage != AuthSession.Stage.LoggedOut }
+                synchronized(monitor) {
+                    if (phase != PushLifecyclePhase.DRAINING || activeLeases != 0) return@synchronized
+                    if (userId == null) {
+                        currentActivationUser = null
+                        phase = PushLifecyclePhase.OPEN
+                    } else {
+                        currentActivationUser = userId
+                        phase = PushLifecyclePhase.ACTIVATING_CURRENT
+                    }
+                    drainStarted = false
+                    drainFailure = null
                 }
-                drainStarted = false
-                drainFailure = null
+                if (userId != null) enqueueScheduler(captureExitEpoch(), allowActivation = true)
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                synchronized(monitor) {
+                    if (drainId == currentDrain && phase == PushLifecyclePhase.DRAINING) {
+                        drainStarted = false
+                        drainFailure = DrainTicket(
+                            currentDrain,
+                            1,
+                            DrainBlockReason.FINAL_SCRUB,
+                        )
+                        phase = PushLifecyclePhase.DRAIN_BLOCKED
+                    }
+                }
+                throw error
+            } catch (_: Throwable) {
+                blockDrain(
+                    DrainTicket(
+                        currentDrain,
+                        1,
+                        DrainBlockReason.FINAL_SCRUB,
+                    ),
+                )
+            } finally {
+                synchronized(monitor) {
+                    if (drainId == currentDrain && phase == PushLifecyclePhase.DRAINING) {
+                        drainStarted = false
+                    }
+                }
             }
-            if (userId != null) enqueueScheduler(captureExitEpoch(), allowActivation = true)
         }
     }
 
@@ -1085,6 +1164,23 @@ internal class PushRegistrationCoordinator(
             if (!pending) return
             delay(1L)
         }
+    }
+
+    private suspend fun readAccountForDrain(drain: Long): AuthSession? {
+        repeat(MAX_ATTEMPTS) { attempt ->
+            try {
+                return authSessionRepository.read()
+            } catch (_: Throwable) {
+                if (attempt == MAX_ATTEMPTS - 1) {
+                    blockDrain(
+                        DrainTicket(drain, attempt + 1, DrainBlockReason.FINAL_SCRUB),
+                    )
+                    return null
+                }
+                delay(RETRY_DELAYS_MILLIS[attempt])
+            }
+        }
+        return null
     }
 
     private fun isCurrentDrain(drain: Long): Boolean =
@@ -1156,7 +1252,8 @@ internal class PushRegistrationCoordinator(
         events: List<String>,
     ): Boolean {
         events.forEach { eventId ->
-            repeat(MAX_ATTEMPTS) { attempt ->
+            var succeeded = false
+            for (attempt in 0 until MAX_ATTEMPTS) {
                 val effect = submitEffect(
                     epoch = null,
                     kind = LifecycleEffectKind.NOTIFICATION_CANCEL,
@@ -1164,7 +1261,10 @@ internal class PushRegistrationCoordinator(
                     allowDuringExit = true,
                     dedupeKey = "notification-cancel:$eventId",
                 )
-                if (effect?.completion?.await()?.isSuccess == true) return@repeat
+                if (effect?.completion?.await()?.isSuccess == true) {
+                    succeeded = true
+                    break
+                }
                 if (attempt == MAX_ATTEMPTS - 1) {
                     blockDrain(
                         DrainTicket(
@@ -1178,6 +1278,7 @@ internal class PushRegistrationCoordinator(
                 }
                 delay(RETRY_DELAYS_MILLIS[attempt])
             }
+            if (!succeeded) return false
         }
         return true
     }
@@ -1199,7 +1300,11 @@ internal class PushRegistrationCoordinator(
 
     private suspend fun scrubWithRetry(drain: Long): ScrubResult? {
         repeat(MAX_ATTEMPTS) { attempt ->
-            val result = finalScrub(System.currentTimeMillis(), false)
+            val result = try {
+                finalScrub(System.currentTimeMillis(), false)
+            } catch (_: Throwable) {
+                ScrubResult(false, null, emptyList())
+            }
             if (result.success) return result
             if (attempt == MAX_ATTEMPTS - 1) {
                 blockDrain(
@@ -1393,12 +1498,19 @@ internal class PushRegistrationCoordinator(
     private fun admitIngress(
         ingressEpoch: Long,
         allowActivation: Boolean = false,
+        job: Job? = null,
     ): IngressPermit? {
         synchronized(monitor) {
             if (!isEpochAuthorizedLocked(ingressEpoch, allowActivation)) return null
             val id = ids.incrementAndGet()
-            children[id] = ChildRecord(id, ingressEpoch)
+            children[id] = ChildRecord(id, ingressEpoch, job = job)
             return IngressPermit(id, ingressEpoch)
+        }
+    }
+
+    private fun linkChild(permit: IngressPermit, job: Job) {
+        synchronized(monitor) {
+            children[permit.id]?.job = job
         }
     }
 
@@ -1614,6 +1726,7 @@ internal class PushRegistrationCoordinator(
         val id: Long,
         val kind: FirebaseKind,
         val epoch: Long,
+        val credentialVersion: CredentialVersion?,
         val completion: CompletableDeferred<Result<Unit>>,
     ) {
         val callback = CompletableDeferred<Unit>()
@@ -1671,7 +1784,26 @@ internal data class PushRegistrationRequestFence(
     val nonce: Long,
     val terminalNonce: Long,
     val exitEpoch: Long = 0L,
+    val credentialVersion: CredentialVersion? = null,
 ) {
+    fun matches(
+        session: AuthSession,
+        credentialVersion: CredentialVersion,
+        state: PushStateV1,
+    ): Boolean {
+        val registration = state.registration
+        return session.stage != AuthSession.Stage.LoggedOut &&
+            session.userId == owner.userId &&
+            registration.owner == owner &&
+            registration.accountGeneration == owner.generation &&
+            registration.operation == operation &&
+            registration.pendingFid == pendingFid &&
+            registration.installationId == installationId &&
+            registration.nonce == nonce &&
+            registration.terminalNonce == terminalNonce &&
+            (this.credentialVersion == null || this.credentialVersion == credentialVersion)
+    }
+
     fun matches(
         session: AuthSession,
         state: PushStateV1,

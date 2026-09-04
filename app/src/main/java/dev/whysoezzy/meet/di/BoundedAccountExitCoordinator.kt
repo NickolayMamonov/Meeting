@@ -118,17 +118,22 @@ internal class BoundedAccountExitCoordinator(
              * phase. Awaiting its independent writer is read-only: timeout or
              * caller cancellation cannot cancel the conditional DataStore write.
              */
-            val reservation = authSessionRepository.reserveClear(permit)
-            if (reservation != null) {
-                val clear = submit {
-                    authSessionRepository.clearReserved(reservation)
+            try {
+                val reservation = authSessionRepository.reserveClear(permit)
+                if (reservation != null) {
+                    val clear = submit {
+                        authSessionRepository.clearReserved(reservation)
+                    }
+                    awaitWithin(
+                        clear,
+                        timeoutMillis = remainingMillis(startedAt, EXIT_DEADLINE_MILLIS),
+                    )
                 }
-                awaitWithin(
-                    clear,
-                    timeoutMillis = remainingMillis(startedAt, EXIT_DEADLINE_MILLIS),
-                )
+            } catch (_: Throwable) {
+                // A failed reservation must not strand the lifecycle lease.
+            } finally {
+                pushRegistrationCoordinator.endAccountExit(lease)
             }
-            pushRegistrationCoordinator.endAccountExit(lease)
         }
     }
 
