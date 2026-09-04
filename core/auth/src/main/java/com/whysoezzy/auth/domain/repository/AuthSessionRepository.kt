@@ -1,7 +1,7 @@
 package com.whysoezzy.auth.domain.repository
 
-import com.whysoezzy.auth.domain.models.AuthCredentialState
 import com.whysoezzy.auth.domain.models.AuthClearResult
+import com.whysoezzy.auth.domain.models.AuthCredentialState
 import com.whysoezzy.auth.domain.models.AuthOperationPermit
 import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.ClearReservation

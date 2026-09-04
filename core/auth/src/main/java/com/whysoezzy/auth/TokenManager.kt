@@ -1,16 +1,15 @@
 package com.whysoezzy.auth
 
-import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.AuthClearResult
 import com.whysoezzy.auth.domain.models.AuthCredentialRead
 import com.whysoezzy.auth.domain.models.AuthCredentialState
 import com.whysoezzy.auth.domain.models.AuthOperationPermit
 import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
 import com.whysoezzy.auth.domain.models.AuthSaveResult
-import com.whysoezzy.auth.domain.models.CredentialVersion
+import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.ClearReservation
+import com.whysoezzy.auth.domain.models.CredentialVersion
 import com.whysoezzy.auth.domain.models.OwnerSaveReservation
-import com.whysoezzy.auth.domain.models.PersistedTokenPair
 import com.whysoezzy.network.TokenProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf

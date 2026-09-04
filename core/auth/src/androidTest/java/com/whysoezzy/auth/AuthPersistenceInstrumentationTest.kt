@@ -12,9 +12,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthClearResult
 import com.whysoezzy.auth.domain.models.AuthCredentialRead
+import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
 import com.whysoezzy.auth.domain.models.AuthSaveResult
 import com.whysoezzy.auth.domain.models.AuthSession

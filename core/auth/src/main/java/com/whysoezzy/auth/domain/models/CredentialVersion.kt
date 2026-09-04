@@ -60,11 +60,13 @@ sealed interface AuthCredentialRead {
 
 sealed interface AuthSaveResult {
     data object Persisted : AuthSaveResult
+
     data object StaleSkipped : AuthSaveResult
 }
 
 sealed interface AuthClearResult {
     data object Cleared : AuthClearResult
+
     data object StaleSkipped : AuthClearResult
 }
 
@@ -74,15 +76,33 @@ data class PersistedTokenPair(
 )
 
 sealed interface AuthRefreshSaveResult {
-    data class Persisted(val pair: PersistedTokenPair) : AuthRefreshSaveResult
+    data class Persisted(
+        val pair: PersistedTokenPair,
+    ) : AuthRefreshSaveResult
+
     data object StaleSkipped : AuthRefreshSaveResult
-    data class Failed(val error: Throwable) : AuthRefreshSaveResult
+
+    data class Failed(
+        val error: Throwable,
+    ) : AuthRefreshSaveResult
 }
 
 sealed interface RefreshOutcome {
-    data class Refreshed(val pair: PersistedTokenPair) : RefreshOutcome
-    data class Missing(val clearPermit: AuthOperationPermit) : RefreshOutcome
-    data class Unauthorized(val clearPermit: AuthOperationPermit) : RefreshOutcome
-    data class TransientFailure(val error: Throwable) : RefreshOutcome
+    data class Refreshed(
+        val pair: PersistedTokenPair,
+    ) : RefreshOutcome
+
+    data class Missing(
+        val clearPermit: AuthOperationPermit,
+    ) : RefreshOutcome
+
+    data class Unauthorized(
+        val clearPermit: AuthOperationPermit,
+    ) : RefreshOutcome
+
+    data class TransientFailure(
+        val error: Throwable,
+    ) : RefreshOutcome
+
     data object StaleSkipped : RefreshOutcome
 }

@@ -26,9 +26,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlin.coroutines.cancellation.CancellationException
 import java.io.IOException
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
 
 private val Context.tokenDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "secure_token_store",
@@ -75,8 +75,7 @@ internal class DataStoreTokenManager(
                     session = if (it.shouldClear) AuthSession.LoggedOut else it.session,
                     credentialVersion = it.credentialVersion,
                 )
-            }
-            .distinctUntilChanged()
+            }.distinctUntilChanged()
 
     override val credentialVersion: Flow<CredentialVersion> =
         resolvedState
@@ -629,8 +628,12 @@ internal class DataStoreTokenManager(
     }
 
     private sealed interface CredentialMetadata {
-        data class Valid(val value: CredentialVersion) : CredentialMetadata
+        data class Valid(
+            val value: CredentialVersion,
+        ) : CredentialMetadata
+
         data object Missing : CredentialMetadata
+
         data object Corrupt : CredentialMetadata
     }
 

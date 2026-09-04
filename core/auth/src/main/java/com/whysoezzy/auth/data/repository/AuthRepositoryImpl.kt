@@ -2,18 +2,18 @@ package com.whysoezzy.auth.data.repository
 
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.data.api.AuthApi
-import com.whysoezzy.auth.domain.models.AuthFailure
-import com.whysoezzy.auth.domain.models.AuthOutcome
-import com.whysoezzy.auth.domain.models.AuthResult
-import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.AuthCredentialRead
-import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
-import com.whysoezzy.auth.domain.models.AuthSaveResult
+import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.AuthOperationPermit
+import com.whysoezzy.auth.domain.models.AuthOutcome
+import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
+import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.auth.domain.models.AuthSaveResult
+import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.RefreshOutcome
-import com.whysoezzy.common.error.AppException
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.network.safeApiCall
 import kotlinx.coroutines.NonCancellable
@@ -101,17 +101,19 @@ internal class AuthRepositoryImpl(
                 val response = responseOutcome.value
                 val reservation = tokenManager.reserveOwnerSave()
                 try {
-                    when (tokenManager.saveAuthenticated(
-                        reservation = reservation,
-                        accessToken = response.accessToken,
-                        refreshToken = response.refreshToken,
-                        userId = response.user.id,
-                        stage = if (response.isNewUser) {
-                            AuthSession.Stage.NeedsName
-                        } else {
-                            AuthSession.Stage.Ready
-                        },
-                    )) {
+                    when (
+                        tokenManager.saveAuthenticated(
+                            reservation = reservation,
+                            accessToken = response.accessToken,
+                            refreshToken = response.refreshToken,
+                            userId = response.user.id,
+                            stage = if (response.isNewUser) {
+                                AuthSession.Stage.NeedsName
+                            } else {
+                                AuthSession.Stage.Ready
+                            },
+                        )
+                    ) {
                         AuthSaveResult.Persisted -> Unit
                         AuthSaveResult.StaleSkipped ->
                             return AuthOutcome.Failure(AuthFailure.SessionPersistenceFailure)

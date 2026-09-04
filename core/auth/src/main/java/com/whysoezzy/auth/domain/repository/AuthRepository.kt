@@ -1,8 +1,8 @@
 package com.whysoezzy.auth.domain.repository
 
+import com.whysoezzy.auth.domain.models.AuthOperationPermit
 import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthResult
-import com.whysoezzy.auth.domain.models.AuthOperationPermit
 import com.whysoezzy.auth.domain.models.RefreshOutcome
 import kotlinx.coroutines.flow.Flow
 
