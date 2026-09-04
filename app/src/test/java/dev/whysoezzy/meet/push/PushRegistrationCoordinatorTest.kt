@@ -21,8 +21,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -855,7 +855,10 @@ class PushRegistrationCoordinatorTest {
                         "550e8400-e29b-41d4-a716-446655440000",
                         42L,
                     ),
-                    isAlreadyAtDestination = { navigationMarkers += marker.get(); false },
+                    isAlreadyAtDestination = {
+                        navigationMarkers += marker.get()
+                        false
+                    },
                     navigate = { navigationMarkers += marker.get() },
                 )
             }
