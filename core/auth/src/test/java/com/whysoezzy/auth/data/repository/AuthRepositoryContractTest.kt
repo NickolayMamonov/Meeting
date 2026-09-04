@@ -2,12 +2,12 @@ package com.whysoezzy.auth.data.repository
 
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.data.api.AuthApiKtor
-import com.whysoezzy.auth.domain.models.AuthFailure
-import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthCredentialIdentity
 import com.whysoezzy.auth.domain.models.AuthCredentialRead
 import com.whysoezzy.auth.domain.models.AuthCredentialSnapshot
+import com.whysoezzy.auth.domain.models.AuthFailure
 import com.whysoezzy.auth.domain.models.AuthOperationPermit
+import com.whysoezzy.auth.domain.models.AuthOutcome
 import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
 import com.whysoezzy.auth.domain.models.AuthSaveResult
 import com.whysoezzy.auth.domain.models.AuthSession
