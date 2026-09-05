@@ -32,7 +32,7 @@ class PublishReleaseTest(unittest.TestCase):
             "attestation_verifier": lambda _path: None,
         }
 
-    def test_loopback_driver_posts_one_asset_and_publishes_last(self):
+    def test_grouped_chain_publication_accepts_valid_identity(self):
         with tempfile.TemporaryDirectory() as root:
             evidence = PackageArtifactsTest.package_release(Path(root), grouped=True)
             result = run_harness(**self.harness_options(evidence))
@@ -146,43 +146,72 @@ class PublishReleaseTest(unittest.TestCase):
                     attestation_run_attempt=2,
                 )
 
-    def test_mismatched_chain_identity_is_rejected_before_post_or_patch(self):
+    def test_grouped_chain_rejects_each_mismatched_identity_before_client_access(self):
         with tempfile.TemporaryDirectory() as root:
-            evidence = PackageArtifactsTest.package_release(Path(root))
-            class NoMutationClient:
-                post_count = 0
-                patch_count = 0
+            expected = {
+                "attestation_repository": "owner/repo",
+                "attestation_signer_workflow": (
+                    "owner/repo/.github/workflows/release.yml"
+                ),
+                "attestation_source_ref": "refs/heads/dev",
+                "attestation_source_sha": "b" * 40,
+                "attestation_run_id": 100,
+                "attestation_run_attempt": 2,
+            }
+            replacements = {
+                "attestation_repository": "other/repo",
+                "attestation_signer_workflow": (
+                    "other/repo/.github/workflows/release.yml"
+                ),
+                "attestation_source_ref": "refs/heads/other",
+                "attestation_source_sha": "c" * 40,
+                "attestation_run_id": 101,
+                "attestation_run_attempt": 3,
+            }
 
-                def get_release(self, _release_id):
-                    raise AssertionError("release state must not be read")
+            for field, replacement in replacements.items():
+                with self.subTest(field=field):
+                    case_root = Path(root) / field
+                    case_root.mkdir()
+                    evidence = PackageArtifactsTest.package_release(
+                        case_root,
+                        grouped=True,
+                    )
 
-                def create_asset(self, _release_id, _path):
-                    self.post_count += 1
-                    raise AssertionError("mismatched admission reached POST")
+                    class NoMutationClient:
+                        post_count = 0
+                        patch_count = 0
 
-                def patch_release(self, _release_id, _payload):
-                    self.patch_count += 1
-                    raise AssertionError("mismatched admission reached PATCH")
+                        def get_release(self, _release_id):
+                            raise AssertionError("release state must not be read")
 
-            client = NoMutationClient()
-            with self.assertRaisesRegex(PublicationError, "protected evidence admission failed"):
-                run(
-                    client=client,
-                    release_id=42,
-                    tag="v1.0.0",
-                    source_sha="a" * 40,
-                    expected_source_branch="dev",
-                    evidence_directory=evidence,
-                    manifest_path=evidence / "release-manifest.json",
-                    attestation_repository="other/repo",
-                    attestation_signer_workflow="owner/repo/.github/workflows/release.yml",
-                    attestation_source_ref="refs/heads/dev",
-                    attestation_source_sha="b" * 40,
-                    attestation_run_id=100,
-                    attestation_run_attempt=2,
-                )
-            self.assertEqual(client.post_count, 0)
-            self.assertEqual(client.patch_count, 0)
+                        def create_asset(self, _release_id, _path):
+                            self.post_count += 1
+                            raise AssertionError("mismatched admission reached POST")
+
+                        def patch_release(self, _release_id, _payload):
+                            self.patch_count += 1
+                            raise AssertionError("mismatched admission reached PATCH")
+
+                    options = expected.copy()
+                    options[field] = replacement
+                    client = NoMutationClient()
+                    with self.assertRaisesRegex(
+                        PublicationError,
+                        "protected evidence admission failed",
+                    ):
+                        run(
+                            client=client,
+                            release_id=42,
+                            tag="v1.0.0",
+                            source_sha="a" * 40,
+                            expected_source_branch="dev",
+                            evidence_directory=evidence,
+                            manifest_path=evidence / "release-manifest.json",
+                            **options,
+                        )
+                    self.assertEqual(client.post_count, 0)
+                    self.assertEqual(client.patch_count, 0)
 
     def test_harness_passes_branch_from_validated_fixture_provenance(self):
         with tempfile.TemporaryDirectory() as root:
