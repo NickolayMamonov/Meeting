@@ -451,6 +451,42 @@ class PublicationGateTest(unittest.TestCase):
         self.assertIn("--evidence-directory release-output", mutation)
         self.assertIn("--rendered-body", mutation)
 
+    def test_every_production_chain_admission_passes_complete_identity_policy(self):
+        workflows = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml",
+            Path(__file__).parents[2] / ".github" / "workflows" / "release.yml",
+            Path(__file__).parents[2] / ".github" / "workflows" / "release-proof.yml",
+            Path(__file__).parents[2] / ".github" / "workflows" / "release-credential-audit.yml",
+        )
+        required = (
+            "--expected-source-repository",
+            "--expected-signer-workflow",
+            "--expected-source-ref",
+            "--expected-source-sha",
+            "--expected-run-id",
+            "--expected-run-attempt",
+        )
+        for path in workflows:
+            workflow = path.read_text(encoding="utf-8")
+            calls = workflow.split("python release-tooling/scripts/release/verify_chain.py")[1:]
+            self.assertTrue(calls, path.name)
+            for call in calls:
+                bounded_call = call.split("\n      - ", 1)[0]
+                for argument in required:
+                    self.assertIn(argument, bounded_call, path.name)
+            self.assertNotIn(
+                "python release-tooling/scripts/release/verify_chain.py release-output\n",
+                workflow,
+            )
+            self.assertNotIn(
+                "python release-tooling/scripts/release/verify_chain.py snapshot-output\n",
+                workflow,
+            )
+            self.assertNotIn(
+                "python release-tooling/scripts/release/verify_chain.py report/release-output\n",
+                workflow,
+            )
+
     def test_release_credential_inventory_and_secret_boundaries_are_exact(self):
         workflow = (
             Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"

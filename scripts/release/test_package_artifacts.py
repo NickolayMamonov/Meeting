@@ -213,7 +213,7 @@ class PackageArtifactsTest(unittest.TestCase):
         path.write_text(json.dumps({"records": records}), encoding="utf-8")
 
     @classmethod
-    def package_release(cls, root_path: Path) -> Path:
+    def package_release(cls, root_path: Path, *, grouped: bool = False) -> Path:
         metadata = root_path / "metadata.json"
         metadata.write_text(
             json.dumps(
@@ -246,7 +246,16 @@ class PackageArtifactsTest(unittest.TestCase):
         )
         package(arguments)
         evidence = root_path / "attestation-evidence.json"
-        cls._write_evidence(output, evidence)
+        if grouped:
+            cls._write_five_subject_group_evidence(
+                output,
+                evidence,
+                source_sha="b" * 40,
+                run_id=100,
+                run_attempt=2,
+            )
+        else:
+            cls._write_evidence(output, evidence)
         arguments.attestation_evidence = str(evidence)
         arguments.prepare_only = False
         package(arguments)
@@ -486,6 +495,32 @@ class PackageArtifactsTest(unittest.TestCase):
                     str(output),
                     "--expected-source-repository",
                     "owner/repo",
+                ],
+            ):
+                with self.assertRaises(SystemExit):
+                    verify_chain_main()
+
+    def test_policy_cli_rejects_mismatched_identity_before_success(self):
+        with tempfile.TemporaryDirectory() as root:
+            output = self.package_five_subject_group_release(Path(root))
+            with patch.object(
+                sys,
+                "argv",
+                [
+                    "verify_chain.py",
+                    str(output),
+                    "--expected-source-repository",
+                    "other/repo",
+                    "--expected-signer-workflow",
+                    "owner/repo/.github/workflows/release.yml",
+                    "--expected-source-ref",
+                    "refs/heads/dev",
+                    "--expected-source-sha",
+                    "a" * 40,
+                    "--expected-run-id",
+                    "101",
+                    "--expected-run-attempt",
+                    "1",
                 ],
             ):
                 self.assertEqual(verify_chain_main(), 1)

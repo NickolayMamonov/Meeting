@@ -477,7 +477,13 @@ jobs:
             --commit "$EXPECTED_COMMIT" \
             --source-branch "$SNAPSHOT_SOURCE_BRANCH" \
             --attestation-evidence "$RUNNER_TEMP/snapshot-attestation-evidence.json"
-          python release-tooling/scripts/release/verify_chain.py snapshot-output
+          python release-tooling/scripts/release/verify_chain.py snapshot-output \
+            --expected-source-repository "$GITHUB_REPOSITORY" \
+            --expected-signer-workflow "$GITHUB_REPOSITORY/.github/workflows/ci.yml" \
+            --expected-source-ref refs/heads/dev \
+            --expected-source-sha "$GITHUB_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android-snapshot-${{ github.run_number }}-${{ github.run_attempt }}

@@ -89,6 +89,12 @@ def verify(
     directory: Path,
     expected_policy: ExpectedAttestationPolicy | None = None,
 ) -> None:
+    """Verify chain structure, optionally binding it to an execution policy.
+
+    Unqualified verification remains available only for local structural
+    inspection. Production admission must use ``verify_admission`` or the CLI,
+    both of which require the complete trusted execution identity.
+    """
     manifest_name = "snapshot-manifest.json" if (directory / "snapshot-manifest.json").exists() else "release-manifest.json"
     manifest_path = directory / manifest_name
     manifest = read(manifest_path)
@@ -317,15 +323,24 @@ def verify(
         raise ChainError("release evidence contains unreferenced or missing files")
 
 
+def verify_admission(
+    directory: Path,
+    expected_policy: ExpectedAttestationPolicy,
+) -> None:
+    if not isinstance(expected_policy, ExpectedAttestationPolicy):
+        raise ChainError("expected attestation policy is required for admission")
+    verify(directory, expected_policy)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("directory", type=Path)
-    parser.add_argument("--expected-source-repository")
-    parser.add_argument("--expected-signer-workflow")
-    parser.add_argument("--expected-source-ref")
-    parser.add_argument("--expected-source-sha")
-    parser.add_argument("--expected-run-id", type=int)
-    parser.add_argument("--expected-run-attempt", type=int)
+    parser.add_argument("--expected-source-repository", required=True)
+    parser.add_argument("--expected-signer-workflow", required=True)
+    parser.add_argument("--expected-source-ref", required=True)
+    parser.add_argument("--expected-source-sha", required=True)
+    parser.add_argument("--expected-run-id", type=int, required=True)
+    parser.add_argument("--expected-run-attempt", type=int, required=True)
     args = parser.parse_args()
     policy_values = (
         args.expected_source_repository,
@@ -335,25 +350,19 @@ def main() -> int:
         args.expected_run_id,
         args.expected_run_attempt,
     )
-    if any(value is not None for value in policy_values) and not all(
-        value is not None for value in policy_values
-    ):
+    if not all(value is not None for value in policy_values):
         print("release-chain verification failed: expected attestation policy is partial")
         return 1
-    expected_policy = (
-        ExpectedAttestationPolicy(
-            source_repository=args.expected_source_repository,
-            signer_workflow=args.expected_signer_workflow,
-            source_ref=args.expected_source_ref,
-            source_sha=args.expected_source_sha,
-            run_id=args.expected_run_id,
-            run_attempt=args.expected_run_attempt,
-        )
-        if all(value is not None for value in policy_values)
-        else None
+    expected_policy = ExpectedAttestationPolicy(
+        source_repository=args.expected_source_repository,
+        signer_workflow=args.expected_signer_workflow,
+        source_ref=args.expected_source_ref,
+        source_sha=args.expected_source_sha,
+        run_id=args.expected_run_id,
+        run_attempt=args.expected_run_attempt,
     )
     try:
-        verify(args.directory, expected_policy)
+        verify_admission(args.directory, expected_policy)
     except (ChainError, KeyError, OSError, ValueError) as error:
         print(f"release-chain verification failed: {error}")
         return 1
