@@ -222,7 +222,26 @@ jobs:
       - name: Provision snapshot Firebase configuration
         env:
           FIREBASE_JSON_B64: ${{ secrets.SNAPSHOT_GOOGLE_SERVICES_JSON_BASE64 }}
-        run: printf '%s' "$FIREBASE_JSON_B64" | base64 --decode > app/google-services.json
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$FIREBASE_JSON_B64"
+          printf '%s' "$FIREBASE_JSON_B64" | base64 --decode > app/google-services.json
+          test -s app/google-services.json
+      - name: Validate snapshot Firebase configuration
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "object"
+            and (.project_info | type == "object")
+            and (.client | type == "array" and length > 0)
+            and any(.client[];
+              type == "object"
+              and (.client_info | type == "object")
+              and (.client_info.android_client_info | type == "object")
+              and (.client_info.android_client_info.package_name == "dev.whysoezzy.meet.snapshot")
+            )
+          ' app/google-services.json >/dev/null
       - name: Build unsigned snapshot
         env:
           ORG_GRADLE_PROJECT_ANDROID_SNAPSHOT_CERT_SHA256: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
@@ -238,6 +257,9 @@ jobs:
             app/build/outputs/apk/snapshot/*.apk
             app/build/release-metadata/snapshot-build.json
           if-no-files-found: error
+      - name: Remove snapshot Firebase configuration
+        if: ${{ always() }}
+        run: rm -f app/google-services.json
 
   snapshot-sign:
     name: Sign snapshot on isolated runner

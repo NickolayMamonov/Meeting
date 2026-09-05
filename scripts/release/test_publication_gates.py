@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -346,6 +348,98 @@ class PublicationGateTest(unittest.TestCase):
         self.assertNotIn("GOOGLE_SERVICES_JSON", validation_step)
         self.assertNotIn("echo", validation_step)
         self.assertIn("if: ${{ always() }}", stable_build)
+
+    def test_snapshot_firebase_validation_precedes_gradle_and_cleanup(self):
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+        snapshot_build = workflow[
+            workflow.index("  snapshot-build:") : workflow.index("  snapshot-sign:")
+        ]
+        provision = snapshot_build.index("Provision snapshot Firebase configuration")
+        validation = snapshot_build.index("Validate snapshot Firebase configuration")
+        gradle = snapshot_build.index("./gradlew")
+        cleanup = snapshot_build.index("Remove snapshot Firebase configuration")
+        self.assertLess(provision, validation)
+        self.assertLess(validation, gradle)
+        self.assertLess(gradle, cleanup)
+        provision_step = snapshot_build[provision:validation]
+        self.assertIn("set -euo pipefail", provision_step)
+        self.assertIn("umask 077", provision_step)
+        self.assertIn('test -n "$FIREBASE_JSON_B64"', provision_step)
+        self.assertIn("test -s app/google-services.json", provision_step)
+        validation_step = snapshot_build[validation:gradle]
+        self.assertIn("jq -e", validation_step)
+        self.assertIn('type == "object"', validation_step)
+        self.assertIn('(.project_info | type == "object")', validation_step)
+        self.assertIn('(.client | type == "array" and length > 0)', validation_step)
+        self.assertIn('(.client_info | type == "object")', validation_step)
+        self.assertIn(
+            '(.client_info.android_client_info | type == "object")',
+            validation_step,
+        )
+        self.assertIn(
+            '.client_info.android_client_info.package_name == "dev.whysoezzy.meet.snapshot"',
+            validation_step,
+        )
+        self.assertIn("app/google-services.json >/dev/null", validation_step)
+        self.assertNotIn("FIREBASE_JSON_B64", validation_step)
+        self.assertNotIn("echo", validation_step)
+        self.assertIn("if: ${{ always() }}", snapshot_build[cleanup:])
+        self.assertIn("rm -f app/google-services.json", snapshot_build[cleanup:])
+
+    def test_snapshot_firebase_validation_executes_valid_and_wrong_package_fixtures(self):
+        jq = shutil.which("jq")
+        self.assertIsNotNone(jq, "jq is required for semantic Firebase coverage")
+        workflow = (
+            Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+        snapshot_build = workflow[
+            workflow.index("  snapshot-build:") : workflow.index("  snapshot-sign:")
+        ]
+        validation_step = snapshot_build[
+            snapshot_build.index("      - name: Validate snapshot Firebase configuration") :
+            snapshot_build.index("      - name: Build unsigned snapshot")
+        ]
+        marker = "jq -e '"
+        self.assertIn(marker, validation_step)
+        predicate = validation_step.split(marker, 1)[1].split(
+            "' app/google-services.json", 1
+        )[0]
+        fixture_path = Path(__file__).parents[2] / "app" / "google-services-ci.json"
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+        def run_validator(path):
+            return subprocess.run(
+                [jq, "-e", predicate, str(path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            valid_path = directory / "valid-google-services.json"
+            valid_path.write_text(json.dumps(fixture), encoding="utf-8")
+            self.assertEqual(run_validator(valid_path).returncode, 0)
+
+            wrong_fixture = json.loads(json.dumps(fixture))
+            for client in wrong_fixture["client"]:
+                package = (
+                    client.get("client_info", {})
+                    .get("android_client_info", {})
+                    .get("package_name")
+                )
+                if package == "dev.whysoezzy.meet.snapshot":
+                    client["client_info"]["android_client_info"][
+                        "package_name"
+                    ] = "dev.whysoezzy.meet.not-snapshot"
+                    break
+            else:
+                self.fail("snapshot package missing from semantic fixture")
+            wrong_path = directory / "wrong-package-google-services.json"
+            wrong_path.write_text(json.dumps(wrong_fixture), encoding="utf-8")
+            self.assertNotEqual(run_validator(wrong_path).returncode, 0)
 
     def test_mutation_is_sha_bound_create_only_then_publish_and_verify(self):
         workflow = (

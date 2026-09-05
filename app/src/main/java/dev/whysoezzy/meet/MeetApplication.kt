@@ -11,6 +11,7 @@ import dev.whysoezzy.communities.di.communityModule
 import dev.whysoezzy.meet.crash.CrashReportingTree
 import dev.whysoezzy.meet.di.appGlueModule
 import dev.whysoezzy.meet.di.appModule
+import dev.whysoezzy.meet.di.crashReportingModule
 import dev.whysoezzy.meet.di.pushRegistrationModule
 import dev.whysoezzy.meet.push.PushRegistrationCoordinator
 import dev.whysoezzy.meetings.di.mainFeatureModule
@@ -23,6 +24,21 @@ import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import timber.log.Timber
 
+internal val meetApplicationModules = listOf(
+    appModule,
+    appGlueModule,
+    authModule,
+    pushRegistrationModule,
+    authFeatureModule,
+    meetingsModule,
+    communitiesModule,
+    profileDataModule,
+    mainFeatureModule,
+    communityModule,
+    profileFeatureModule,
+    crashReportingModule,
+)
+
 class MeetApplication : Application() {
     private val crashReporter: CrashReporter by inject()
     private val pushRegistrationCoordinator: PushRegistrationCoordinator by inject()
@@ -34,19 +50,7 @@ class MeetApplication : Application() {
             androidLogger(if (BuildConfig.DEBUG) Level.DEBUG else Level.ERROR)
             androidContext(this@MeetApplication)
             workManagerFactory()
-            modules(
-                appModule,
-                appGlueModule,
-                authModule,
-                pushRegistrationModule,
-                authFeatureModule,
-                meetingsModule,
-                communitiesModule,
-                profileDataModule,
-                mainFeatureModule,
-                communityModule,
-                profileFeatureModule,
-            )
+            modules(meetApplicationModules)
         }
 
         pushRegistrationCoordinator.start()
