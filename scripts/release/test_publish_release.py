@@ -24,17 +24,17 @@ class PublishReleaseTest(unittest.TestCase):
             "source_sha": "a" * 40,
             "application_source_sha": "a" * 40,
             "attestation_repository": "owner/repo",
-            "attestation_signer_workflow": "owner/repo/.github/workflows/release-credential-audit.yml",
-            "attestation_source_ref": "refs/heads/MEE3-59",
+            "attestation_signer_workflow": "owner/repo/.github/workflows/release.yml",
+            "attestation_source_ref": "refs/heads/dev",
             "attestation_source_sha": "b" * 40,
             "attestation_token": "fixture-token",
             "android_verifier": lambda _path: None,
             "attestation_verifier": lambda _path: None,
         }
 
-    def test_loopback_driver_posts_one_asset_and_publishes_last(self):
+    def test_grouped_chain_publication_accepts_valid_identity(self):
         with tempfile.TemporaryDirectory() as root:
-            evidence = PackageArtifactsTest.package_release(Path(root))
+            evidence = PackageArtifactsTest.package_release(Path(root), grouped=True)
             result = run_harness(**self.harness_options(evidence))
             transcript = result["transcript"]
             self.assertEqual(sum(item["method"] == "POST" for item in transcript), 1)
@@ -81,7 +81,7 @@ class PublishReleaseTest(unittest.TestCase):
 
     def test_loopback_driver_uses_real_single_redirect_without_data_credentials(self):
         with tempfile.TemporaryDirectory() as root:
-            evidence = PackageArtifactsTest.package_release(Path(root))
+            evidence = PackageArtifactsTest.package_release(Path(root), grouped=True)
             options = self.harness_options(evidence)
             options["use_redirect"] = True
             result = run_harness(**options)
@@ -99,7 +99,7 @@ class PublishReleaseTest(unittest.TestCase):
 
     def test_final_read_race_is_indeterminate_without_repair(self):
         with tempfile.TemporaryDirectory() as root:
-            evidence = PackageArtifactsTest.package_release(Path(root))
+            evidence = PackageArtifactsTest.package_release(Path(root), grouped=True)
             options = self.harness_options(evidence)
             options["inject_after_final_read"] = True
             result = run_harness(**options)
@@ -113,7 +113,7 @@ class PublishReleaseTest(unittest.TestCase):
 
     def test_harness_rejects_missing_identity_inputs(self):
         with tempfile.TemporaryDirectory() as root:
-            evidence = PackageArtifactsTest.package_release(Path(root))
+            evidence = PackageArtifactsTest.package_release(Path(root), grouped=True)
             options = self.harness_options(evidence)
             options["application_source_sha"] = "c" * 40
             with self.assertRaisesRegex(PublicationError, "bound to application"):
@@ -121,7 +121,7 @@ class PublishReleaseTest(unittest.TestCase):
 
     def test_noncanonical_manifest_is_rejected_before_client_state_read(self):
         with tempfile.TemporaryDirectory() as root:
-            evidence = PackageArtifactsTest.package_release(Path(root))
+            evidence = PackageArtifactsTest.package_release(Path(root), grouped=True)
             alternate = Path(root) / "alternate-manifest.json"
             alternate.write_bytes((evidence / "release-manifest.json").read_bytes())
 
@@ -138,7 +138,80 @@ class PublishReleaseTest(unittest.TestCase):
                     expected_source_branch="dev",
                     evidence_directory=evidence,
                     manifest_path=alternate,
+                    attestation_repository="owner/repo",
+                    attestation_signer_workflow="owner/repo/.github/workflows/release.yml",
+                    attestation_source_ref="refs/heads/dev",
+                    attestation_source_sha="b" * 40,
+                    attestation_run_id=100,
+                    attestation_run_attempt=2,
                 )
+
+    def test_grouped_chain_rejects_each_mismatched_identity_before_client_access(self):
+        with tempfile.TemporaryDirectory() as root:
+            expected = {
+                "attestation_repository": "owner/repo",
+                "attestation_signer_workflow": (
+                    "owner/repo/.github/workflows/release.yml"
+                ),
+                "attestation_source_ref": "refs/heads/dev",
+                "attestation_source_sha": "b" * 40,
+                "attestation_run_id": 100,
+                "attestation_run_attempt": 2,
+            }
+            replacements = {
+                "attestation_repository": "other/repo",
+                "attestation_signer_workflow": (
+                    "other/repo/.github/workflows/release.yml"
+                ),
+                "attestation_source_ref": "refs/heads/other",
+                "attestation_source_sha": "c" * 40,
+                "attestation_run_id": 101,
+                "attestation_run_attempt": 3,
+            }
+
+            for field, replacement in replacements.items():
+                with self.subTest(field=field):
+                    case_root = Path(root) / field
+                    case_root.mkdir()
+                    evidence = PackageArtifactsTest.package_release(
+                        case_root,
+                        grouped=True,
+                    )
+
+                    class NoMutationClient:
+                        post_count = 0
+                        patch_count = 0
+
+                        def get_release(self, _release_id):
+                            raise AssertionError("release state must not be read")
+
+                        def create_asset(self, _release_id, _path):
+                            self.post_count += 1
+                            raise AssertionError("mismatched admission reached POST")
+
+                        def patch_release(self, _release_id, _payload):
+                            self.patch_count += 1
+                            raise AssertionError("mismatched admission reached PATCH")
+
+                    options = expected.copy()
+                    options[field] = replacement
+                    client = NoMutationClient()
+                    with self.assertRaisesRegex(
+                        PublicationError,
+                        "protected evidence admission failed",
+                    ):
+                        run(
+                            client=client,
+                            release_id=42,
+                            tag="v1.0.0",
+                            source_sha="a" * 40,
+                            expected_source_branch="dev",
+                            evidence_directory=evidence,
+                            manifest_path=evidence / "release-manifest.json",
+                            **options,
+                        )
+                    self.assertEqual(client.post_count, 0)
+                    self.assertEqual(client.patch_count, 0)
 
     def test_harness_passes_branch_from_validated_fixture_provenance(self):
         with tempfile.TemporaryDirectory() as root:

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.whysoezzy.auth.domain.usecase.IsLoggedInUseCase
 import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.common.error.toErrorType
+import com.whysoezzy.common.push.MeetingJoinEvents
 import com.whysoezzy.common.utils.AddressUtils.extractMetroFromAddress
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
@@ -148,6 +149,7 @@ class MeetingDetailsViewModel(
         viewModelScope.launch {
             _uiState.value = currentState.copy(isUserJoined = true)
             joinMeetingUseCase(meetingId)
+                .onSuccess { MeetingJoinEvents.emitSuccessfulJoin() }
                 .onFailure {
                     _uiState.value = currentState.copy(isUserJoined = false)
                 }

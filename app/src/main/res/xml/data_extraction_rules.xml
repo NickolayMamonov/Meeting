@@ -5,6 +5,8 @@
         <exclude domain="file" path="datastore/secure_token_store.preferences_pb"/>
         <exclude domain="file" path="datastore/secure_auth_session_store.preferences_pb"/>
         <exclude domain="file" path="datastore/pending_email_otp_store.preferences_pb"/>
+        <!-- Firebase Installation IDs are device-specific and must not transfer to another device. -->
+        <exclude domain="file" path="datastore/pending_push_registration_store.preferences_pb"/>
         <exclude domain="sharedpref" path="meeting_token_keyset_prefs.xml"/>
     </cloud-backup>
     <device-transfer>
@@ -12,6 +14,8 @@
         <exclude domain="file" path="datastore/secure_token_store.preferences_pb"/>
         <exclude domain="file" path="datastore/secure_auth_session_store.preferences_pb"/>
         <exclude domain="file" path="datastore/pending_email_otp_store.preferences_pb"/>
+        <!-- Firebase Installation IDs are device-specific and must not transfer to another device. -->
+        <exclude domain="file" path="datastore/pending_push_registration_store.preferences_pb"/>
         <exclude domain="sharedpref" path="meeting_token_keyset_prefs.xml"/>
     </device-transfer>
 </data-extraction-rules>
