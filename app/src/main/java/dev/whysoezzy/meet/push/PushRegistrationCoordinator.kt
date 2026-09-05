@@ -143,6 +143,7 @@ internal class PushRegistrationCoordinator(
     private var callbackDebtSatisfied = false
     private var registerCallbackDebt = 0
     private var unregisterTaskSucceeded = false
+    private var unregisterInvocations = 0
     private var lastUnregisterCompletion: Deferred<Result<Unit>>? = null
     private var drainBlockedCredentialVersion: CredentialVersion? = null
     private var lastObservedCredentialVersion: CredentialVersion? = null
@@ -197,6 +198,7 @@ internal class PushRegistrationCoordinator(
         val lease: AccountExitLease
         synchronized(monitor) {
             check(activeLeases < Int.MAX_VALUE) { "Account-exit lease count overflow" }
+            val startsExitCycle = activeLeases == 0
             epoch++
             phase = PushLifecyclePhase.EXITING
             activeLeases++
@@ -205,10 +207,14 @@ internal class PushRegistrationCoordinator(
             children.values.forEach { it.stale = true }
             localWrites.values.forEach { it.stale = true }
             firebaseCommand?.let { if (it.epoch < epoch) it.stale = true }
+            if (startsExitCycle) unregisterInvocations = 0
             remoteHandles.values
                 .filter { it.state == RemoteHandleState.PENDING }
                 .forEach { it.state = RemoteHandleState.SUPPRESSED }
             effects.forEach { if (it.epoch != null && it.epoch < epoch) it.suppressed = true }
+            activeEffects.values
+                .filter { it.state == RemoteHandleState.PENDING }
+                .forEach { it.suppressed = true }
             toCancel = children.values.mapNotNull { it.job }
         }
         toCancel.forEach { it.cancel() }
@@ -261,7 +267,8 @@ internal class PushRegistrationCoordinator(
                 command.epoch == epoch &&
                 !command.stale &&
                 command.state != RemoteHandleState.COMPLETED &&
-                command.state != RemoteHandleState.SUPPRESSED
+                command.state != RemoteHandleState.SUPPRESSED &&
+                !command.callback.isCompleted
             ) {
                 command.fid = validFid
                 command.callback.complete(Unit)
@@ -305,20 +312,34 @@ internal class PushRegistrationCoordinator(
         hasNotificationBlock: Boolean,
         onComplete: () -> Unit = {},
     ) {
-        val permit = admitIngress(captureExitEpoch()) ?: run {
+        val completionSignaled = AtomicBoolean(false)
+        val admitted = synchronized(monitor) {
+            val ingressEpoch = epoch
+            if (!isEpochAuthorizedLocked(ingressEpoch, allowActivation = false)) {
+                null
+            } else {
+                val permit = IngressPermit(ids.incrementAndGet(), ingressEpoch)
+                val child = completionScope.launch(start = CoroutineStart.LAZY) {
+                    try {
+                        processDataMessage(data, hasNotificationBlock, permit.epoch)
+                    } finally {
+                        finishChild(permit)
+                        if (completionSignaled.compareAndSet(false, true)) onComplete()
+                    }
+                }
+                children[permit.id] = ChildRecord(permit.id, permit.epoch, job = child)
+                child.invokeOnCompletion {
+                    finishChild(permit)
+                    if (completionSignaled.compareAndSet(false, true)) onComplete()
+                }
+                child.start()
+                permit
+            }
+        }
+        if (admitted == null) {
             onComplete()
             return
         }
-        val child = completionScope.launch(start = CoroutineStart.LAZY) {
-            try {
-                processDataMessage(data, hasNotificationBlock, permit.epoch)
-            } finally {
-                finishChild(permit)
-                onComplete()
-            }
-        }
-        linkChild(permit, child)
-        child.start()
     }
 
     override suspend fun handleDataMessage(
@@ -633,10 +654,12 @@ internal class PushRegistrationCoordinator(
                 }
             } else {
                 val currentUserId = requireNotNull(userId)
-                val activating = oldOwner == null ||
-                    state.registration.pendingFid == null ||
-                    state.registration.installationId == null ||
-                    state.registration.terminal != RegistrationTerminal.NONE
+                val activating = state.registration.terminal == RegistrationTerminal.NONE &&
+                    (
+                        oldOwner == null ||
+                            state.registration.pendingFid == null ||
+                            state.registration.installationId == null
+                    )
                 val credentialRearm = oldOwner?.userId == currentUserId &&
                     state.registration.terminal == RegistrationTerminal.BLOCKED_AUTH &&
                     credentialState.credentialVersion.isAdvancedFrom(state.registration)
@@ -652,7 +675,15 @@ internal class PushRegistrationCoordinator(
                         }
                         phase == PushLifecyclePhase.ACTIVATING_CURRENT
                     } else {
-                        phase == PushLifecyclePhase.OPEN
+                        if (state.registration.terminal != RegistrationTerminal.NONE) {
+                            if (phase == PushLifecyclePhase.OPEN) {
+                                currentActivationUser = currentUserId
+                                phase = PushLifecyclePhase.ACTIVATING_CURRENT
+                            }
+                            false
+                        } else {
+                            phase == PushLifecyclePhase.OPEN
+                        }
                     }
                 }
                 if (shouldEnqueue) {
@@ -1042,6 +1073,18 @@ internal class PushRegistrationCoordinator(
                 completion.complete(Result.failure(IllegalStateException("Firebase command already active")))
                 return FirebaseHandle(command, completion)
             }
+            if (kind == FirebaseKind.REGISTER && registerCallbackDebt > 0) {
+                /*
+                 * Firebase callbacks carry no command identity. Do not let a callback
+                 * for a timed-out command become the callback for a later command.
+                 * The debt is released only by quarantining one callback while no
+                 * register command is active.
+                 */
+                completion.complete(
+                    Result.failure(IllegalStateException("Firebase register callback debt outstanding")),
+                )
+                return FirebaseHandle(command, completion)
+            }
             firebaseCommand = command
             if (kind == FirebaseKind.UNREGISTER) {
                 callbackDebt = CompletableDeferred()
@@ -1062,22 +1105,27 @@ internal class PushRegistrationCoordinator(
                 }
             }
             if (!started) {
-                completion.complete(Result.failure(IllegalStateException("Suppressed Firebase command")))
                 finishFirebase(command)
+                completion.complete(Result.failure(IllegalStateException("Suppressed Firebase command")))
                 return@launch
             }
             val task = runCatching {
-                if (kind == FirebaseKind.REGISTER) fcm.register() else fcm.unregister()
+                if (kind == FirebaseKind.REGISTER) {
+                    fcm.register()
+                } else {
+                    synchronized(monitor) { unregisterInvocations++ }
+                    fcm.unregister()
+                }
             }.getOrElse {
-                completion.complete(Result.failure(it))
                 finishFirebase(command)
+                completion.complete(Result.failure(it))
                 return@launch
             }
             val taskResult = runCatching { task.await() }
                 .getOrElse { Result.failure<Unit>(it) }
             if (taskResult.isFailure) {
-                completion.complete(taskResult)
                 finishFirebase(command)
+                completion.complete(taskResult)
                 return@launch
             }
             if (kind == FirebaseKind.REGISTER) {
@@ -1088,10 +1136,10 @@ internal class PushRegistrationCoordinator(
                     synchronized(monitor) {
                         registerCallbackDebt++
                     }
+                    finishFirebase(command)
                     completion.complete(
                         Result.failure(IllegalStateException("Firebase register callback missing")),
                     )
-                    finishFirebase(command)
                     return@launch
                 }
             } else {
@@ -1100,8 +1148,8 @@ internal class PushRegistrationCoordinator(
                     if (callbackDebtSatisfied) command.callback.complete(Unit)
                 }
             }
-            completion.complete(Result.success(Unit))
             finishFirebase(command)
+            completion.complete(Result.success(Unit))
             launchDrainIfNeeded()
         }
         return FirebaseHandle(command, completion)
@@ -1200,7 +1248,8 @@ internal class PushRegistrationCoordinator(
                     remoteHandles.values.any {
                         it.state == RemoteHandleState.STARTED || it.state == RemoteHandleState.PENDING
                     } ||
-                    firebaseCommand?.state == RemoteHandleState.STARTED
+                    firebaseCommand?.state == RemoteHandleState.STARTED ||
+                    firebaseCommand?.state == RemoteHandleState.PENDING
             }
             if (!pending) return
             delay(1L)
@@ -1241,8 +1290,22 @@ internal class PushRegistrationCoordinator(
                 return true
             }
         }
-        repeat(MAX_ATTEMPTS) { attempt ->
-            val ticket = DrainTicket(drain, attempt + 1, DrainBlockReason.UNREGISTER_TASK)
+        val consumedAttempts = synchronized(monitor) {
+            unregisterInvocations.coerceAtMost(MAX_ATTEMPTS)
+        }
+        val remainingAttempts = MAX_ATTEMPTS - consumedAttempts
+        if (remainingAttempts == 0) {
+            val step = if (synchronized(monitor) { unregisterTaskSucceeded }) {
+                DrainBlockReason.UNREGISTER_CALLBACK
+            } else {
+                DrainBlockReason.UNREGISTER_TASK
+            }
+            blockDrain(DrainTicket(drain, MAX_ATTEMPTS, step))
+            return false
+        }
+        repeat(remainingAttempts) { retryIndex ->
+            val attempt = consumedAttempts + retryIndex + 1
+            val ticket = DrainTicket(drain, attempt, DrainBlockReason.UNREGISTER_TASK)
             val command = launchFirebase(FirebaseKind.UNREGISTER, null)
             val taskResult = command.completion.await()
             if (taskResult.isSuccess) {
@@ -1264,7 +1327,7 @@ internal class PushRegistrationCoordinator(
                 blockDrain(ticket)
                 return false
             }
-            delay(RETRY_DELAYS_MILLIS[attempt])
+            delay(RETRY_DELAYS_MILLIS[attempt - 1])
         }
         return false
     }
@@ -1514,32 +1577,42 @@ internal class PushRegistrationCoordinator(
     }
 
     private fun invokeEffect(record: EffectRecord) {
-        val authorized = synchronized(monitor) {
+        val initiallyAuthorized = synchronized(monitor) {
             if (record.allowDuringExit) {
-                true
+                record.state == RemoteHandleState.PENDING && !record.suppressed
             } else if (record.epoch == null) {
                 false
             } else {
-                isEpochAuthorizedLocked(record.epoch, allowActivation = record.allowActivation)
+                record.state == RemoteHandleState.PENDING &&
+                    !record.suppressed &&
+                    isEpochAuthorizedLocked(record.epoch, allowActivation = record.allowActivation)
             }
         }
-        if (!authorized) {
+        if (!initiallyAuthorized) {
             record.completion.complete(Result.failure(IllegalStateException("Suppressed lifecycle effect")))
+            record.dedupeKey?.let { key ->
+                synchronized(monitor) { activeEffects.remove(key, record) }
+            }
             return
         }
         val result = runCatching {
             beforeEffectInvocation(record.kind)
-            val stillAuthorized = synchronized(monitor) {
-                record.allowDuringExit ||
+            val started = synchronized(monitor) {
+                val authorized = !record.suppressed &&
                     (
-                        record.epoch != null &&
-                            isEpochAuthorizedLocked(
-                                record.epoch,
-                                allowActivation = record.allowActivation,
+                        record.allowDuringExit ||
+                            (
+                                record.epoch != null &&
+                                    isEpochAuthorizedLocked(
+                                        record.epoch,
+                                        allowActivation = record.allowActivation,
+                                    )
                             )
                     )
+                if (authorized) record.state = RemoteHandleState.STARTED
+                authorized
             }
-            check(stillAuthorized) { "Suppressed lifecycle effect" }
+            check(started) { "Suppressed lifecycle effect" }
             record.action()
             Unit
         }
@@ -1764,6 +1837,7 @@ internal class PushRegistrationCoordinator(
         val allowActivation: Boolean,
         val dedupeKey: String?,
         var suppressed: Boolean = false,
+        var state: RemoteHandleState = RemoteHandleState.PENDING,
     )
 
     private enum class FirebaseKind {

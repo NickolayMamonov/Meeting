@@ -64,6 +64,7 @@ internal class BoundedAccountExitCoordinator(
         val startedAt = System.nanoTime()
         val permit = authSessionRepository.captureAuthOperationPermit()
         val lease = pushRegistrationCoordinator.beginAccountExitLease()
+        var clearCompletion: Deferred<Result<com.whysoezzy.auth.domain.models.AuthClearResult>>? = null
         try {
             val installationId = awaitWithin(
                 submit {
@@ -124,6 +125,7 @@ internal class BoundedAccountExitCoordinator(
                     val clear = submit {
                         authSessionRepository.clearReserved(reservation)
                     }
+                    clearCompletion = clear
                     awaitWithin(
                         clear,
                         timeoutMillis = remainingMillis(startedAt, EXIT_DEADLINE_MILLIS),
@@ -132,7 +134,15 @@ internal class BoundedAccountExitCoordinator(
             } catch (_: Throwable) {
                 // A failed reservation must not strand the lifecycle lease.
             } finally {
-                pushRegistrationCoordinator.endAccountExit(lease)
+                val pendingClear = clearCompletion
+                if (pendingClear == null || pendingClear.isCompleted) {
+                    pushRegistrationCoordinator.endAccountExit(lease)
+                } else {
+                    completionScope.async(start = CoroutineStart.UNDISPATCHED) {
+                        runCatching { pendingClear.await() }
+                        pushRegistrationCoordinator.endAccountExit(lease)
+                    }
+                }
             }
         }
     }

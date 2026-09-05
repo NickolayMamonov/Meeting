@@ -233,6 +233,32 @@ class AuthRepositoryImplTest {
     }
 
     @Test
+    fun `logout still attempts one fenced clear when credential read fails`() = runTest {
+        coEvery { tokenManager.readCredentialSnapshot(refreshPermit) } throws
+            IllegalStateException("credential store unavailable")
+        coEvery { authApi.logout() } returns mapOf("message" to "ok")
+
+        repository().logout()
+
+        coVerify(exactly = 1) { authApi.logout() }
+        coVerify(exactly = 1) { tokenManager.reserveClear(refreshPermit) }
+        coVerify(exactly = 1) { tokenManager.clearReserved(clearReservation) }
+    }
+
+    @Test
+    fun `stale credential read retains the original fence instead of clearing a newer owner`() =
+        runTest {
+            coEvery { tokenManager.readCredentialSnapshot(refreshPermit) } returns
+                AuthCredentialRead.Stale
+            coEvery { authApi.logout() } returns mapOf("message" to "ok")
+
+            repository().logout()
+
+            coVerify(exactly = 1) { tokenManager.reserveClear(refreshPermit) }
+            coVerify(exactly = 1) { tokenManager.clearReserved(clearReservation) }
+        }
+
+    @Test
     fun `verification persistence failure makes one generation-safe clear reservation`() = runTest {
         val repository = repository()
         val failedClearReservation = ClearReservation(2L, 2L, ownerPermit.identity)

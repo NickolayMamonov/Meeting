@@ -389,15 +389,21 @@ class PushRegistrationCoordinatorTest {
                 coordinator.reconcileCurrent()
             }
             runCurrent()
-            assertEquals(2, firebase.registers)
+            second.await()
+            assertEquals(1, firebase.registers)
 
             coordinator.onRegistered("fid-a")
             runCurrent()
-            assertFalse(second.isCompleted)
 
-            coordinator.onRegistered("fid-b")
+            val next = async(start = CoroutineStart.UNDISPATCHED) {
+                coordinator.reconcileCurrent()
+            }
             runCurrent()
-            second.await()
+            assertEquals(2, firebase.registers)
+            coordinator.onRegistered("fid-b")
+            coordinator.onRegistered("fid-a")
+            runCurrent()
+            next.await()
             coordinator.reconcileCurrent()
 
             assertEquals(listOf("fid-b"), installations.createdFids)
@@ -603,6 +609,74 @@ class PushRegistrationCoordinatorTest {
 
             assertEquals(6, store.updateAttempts)
             assertEquals(31_000L, testScheduler.currentTime)
+            assertEquals(PushLifecyclePhase.DRAIN_BLOCKED, coordinator.lifecyclePhase)
+            coordinator.close()
+        }
+
+    @Test
+    fun `terminal registration rows remain fail closed without credential rearm`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val owner = OwnerSnapshot(userId = 7L, generation = 1L)
+            val auth = RecordingAuth(
+                initial = AuthSession(owner.userId, AuthSession.Stage.Ready),
+                initialCredentialVersion = CredentialVersion("epoch", 0L),
+            )
+            val scheduler = RecordingScheduler()
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = auth,
+                installationRepository = RecordingInstallations(),
+                fcm = RecordingFirebase(),
+                stateStore = RecordingStateStore(
+                    PushStateV1(
+                        registration = RegistrationState(
+                            owner = owner,
+                            accountGeneration = owner.generation,
+                            pendingFid = "fid-a",
+                            installationId = "550e8400-e29b-41d4-a716-446655440000",
+                            terminal = RegistrationTerminal.FORBIDDEN,
+                        ),
+                    ),
+                ),
+                workScheduler = scheduler,
+                dispatcher = dispatcher,
+            )
+
+            coordinator.start()
+            runCurrent()
+            auth.setCredentialVersion(CredentialVersion("epoch", 1L))
+            runCurrent()
+
+            assertEquals(0, scheduler.enqueues)
+            assertEquals(PushLifecyclePhase.ACTIVATING_CURRENT, coordinator.lifecyclePhase)
+            coordinator.close()
+        }
+
+    @Test
+    fun `explicit unregister failure and drain retries stay within six task invocations`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val unregisterFailure = CompletableDeferred<Result<Unit>>().also {
+                it.complete(Result.failure(IllegalStateException("unregister failed")))
+            }
+            val firebase = RecordingFirebase(unregisterGate = unregisterFailure)
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = RecordingAuth(AuthSession.LoggedOut),
+                installationRepository = RecordingInstallations(),
+                fcm = firebase,
+                stateStore = RecordingStateStore(PushStateV1()),
+                workScheduler = RecordingScheduler(),
+                dispatcher = dispatcher,
+            )
+
+            val lease = coordinator.beginAccountExitLease()
+            val initial = coordinator.unregisterFirebase()
+            runCurrent()
+            initial.await()
+            coordinator.endAccountExit(lease)
+            advanceUntilIdle()
+
+            assertTrue(firebase.unregisters in 1..6)
             assertEquals(PushLifecyclePhase.DRAIN_BLOCKED, coordinator.lifecyclePhase)
             coordinator.close()
         }
@@ -1444,6 +1518,7 @@ class PushRegistrationCoordinatorTest {
         private val unregisterGate: CompletableDeferred<Result<Unit>>? = null,
     ) : FcmRegistrationClient {
         var registers = 0
+        var unregisters = 0
 
         override fun register(): Deferred<Result<Unit>> {
             registers++
@@ -1462,10 +1537,12 @@ class PushRegistrationCoordinatorTest {
             return completion
         }
 
-        override fun unregister(): Deferred<Result<Unit>> =
-            unregisterGate ?: CompletableDeferred<Result<Unit>>().also {
+        override fun unregister(): Deferred<Result<Unit>> {
+            unregisters++
+            return unregisterGate ?: CompletableDeferred<Result<Unit>>().also {
                 it.complete(Result.success(Unit))
             }
+        }
     }
 
     private class RecordingInstallations(

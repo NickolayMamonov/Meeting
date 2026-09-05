@@ -198,10 +198,22 @@ internal class AuthRepositoryImpl(
 
     override suspend fun logout() {
         val operationPermit = tokenManager.captureAuthOperationPermit()
-        val clearPermit = when (val read = tokenManager.readCredentialSnapshot(operationPermit)) {
-            is AuthCredentialRead.Present -> read.permit
-            is AuthCredentialRead.Missing -> read.permit
-            AuthCredentialRead.Stale -> null
+        var clearPermit = operationPermit
+        try {
+            clearPermit = when (val read = tokenManager.readCredentialSnapshot(operationPermit)) {
+                is AuthCredentialRead.Present -> read.permit
+                is AuthCredentialRead.Missing -> read.permit
+                /*
+                 * Retain the original generation fence. A stale permit is rejected
+                 * by reserveClear if a newer owner won the race, while a current
+                 * permit still gets the one safe fallback clear.
+                 */
+                AuthCredentialRead.Stale -> operationPermit
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Credential read failed during logout, clearing if still current")
         }
         try {
             authApi.logout()
@@ -211,10 +223,11 @@ internal class AuthRepositoryImpl(
             Timber.w(e, "Server logout failed, clearing local tokens anyway")
         } finally {
             withContext(NonCancellable) {
-                val clearReservation =
-                    clearPermit?.let { tokenManager.reserveClear(it) }
-                if (clearReservation != null) {
-                    tokenManager.clearReserved(clearReservation)
+                runCatching {
+                    val clearReservation = tokenManager.reserveClear(clearPermit)
+                    if (clearReservation != null) {
+                        tokenManager.clearReserved(clearReservation)
+                    }
                 }
             }
         }
