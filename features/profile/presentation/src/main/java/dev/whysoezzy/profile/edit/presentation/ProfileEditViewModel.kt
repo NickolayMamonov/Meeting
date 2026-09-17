@@ -11,6 +11,7 @@ import com.whysoezzy.domain.models.SocialMediaInfo
 import com.whysoezzy.domain.models.SocialMediaType
 import com.whysoezzy.domain.models.Tag
 import com.whysoezzy.domain.models.User
+import com.whysoezzy.domain.usecase.AccountExitCoordinator
 import com.whysoezzy.domain.usecase.DeleteCurrentUserProfileUseCase
 import com.whysoezzy.domain.usecase.GetAllTagsUseCase
 import com.whysoezzy.domain.usecase.GetCurrentUserUseCase
@@ -41,6 +42,7 @@ class ProfileEditViewModel(
     private val deleteCurrentUserProfileUseCase: DeleteCurrentUserProfileUseCase,
     private val uploadAvatarUseCase: UploadAvatarUseCase,
     private val logoutUseCase: LogoutUseCase,
+    private val accountExitCoordinator: AccountExitCoordinator? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileEditUiState())
     val uiState: StateFlow<ProfileEditUiState> = _uiState.asStateFlow()
@@ -386,9 +388,14 @@ class ProfileEditViewModel(
                 showDeleteConfirmDialog = false,
             )
 
-            deleteCurrentUserProfileUseCase()
+            val deletion =
+                accountExitCoordinator?.deleteCurrentAccount()
+                    ?: deleteCurrentUserProfileUseCase()
+            deletion
                 .onSuccess {
-                    logoutUseCase()
+                    if (accountExitCoordinator == null) {
+                        logoutUseCase()
+                    }
                     _uiState.value = _uiState.value.copy(isSaving = false)
                     _navEvent.tryEmit(ProfileEditNavEvent.NavigateToAuth)
                 }.onFailure { exception ->

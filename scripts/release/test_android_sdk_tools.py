@@ -23,7 +23,7 @@ class AndroidSdkToolsTest(unittest.TestCase):
         self.addCleanup(self.platform.stop)
 
     @staticmethod
-    def make_sdk(root, versions):
+    def make_sdk(root, versions, launchers=("apksigner",)):
         build_tools = root / "build-tools"
         build_tools.mkdir()
         for version, valid in versions:
@@ -33,9 +33,10 @@ class AndroidSdkToolsTest(unittest.TestCase):
                 f"Pkg.Revision = {version}\n", encoding="utf-8"
             )
             if valid:
-                tool = package / "apksigner"
-                tool.write_text("#!/bin/sh\n", encoding="utf-8")
-                tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
+                for launcher in launchers:
+                    tool = package / launcher
+                    tool.write_text("#!/bin/sh\n", encoding="utf-8")
+                    tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
 
     @staticmethod
     def successful_tool(*_args, **_kwargs):
@@ -132,6 +133,68 @@ class AndroidSdkToolsTest(unittest.TestCase):
                 ):
                     with self.assertRaises(AndroidSdkToolError):
                         resolve_apksigner({"ANDROID_SDK_ROOT": str(root)})
+
+    def test_apksigner_windows_prefers_bat_launcher_and_allows_batch_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_sdk(
+                root,
+                [("36.1.0", True)],
+                launchers=("apksigner", "apksigner.bat"),
+            )
+            batch_file = root / "build-tools/36.1.0/apksigner.bat"
+            batch_file.chmod(batch_file.stat().st_mode & ~stat.S_IXUSR)
+            with patch.object(android_sdk_tools.sys, "platform", "win32"):
+                with patch(
+                    "android_sdk_tools.subprocess.run",
+                    side_effect=self.successful_tool,
+                ) as probe:
+                    self.assertEqual(
+                        resolve_apksigner({"ANDROID_SDK_ROOT": str(root)}),
+                        batch_file.resolve(),
+                    )
+            probe.assert_called_once_with(
+                [str(batch_file.resolve()), "version"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+    def test_apksigner_windows_does_not_fallback_to_extensionless_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_sdk(root, [("36.1.0", True)])
+            with patch.object(android_sdk_tools.sys, "platform", "win32"):
+                with patch(
+                    "android_sdk_tools.subprocess.run",
+                    side_effect=self.successful_tool,
+                ) as probe:
+                    with self.assertRaises(AndroidSdkToolError):
+                        resolve_apksigner({"ANDROID_SDK_ROOT": str(root)})
+            probe.assert_not_called()
+
+    def test_apksigner_non_windows_prefers_extensionless_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_sdk(
+                root,
+                [("36.1.0", True)],
+                launchers=("apksigner", "apksigner.bat"),
+            )
+            with patch(
+                "android_sdk_tools.subprocess.run",
+                side_effect=self.successful_tool,
+            ) as probe:
+                self.assertEqual(
+                    resolve_apksigner({"ANDROID_SDK_ROOT": str(root)}),
+                    (root / "build-tools/36.1.0/apksigner").resolve(),
+                )
+            probe.assert_called_once_with(
+                [str((root / "build-tools/36.1.0/apksigner").resolve()), "version"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
     def test_symlink_escape_and_non_executable_tool_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:

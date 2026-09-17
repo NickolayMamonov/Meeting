@@ -15,6 +15,7 @@ val profileFeatureModule = module {
             manageCommunitySubscriptionUseCase = get(),
             logoutUseCase = get(),
             dispatchers = get(),
+            accountExitCoordinator = get(),
         )
     }
 
@@ -26,6 +27,7 @@ val profileFeatureModule = module {
             deleteCurrentUserProfileUseCase = get(),
             uploadAvatarUseCase = get(),
             logoutUseCase = get(),
+            accountExitCoordinator = get(),
         )
     }
 }

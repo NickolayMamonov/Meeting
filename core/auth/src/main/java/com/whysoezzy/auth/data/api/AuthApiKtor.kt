@@ -15,10 +15,11 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
 internal class AuthApiKtor(
-    private val client: HttpClient,
+    private val publicClient: HttpClient,
+    private val authorizedClient: HttpClient,
 ) : AuthApi {
     override suspend fun requestEmailOtp(email: String): SendOtpResponse =
-        client
+        publicClient
             .post("auth/email/send-otp") {
                 contentType(ContentType.Application.Json)
                 retry { noRetry() }
@@ -31,7 +32,7 @@ internal class AuthApiKtor(
         name: String?,
         surname: String?,
     ): AuthResponse =
-        client
+        publicClient
             .post("auth/email/verify-otp") {
                 contentType(ContentType.Application.Json)
                 retry { noRetry() }
@@ -39,11 +40,11 @@ internal class AuthApiKtor(
             }.body()
 
     override suspend fun refreshToken(refreshToken: String): RefreshTokenResponse =
-        client
+        publicClient
             .post("auth/refresh") {
                 contentType(ContentType.Application.Json)
                 setBody(RefreshTokenRequest(refreshToken))
             }.body()
 
-    override suspend fun logout(): Map<String, String> = client.post("auth/logout").body()
+    override suspend fun logout(): Map<String, String> = authorizedClient.post("auth/logout").body()
 }

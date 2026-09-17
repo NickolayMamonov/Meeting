@@ -605,6 +605,12 @@ def _no_pre_admission_post(
             expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
+            attestation_repository="owner/repo",
+            attestation_signer_workflow="owner/repo/.github/workflows/release.yml",
+            attestation_source_ref="refs/heads/dev",
+            attestation_source_sha="b" * 40,
+            attestation_run_id=100,
+            attestation_run_attempt=2,
         )
     except (PublicationError, AssertionError):
         return client.post_count == 0
@@ -700,6 +706,12 @@ def _prepatch_divergence_rejected(
             expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
+            attestation_repository="owner/repo",
+            attestation_signer_workflow="owner/repo/.github/workflows/release.yml",
+            attestation_source_ref="refs/heads/dev",
+            attestation_source_sha="b" * 40,
+            attestation_run_id=100,
+            attestation_run_attempt=2,
         )
     except (PublicationError, AssertionError):
         return client.post_count == 1 and client.patch_count == 0
@@ -786,6 +798,12 @@ def _loopback_state_identity_mismatch_rejected(
             expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
+            attestation_repository="owner/repo",
+            attestation_signer_workflow="owner/repo/.github/workflows/release.yml",
+            attestation_source_ref="refs/heads/dev",
+            attestation_source_sha="b" * 40,
+            attestation_run_id=100,
+            attestation_run_attempt=2,
         )
     except (PublicationError, AssertionError):
         return client.post_count == 0
@@ -1020,6 +1038,12 @@ def _final_asset_metadata_drift_rejected(
             expected_source_branch=expected_source_branch,
             evidence_directory=evidence_directory,
             manifest_path=manifest_path,
+            attestation_repository="owner/repo",
+            attestation_signer_workflow="owner/repo/.github/workflows/release.yml",
+            attestation_source_ref="refs/heads/dev",
+            attestation_source_sha="b" * 40,
+            attestation_run_id=100,
+            attestation_run_attempt=2,
         )
     except PublicationError:
         return client.post_count == 1 and client.patch_count == 1
@@ -1495,6 +1519,12 @@ def run_harness(
                     verify_downloaded=android_verifier,
                     verify_attestation_local=attestation_verifier,
                     verify_attestation_downloaded=attestation_verifier,
+                    attestation_repository=attestation_repository,
+                    attestation_signer_workflow=attestation_signer_workflow,
+                    attestation_source_ref=attestation_source_ref,
+                    attestation_source_sha=attestation_source_sha,
+                    attestation_run_id=attestation_run_id or 100,
+                    attestation_run_attempt=attestation_run_attempt or 2,
                 )
             except PublicationError as error:
                 if not (

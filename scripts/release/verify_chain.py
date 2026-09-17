@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -19,6 +20,39 @@ from release_evidence import (
 
 class ChainError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class ExpectedAttestationPolicy:
+    """The signed execution identity a retained chain must belong to."""
+
+    source_repository: str
+    signer_workflow: str
+    source_ref: str
+    source_sha: str
+    run_id: int
+    run_attempt: int
+
+    def __post_init__(self) -> None:
+        if not all(
+            isinstance(value, str) and value
+            for value in (
+                self.source_repository,
+                self.signer_workflow,
+                self.source_ref,
+                self.source_sha,
+            )
+        ):
+            raise ChainError("expected attestation policy contains an empty identity")
+        if (
+            not isinstance(self.run_id, int)
+            or isinstance(self.run_id, bool)
+            or self.run_id <= 0
+            or not isinstance(self.run_attempt, int)
+            or isinstance(self.run_attempt, bool)
+            or self.run_attempt <= 0
+        ):
+            raise ChainError("expected attestation policy execution identity is invalid")
 
 
 def digest(path: Path) -> str:
@@ -51,7 +85,16 @@ def require_reference(
         raise ChainError(f"{description} digest mismatch")
 
 
-def verify(directory: Path) -> None:
+def verify(
+    directory: Path,
+    expected_policy: ExpectedAttestationPolicy | None = None,
+) -> None:
+    """Verify chain structure, optionally binding it to an execution policy.
+
+    Unqualified verification remains available only for local structural
+    inspection. Production admission must use ``verify_admission`` or the CLI,
+    both of which require the complete trusted execution identity.
+    """
     manifest_name = "snapshot-manifest.json" if (directory / "snapshot-manifest.json").exists() else "release-manifest.json"
     manifest_path = directory / manifest_name
     manifest = read(manifest_path)
@@ -154,6 +197,7 @@ def verify(directory: Path) -> None:
     statements: set[str] = set()
     identities: set[str] = set()
     group_records: list[dict] = []
+    policy_comparisons = 0
     for reference in references:
         reference_name = reference["name"]
         if Path(reference_name).name != reference_name:
@@ -221,6 +265,23 @@ def verify(directory: Path) -> None:
                 ) from error
             if producer_group != authoritative_group:
                 raise ChainError(f"producer/authoritative group mismatch for {attestation_path.name}")
+            if expected_policy is not None:
+                if (
+                    producer_group.source_repository != expected_policy.source_repository
+                    or producer_group.signer != expected_policy.signer_workflow
+                    or producer_group.source_ref != expected_policy.source_ref
+                    or producer_group.source_sha != expected_policy.source_sha
+                    or producer_group.run_id != expected_policy.run_id
+                    or producer_group.run_attempt != expected_policy.run_attempt
+                ):
+                    raise ChainError(
+                        f"attestation group does not match expected policy for {attestation_path.name}"
+                    )
+                policy_comparisons += 1
+        elif expected_policy is not None:
+            raise ChainError(
+                f"expected policy requires an attestation group for {attestation_path.name}"
+            )
         if linked["canonical_bundle_sha256"] in canonical_bundles:
             raise ChainError("duplicate canonical attestation bundle")
         if linked["statement_sha256"] in statements:
@@ -242,6 +303,10 @@ def verify(directory: Path) -> None:
         verify_attestation_groups(group_records)
     except (EvidenceError, KeyError, TypeError, ValueError) as error:
         raise ChainError(f"invalid attestation group cardinality: {error}") from error
+    if expected_policy is not None and (
+        policy_comparisons == 0 or policy_comparisons != len(references)
+    ):
+        raise ChainError("expected attestation policy was not compared for every record")
     if covered_subjects != expected_subjects:
         raise ChainError("attestation coverage is not exact")
     expected_files = {
@@ -258,11 +323,46 @@ def verify(directory: Path) -> None:
         raise ChainError("release evidence contains unreferenced or missing files")
 
 
+def verify_admission(
+    directory: Path,
+    expected_policy: ExpectedAttestationPolicy,
+) -> None:
+    if not isinstance(expected_policy, ExpectedAttestationPolicy):
+        raise ChainError("expected attestation policy is required for admission")
+    verify(directory, expected_policy)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("directory", type=Path)
+    parser.add_argument("--expected-source-repository", required=True)
+    parser.add_argument("--expected-signer-workflow", required=True)
+    parser.add_argument("--expected-source-ref", required=True)
+    parser.add_argument("--expected-source-sha", required=True)
+    parser.add_argument("--expected-run-id", type=int, required=True)
+    parser.add_argument("--expected-run-attempt", type=int, required=True)
+    args = parser.parse_args()
+    policy_values = (
+        args.expected_source_repository,
+        args.expected_signer_workflow,
+        args.expected_source_ref,
+        args.expected_source_sha,
+        args.expected_run_id,
+        args.expected_run_attempt,
+    )
+    if not all(value is not None for value in policy_values):
+        print("release-chain verification failed: expected attestation policy is partial")
+        return 1
+    expected_policy = ExpectedAttestationPolicy(
+        source_repository=args.expected_source_repository,
+        signer_workflow=args.expected_signer_workflow,
+        source_ref=args.expected_source_ref,
+        source_sha=args.expected_source_sha,
+        run_id=args.expected_run_id,
+        run_attempt=args.expected_run_attempt,
+    )
     try:
-        verify(parser.parse_args().directory)
+        verify_admission(args.directory, expected_policy)
     except (ChainError, KeyError, OSError, ValueError) as error:
         print(f"release-chain verification failed: {error}")
         return 1

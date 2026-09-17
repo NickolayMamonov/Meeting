@@ -479,6 +479,12 @@ def run(
     verify_downloaded: Callable[[Path], Any] | None = None,
     verify_attestation_local: Callable[[Path], Any] | None = None,
     verify_attestation_downloaded: Callable[[Path], Any] | None = None,
+    attestation_repository: str,
+    attestation_signer_workflow: str,
+    attestation_source_ref: str,
+    attestation_source_sha: str,
+    attestation_run_id: int,
+    attestation_run_attempt: int,
     assert_tag_absent: Callable[[str], None] | None = None,
     download_path: Path | None = None,
 ) -> dict[str, Any]:
@@ -496,8 +502,18 @@ def run(
             source_sha=source_sha,
             expected_source_branch=expected_source_branch,
         )
-        from verify_chain import verify as verify_chain
-        verify_chain(evidence_directory)
+        from verify_chain import ExpectedAttestationPolicy, verify_admission
+        verify_admission(
+            evidence_directory,
+            ExpectedAttestationPolicy(
+                source_repository=attestation_repository,
+                signer_workflow=attestation_signer_workflow,
+                source_ref=attestation_source_ref,
+                source_sha=attestation_source_sha,
+                run_id=attestation_run_id,
+                run_attempt=attestation_run_attempt,
+            ),
+        )
     except (MutationError, OSError, ValueError) as error:
         raise PublicationError(f"protected evidence admission failed: {error}") from error
     apk = evidence_directory / "Meet.apk"
@@ -746,6 +762,12 @@ def main() -> int:
             verify_downloaded=verify_android,
             verify_attestation_local=verify_attestation,
             verify_attestation_downloaded=verify_attestation,
+            attestation_repository=args.repository,
+            attestation_signer_workflow=args.attestation_signer_workflow,
+            attestation_source_ref=args.attestation_source_ref,
+            attestation_source_sha=args.attestation_source_sha,
+            attestation_run_id=args.attestation_run_id,
+            attestation_run_attempt=args.attestation_run_attempt,
         )
     except (PublicationError, MutationError, OSError, ValueError, json.JSONDecodeError) as error:
         print(f"release publication failed: {error}")

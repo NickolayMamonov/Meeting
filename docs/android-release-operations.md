@@ -249,3 +249,49 @@ must confirm package `dev.whysoezzy.meet`, version name/code,
 non-debuggable release state, the existing RSA-4096 certificate fingerprint
 `b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f`, exact
 checksums, manifests, optional outputs, attestations, and production URL.
+
+## Firebase, crash reporting, and SDK custody
+
+Stable builds use the protected `GOOGLE_SERVICES_JSON` input and validate that
+its client package is exactly `dev.whysoezzy.meet` before Gradle runs.
+Snapshot builds use the protected snapshot configuration and validate
+`dev.whysoezzy.meet.snapshot` before producing unsigned artifacts. Both
+configurations are temporary build inputs: they are written with restrictive
+permissions, are never printed or uploaded, and are removed on successful,
+failed, or interrupted build exits. The checked-in
+`app/google-services-ci.json` is a non-secret test fixture only and does not
+stand in for either protected release input.
+
+The application starts Koin with the complete immutable application module
+collection, including the existing Crashlytics reporter binding. Debug builds
+resolve `NoOpCrashReporter`; non-debug builds resolve the Firebase
+Crashlytics bridge and plant its Timber tree. This verifies startup wiring only;
+it does not claim that a live Firebase console has received an event.
+Analytics remains the existing Firebase SDK integration. Local gates can verify
+configuration and release package identity, but cannot prove production
+dashboard delivery or event attribution without a separately authorized
+console-side check.
+
+Android SDK release tools are selected from one canonical SDK root and one
+highest validated package. Windows uses regular `apksigner.bat` and
+`apkanalyzer.bat` launchers and identity probes without requiring a POSIX
+execute bit. Unix uses executable extensionless `apksigner` and `apkanalyzer`
+launchers. A missing launcher, package mismatch, escape from the SDK root, or
+malformed identity probe fails closed; no alternate launcher or downgrade is
+permitted.
+
+Admission cryptographically recomputes the producer and authoritative
+attestation group for every indexed record and compares repository, signer
+workflow, source ref, tooling SHA, run ID, and run attempt with the retained
+`proof-run.json`. A complete expected policy is all-or-none: legacy, absent,
+partial, mixed, or cross-run/cross-tooling group evidence is rejected before
+SDK resolution. Policy-free verification remains available only for compatible
+legacy chain inspection; it is not proof admission.
+
+Device continuation is a cleanup-owned probe on an authorized API 37 Google
+Play target. It checks the literal admitted APK digest before installation,
+returns status `1` for a bad-digest prerequisite without installing, and
+returns status `97` only for the intentional post-install failure after
+uninstall and package-absence verification. Normal startup performs the same
+cleanup proof. `dev.whysoezzy.meet` must be absent after every probe and after
+successful execution; a cleanup query failure is itself a gate failure.

@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class KtorNetworkModuleTest {
     @Test
-    fun `email auth request is sent without bearer token or retries`() = runTest {
+    fun `OTP and refresh auth requests are sent without bearer tokens or retries`() = runTest {
         val requestCount = AtomicInteger()
         val engine = MockEngine { request ->
             requestCount.incrementAndGet()
@@ -34,9 +34,50 @@ class KtorNetworkModuleTest {
             onRefreshToken = { "new-access-token" to "new-refresh-token" },
         )
         try {
-            val result = safeApiCall { client.post("/auth/email/send-otp").bodyAsText() }
-            assertTrue(result.exceptionOrNull() is ApiException.ServerError)
-            assertEquals(1, requestCount.get())
+            listOf(
+                "/auth/email/send-otp",
+                "/auth/email/verify-otp",
+                "/auth/refresh",
+            ).forEach { path ->
+                val result = safeApiCall { client.post(path).bodyAsText() }
+                assertTrue(result.exceptionOrNull() is ApiException.ServerError)
+            }
+            assertEquals(3, requestCount.get())
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun `logout sends bearer token then refreshes and retries after unauthorized response`() = runTest {
+        val requestCount = AtomicInteger()
+        val refreshCount = AtomicInteger()
+        val engine = MockEngine { request ->
+            assertEquals("/auth/logout", request.url.encodedPath)
+            when (requestCount.incrementAndGet()) {
+                1 -> {
+                    assertEquals("Bearer old-access-token", request.headers[HttpHeaders.Authorization])
+                    respond(content = "", status = HttpStatusCode.Unauthorized)
+                }
+                2 -> {
+                    assertEquals("Bearer new-access-token", request.headers[HttpHeaders.Authorization])
+                    respond(content = "success", status = HttpStatusCode.OK)
+                }
+                else -> error("Unexpected logout request")
+            }
+        }
+        val client = KtorNetworkModule.provideHttpClient(
+            engine = engine,
+            tokenProvider = tokenProvider(),
+            onRefreshToken = {
+                refreshCount.incrementAndGet()
+                "new-access-token" to "new-refresh-token"
+            },
+        )
+        try {
+            assertEquals("success", client.post("auth/logout").bodyAsText())
+            assertEquals(2, requestCount.get())
+            assertEquals(1, refreshCount.get())
         } finally {
             client.close()
         }

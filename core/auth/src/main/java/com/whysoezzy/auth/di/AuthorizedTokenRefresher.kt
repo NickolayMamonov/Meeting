@@ -1,57 +1,63 @@
 package com.whysoezzy.auth.di
 
 import com.whysoezzy.auth.TokenManager
+import com.whysoezzy.auth.domain.models.AuthClearResult
+import com.whysoezzy.auth.domain.models.RefreshOutcome
 import com.whysoezzy.auth.domain.repository.AuthRepository
-import com.whysoezzy.auth.domain.repository.AuthSessionRepository
 import com.whysoezzy.common.error.AppException
 import com.whysoezzy.network.error.ApiException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Converts a bearer-token refresh into Ktor tokens without treating transient failures as logout.
+ * Converts an explicit refresh outcome into the token pair required by Ktor.
+ *
+ * The operation permit is captured before the first suspension. The repository owns the one
+ * coherent credential read and returns the exact pair it persisted.
  */
 internal suspend fun refreshAuthorizedTokens(
     authRepository: AuthRepository,
     tokenManager: TokenManager,
-    sessionRepository: AuthSessionRepository? = null,
+    sessionRepository: com.whysoezzy.auth.domain.repository.AuthSessionRepository? = null,
 ): Pair<String, String>? {
-    if (tokenManager.getRefreshToken().isNullOrBlank()) {
-        clearSession(tokenManager, sessionRepository)
-        return null
-    }
-
-    try {
-        val result = authRepository.refreshToken()
-        val accessToken = result.getOrElse { error ->
-            if (error is AppException.UnauthorizedError || error is ApiException.UnauthorizedError) {
-                clearSession(tokenManager, sessionRepository)
-            } else {
-                Timber.w(error, "Token refresh failed; preserving local session for retry")
+    val operationPermit = tokenManager.captureAuthOperationPermit()
+    return try {
+        when (val outcome = authRepository.refreshToken(operationPermit)) {
+            is RefreshOutcome.Refreshed ->
+                outcome.pair.accessToken to outcome.pair.refreshToken
+            is RefreshOutcome.Missing ->
+                clearReserved(tokenManager, outcome.clearPermit)
+            is RefreshOutcome.Unauthorized ->
+                clearReserved(tokenManager, outcome.clearPermit)
+            is RefreshOutcome.TransientFailure -> {
+                Timber.w(outcome.error, "Token refresh failed; preserving local session for retry")
+                null
             }
-            return null
+            RefreshOutcome.StaleSkipped -> null
         }
-        val refreshToken = tokenManager.getRefreshToken()
-        if (refreshToken.isNullOrBlank()) {
-            clearSession(tokenManager, sessionRepository)
-            return null
-        }
-        return accessToken to refreshToken
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        Timber.w(e, "Token refresh failed; preserving local session for retry")
-        return null
+        if (e is AppException.UnauthorizedError || e is ApiException.UnauthorizedError) {
+            Timber.w(e, "Token refresh authorization outcome was not explicit")
+        } else {
+            Timber.w(e, "Token refresh failed; preserving local session for retry")
+        }
+        null
     }
 }
 
-private suspend fun clearSession(
+private suspend fun clearReserved(
     tokenManager: TokenManager,
-    sessionRepository: AuthSessionRepository?,
-) {
-    try {
-        sessionRepository?.clear()
-    } finally {
-        tokenManager.clearTokens()
+    permit: com.whysoezzy.auth.domain.models.AuthOperationPermit,
+): Pair<String, String>? =
+    withContext(NonCancellable) {
+        val reservation = tokenManager.reserveClear(permit) ?: return@withContext null
+        when (tokenManager.clearReserved(reservation)) {
+            AuthClearResult.Cleared,
+            AuthClearResult.StaleSkipped,
+            -> null
+        }
     }
-}

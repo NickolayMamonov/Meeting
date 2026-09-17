@@ -364,7 +364,13 @@ jobs:
           test -z "$symbols" || args+=(--symbols "$symbols")
           python release-tooling/scripts/release/package_artifacts.py "${args[@]}"
           (cd release-output && sha256sum --check SHA256SUMS)
-          verification="$(python release-tooling/scripts/release/verify_chain.py release-output)"
+          verification="$(python release-tooling/scripts/release/verify_chain.py release-output \
+            --expected-source-repository "$GITHUB_REPOSITORY" \
+            --expected-signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-proof.yml" \
+            --expected-source-ref refs/heads/master \
+            --expected-source-sha "$GITHUB_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT")"
           printf '%s\n' "$verification"
           grep -Fx 'release-chain verification passed' <<<"$verification"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -444,7 +450,13 @@ jobs:
             '.apk == $expected and .aab == $expected' \
             report/signer/signer-fingerprints.json >/dev/null
           (cd report/release-output && sha256sum --check SHA256SUMS)
-          verification="$(python release-tooling/scripts/release/verify_chain.py report/release-output)"
+          verification="$(python release-tooling/scripts/release/verify_chain.py report/release-output \
+            --expected-source-repository "$GITHUB_REPOSITORY" \
+            --expected-signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-proof.yml" \
+            --expected-source-ref refs/heads/master \
+            --expected-source-sha "$GITHUB_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT")"
           printf '%s\n' "$verification"
           grep -Fx 'release-chain verification passed' <<<"$verification"
       - name: Write retained proof identities
