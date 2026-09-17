@@ -20,7 +20,7 @@ val pushRegistrationModule =
     module {
         worker { parameters ->
             PushReconcileWorker(
-                appContext = parameters.get(),
+                appContext = androidContext(),
                 workerParams = parameters.get(),
                 coordinator = get(),
             )
