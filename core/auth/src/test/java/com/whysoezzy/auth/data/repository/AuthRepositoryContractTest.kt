@@ -174,7 +174,7 @@ class AuthRepositoryContractTest {
     }
 
     private fun repository(client: HttpClient): AuthRepositoryImpl =
-        AuthRepositoryImpl(AuthApiKtor(client), tokenManager)
+        AuthRepositoryImpl(AuthApiKtor(client, client), tokenManager)
 
     private suspend fun <T> withClient(
         engine: MockEngine,

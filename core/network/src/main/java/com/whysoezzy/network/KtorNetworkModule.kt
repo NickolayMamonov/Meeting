@@ -115,7 +115,10 @@ object KtorNetworkModule {
 
                     sendWithoutRequest { request ->
                         request.url.host == baseHost() &&
-                            !request.url.encodedPath.isAuthPath()
+                            (
+                                !request.url.encodedPath.isAuthPath() ||
+                                    request.url.encodedPath == AUTH_LOGOUT_PATH
+                            )
                     }
 
                     refreshTokens {
@@ -158,6 +161,7 @@ object KtorNetworkModule {
             .substringBefore(":")
 
     private const val AUTH_PATH_SEGMENT = "auth"
+    private const val AUTH_LOGOUT_PATH = "/auth/logout"
     private const val MAX_RETRIES = 3
     private val SERVER_ERROR_STATUS_RANGE = 500..599
 }
