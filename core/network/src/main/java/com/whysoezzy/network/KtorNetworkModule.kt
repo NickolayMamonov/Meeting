@@ -117,7 +117,7 @@ object KtorNetworkModule {
                         request.url.host == baseHost() &&
                             (
                                 !request.url.encodedPath.isAuthPath() ||
-                                    request.url.encodedPath == AUTH_LOGOUT_PATH
+                                    request.url.encodedPath.trimStart('/') == AUTH_LOGOUT_PATH.trimStart('/')
                             )
                     }
 

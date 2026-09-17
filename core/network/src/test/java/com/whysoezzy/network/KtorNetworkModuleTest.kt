@@ -53,6 +53,7 @@ class KtorNetworkModuleTest {
         val requestCount = AtomicInteger()
         val refreshCount = AtomicInteger()
         val engine = MockEngine { request ->
+            assertEquals("/auth/logout", request.url.encodedPath)
             when (requestCount.incrementAndGet()) {
                 1 -> {
                     assertEquals("Bearer old-access-token", request.headers[HttpHeaders.Authorization])
@@ -74,7 +75,7 @@ class KtorNetworkModuleTest {
             },
         )
         try {
-            assertEquals("success", client.post("/auth/logout").bodyAsText())
+            assertEquals("success", client.post("auth/logout").bodyAsText())
             assertEquals(2, requestCount.get())
             assertEquals(1, refreshCount.get())
         } finally {

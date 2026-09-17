@@ -5,6 +5,8 @@ import com.whysoezzy.auth.data.dto.AuthUserDto
 import com.whysoezzy.auth.data.dto.SendOtpRequest
 import com.whysoezzy.auth.data.dto.VerifyOtpRequest
 import com.whysoezzy.network.KtorNetworkModule
+import com.whysoezzy.network.TokenProvider
+import com.whysoezzy.network.TokenSnapshot
 import com.whysoezzy.testing.MainDispatcherRule
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -19,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -56,7 +59,20 @@ class AuthApiKtorTest {
         block: suspend (HttpClient, HttpClient) -> T,
     ): T {
         val publicClient = KtorNetworkModule.provideHttpClient(publicEngine)
-        val authorizedClient = KtorNetworkModule.provideHttpClient(authorizedEngine)
+        val authorizedClient = KtorNetworkModule.provideHttpClient(
+            engine = authorizedEngine,
+            tokenProvider = object : TokenProvider {
+                override suspend fun getAccessToken() = "access-token"
+
+                override suspend fun getRefreshToken() = "refresh-token"
+
+                override suspend fun loadTokens() = TokenSnapshot(
+                    accessToken = "access-token",
+                    refreshToken = "refresh-token",
+                )
+            },
+            onRefreshToken = { null },
+        )
         return try {
             block(publicClient, authorizedClient)
         } finally {
@@ -77,6 +93,7 @@ class AuthApiKtorTest {
         )
         val publicEngine = MockEngine { request ->
             publicRequests += request
+            assertNull(request.headers[HttpHeaders.Authorization])
             when (request.url.encodedPath) {
                 "/auth/email/send-otp" -> respond(
                     content = """{"message":"sent"}""",
@@ -98,6 +115,7 @@ class AuthApiKtorTest {
             check(request.url.encodedPath == "/auth/logout") {
                 "Unexpected authorized auth path: ${request.url.encodedPath}"
             }
+            assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
             respond(
                 content = """{"message":"logged out"}""",
                 headers = jsonHeaders,
