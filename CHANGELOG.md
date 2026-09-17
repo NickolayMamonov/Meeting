@@ -2,6 +2,38 @@
 
 All notable Android releases are documented here.
 
+## [1.1.0](https://github.com/NickolayMamonov/Meeting/compare/v1.0.0...v1.1.0) (2026-08-28)
+
+
+### Features
+
+* **release:** simplify Android release assets ([fa9b476](https://github.com/NickolayMamonov/Meeting/commit/fa9b476bdf186b51631dccb3fc4ac6b251eafd87))
+* **release:** simplify Android release assets ([1666f86](https://github.com/NickolayMamonov/Meeting/commit/1666f86c4dc2ed30d15ec5e61f74190fd16abfaa))
+
+
+### Bug Fixes
+
+* **release:** accept generated version state ([1670aa6](https://github.com/NickolayMamonov/Meeting/commit/1670aa6b9a415c7638c9b5b348d9ecd991b736c8))
+* **release:** accept generated version state ([8bdfb08](https://github.com/NickolayMamonov/Meeting/commit/8bdfb088db38783fc0163d264309f689f0e816ff))
+* **release:** accept verified self-signed AABs ([a3df98e](https://github.com/NickolayMamonov/Meeting/commit/a3df98e73fd97770c826fc5c7d4e37ffaaa491c0))
+* **release:** bind attestations to workflow commit ([e913b9a](https://github.com/NickolayMamonov/Meeting/commit/e913b9aa9eade2d24c3a1dd1003fdcff2c7725a1))
+* **release:** bind QA attestations to current runs ([c13b0e3](https://github.com/NickolayMamonov/Meeting/commit/c13b0e3f18aabe6a09d35d4da57c6c03f7b7b046))
+* **release:** bind QA identity fixtures and audit counts ([b589c13](https://github.com/NickolayMamonov/Meeting/commit/b589c13eb9a8354af2619e91c0a3f1c5fff90665))
+* **release:** close exact publication identity gaps ([c084206](https://github.com/NickolayMamonov/Meeting/commit/c0842069a0bb0964506797ca06a1869d7d66d58f))
+* **release:** close protected publication QA gaps ([e229e90](https://github.com/NickolayMamonov/Meeting/commit/e229e906a5bf57260bccc388ee67ad4785381edd))
+* **release:** derive cmdline package identity ([82ad035](https://github.com/NickolayMamonov/Meeting/commit/82ad0350111d6eeca4cfc4871306b70460265143))
+* **release:** pin post-build tooling to workflow commit ([502ea75](https://github.com/NickolayMamonov/Meeting/commit/502ea7551db5607aeef732c360b207d0ddbe2787))
+* **release:** resolve Android SDK tools before signing ([e1ac654](https://github.com/NickolayMamonov/Meeting/commit/e1ac6542a015d047751dfe0c3a7f3f6c0e72492b))
+* **release:** resolve drafts from paginated releases ([7b4641a](https://github.com/NickolayMamonov/Meeting/commit/7b4641ae3676fcb24c1d6ed648b132614e89c343))
+* **release:** resolve Windows apkanalyzer launcher ([87b0166](https://github.com/NickolayMamonov/Meeting/commit/87b0166b89c045e64cc15d16e42a4e550499ee3f))
+* **release:** resolve Windows apkanalyzer launcher ([92311fa](https://github.com/NickolayMamonov/Meeting/commit/92311fa21e7b16cfa74ac75de7790beb9e014873))
+* **release:** resume canonical Android draft safely ([5518008](https://github.com/NickolayMamonov/Meeting/commit/551800898da092d5857d91c0ec51b873c6174cf1))
+* **release:** use list authority for fresh drafts ([3a61300](https://github.com/NickolayMamonov/Meeting/commit/3a61300a95c3f0e7181eccdd8b59d3c007a194b1))
+* **release:** validate cmdline metadata identity ([385f6ec](https://github.com/NickolayMamonov/Meeting/commit/385f6eccc8f7f82657db2901b50afa2a13e93a05))
+* **release:** validate cmdline metadata identity ([1d970d3](https://github.com/NickolayMamonov/Meeting/commit/1d970d35304f9ff33fc432cfdb8e081f935d15a8))
+* **release:** validate cmdline package path ([fce49d7](https://github.com/NickolayMamonov/Meeting/commit/fce49d7bacf5be801583b5675138b22a04fcdd96))
+* **release:** validate stable Firebase config early ([a06fbf6](https://github.com/NickolayMamonov/Meeting/commit/a06fbf60d9b70c34d336014450f2410e53e1cf30))
+
 ## 1.0.0 (2026-08-15)
 
 
