@@ -296,7 +296,7 @@ class PushRegistrationCoordinatorTest {
             runCurrent()
             assertTrue(reconciliation.isCancelled)
             assertEquals(null, store.state.registration.pendingFid)
-            assertEquals(0, scheduler.enqueues)
+            assertEquals(1, scheduler.enqueues)
             coordinator.close()
         }
 
@@ -678,6 +678,36 @@ class PushRegistrationCoordinatorTest {
 
             assertTrue(firebase.unregisters in 1..6)
             assertEquals(PushLifecyclePhase.DRAIN_BLOCKED, coordinator.lifecyclePhase)
+            coordinator.close()
+        }
+
+    @Test
+    fun `idempotent unregister success without callback cannot block first authenticated activation`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val auth = RecordingAuth(AuthSession.LoggedOut)
+            val firebase = RecordingFirebase()
+            val scheduler = RecordingScheduler()
+            val coordinator = PushRegistrationCoordinator(
+                authSessionRepository = auth,
+                installationRepository = RecordingInstallations(),
+                fcm = firebase,
+                stateStore = RecordingStateStore(PushStateV1()),
+                workScheduler = scheduler,
+                dispatcher = dispatcher,
+            )
+
+            coordinator.start()
+            advanceUntilIdle()
+
+            assertEquals(1, firebase.unregisters)
+            assertEquals(PushLifecyclePhase.OPEN, coordinator.lifecyclePhase)
+
+            auth.setSession(AuthSession(7L, AuthSession.Stage.Ready))
+            runCurrent()
+
+            assertEquals(1, scheduler.enqueues)
+            assertEquals(PushLifecyclePhase.ACTIVATING_CURRENT, coordinator.lifecyclePhase)
             coordinator.close()
         }
 
