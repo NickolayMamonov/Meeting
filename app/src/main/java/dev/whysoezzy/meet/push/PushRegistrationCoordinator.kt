@@ -40,7 +40,6 @@ internal enum class PushLifecyclePhase {
 
 internal enum class DrainBlockReason {
     UNREGISTER_TASK,
-    UNREGISTER_CALLBACK,
     FINAL_SCRUB,
     SCHEDULER_CANCEL,
     NOTIFICATION_CANCEL,
@@ -139,8 +138,6 @@ internal class PushRegistrationCoordinator(
     private var drainFailure: DrainTicket? = null
     private var currentActivationUser: Long? = null
     private var firebaseCommand: FirebaseCommand? = null
-    private var callbackDebt: CompletableDeferred<Unit>? = null
-    private var callbackDebtSatisfied = false
     private var registerCallbackDebt = 0
     private var unregisterTaskSucceeded = false
     private var unregisterInvocations = 0
@@ -280,29 +277,9 @@ internal class PushRegistrationCoordinator(
         if (command == null) return
     }
 
-    fun onUnregistered() {
-        val signal = synchronized(monitor) {
-            val debt = callbackDebt
-            if (debt != null && unregisterTaskSucceeded && !callbackDebtSatisfied) {
-                callbackDebtSatisfied = true
-                debt
-            } else {
-                null
-            }
-        }
-        signal?.complete(Unit)
-        if (signal != null) {
-            synchronized(monitor) {
-                if (phase == PushLifecyclePhase.DRAIN_BLOCKED &&
-                    drainFailure?.step == DrainBlockReason.UNREGISTER_CALLBACK
-                ) {
-                    phase = PushLifecyclePhase.DRAINING
-                    drainStarted = false
-                }
-            }
-            launchDrainIfNeeded()
-        }
-    }
+    // Firebase Messaging 25.1.1 emits no callback for an already-unregistered
+    // installation. The unregister Task is the completion authority.
+    fun onUnregistered() = Unit
 
     fun unregisterFirebase(): Deferred<Result<Unit>> =
         launchFirebase(FirebaseKind.UNREGISTER, null).completion
@@ -1087,8 +1064,6 @@ internal class PushRegistrationCoordinator(
             }
             firebaseCommand = command
             if (kind == FirebaseKind.UNREGISTER) {
-                callbackDebt = CompletableDeferred()
-                callbackDebtSatisfied = false
                 unregisterTaskSucceeded = false
                 lastUnregisterCompletion = completion
             }
@@ -1145,7 +1120,6 @@ internal class PushRegistrationCoordinator(
             } else {
                 synchronized(monitor) {
                     unregisterTaskSucceeded = true
-                    if (callbackDebtSatisfied) command.callback.complete(Unit)
                 }
             }
             finishFirebase(command)
@@ -1283,24 +1257,13 @@ internal class PushRegistrationCoordinator(
         if (existing != null && !existing.isCompleted) {
             runCatching { existing.await() }
         }
-        if (synchronized(monitor) { unregisterTaskSucceeded }) {
-            val callback = synchronized(monitor) { callbackDebt }
-            if (synchronized(monitor) { callbackDebtSatisfied }) return true
-            if (withTimeoutOrNull(FIREBASE_CALLBACK_TIMEOUT_MILLIS) { callback?.await() } != null) {
-                return true
-            }
-        }
+        if (synchronized(monitor) { unregisterTaskSucceeded }) return true
         val consumedAttempts = synchronized(monitor) {
             unregisterInvocations.coerceAtMost(MAX_ATTEMPTS)
         }
         val remainingAttempts = MAX_ATTEMPTS - consumedAttempts
         if (remainingAttempts == 0) {
-            val step = if (synchronized(monitor) { unregisterTaskSucceeded }) {
-                DrainBlockReason.UNREGISTER_CALLBACK
-            } else {
-                DrainBlockReason.UNREGISTER_TASK
-            }
-            blockDrain(DrainTicket(drain, MAX_ATTEMPTS, step))
+            blockDrain(DrainTicket(drain, MAX_ATTEMPTS, DrainBlockReason.UNREGISTER_TASK))
             return false
         }
         repeat(remainingAttempts) { retryIndex ->
@@ -1309,20 +1272,7 @@ internal class PushRegistrationCoordinator(
             val command = launchFirebase(FirebaseKind.UNREGISTER, null)
             val taskResult = command.completion.await()
             if (taskResult.isSuccess) {
-                val callback = synchronized(monitor) { callbackDebt }
-                val satisfied = synchronized(monitor) { callbackDebtSatisfied }
-                if (satisfied) return true
-                val callbackArrived = withTimeoutOrNull(FIREBASE_CALLBACK_TIMEOUT_MILLIS) {
-                    callback?.await()
-                }
-                if (callbackArrived != null) {
-                    synchronized(monitor) { callbackDebtSatisfied = true }
-                    return true
-                }
-                if (attempt == MAX_ATTEMPTS - 1) {
-                    blockDrain(ticket.copy(step = DrainBlockReason.UNREGISTER_CALLBACK))
-                    return false
-                }
+                return true
             } else if (attempt == MAX_ATTEMPTS - 1) {
                 blockDrain(ticket)
                 return false
