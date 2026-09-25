@@ -2,6 +2,66 @@
 
 All notable Android releases are documented here.
 
+## [1.1.0](https://github.com/NickolayMamonov/Meeting/compare/v1.0.0...v1.1.0) (2026-09-25)
+
+
+### Features
+
+* **android:** enable beta push registration ([0d8332e](https://github.com/NickolayMamonov/Meeting/commit/0d8332ee44acee1aba21399bbe5ef8d513ade968))
+* **release:** establish dev and master role contracts ([91bedd1](https://github.com/NickolayMamonov/Meeting/commit/91bedd116ca9c81110f136485a22914705cd1d60))
+* **release:** simplify Android release assets ([fa9b476](https://github.com/NickolayMamonov/Meeting/commit/fa9b476bdf186b51631dccb3fc4ac6b251eafd87))
+* **release:** simplify Android release assets ([1666f86](https://github.com/NickolayMamonov/Meeting/commit/1666f86c4dc2ed30d15ec5e61f74190fd16abfaa))
+
+
+### Bug Fixes
+
+* **android:** authorize logout requests ([c0b73f0](https://github.com/NickolayMamonov/Meeting/commit/c0b73f041ac3357e3e9faddbc455a4d51047c1da))
+* **android:** authorize relative logout paths ([f0f2742](https://github.com/NickolayMamonov/Meeting/commit/f0f2742edee7cc7ba5c25872f66e08e2002ce479))
+* **android:** close account exit push races ([d912371](https://github.com/NickolayMamonov/Meeting/commit/d9123717eb12cfe51f7c9c265fd9f38d314c8318))
+* **android:** close beta push exit fences ([98b8d9a](https://github.com/NickolayMamonov/Meeting/commit/98b8d9a668d3e2e43d2866025be13c194c54d775))
+* **android:** close credential and ledger gate findings ([f558801](https://github.com/NickolayMamonov/Meeting/commit/f558801724dcb1e0f2eb2ed1a854187f7464fd0e))
+* **android:** close push beta gate findings ([ab09aaf](https://github.com/NickolayMamonov/Meeting/commit/ab09aaf5f9bcc4ad16aee354a73f49fcb82855bd))
+* **android:** close push beta rework findings ([b847c30](https://github.com/NickolayMamonov/Meeting/commit/b847c301cec805378658b8a89de01c27d2b1c1f2))
+* **android:** close push exit gate findings ([0e19d42](https://github.com/NickolayMamonov/Meeting/commit/0e19d42a35d9f2c434edb67740b4b3f95eab7979))
+* **android:** close remaining push lifecycle races ([cdc118d](https://github.com/NickolayMamonov/Meeting/commit/cdc118d19c5ff113230c6529403904dc40ccbea2))
+* **android:** close remaining push lifecycle races ([a71f625](https://github.com/NickolayMamonov/Meeting/commit/a71f62576e0bf0d61ef52f853df9d5d61645b42a))
+* **android:** close service ingress retry gates ([ac5612e](https://github.com/NickolayMamonov/Meeting/commit/ac5612ee058f1cd56a28f257dc60423691dc8cc8))
+* **android:** harden push beta rework ([21ca051](https://github.com/NickolayMamonov/Meeting/commit/21ca0514466e646c74db928a168fb0ac1f73bbeb))
+* **android:** rearm push registration after terminal cleanup ([6b7d325](https://github.com/NickolayMamonov/Meeting/commit/6b7d32543f7b9c076a64467904786f30ca6a22f8))
+* **android:** resolve push worker context ([ebefabc](https://github.com/NickolayMamonov/Meeting/commit/ebefabc184799ef2c6c5dc6feab95dbe66fb31d3))
+* **android:** unregister firebase after account cleanup ([d44a003](https://github.com/NickolayMamonov/Meeting/commit/d44a003bc7971c390f96d2bb8670b578e73dce34))
+* close push lifecycle rework gaps ([d966d70](https://github.com/NickolayMamonov/Meeting/commit/d966d70b86ff4da71895a17f557c3456f2dd2486))
+* pin reviewed Firebase BoM ([d7ae5e4](https://github.com/NickolayMamonov/Meeting/commit/d7ae5e46c8b4070e559826dcc34f3435da0d4c87))
+* **push:** accept idempotent Firebase unregister ([#89](https://github.com/NickolayMamonov/Meeting/issues/89)) ([8a66a48](https://github.com/NickolayMamonov/Meeting/commit/8a66a48bd5de252b3e2d582df127a80d5425be3e))
+* **push:** promote idempotent unregister fix ([302fccc](https://github.com/NickolayMamonov/Meeting/commit/302fccc18e2d6e81aa75d711f500101767614992))
+* **release:** accept generated version state ([1670aa6](https://github.com/NickolayMamonov/Meeting/commit/1670aa6b9a415c7638c9b5b348d9ecd991b736c8))
+* **release:** accept generated version state ([8bdfb08](https://github.com/NickolayMamonov/Meeting/commit/8bdfb088db38783fc0163d264309f689f0e816ff))
+* **release:** accept verified self-signed AABs ([a3df98e](https://github.com/NickolayMamonov/Meeting/commit/a3df98e73fd97770c826fc5c7d4e37ffaaa491c0))
+* **release:** bind attestations to workflow commit ([e913b9a](https://github.com/NickolayMamonov/Meeting/commit/e913b9aa9eade2d24c3a1dd1003fdcff2c7725a1))
+* **release:** bind QA attestations to current runs ([c13b0e3](https://github.com/NickolayMamonov/Meeting/commit/c13b0e3f18aabe6a09d35d4da57c6c03f7b7b046))
+* **release:** bind QA identity fixtures and audit counts ([b589c13](https://github.com/NickolayMamonov/Meeting/commit/b589c13eb9a8354af2619e91c0a3f1c5fff90665))
+* **release:** close exact publication identity gaps ([c084206](https://github.com/NickolayMamonov/Meeting/commit/c0842069a0bb0964506797ca06a1869d7d66d58f))
+* **release:** close master contract trust gaps ([61e6470](https://github.com/NickolayMamonov/Meeting/commit/61e647095158046367bfb39154cbe2f14279bcb6))
+* **release:** close protected publication QA gaps ([e229e90](https://github.com/NickolayMamonov/Meeting/commit/e229e906a5bf57260bccc388ee67ad4785381edd))
+* **release:** close stable admission gaps ([743e917](https://github.com/NickolayMamonov/Meeting/commit/743e9177d89aaebedb53b13926cab94ecfa91d41))
+* **release:** consume uppercase commit property ([37833a5](https://github.com/NickolayMamonov/Meeting/commit/37833a56f1e713122335dec42475d41a0de3b973))
+* **release:** derive cmdline package identity ([82ad035](https://github.com/NickolayMamonov/Meeting/commit/82ad0350111d6eeca4cfc4871306b70460265143))
+* **release:** enforce attestation execution identity ([32d447c](https://github.com/NickolayMamonov/Meeting/commit/32d447c55c19e714a704bd9f267d776bce008af3))
+* **release:** enforce canonical identity boundaries ([b36d084](https://github.com/NickolayMamonov/Meeting/commit/b36d0844e79f7f9ac51a1aa319e2db7ff22fc6c9))
+* **release:** make Firebase gates truthful ([a2eaa4b](https://github.com/NickolayMamonov/Meeting/commit/a2eaa4bb82de380c5651b0e87baaa17b61586730))
+* **release:** pin post-build tooling to workflow commit ([502ea75](https://github.com/NickolayMamonov/Meeting/commit/502ea7551db5607aeef732c360b207d0ddbe2787))
+* **release:** resolve Android SDK tools before signing ([e1ac654](https://github.com/NickolayMamonov/Meeting/commit/e1ac6542a015d047751dfe0c3a7f3f6c0e72492b))
+* **release:** resolve drafts from paginated releases ([7b4641a](https://github.com/NickolayMamonov/Meeting/commit/7b4641ae3676fcb24c1d6ed648b132614e89c343))
+* **release:** resolve Windows apkanalyzer launcher ([87b0166](https://github.com/NickolayMamonov/Meeting/commit/87b0166b89c045e64cc15d16e42a4e550499ee3f))
+* **release:** resolve Windows apkanalyzer launcher ([92311fa](https://github.com/NickolayMamonov/Meeting/commit/92311fa21e7b16cfa74ac75de7790beb9e014873))
+* **release:** resume canonical Android draft safely ([5518008](https://github.com/NickolayMamonov/Meeting/commit/551800898da092d5857d91c0ec51b873c6174cf1))
+* **release:** use list authority for fresh drafts ([3a61300](https://github.com/NickolayMamonov/Meeting/commit/3a61300a95c3f0e7181eccdd8b59d3c007a194b1))
+* **release:** validate cmdline metadata identity ([385f6ec](https://github.com/NickolayMamonov/Meeting/commit/385f6eccc8f7f82657db2901b50afa2a13e93a05))
+* **release:** validate cmdline metadata identity ([1d970d3](https://github.com/NickolayMamonov/Meeting/commit/1d970d35304f9ff33fc432cfdb8e081f935d15a8))
+* **release:** validate cmdline package path ([fce49d7](https://github.com/NickolayMamonov/Meeting/commit/fce49d7bacf5be801583b5675138b22a04fcdd96))
+* **release:** validate snapshot Firebase package ([994e878](https://github.com/NickolayMamonov/Meeting/commit/994e8789c7ab8ef2b76cffbf8bdc7ea6eb3d1a53))
+* **release:** validate stable Firebase config early ([a06fbf6](https://github.com/NickolayMamonov/Meeting/commit/a06fbf60d9b70c34d336014450f2410e53e1cf30))
+
 ## 1.0.0 (2026-08-15)
 
 
