@@ -57,9 +57,9 @@ class MeetingDetailsInsetsTest {
                     onParticipantsClick = {},
                     onRetry = {},
                     navigationBarInsets = WindowInsets(
-                        0,
-                        0,
-                        0,
+                        0.dp,
+                        0.dp,
+                        0.dp,
                         currentFixture.bottomInset,
                     ),
                 )
