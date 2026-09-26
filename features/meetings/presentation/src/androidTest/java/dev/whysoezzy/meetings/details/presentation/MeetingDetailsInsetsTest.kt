@@ -16,6 +16,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.whysoezzy.common.error.ErrorType
 import dev.whysoezzy.uikit.models.UIKitAddress
@@ -34,17 +36,19 @@ class MeetingDetailsInsetsTest {
 
     @Test
     fun actionStates_clearNavigationAndInvokeCallbackOncePerInteriorTap() {
-        var currentFixture by mutableStateOf(ActionFixture(ActionState(), 0))
-        var callbackCount = 0
+        var currentFixture by mutableStateOf(ActionFixture(ActionState(), 0.dp))
+        var joinCallbackCount = 0
+        var leaveCallbackCount = 0
+        var externalCallbackCount = 0
         composeTestRule.setContent {
             UIKitTheme {
                 MeetingDetailsLayout(
                     uiState = fixture(currentFixture.actionState),
                     onBackPressed = {},
                     onShareClick = {},
-                    onJoinClick = { callbackCount++ },
-                    onLeaveClick = { callbackCount++ },
-                    onOpenExternalClick = { callbackCount++ },
+                    onJoinClick = { joinCallbackCount++ },
+                    onLeaveClick = { leaveCallbackCount++ },
+                    onOpenExternalClick = { externalCallbackCount++ },
                     onHostClick = {},
                     onParticipantClick = {},
                     onCommunityClick = {},
@@ -67,8 +71,10 @@ class MeetingDetailsInsetsTest {
             ActionState(joined = true),
             ActionState(externalUrl = "https://registration.example"),
         ).forEach { actionState ->
-            listOf(0, 24, 48).forEach { bottomInset ->
-                callbackCount = 0
+            listOf(0.dp, 24.dp, 48.dp).forEach { bottomInset ->
+                joinCallbackCount = 0
+                leaveCallbackCount = 0
+                externalCallbackCount = 0
                 currentFixture = ActionFixture(actionState, bottomInset)
                 composeTestRule.waitForIdle()
 
@@ -81,8 +87,10 @@ class MeetingDetailsInsetsTest {
                 val buttonBounds = button.fetchSemanticsNode().boundsInRoot
                 val expectedFixedPadding =
                     with(composeTestRule.density) { SpacingTokens.L.toPx() }
+                val bottomInsetPx =
+                    with(composeTestRule.density) { bottomInset.toPx() }
                 assertEquals(
-                    expectedFixedPadding + bottomInset,
+                    expectedFixedPadding + bottomInsetPx,
                     actionBounds.bottom - buttonBounds.bottom,
                     1f,
                 )
@@ -92,13 +100,28 @@ class MeetingDetailsInsetsTest {
                         .fetchSemanticsNode()
                         .boundsInRoot
                         .bottom
-                assertTrue(buttonBounds.bottom <= rootBottom - bottomInset + 1f)
+                assertTrue(buttonBounds.bottom <= rootBottom - bottomInsetPx + 1f)
 
                 button.performTouchInput {
                     click(center)
+                }
+                assertCallbackCounts(
+                    actionState = actionState,
+                    joinCount = joinCallbackCount,
+                    leaveCount = leaveCallbackCount,
+                    externalCount = externalCallbackCount,
+                    expectedCount = 1,
+                )
+                button.performTouchInput {
                     click(Offset(buttonBounds.width / 2f, buttonBounds.height - 1f))
                 }
-                assertEquals(2, callbackCount)
+                assertCallbackCounts(
+                    actionState = actionState,
+                    joinCount = joinCallbackCount,
+                    leaveCount = leaveCallbackCount,
+                    externalCount = externalCallbackCount,
+                    expectedCount = 2,
+                )
             }
         }
     }
@@ -121,7 +144,7 @@ class MeetingDetailsInsetsTest {
                     onMapClick = {},
                     onParticipantsClick = {},
                     onRetry = {},
-                    navigationBarInsets = WindowInsets(0, 0, 0, 48),
+                    navigationBarInsets = WindowInsets(0.dp, 0.dp, 0.dp, 48.dp),
                 )
             }
         }
@@ -164,7 +187,7 @@ class MeetingDetailsInsetsTest {
                     onMapClick = {},
                     onParticipantsClick = {},
                     onRetry = { retryCount++ },
-                    navigationBarInsets = WindowInsets(0, 0, 0, 48),
+                    navigationBarInsets = WindowInsets(0.dp, 0.dp, 0.dp, 48.dp),
                 )
             }
         }
@@ -225,6 +248,34 @@ class MeetingDetailsInsetsTest {
 
     private data class ActionFixture(
         val actionState: ActionState,
-        val bottomInset: Int,
+        val bottomInset: Dp,
     )
+
+    private fun assertCallbackCounts(
+        actionState: ActionState,
+        joinCount: Int,
+        leaveCount: Int,
+        externalCount: Int,
+        expectedCount: Int,
+    ) {
+        when {
+            actionState.externalUrl != null -> {
+                assertEquals(0, joinCount)
+                assertEquals(0, leaveCount)
+                assertEquals(expectedCount, externalCount)
+            }
+
+            actionState.joined -> {
+                assertEquals(0, joinCount)
+                assertEquals(expectedCount, leaveCount)
+                assertEquals(0, externalCount)
+            }
+
+            else -> {
+                assertEquals(expectedCount, joinCount)
+                assertEquals(0, leaveCount)
+                assertEquals(0, externalCount)
+            }
+        }
+    }
 }
