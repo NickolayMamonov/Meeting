@@ -71,6 +71,7 @@ class MeetingDetailsInsetsTest {
             ActionState(joined = true),
             ActionState(externalUrl = "https://registration.example"),
         ).forEach { actionState ->
+            var ctaHeightAtZeroInset = 0f
             listOf(0.dp, 24.dp, 48.dp).forEach { bottomInset ->
                 joinCallbackCount = 0
                 leaveCallbackCount = 0
@@ -85,6 +86,14 @@ class MeetingDetailsInsetsTest {
 
                 val actionBounds = action.fetchSemanticsNode().boundsInRoot
                 val buttonBounds = button.fetchSemanticsNode().boundsInRoot
+                if (bottomInset == 0.dp) {
+                    ctaHeightAtZeroInset = buttonBounds.height
+                }
+                assertEquals(
+                    ctaHeightAtZeroInset,
+                    buttonBounds.height,
+                    1f,
+                )
                 val expectedFixedPadding =
                     with(composeTestRule.density) { SpacingTokens.L.toPx() }
                 val bottomInsetPx =
