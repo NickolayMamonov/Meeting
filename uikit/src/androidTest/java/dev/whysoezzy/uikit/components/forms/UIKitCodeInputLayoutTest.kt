@@ -250,6 +250,7 @@ class UIKitCodeInputLayoutTest {
                 }
             val layoutContext =
                 "$context, textSize=${layout.size}, constraints=${layout.layoutInput.constraints}, " +
+                    "lineBounds=$lineBounds, " +
                     "overflowWidth=${layout.didOverflowWidth}, overflowHeight=${layout.didOverflowHeight}"
             assertTrue("$layoutContext: width overflow", !layout.didOverflowWidth)
             assertTrue("$layoutContext: height overflow", !layout.didOverflowHeight)
