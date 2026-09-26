@@ -3,10 +3,15 @@ package dev.whysoezzy.auth.presentation.email
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -23,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.whysoezzy.auth.domain.models.AuthFailure
 import dev.whysoezzy.auth.R
+import dev.whysoezzy.auth.presentation.AuthFormLayout
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
@@ -53,7 +59,10 @@ fun EmailInputScreen(
     Scaffold { padding ->
         EmailInputContent(
             state = state,
-            modifier = modifier.padding(padding).fillMaxSize(),
+            modifier = modifier
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .fillMaxSize(),
             onEmailChange = { viewModel.onEvent(EmailInputEvent.UpdateEmail(it)) },
             onSubmit = { viewModel.onEvent(EmailInputEvent.Submit) },
         )
@@ -61,58 +70,66 @@ fun EmailInputScreen(
 }
 
 @Composable
-private fun EmailInputContent(
+internal fun EmailInputContent(
     state: EmailInputUiState,
     modifier: Modifier = Modifier,
     onEmailChange: (String) -> Unit = {},
     onSubmit: () -> Unit = {},
+    windowInsets: WindowInsets = WindowInsets.navigationBars.union(WindowInsets.ime),
 ) {
-    Column(
-        modifier = modifier.padding(SpacingTokens.L),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
-    ) {
-        Spacer(Modifier.height(60.dp))
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-        ) {
-            TextHeading1(
-                text = stringResource(R.string.auth_email_title),
-                color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center,
+    AuthFormLayout(
+        modifier = modifier,
+        windowInsets = windowInsets,
+        body = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
+            ) {
+                Spacer(Modifier.height(60.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
+                ) {
+                    TextHeading1(
+                        text = stringResource(R.string.auth_email_title),
+                        color = ColorTokens.NeutralWeak,
+                        textAlign = TextAlign.Center,
+                    )
+                    TextBody2(
+                        text = stringResource(R.string.auth_email_subtitle),
+                        color = ColorTokens.NeutralWeak,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                UIKitInput(
+                    value = state.email,
+                    onValueChange = onEmailChange,
+                    placeholder = stringResource(R.string.auth_email_placeholder),
+                    hint = stringResource(R.string.auth_email_placeholder),
+                    isError = state.error != null,
+                    errorMessage = state.error?.let(::emailFailureMessage) ?: "",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    contentType = ContentType.EmailAddress,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        action = {
+            UIKitButton(
+                text = stringResource(R.string.auth_email_send_code),
+                onClick = onSubmit,
+                state = if (state.isLoading) {
+                    UIKitButtonState.LOADING
+                } else if (state.email.isNotBlank()) {
+                    UIKitButtonState.PRIMARY
+                } else {
+                    UIKitButtonState.DISABLED
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
-            TextBody2(
-                text = stringResource(R.string.auth_email_subtitle),
-                color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center,
-            )
-        }
-        UIKitInput(
-            value = state.email,
-            onValueChange = onEmailChange,
-            placeholder = stringResource(R.string.auth_email_placeholder),
-            hint = stringResource(R.string.auth_email_placeholder),
-            isError = state.error != null,
-            errorMessage = state.error?.let(::emailFailureMessage) ?: "",
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            contentType = ContentType.EmailAddress,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.weight(1f))
-        UIKitButton(
-            text = stringResource(R.string.auth_email_send_code),
-            onClick = onSubmit,
-            state = if (state.isLoading) {
-                UIKitButtonState.LOADING
-            } else if (state.email.isNotBlank()) {
-                UIKitButtonState.PRIMARY
-            } else {
-                UIKitButtonState.DISABLED
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+        },
+    )
 }
 
 internal fun emailFailureMessage(failure: AuthFailure): String = when (failure) {
