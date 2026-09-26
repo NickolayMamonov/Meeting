@@ -4,12 +4,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -29,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -69,6 +74,11 @@ import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
 
+internal const val MEETING_DETAILS_ACTION_TAG = "meeting-details-action"
+internal const val MEETING_DETAILS_CTA_TAG = "meeting-details-cta"
+internal const val MEETING_DETAILS_CONTENT_TAG = "meeting-details-content"
+internal const val MEETING_DETAILS_TERMINAL_TAG = "meeting-details-terminal"
+
 @Composable
 fun MeetingDetailsScreen(
     meetingId: Long,
@@ -108,6 +118,44 @@ fun MeetingDetailsScreen(
         }
     }
 
+    MeetingDetailsLayout(
+        uiState = uiState,
+        onBackPressed = onBackPressed,
+        onShareClick = { viewModel.onEvent(MeetingDetailsEvent.ShareMeeting) },
+        onJoinClick = { viewModel.onEvent(MeetingDetailsEvent.JoinMeeting) },
+        onLeaveClick = { viewModel.onEvent(MeetingDetailsEvent.LeaveMeeting) },
+        onOpenExternalClick = { viewModel.onEvent(MeetingDetailsEvent.OpenExternalUrl) },
+        onHostClick = onHostClick,
+        onParticipantClick = { userId ->
+            viewModel.onEvent(MeetingDetailsEvent.NavigateToProfile(userId))
+        },
+        onCommunityClick = onCommunityClick,
+        onOtherMeetingClick = { meetId ->
+            viewModel.onEvent(MeetingDetailsEvent.NavigateToMeeting(meetId))
+        },
+        onMapClick = { viewModel.onEvent(MeetingDetailsEvent.OpenMap) },
+        onParticipantsClick = onParticipantsClick,
+        onRetry = { viewModel.onEvent(MeetingDetailsEvent.LoadMeeting(meetingId)) },
+    )
+}
+
+@Composable
+internal fun MeetingDetailsLayout(
+    uiState: MeetingDetailsUiState,
+    onBackPressed: () -> Unit,
+    onShareClick: () -> Unit,
+    onJoinClick: () -> Unit,
+    onLeaveClick: () -> Unit,
+    onOpenExternalClick: () -> Unit,
+    onHostClick: (Long) -> Unit,
+    onParticipantClick: (Long) -> Unit,
+    onCommunityClick: (Long) -> Unit,
+    onOtherMeetingClick: (Long) -> Unit,
+    onMapClick: () -> Unit,
+    onParticipantsClick: () -> Unit,
+    onRetry: () -> Unit,
+    navigationBarInsets: WindowInsets = WindowInsets.navigationBars,
+) {
     val successState = uiState as? MeetingDetailsUiState.Success
 
     Scaffold(
@@ -115,55 +163,49 @@ fun MeetingDetailsScreen(
             BackShareTopBar(
                 title = successState?.title ?: "",
                 onBackClick = onBackPressed,
-                onShareClick = {
-                    if (successState != null) viewModel.onEvent(MeetingDetailsEvent.ShareMeeting)
-                },
+                onShareClick = onShareClick,
                 modifier = Modifier.statusBarsPadding(),
             )
         },
         bottomBar = {
             if (successState != null) {
-                BottomActionSection(
+                MeetingDetailsBottomActionSection(
                     totalPlaces = successState.totalPlaces,
                     isUserJoined = successState.isUserJoined,
                     externalUrl = successState.externalUrl,
-                    onJoinClick = { viewModel.onEvent(MeetingDetailsEvent.JoinMeeting) },
-                    onLeaveClick = { viewModel.onEvent(MeetingDetailsEvent.LeaveMeeting) },
-                    onOpenExternalClick = { viewModel.onEvent(MeetingDetailsEvent.OpenExternalUrl) },
+                    onJoinClick = onJoinClick,
+                    onLeaveClick = onLeaveClick,
+                    onOpenExternalClick = onOpenExternalClick,
+                    navigationBarInsets = navigationBarInsets,
                 )
             }
         },
     ) { paddingValues ->
+        val contentModifier = Modifier
+            .padding(paddingValues)
+            .consumeWindowInsets(paddingValues)
         when (val state = uiState) {
-            is MeetingDetailsUiState.Loading -> {
-                LoadingContent(
-                    modifier = Modifier.padding(paddingValues),
-                )
-            }
+            is MeetingDetailsUiState.Loading -> LoadingContent(modifier = contentModifier)
 
             is MeetingDetailsUiState.Success -> {
                 MeetingContent(
                     uiState = state,
                     onHostClick = onHostClick,
-                    onParticipantClick = { userId ->
-                        viewModel.onEvent(MeetingDetailsEvent.NavigateToProfile(userId))
-                    },
+                    onParticipantClick = onParticipantClick,
                     onCommunityClick = onCommunityClick,
-                    onOtherMeetingClick = { meetId ->
-                        viewModel.onEvent(MeetingDetailsEvent.NavigateToMeeting(meetId))
-                    },
-                    onMapClick = { viewModel.onEvent(MeetingDetailsEvent.OpenMap) },
+                    onOtherMeetingClick = onOtherMeetingClick,
+                    onMapClick = onMapClick,
                     onParticipantsClick = onParticipantsClick,
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = contentModifier,
                 )
             }
 
             is MeetingDetailsUiState.Error -> {
                 ErrorContent(
                     message = state.errorType.asUserMessage(),
-                    onRetry = { viewModel.onEvent(MeetingDetailsEvent.LoadMeeting(meetingId)) },
+                    onRetry = onRetry,
                     onBackPressed = onBackPressed,
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = contentModifier,
                 )
             }
         }
@@ -171,17 +213,20 @@ fun MeetingDetailsScreen(
 }
 
 @Composable
-private fun BottomActionSection(
+internal fun MeetingDetailsBottomActionSection(
     totalPlaces: Int,
     isUserJoined: Boolean,
     onJoinClick: () -> Unit,
     onLeaveClick: () -> Unit,
     externalUrl: String? = null,
     onOpenExternalClick: () -> Unit = {},
+    navigationBarInsets: WindowInsets = WindowInsets.navigationBars,
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(MEETING_DETAILS_ACTION_TAG),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -189,7 +234,8 @@ private fun BottomActionSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(SpacingTokens.L),
+                .padding(SpacingTokens.L)
+                .windowInsetsPadding(navigationBarInsets),
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
             if (externalUrl != null) {
@@ -197,7 +243,9 @@ private fun BottomActionSection(
                     text = "Перейти к регистрации",
                     onClick = onOpenExternalClick,
                     state = UIKitButtonState.PRIMARY,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(MEETING_DETAILS_CTA_TAG),
                 )
             } else {
                 TextBody2(
@@ -211,14 +259,18 @@ private fun BottomActionSection(
                         text = stringResource(R.string.meeting_details_leave),
                         onClick = onLeaveClick,
                         state = UIKitButtonState.SECONDARY,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(MEETING_DETAILS_CTA_TAG),
                     )
                 } else {
                     UIKitButton(
                         text = stringResource(R.string.meeting_details_join),
                         onClick = onJoinClick,
                         state = UIKitButtonState.PRIMARY,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(MEETING_DETAILS_CTA_TAG),
                     )
                 }
             }
@@ -245,7 +297,10 @@ private fun MeetingContent(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxSize().padding(horizontal = SpacingTokens.L),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = SpacingTokens.L)
+            .testTag(MEETING_DETAILS_CONTENT_TAG),
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
     ) {
         item {
@@ -355,7 +410,11 @@ private fun MeetingContent(
         }
 
         item {
-            Spacer(modifier = Modifier.height(SpacingTokens.L))
+            Spacer(
+                modifier = Modifier
+                    .height(SpacingTokens.L)
+                    .testTag(MEETING_DETAILS_TERMINAL_TAG),
+            )
         }
     }
 }

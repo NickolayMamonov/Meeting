@@ -4,6 +4,10 @@ plugins {
 
 android {
     namespace = "dev.whysoezzy.features_meetings"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
@@ -26,6 +30,7 @@ dependencies {
     implementation(libs.coil)
     implementation(libs.coil.network.okhttp)
 
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     testImplementation(project(":core:testing"))
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
