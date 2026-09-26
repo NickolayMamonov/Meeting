@@ -144,6 +144,7 @@ private fun CodeDigitBox(
             text = digit,
             color = ColorTokens.NeutralWeak,
             textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

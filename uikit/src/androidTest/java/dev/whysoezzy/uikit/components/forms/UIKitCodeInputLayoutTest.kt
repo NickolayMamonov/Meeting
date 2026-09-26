@@ -19,8 +19,8 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
@@ -128,19 +128,45 @@ class UIKitCodeInputLayoutTest {
             FixtureContent(fixture)
         }
 
+        val states =
+            listOf(
+                FixtureState(value = ""),
+                FixtureState(value = "12"),
+                FixtureState(value = "123456"),
+                FixtureState(value = "12", isError = true),
+                FixtureState(value = "123456", isError = true),
+            )
+        val repeatedDigits = ('0'..'9').map { digit -> digit.toString().repeat(6) }
+
         listOf(1f, 1.3f).forEach { fontScale ->
-            listOf("", "12", "123456").forEach { value ->
-                fixture = Fixture(screenWidth = 320.dp, fontScale = fontScale, value = value)
-                composeTestRule.waitForIdle()
-                assertTextLayoutsContained(value)
-            }
-            fixture = Fixture(screenWidth = 320.dp, fontScale = fontScale, value = "12", isError = true)
-            composeTestRule.waitForIdle()
-            assertTextLayoutsContained("12")
-            (0 until 6).forEach { index ->
-                composeTestRule
-                    .onNodeWithTag("$CODE_INPUT_CELL_TAG_PREFIX$index", useUnmergedTree = true)
-                    .assertIsDisplayed()
+            listOf(1f, 2.625f).forEach { density ->
+                listOf(320.dp, 360.dp, 411.dp).forEach { screenWidth ->
+                    states.forEach { state ->
+                        fixture =
+                            Fixture(
+                                screenWidth = screenWidth,
+                                density = density,
+                                fontScale = fontScale,
+                                value = state.value,
+                                isError = state.isError,
+                            )
+                        composeTestRule.waitForIdle()
+                        assertAllCellsDisplayed()
+                        assertTextLayoutsContained(fixture)
+                    }
+                    repeatedDigits.forEach { value ->
+                        fixture =
+                            Fixture(
+                                screenWidth = screenWidth,
+                                density = density,
+                                fontScale = fontScale,
+                                value = value,
+                            )
+                        composeTestRule.waitForIdle()
+                        assertAllCellsDisplayed()
+                        assertTextLayoutsContained(fixture)
+                    }
+                }
             }
         }
     }
@@ -179,19 +205,33 @@ class UIKitCodeInputLayoutTest {
             .assertIsFocused()
     }
 
-    private fun assertTextLayoutsContained(value: String) {
-        value.forEach { digit ->
-            val textNode =
-                composeTestRule.onNodeWithText(digit.toString(), useUnmergedTree = true)
+    private fun assertAllCellsDisplayed() {
+        (0 until 6).forEach { index ->
+            composeTestRule
+                .onNodeWithTag("$CODE_INPUT_CELL_TAG_PREFIX$index", useUnmergedTree = true)
+                .assertIsDisplayed()
+        }
+    }
+
+    private fun assertTextLayoutsContained(fixture: Fixture) {
+        fixture.value.forEachIndexed { index, digit ->
+            val cellTag = "$CODE_INPUT_CELL_TAG_PREFIX$index"
+            val cellNode = composeTestRule.onNodeWithTag(cellTag, useUnmergedTree = true)
+            val textNode = cellNode.onChild()
             val textBounds = textNode.fetchSemanticsNode().boundsInRoot
-            val cellIndex = value.indexOf(digit)
-            val cellBounds =
-                composeTestRule
-                    .onNodeWithTag("$CODE_INPUT_CELL_TAG_PREFIX$cellIndex", useUnmergedTree = true)
-                    .fetchSemanticsNode()
-                    .boundsInRoot
-            assertTrue(cellBounds.contains(textBounds.topLeft))
-            assertTrue(cellBounds.contains(textBounds.bottomRight))
+            val cellBounds = cellNode.fetchSemanticsNode().boundsInRoot
+            val tolerance = 1f
+            val context =
+                "width=${fixture.screenWidth}, density=${fixture.density}, fontScale=${fixture.fontScale}, " +
+                    "value=${fixture.value}, error=${fixture.isError}, index=$index, digit=$digit, " +
+                    "textBounds=$textBounds, cellBounds=$cellBounds"
+            assertTrue(
+                "$context: text exceeds cell by more than one physical pixel",
+                textBounds.left >= cellBounds.left - tolerance &&
+                    textBounds.top >= cellBounds.top - tolerance &&
+                    textBounds.right <= cellBounds.right + tolerance &&
+                    textBounds.bottom <= cellBounds.bottom + tolerance,
+            )
 
             val action =
                 textNode
@@ -200,10 +240,19 @@ class UIKitCodeInputLayoutTest {
                     .getOrNull(SemanticsActions.GetTextLayoutResult)
                     ?.action
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-            assertTrue(action?.invoke(layouts) == true)
-            assertEquals(1, layouts.size)
-            assertTrue(!layouts.single().didOverflowWidth)
-            assertTrue(!layouts.single().didOverflowHeight)
+            assertTrue("$context: TextLayoutResult action was unavailable", action?.invoke(layouts) == true)
+            assertEquals("$context: unexpected TextLayoutResult count", 1, layouts.size)
+            val layout = layouts.single()
+            val lineBounds =
+                (0 until layout.lineCount).joinToString { line ->
+                    "[$line:${layout.getLineLeft(line)},${layout.getLineTop(line)}-" +
+                        "${layout.getLineRight(line)},${layout.getLineBottom(line)}]"
+                }
+            val layoutContext =
+                "$context, textSize=${layout.size}, constraints=${layout.layoutInput.constraints}, " +
+                    "overflowWidth=${layout.didOverflowWidth}, overflowHeight=${layout.didOverflowHeight}"
+            assertTrue("$layoutContext: width overflow", !layout.didOverflowWidth)
+            assertTrue("$layoutContext: height overflow", !layout.didOverflowHeight)
         }
     }
 
@@ -236,6 +285,11 @@ class UIKitCodeInputLayoutTest {
         val density: Float = 1f,
         val fontScale: Float = 1f,
         val value: String = "",
+        val isError: Boolean = false,
+    )
+
+    private data class FixtureState(
+        val value: String,
         val isError: Boolean = false,
     )
 
