@@ -78,6 +78,10 @@ internal const val MEETING_DETAILS_ACTION_TAG = "meeting-details-action"
 internal const val MEETING_DETAILS_CTA_TAG = "meeting-details-cta"
 internal const val MEETING_DETAILS_CONTENT_TAG = "meeting-details-content"
 internal const val MEETING_DETAILS_TERMINAL_TAG = "meeting-details-terminal"
+internal const val MEETING_DETAILS_LOADING_TAG = "meeting-details-loading"
+internal const val MEETING_DETAILS_ERROR_TAG = "meeting-details-error"
+internal const val MEETING_DETAILS_RETRY_TAG = "meeting-details-retry"
+internal const val MEETING_DETAILS_BACK_TAG = "meeting-details-back"
 
 @Composable
 fun MeetingDetailsScreen(
@@ -280,7 +284,12 @@ internal fun MeetingDetailsBottomActionSection(
 
 @Composable
 private fun LoadingContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag(MEETING_DETAILS_LOADING_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
         CircularProgressIndicator()
     }
 }
@@ -428,7 +437,12 @@ private fun ErrorContent(
     onBackPressed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag(MEETING_DETAILS_ERROR_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
@@ -437,12 +451,18 @@ private fun ErrorContent(
             UIKitButton(
                 text = stringResource(dev.whysoezzy.uikit.R.string.action_retry),
                 onClick = onRetry,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
+                modifier = Modifier
+                    .widthIn(max = ErrorButtonMaxWidth)
+                    .fillMaxWidth()
+                    .testTag(MEETING_DETAILS_RETRY_TAG),
             )
             UIKitButton(
                 text = stringResource(dev.whysoezzy.uikit.R.string.action_cancel),
                 onClick = onBackPressed,
-                modifier = Modifier.widthIn(max = ErrorButtonMaxWidth).fillMaxWidth(),
+                modifier = Modifier
+                    .widthIn(max = ErrorButtonMaxWidth)
+                    .fillMaxWidth()
+                    .testTag(MEETING_DETAILS_BACK_TAG),
             )
         }
     }

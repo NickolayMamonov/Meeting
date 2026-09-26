@@ -5,15 +5,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.whysoezzy.common.error.ErrorType
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
@@ -137,6 +141,59 @@ class MeetingDetailsInsetsTest {
                 .boundsInRoot
 
         assertTrue("terminal content overlaps fixed action surface", terminalBounds.bottom <= actionBounds.top)
+    }
+
+    @Test
+    fun loadingAndErrorBranchesKeepBodyUsableWithoutActionBar() {
+        var state by mutableStateOf<MeetingDetailsUiState>(MeetingDetailsUiState.Loading)
+        var retryCount = 0
+        var backCount = 0
+        composeTestRule.setContent {
+            UIKitTheme {
+                MeetingDetailsLayout(
+                    uiState = state,
+                    onBackPressed = { backCount++ },
+                    onShareClick = {},
+                    onJoinClick = {},
+                    onLeaveClick = {},
+                    onOpenExternalClick = {},
+                    onHostClick = {},
+                    onParticipantClick = {},
+                    onCommunityClick = {},
+                    onOtherMeetingClick = {},
+                    onMapClick = {},
+                    onParticipantsClick = {},
+                    onRetry = { retryCount++ },
+                    navigationBarInsets = WindowInsets(0, 0, 0, 48),
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule
+            .onNodeWithTag(MEETING_DETAILS_LOADING_TAG, useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeTestRule
+            .onAllNodesWithTag(MEETING_DETAILS_ACTION_TAG, useUnmergedTree = true)
+            .assertCountEquals(0)
+
+        state = MeetingDetailsUiState.Error(ErrorType.Server)
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag(MEETING_DETAILS_ERROR_TAG, useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithTag(MEETING_DETAILS_RETRY_TAG, useUnmergedTree = true)
+            .performClick()
+        composeTestRule
+            .onNodeWithTag(MEETING_DETAILS_BACK_TAG, useUnmergedTree = true)
+            .performClick()
+
+        assertEquals(1, retryCount)
+        assertEquals(1, backCount)
+        composeTestRule
+            .onAllNodesWithTag(MEETING_DETAILS_ACTION_TAG, useUnmergedTree = true)
+            .assertCountEquals(0)
     }
 
     private fun fixture(
