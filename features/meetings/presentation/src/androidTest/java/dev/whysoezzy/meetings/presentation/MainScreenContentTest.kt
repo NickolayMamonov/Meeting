@@ -9,8 +9,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.paging.PagingData
@@ -101,8 +101,7 @@ class MainScreenContentTest {
             .onNodeWithText(
                 context.getString(R.string.meetings_main_search_empty),
                 useUnmergedTree = true,
-            )
-            .assertIsDisplayed()
+            ).assertIsDisplayed()
         assertSearchExcludesHomeAndAds(fixtures, homeTitles)
 
         searchQuery = ""
@@ -121,8 +120,7 @@ class MainScreenContentTest {
             .onNodeWithText(
                 context.getString(R.string.meetings_main_section_upcoming),
                 useUnmergedTree = true,
-            )
-            .assertIsDisplayed()
+            ).assertIsDisplayed()
         composeTestRule
             .onAllNodes(hasContentDescription(searchMeetings.first().title, substring = true), useUnmergedTree = true)
             .assertCountEquals(0)
@@ -161,8 +159,7 @@ class MainScreenContentTest {
             .onNodeWithText(
                 context.getString(R.string.meetings_main_search_empty),
                 useUnmergedTree = true,
-            )
-            .assertIsDisplayed()
+            ).assertIsDisplayed()
         assertSearchExcludesHomeAndAds(
             adBlocks = fixtures,
             homeTitles = listOf("Hero sentinel", "Upcoming sentinel", "Community sentinel"),
@@ -179,8 +176,7 @@ class MainScreenContentTest {
             .onNodeWithText(
                 context.getString(R.string.meetings_main_section_all),
                 useUnmergedTree = true,
-            )
-            .assertIsDisplayed()
+            ).assertIsDisplayed()
     }
 
     private fun assertHomeContent(
@@ -221,20 +217,17 @@ class MainScreenContentTest {
             .onAllNodes(
                 hasText(context.getString(R.string.meetings_main_section_upcoming)),
                 useUnmergedTree = true,
-            )
-            .assertCountEquals(0)
+            ).assertCountEquals(0)
         composeTestRule
             .onAllNodes(
                 hasText(context.getString(R.string.meetings_main_section_communities)),
                 useUnmergedTree = true,
-            )
-            .assertCountEquals(0)
+            ).assertCountEquals(0)
         composeTestRule
             .onAllNodes(
                 hasText(context.getString(R.string.meetings_main_section_all)),
                 useUnmergedTree = true,
-            )
-            .assertCountEquals(0)
+            ).assertCountEquals(0)
         adBlocks.forEach { adBlock ->
             composeTestRule
                 .onAllNodes(hasText(adBlock.title), useUnmergedTree = true)
