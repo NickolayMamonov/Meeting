@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -19,6 +21,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.Dp
@@ -41,6 +44,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 private const val AUTH_FORM_TEST_ROOT_TAG = "auth-form-test-root"
+private val AUTH_FORM_WIDTHS = listOf(320.dp, 360.dp)
 
 @RunWith(AndroidJUnit4::class)
 class AuthFormInsetsTest {
@@ -48,25 +52,32 @@ class AuthFormInsetsTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun fittingEmail_keepsActionBottomAlignedAndClearsImeUnion() {
-        var bottomInset by mutableStateOf(0.dp)
-        setContainer(height = 640.dp) {
+    fun fittingEmail_at320And360_usesMaxOfNavigationAndImeInsets() {
+        var width by mutableStateOf(AUTH_FORM_WIDTHS.first())
+        val navigationInset = 48.dp
+        val imeInset = 180.dp
+        setContainer(width = { width }, height = 640.dp) {
             EmailInputContent(
                 state = EmailInputUiState(email = "person@example.com"),
                 modifier = Modifier.fillMaxSize(),
-                windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, bottomInset),
+                windowInsets = unionInsets(navigationInset, imeInset),
             )
         }
 
-        val root = rootBounds()
-        val action = actionBounds()
-        val designPadding = with(composeTestRule.density) { SpacingTokens.L.toPx() }
-        assertEquals(root.bottom - designPadding, action.bottom, 1f)
+        AUTH_FORM_WIDTHS.forEach { testWidth ->
+            width = testWidth
+            composeTestRule.waitForIdle()
+            val root = rootBounds()
+            val action = actionBounds()
+            val designPadding = with(composeTestRule.density) { SpacingTokens.L.toPx() }
+            val navigationPx = with(composeTestRule.density) { navigationInset.toPx() }
+            val imePx = with(composeTestRule.density) { imeInset.toPx() }
+            val maxObstruction = maxOf(navigationPx, imePx)
+            val summedObstruction = navigationPx + imePx
 
-        bottomInset = 220.dp
-        composeTestRule.waitForIdle()
-        val imeBottom = with(composeTestRule.density) { bottomInset.toPx() }
-        assertTrue(actionBounds().bottom <= rootBounds().bottom - imeBottom - designPadding + 1f)
+            assertEquals(root.bottom - maxObstruction - designPadding, action.bottom, 1f)
+            assertTrue(action.bottom > root.bottom - summedObstruction - designPadding + 1f)
+        }
     }
 
     @Test
@@ -105,60 +116,93 @@ class AuthFormInsetsTest {
     }
 
     @Test
-    fun overflowingEmail_scrollsWholeFormAndRetainsEditableTextAfterResize() {
+    fun overflowingEmail_at320And360_resizesBackToFitAndRetainsSelection() {
+        var width by mutableStateOf(AUTH_FORM_WIDTHS.first())
         var email by mutableStateOf("")
-        var bottomInset by mutableStateOf(0.dp)
-        setContainer(height = 280.dp) {
+        var imeInset by mutableStateOf(360.dp)
+        setContainer(width = { width }, height = 640.dp) {
             EmailInputContent(
                 state = EmailInputUiState(email = email, error = AuthFailure.InvalidEmail),
                 modifier = Modifier.fillMaxSize(),
                 onEmailChange = { email = it },
-                windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, bottomInset),
+                windowInsets = unionInsets(48.dp, imeInset),
             )
         }
 
-        composeTestRule
-            .onNode(hasSetTextAction(), useUnmergedTree = true)
-            .performTextInput("person@example.com")
-        assertEquals("person@example.com", email)
+        AUTH_FORM_WIDTHS.forEach { testWidth ->
+            width = testWidth
+            email = ""
+            imeInset = 360.dp
+            composeTestRule.waitForIdle()
+            val input = composeTestRule.onNode(hasSetTextAction(), useUnmergedTree = true)
+            input.performTextInput("person@example.com")
+            input.performTextInputSelection(TextRange(7, 7))
+            assertEquals("person@example.com", email)
 
-        val scroll = composeTestRule.onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
-        scroll.performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
-        composeTestRule.onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true).assertIsDisplayed()
+            val scroll = composeTestRule.onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
+            scroll.performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
+            composeTestRule.onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true).assertIsDisplayed()
 
-        bottomInset = 120.dp
-        composeTestRule.waitForIdle()
-        composeTestRule
-            .onNode(hasText("person@example.com"), useUnmergedTree = true)
-            .assertIsDisplayed()
-        scroll.performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
-        composeTestRule.onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true).assertIsDisplayed()
+            imeInset = 0.dp
+            composeTestRule.waitForIdle()
+            val designPadding = with(composeTestRule.density) { SpacingTokens.L.toPx() }
+            val navigationPx = with(composeTestRule.density) { 48.dp.toPx() }
+            assertEquals(rootBounds().bottom - navigationPx - designPadding, actionBounds().bottom, 1f)
+            composeTestRule
+                .onNode(hasText("person@example.com"), useUnmergedTree = true)
+                .assertIsDisplayed()
+
+            input.performTextInput("X")
+            assertEquals("person@Xexample.com", email)
+        }
     }
 
     @Test
-    fun codeResendAndVerify_remainReachableAfterOverflow() {
-        setContainer(height = 280.dp) {
+    fun codeResendAndTimer_at320And360_remainReachableAfterOverflow() {
+        var width by mutableStateOf(AUTH_FORM_WIDTHS.first())
+        var canResend by mutableStateOf(true)
+        setContainer(width = { width }, height = 300.dp) {
             CodeVerificationContent(
                 maskedEmail = "p***@example.com",
                 uiState = CodeVerificationUiState(
                     code = "123456",
                     error = AuthFailure.InvalidCode,
-                    canResend = true,
+                    canResend = canResend,
+                    remainingTime = 45,
                 ),
                 modifier = Modifier.fillMaxSize(),
-                windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+                windowInsets = unionInsets(48.dp, 180.dp),
             )
         }
 
-        composeTestRule
-            .onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
-            .performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
-        composeTestRule.onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true).assertIsDisplayed()
+        listOf(true, false).forEach { resendState ->
+            canResend = resendState
+            AUTH_FORM_WIDTHS.forEach { testWidth ->
+                width = testWidth
+                composeTestRule.waitForIdle()
+                val expectedResendText =
+                    if (resendState) {
+                        "Отправить код повторно"
+                    } else {
+                        "Отправить повторно через 45 сек"
+                    }
+                val scroll = composeTestRule.onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
+                scroll.performScrollToNode(hasText(expectedResendText))
+                composeTestRule
+                    .onNode(hasText(expectedResendText), useUnmergedTree = true)
+                    .assertIsDisplayed()
+                scroll.performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
+                composeTestRule
+                    .onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true)
+                    .assertIsDisplayed()
+            }
+        }
     }
 
     @Test
-    fun nameValidationGrowth_remainsReachableAfterOverflow() {
-        setContainer(height = 280.dp) {
+    fun nameValidationGrowth_at320And360_remainsReachableAfterOverflow() {
+        var width by mutableStateOf(AUTH_FORM_WIDTHS.first())
+        setContainer(width = { width }, height = 300.dp) {
             NameInputContent(
                 uiState = NameInputUiState(
                     name = "I",
@@ -167,17 +211,22 @@ class AuthFormInsetsTest {
                     surnameError = NameFieldError.Blank,
                 ),
                 modifier = Modifier.fillMaxSize(),
-                windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+                windowInsets = unionInsets(48.dp, 180.dp),
             )
         }
 
-        composeTestRule
-            .onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
-            .performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
-        composeTestRule.onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true).assertIsDisplayed()
+        AUTH_FORM_WIDTHS.forEach { testWidth ->
+            width = testWidth
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
+                .performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
+            composeTestRule.onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true).assertIsDisplayed()
+        }
     }
 
     private fun setContainer(
+        width: () -> Dp = { 360.dp },
         height: Dp,
         content: @androidx.compose.runtime.Composable () -> Unit,
     ) {
@@ -185,7 +234,7 @@ class AuthFormInsetsTest {
             UIKitTheme {
                 Box(
                     modifier = Modifier
-                        .size(width = 360.dp, height = height)
+                        .size(width = width(), height = height)
                         .testTag(AUTH_FORM_TEST_ROOT_TAG),
                 ) {
                     content()
@@ -200,6 +249,13 @@ class AuthFormInsetsTest {
             .onNodeWithTag(AUTH_FORM_TEST_ROOT_TAG, useUnmergedTree = true)
             .fetchSemanticsNode()
             .boundsInRoot
+
+    private fun unionInsets(
+        navigationBottom: Dp,
+        imeBottom: Dp,
+    ): WindowInsets =
+        WindowInsets(0.dp, 0.dp, 0.dp, navigationBottom)
+            .union(WindowInsets(0.dp, 0.dp, 0.dp, imeBottom))
 
     private fun actionBounds() =
         composeTestRule
