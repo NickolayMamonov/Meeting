@@ -12,6 +12,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -80,6 +81,8 @@ class MainScreenContentTest {
         val homeTitles =
             homeMeetings.map { it.title } +
                 listOf("Hero sentinel", "Upcoming sentinel", "Community sentinel")
+        content.performScrollToIndex(0)
+        assertSearchExcludesHomeAndAds(fixtures, homeTitles)
         searchMeetings.forEach { result ->
             content.performScrollToNode(hasContentDescription(result.title, substring = true))
             composeTestRule
