@@ -1,6 +1,5 @@
 package dev.whysoezzy.uikit.components.cards
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,13 +11,13 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.whysoezzy.uikit.models.UIKitCommunitySubscriptionAction
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -116,36 +115,63 @@ class UIKitCommunityCardTest {
 
     @Test
     fun readOnlyOmissionRemovesButtonHeightAndGap() {
+        val title = "Equivalent community"
+        val imageUrl = "equivalent-image"
+        var readOnly by mutableStateOf(true)
         composeTestRule.setContent {
             UIKitTheme {
-                Column {
-                    UIKitCommunityCard(
-                        imageUrl = "",
-                        title = "Read-only",
-                        subscriptionAction = UIKitCommunitySubscriptionAction.ReadOnly,
-                        modifier = Modifier.testTag("read-only"),
-                    )
-                    UIKitCommunityCard(
-                        imageUrl = "",
-                        title = "Actionable",
-                        subscriptionAction = UIKitCommunitySubscriptionAction.Actionable(
-                            isSubscribed = false,
-                            onSubscribeClick = {},
-                        ),
-                        modifier = Modifier.testTag("actionable"),
-                    )
-                }
+                UIKitCommunityCard(
+                    imageUrl = imageUrl,
+                    title = title,
+                    subscriptionAction =
+                        if (readOnly) {
+                            UIKitCommunitySubscriptionAction.ReadOnly
+                        } else {
+                            UIKitCommunitySubscriptionAction.Actionable(
+                                isSubscribed = false,
+                                onSubscribeClick = {},
+                            )
+                        },
+                    modifier = Modifier.testTag("equivalent-card"),
+                )
             }
         }
 
-        val readOnlyNode = composeTestRule.onNodeWithTag("read-only", useUnmergedTree = true)
-        val actionableNode = composeTestRule.onNodeWithTag("actionable", useUnmergedTree = true)
-        val readOnlyBounds = readOnlyNode.getUnclippedBoundsInRoot()
-        val actionableBounds = actionableNode.getUnclippedBoundsInRoot()
+        val card = composeTestRule.onNodeWithTag("equivalent-card", useUnmergedTree = true)
+        val readOnlyBounds = card.getUnclippedBoundsInRoot()
+        val readOnlyImageBounds =
+            composeTestRule.onNodeWithContentDescription(title).getUnclippedBoundsInRoot()
+        val readOnlyTitleBounds =
+            composeTestRule.onNodeWithText(title).getUnclippedBoundsInRoot()
+
+        readOnly = false
+        composeTestRule.waitForIdle()
+
+        val actionableBounds = card.getUnclippedBoundsInRoot()
+        val actionableImageBounds =
+            composeTestRule.onNodeWithContentDescription(title).getUnclippedBoundsInRoot()
+        val actionableTitleBounds =
+            composeTestRule.onNodeWithText(title).getUnclippedBoundsInRoot()
         val readOnlyHeight = readOnlyBounds.bottom - readOnlyBounds.top
         val actionableHeight = actionableBounds.bottom - actionableBounds.top
         val omittedHeight = actionableHeight - readOnlyHeight
-        assertTrue("omitted control height should include button and gap", omittedHeight >= 40.dp)
-        assertTrue("omitted control height should remain bounded", omittedHeight <= 50.dp)
+        val readOnlyWidth = readOnlyBounds.right - readOnlyBounds.left
+        val actionableWidth = actionableBounds.right - actionableBounds.left
+        val readOnlyImageWidth = readOnlyImageBounds.right - readOnlyImageBounds.left
+        val actionableImageWidth = actionableImageBounds.right - actionableImageBounds.left
+        val readOnlyImageHeight = readOnlyImageBounds.bottom - readOnlyImageBounds.top
+        val actionableImageHeight = actionableImageBounds.bottom - actionableImageBounds.top
+        val readOnlyTitleWidth = readOnlyTitleBounds.right - readOnlyTitleBounds.left
+        val actionableTitleWidth = actionableTitleBounds.right - actionableTitleBounds.left
+        val readOnlyTitleHeight = readOnlyTitleBounds.bottom - readOnlyTitleBounds.top
+        val actionableTitleHeight = actionableTitleBounds.bottom - actionableTitleBounds.top
+
+        assertEquals(104.dp.value, readOnlyWidth.value, 0f)
+        assertEquals(readOnlyWidth.value, actionableWidth.value, 0f)
+        assertEquals(37.dp.value + 4.dp.value, omittedHeight.value, 1.dp.value)
+        assertEquals(readOnlyImageWidth.value, actionableImageWidth.value, 0f)
+        assertEquals(readOnlyImageHeight.value, actionableImageHeight.value, 0f)
+        assertEquals(readOnlyTitleWidth.value, actionableTitleWidth.value, 0f)
+        assertEquals(readOnlyTitleHeight.value, actionableTitleHeight.value, 0f)
     }
 }

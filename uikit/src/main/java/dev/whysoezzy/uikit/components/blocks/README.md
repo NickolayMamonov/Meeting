@@ -170,7 +170,10 @@ fun ProfileScreen(userId: Long?, isOwnProfile: Boolean) {
         item {
             UIKitUserCommunitiesBlock(
                 communities = communities,
-                onCommunityClick = { id -> /* навигация */ }
+                onCommunityClick = { id -> /* навигация */ },
+                subscriptionActionForCommunity = {
+                    UIKitCommunitySubscriptionAction.ReadOnly
+                },
             )
         }
     }

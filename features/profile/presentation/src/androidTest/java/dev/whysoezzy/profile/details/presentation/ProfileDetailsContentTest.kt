@@ -71,24 +71,37 @@ class ProfileDetailsContentTest {
         composeTestRule
             .onNodeWithText("Вы пока не состоите ни в одном сообществе")
             .assertExists()
+        composeTestRule.onNodeWithText("Мои сообщества").assertExists()
         isOwnProfile = false
         composeTestRule.waitForIdle()
-        composeTestRule
-            .onAllNodes(hasText("Вы пока не состоите ни в одном сообществе"), useUnmergedTree = true)
-            .assertCountEquals(0)
+        listOf(
+            "Вы пока не состоите ни в одном сообществе",
+            "Сообщества",
+        ).forEach { text ->
+            composeTestRule.onAllNodes(hasText(text), useUnmergedTree = false).assertCountEquals(0)
+            composeTestRule.onAllNodes(hasText(text), useUnmergedTree = true).assertCountEquals(0)
+        }
     }
 
     private fun assertReadOnlyCommunities(prefix: String) {
         val content = composeTestRule.onNodeWithTag(PROFILE_DETAILS_CONTENT_TAG, useUnmergedTree = true)
         listOf("$prefix subscribed", "$prefix unsubscribed").forEach { title ->
             content.performScrollToNode(hasContentDescription(title, substring = true))
+            composeTestRule.onNodeWithContentDescription(title).assertExists()
+            composeTestRule.onNodeWithText(title).assertExists()
         }
-        composeTestRule
-            .onAllNodes(hasContentDescription("Subscribe"), useUnmergedTree = true)
-            .assertCountEquals(0)
-        composeTestRule
-            .onAllNodes(hasContentDescription("Unsubscribe"), useUnmergedTree = true)
-            .assertCountEquals(0)
+        listOf("Subscribe", "Unsubscribe").forEach { description ->
+            composeTestRule
+                .onAllNodes(
+                    hasContentDescription(description),
+                    useUnmergedTree = false,
+                ).assertCountEquals(0)
+            composeTestRule
+                .onAllNodes(
+                    hasContentDescription(description),
+                    useUnmergedTree = true,
+                ).assertCountEquals(0)
+        }
     }
 
     private fun profileState(
