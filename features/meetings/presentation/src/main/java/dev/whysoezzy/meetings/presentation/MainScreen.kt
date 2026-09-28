@@ -51,6 +51,7 @@ import dev.whysoezzy.uikit.error.asUserMessage
 import dev.whysoezzy.uikit.models.UIKitAdBlock
 import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
+import dev.whysoezzy.uikit.models.UIKitCommunitySubscriptionAction
 import dev.whysoezzy.uikit.models.UIKitMeetingInfo
 import dev.whysoezzy.uikit.tokens.AppIcons
 import org.koin.androidx.compose.koinViewModel
@@ -275,10 +276,12 @@ internal fun MainScreenContent(
                             UIKitCommunityCard(
                                 imageUrl = community.imageUrl,
                                 title = community.title,
-                                isSubscribed = community.isSubscribed,
-                                onSubscribeClick = { isSubscribed ->
-                                    onCommunitySubscribeClick(community.id, isSubscribed)
-                                },
+                                subscriptionAction = UIKitCommunitySubscriptionAction.Actionable(
+                                    isSubscribed = community.isSubscribed,
+                                    onSubscribeClick = { isSubscribed ->
+                                        onCommunitySubscribeClick(community.id, isSubscribed)
+                                    },
+                                ),
                                 onCardClick = {
                                     onCommunityClick(community.id)
                                 },

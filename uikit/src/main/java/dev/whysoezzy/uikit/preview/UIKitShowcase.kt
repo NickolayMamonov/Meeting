@@ -43,6 +43,7 @@ import dev.whysoezzy.uikit.components.text.TextHeading1
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.components.toggles.UIKitToggle
 import dev.whysoezzy.uikit.models.UIKitAddress
+import dev.whysoezzy.uikit.models.UIKitCommunitySubscriptionAction
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
@@ -126,19 +127,19 @@ fun CardSection() {
         Row(
             horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
         ) {
-            var isSubscribed1 by remember { mutableStateOf(false) }
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Design",
-                isSubscribed = isSubscribed1,
-                onSubscribeClick = { isSubscribed1 = it },
+                subscriptionAction = UIKitCommunitySubscriptionAction.ReadOnly,
             )
 
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Android Dev",
-                isSubscribed = true,
-                onSubscribeClick = { },
+                subscriptionAction = UIKitCommunitySubscriptionAction.Actionable(
+                    isSubscribed = true,
+                    onSubscribeClick = { },
+                ),
             )
         }
 

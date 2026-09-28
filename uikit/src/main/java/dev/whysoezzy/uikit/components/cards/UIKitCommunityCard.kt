@@ -10,10 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
@@ -23,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.whysoezzy.uikit.components.buttons.UIKitSubscribeButton
+import dev.whysoezzy.uikit.models.UIKitCommunitySubscriptionAction
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.ColorTokens
@@ -33,8 +30,7 @@ import dev.whysoezzy.uikit.tokens.TypographyTokens
 fun UIKitCommunityCard(
     imageUrl: String,
     title: String,
-    isSubscribed: Boolean,
-    onSubscribeClick: (Boolean) -> Unit,
+    subscriptionAction: UIKitCommunitySubscriptionAction,
     modifier: Modifier = Modifier,
     onCardClick: (() -> Unit)? = null,
 ) {
@@ -74,12 +70,16 @@ fun UIKitCommunityCard(
             overflow = TextOverflow.Ellipsis,
         )
 
-        // Subscribe Button
-        UIKitSubscribeButton(
-            selected = isSubscribed,
-            onSelectedChange = onSubscribeClick,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        when (val action = subscriptionAction) {
+            UIKitCommunitySubscriptionAction.ReadOnly -> Unit
+            is UIKitCommunitySubscriptionAction.Actionable -> {
+                UIKitSubscribeButton(
+                    selected = action.isSubscribed,
+                    onSelectedChange = action.onSubscribeClick,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 
@@ -87,9 +87,6 @@ fun UIKitCommunityCard(
 @Composable
 fun UIKitCommunityCardPreview() {
     UIKitTheme {
-        var isSubscribed1 by remember { mutableStateOf(false) }
-        var isSubscribed2 by remember { mutableStateOf(true) }
-
         Column(
             modifier =
                 Modifier
@@ -101,24 +98,27 @@ fun UIKitCommunityCardPreview() {
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Design",
-                isSubscribed = false,
-                onSubscribeClick = { },
+                subscriptionAction = UIKitCommunitySubscriptionAction.ReadOnly,
             )
 
             // Long title
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Очень длинный текст сообщества, который должен обрезаться",
-                isSubscribed = true,
-                onSubscribeClick = { },
+                subscriptionAction = UIKitCommunitySubscriptionAction.Actionable(
+                    isSubscribed = true,
+                    onSubscribeClick = { },
+                ),
             )
 
             // Interactive card
             UIKitCommunityCard(
                 imageUrl = "https://picsum.photos/104/104",
                 title = "Android Dev",
-                isSubscribed = isSubscribed1,
-                onSubscribeClick = { isSubscribed1 = it },
+                subscriptionAction = UIKitCommunitySubscriptionAction.Actionable(
+                    isSubscribed = false,
+                    onSubscribeClick = { },
+                ),
                 onCardClick = { /* handle card click */ },
             )
         }

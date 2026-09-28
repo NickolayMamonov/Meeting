@@ -87,6 +87,7 @@ UIKitUserMeetingsBlock(
 - `title` - заголовок блока (по умолчанию "Мои сообщества")
 - `communities` - список сообществ пользователя
 - `onCommunityClick` - колбэк при клике на сообщество
+- `subscriptionActionForCommunity` - фабрика действия подписки для каждого сообщества (`ReadOnly` скрывает управление, `Actionable` сохраняет кнопку)
 
 **Пример использования:**
 
@@ -94,7 +95,8 @@ UIKitUserMeetingsBlock(
 UIKitUserCommunitiesBlock(
     title = "Подписки",
     communities = userCommunities,
-    onCommunityClick = { communityId -> /* навигация к сообществу */ }
+    onCommunityClick = { communityId -> /* навигация к сообществу */ },
+    subscriptionActionForCommunity = { UIKitCommunitySubscriptionAction.ReadOnly },
 )
 ```
 

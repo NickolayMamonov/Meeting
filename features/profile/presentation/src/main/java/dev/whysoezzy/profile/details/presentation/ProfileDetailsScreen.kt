@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +44,7 @@ import dev.whysoezzy.uikit.components.social.UIKitSocialMediaList
 import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.topbar.ProfileTopBar
 import dev.whysoezzy.uikit.error.asUserMessage
+import dev.whysoezzy.uikit.models.UIKitCommunitySubscriptionAction
 import dev.whysoezzy.uikit.security.SecureScreenEffect
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SFProDisplayFontFamily
@@ -99,9 +101,6 @@ fun ProfileDetailsScreen(
                 onMeetingClick = { viewModel.onEvent(ProfileDetailsEvent.NavigateToMeeting(it)) },
                 onCommunityClick = { viewModel.onEvent(ProfileDetailsEvent.NavigateToCommunity(it)) },
                 onSocialMediaClick = { viewModel.onEvent(ProfileDetailsEvent.OpenSocialMedia(it)) },
-                onCommunitySubscribeClick = { id, subscribed ->
-                    viewModel.onEvent(ProfileDetailsEvent.ToggleCommunitySubscription(id, subscribed))
-                },
                 onLogoutClick = { viewModel.onEvent(ProfileDetailsEvent.Logout) },
             )
 
@@ -133,18 +132,19 @@ private fun LoadingContent(modifier: Modifier = Modifier) {
     }
 }
 
+internal const val PROFILE_DETAILS_CONTENT_TAG = "profile_details_content"
+
 @Composable
-private fun ProfileContent(
+internal fun ProfileContent(
     uiState: ProfileDetailsUiState.Success,
     onMeetingClick: (Long) -> Unit,
     onCommunityClick: (Long) -> Unit,
     onSocialMediaClick: (String) -> Unit,
-    onCommunitySubscribeClick: (Long, Boolean) -> Unit,
     onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().testTag(PROFILE_DETAILS_CONTENT_TAG),
     ) {
         // 1. Фото + основная инфо — edge-to-edge, без верхнего padding
         item {
@@ -206,7 +206,7 @@ private fun ProfileContent(
                     },
                     communities = uiState.userCommunities,
                     onCommunityClick = onCommunityClick,
-                    onSubscribeClick = { _, _ -> },
+                    subscriptionActionForCommunity = { UIKitCommunitySubscriptionAction.ReadOnly },
                     modifier = Modifier.padding(horizontal = SpacingTokens.L),
                 )
             }
