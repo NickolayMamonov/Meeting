@@ -7,13 +7,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,9 +33,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,6 +65,11 @@ import dev.whysoezzy.uikit.models.UIKitAddress
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import org.koin.androidx.compose.koinViewModel
+
+internal const val COMMUNITY_DETAILS_TOP_BAR_TAG = "community-details-top-bar"
+internal const val COMMUNITY_DETAILS_VIEWPORT_TAG = "community-details-viewport"
+internal const val COMMUNITY_DETAILS_HEADER_TAG = "community-details-header"
+internal const val COMMUNITY_DETAILS_TERMINAL_TAG = "community-details-terminal"
 
 @Composable
 fun CommunityDetailsScreen(
@@ -96,15 +107,51 @@ fun CommunityDetailsScreen(
         }
     }
 
+    CommunityDetailsLayout(
+        uiState = uiState,
+        onBackPressed = onBackPressed,
+        onShareClick = { viewModel.onEvent(CommunityDetailsEvent.ShareCommunity) },
+        onSubscribeClick = {
+            viewModel.onEvent(CommunityDetailsEvent.ToggleSubscription)
+        },
+        onSubscribersClick = {
+            viewModel.onEvent(CommunityDetailsEvent.NavigateToSubscribers)
+        },
+        onMeetingClick = { meetingId ->
+            viewModel.onEvent(CommunityDetailsEvent.NavigateToMeeting(meetingId))
+        },
+        onRetry = {
+            viewModel.onEvent(CommunityDetailsEvent.LoadCommunity(communityId))
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun CommunityDetailsLayout(
+    uiState: CommunityDetailsUiState,
+    onBackPressed: () -> Unit,
+    onShareClick: () -> Unit,
+    onSubscribeClick: () -> Unit,
+    onSubscribersClick: () -> Unit,
+    onMeetingClick: (Long) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    scaffoldContentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
+    topBarWindowInsets: WindowInsets = WindowInsets.statusBars,
+) {
     Scaffold(
+        contentWindowInsets = scaffoldContentWindowInsets,
         topBar = {
             when (val state = uiState) {
                 is CommunityDetailsUiState.Success -> {
                     BackShareTopBar(
                         title = state.title,
                         onBackClick = onBackPressed,
-                        onShareClick = { viewModel.onEvent(CommunityDetailsEvent.ShareCommunity) },
-                        modifier = Modifier.statusBarsPadding(),
+                        onShareClick = onShareClick,
+                        modifier = Modifier
+                            .windowInsetsPadding(topBarWindowInsets)
+                            .testTag(COMMUNITY_DETAILS_TOP_BAR_TAG),
                     )
                 }
                 else -> {
@@ -112,41 +159,37 @@ fun CommunityDetailsScreen(
                         title = stringResource(R.string.community_details_title),
                         onBackClick = onBackPressed,
                         onShareClick = {},
-                        modifier = Modifier.statusBarsPadding(),
+                        modifier = Modifier
+                            .windowInsetsPadding(topBarWindowInsets)
+                            .testTag(COMMUNITY_DETAILS_TOP_BAR_TAG),
                     )
                 }
             }
         },
     ) { paddingValues ->
+        val contentModifier = modifier
+            .padding(paddingValues)
+            .consumeWindowInsets(paddingValues)
         when (val state = uiState) {
             is CommunityDetailsUiState.Loading -> {
-                LoadingContent(modifier = Modifier.padding(paddingValues))
+                LoadingContent(modifier = contentModifier)
             }
 
             is CommunityDetailsUiState.Success -> {
                 CommunityDetailsContent(
                     state = state,
-                    onSubscribeClick = {
-                        viewModel.onEvent(CommunityDetailsEvent.ToggleSubscription)
-                    },
-                    onSubscribersClick = {
-                        viewModel.onEvent(CommunityDetailsEvent.NavigateToSubscribers)
-                    },
-                    onMeetingClick = { meetingId ->
-                        viewModel.onEvent(CommunityDetailsEvent.NavigateToMeeting(meetingId))
-                    },
-                    paddingValues = paddingValues,
-                    modifier = modifier,
+                    onSubscribeClick = onSubscribeClick,
+                    onSubscribersClick = onSubscribersClick,
+                    onMeetingClick = onMeetingClick,
+                    modifier = contentModifier,
                 )
             }
 
             is CommunityDetailsUiState.Error -> {
                 ErrorContent(
                     message = state.errorType.asUserMessage(),
-                    onRetry = {
-                        viewModel.onEvent(CommunityDetailsEvent.LoadCommunity(communityId))
-                    },
-                    modifier = Modifier.padding(paddingValues),
+                    onRetry = onRetry,
+                    modifier = contentModifier,
                 )
             }
         }
@@ -166,31 +209,38 @@ private fun CommunityDetailsContent(
     onSubscribeClick: () -> Unit,
     onSubscribersClick: () -> Unit,
     onMeetingClick: (Long) -> Unit,
-    paddingValues: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .testTag(COMMUNITY_DETAILS_VIEWPORT_TAG),
         contentPadding = PaddingValues(
             start = SpacingTokens.L,
             end = SpacingTokens.L,
-            top = paddingValues.calculateTopPadding(),
-            bottom = paddingValues.calculateBottomPadding() + SpacingTokens.L,
+            bottom = SpacingTokens.L,
         ),
         verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
     ) {
         item {
-            AsyncImage(
-                model = state.imageUrl,
-                contentDescription = state.title,
+            Column(
                 modifier = Modifier
-                    .size(240.dp)
-                    .clip(RoundedCornerShape(16.dp)),
-                contentScale = ContentScale.Crop,
-                placeholder = ColorPainter(ColorTokens.NeutralLine),
-                error = ColorPainter(ColorTokens.NeutralLine),
-            )
-            TextHeading1(text = state.title, modifier = Modifier.fillMaxWidth())
+                    .fillMaxWidth()
+                    .testTag(COMMUNITY_DETAILS_HEADER_TAG),
+            ) {
+                AsyncImage(
+                    model = state.imageUrl,
+                    contentDescription = state.title,
+                    modifier = Modifier
+                        .size(240.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    contentScale = ContentScale.Crop,
+                    placeholder = ColorPainter(ColorTokens.NeutralLine),
+                    error = ColorPainter(ColorTokens.NeutralLine),
+                )
+                TextHeading1(text = state.title, modifier = Modifier.fillMaxWidth())
+            }
         }
 
         item {
@@ -265,7 +315,10 @@ private fun CommunityDetailsContent(
             }
 
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
+                LazyRow(
+                    modifier = Modifier.testTag(COMMUNITY_DETAILS_TERMINAL_TAG),
+                    horizontalArrangement = Arrangement.spacedBy(SpacingTokens.M),
+                ) {
                     items(state.pastMeetings, key = { it.id }) { meeting ->
                         val eventCardTags = remember(meeting.tags) { meeting.tags.toEventCardTagsAllDisabled() }
                         UIKitEventCard(
