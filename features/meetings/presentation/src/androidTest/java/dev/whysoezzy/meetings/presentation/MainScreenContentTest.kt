@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -180,6 +181,46 @@ class MainScreenContentTest {
                 context.getString(R.string.meetings_main_section_all),
                 useUnmergedTree = true,
             ).assertIsDisplayed()
+    }
+
+    @Test
+    fun homeCommunityCardInvokesSubscriptionAndNavigationIndependently() {
+        val community = UIKitCommunityInfo(301, "Interactive community", "", false)
+        var subscription: Pair<Long, Boolean>? = null
+        var navigationId: Long? = null
+
+        composeTestRule.setContent {
+            val pagedMeetings =
+                remember { flowOf(PagingData.empty<UIKitMeetingInfo>()) }.collectAsLazyPagingItems()
+            UIKitTheme {
+                MainScreenContent(
+                    heroMeetings = emptyList(),
+                    popularMeetings = emptyList(),
+                    searchResults = emptyList(),
+                    searchQuery = "",
+                    pagedMeetings = pagedMeetings,
+                    communities = listOf(community),
+                    adBlocks = emptyList(),
+                    onMeetingClick = {},
+                    onCommunityClick = { navigationId = it },
+                    onUserProfileClick = {},
+                    onCommunitySubscribeClick = { id, isSubscribed ->
+                        subscription = id to isSubscribed
+                    },
+                )
+            }
+        }
+
+        val content = composeTestRule.onNodeWithTag(MAIN_SCREEN_CONTENT_TAG, useUnmergedTree = true)
+        content.performScrollToNode(hasContentDescription(community.title, substring = true))
+        composeTestRule.onNodeWithContentDescription("Subscribe").performClick()
+        assertEquals(community.id to true, subscription)
+        assertEquals(null, navigationId)
+
+        composeTestRule
+            .onNodeWithContentDescription(community.title, substring = true)
+            .performClick()
+        assertEquals(community.id, navigationId)
     }
 
     private fun assertHomeContent(
