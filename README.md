@@ -5,7 +5,8 @@ This README is the contributor entry point for the Android project.
 
 ## Stack and architecture
 
-- Kotlin 2.3.20, Jetpack Compose, Koin, Ktor, and Kotlin Coroutines/Flow.
+- Kotlin 2.3.20, Jetpack Compose, Koin, Ktor, Kotlin Coroutines/Flow,
+  WorkManager, and Firebase Messaging/Crashlytics/Analytics.
 - Clean Architecture with feature `data`, `domain`, and `presentation`
   boundaries.
 - Gradle convention plugins in `build-logic/convention` centralize Android,
@@ -29,7 +30,8 @@ The following map mirrors the 18 module paths in `settings.gradle.kts`:
 
 ### Application and shared modules
 
-- `:app` — application entry point, dependency assembly, and navigation.
+- `:app` — application entry point, dependency assembly, navigation, push
+  registration, and reminder notification integration.
 - `:uikit` — shared Compose components, UI models, theme, and assets.
 - `:core:common` — shared JVM utilities.
 - `:core:network` — Ktor client and the `BuildConfig.BASE_URL` boundary.
@@ -142,10 +144,28 @@ For example, a complete POSIX invocation is
   `https://api.whysoezzy.online`. Protected Firebase configuration and signing
   material are supplied only through release custody.
 
-See [Android release operations](docs/android-release-operations.md) for the
-authoritative promotion, custody, evidence, signing, and publication
-procedures. This README does not represent an unfinished snapshot, beta, or
-stable release as shipped.
+`dev` is the integration and snapshot authority; `master` is the stable
+release authority. A successful signed and attested `dev` snapshot is a
+candidate, not a published production release. Promotion and publication are
+separate reviewed operations.
+
+## Documentation map
+
+- [Android release operations](docs/android-release-operations.md) is the
+  authority for branch roles, snapshot and release custody, exact artifact
+  evidence, signing, promotion, public probing, and publication.
+- [Verification and rollout](docs/android-release-operations.md#verification-and-rollout)
+  defines the release verification boundary and pre-promotion smoke
+  expectations. Candidate-specific runtime results belong to their reviewed
+  evidence; this README is not runtime proof.
+- [Firebase, crash reporting, and SDK custody](docs/android-release-operations.md#firebase-crash-reporting-and-sdk-custody)
+  explains protected configuration, Crashlytics startup claims, Android SDK
+  tool selection, and cleanup-owned device continuation.
+- [UIKit guide](uikit/README.md) and
+  [UIKit block guide](uikit/src/main/java/dev/whysoezzy/uikit/components/blocks/README.md)
+  describe reusable UI components.
+- [CHANGELOG](CHANGELOG.md) records stable release history. Do not infer
+  production publication from the state of `dev`.
 
 ## CI checks
 
