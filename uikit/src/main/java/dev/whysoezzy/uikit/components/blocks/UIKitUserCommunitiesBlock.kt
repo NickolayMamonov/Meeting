@@ -12,6 +12,7 @@ import dev.whysoezzy.uikit.components.cards.UIKitCommunityCard
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitCommunityInfo
+import dev.whysoezzy.uikit.models.UIKitCommunitySubscriptionAction
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
@@ -20,9 +21,8 @@ import dev.whysoezzy.uikit.tokens.SpacingTokens
  *
  * @param title Заголовок блока (по умолчанию "Мои сообщества")
  * @param communities Список сообществ пользователя
- * @param subscribedCommunityIds Список ID сообществ, на которые подписан пользователь
  * @param onCommunityClick Колбэк при клике на сообщество
- * @param onSubscribeClick Колбэк при изменении подписки на сообщество
+ * @param subscriptionActionForCommunity Действие подписки для каждого сообщества
  * @param modifier Модификатор для кастомизации
  */
 @Composable
@@ -31,7 +31,7 @@ fun UIKitUserCommunitiesBlock(
     title: String = "Мои сообщества",
     communities: List<UIKitCommunityInfo>,
     onCommunityClick: (Long) -> Unit,
-    onSubscribeClick: (Long, Boolean) -> Unit = { _, _ -> },
+    subscriptionActionForCommunity: (UIKitCommunityInfo) -> UIKitCommunitySubscriptionAction,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -55,10 +55,7 @@ fun UIKitUserCommunitiesBlock(
                     UIKitCommunityCard(
                         imageUrl = community.imageUrl,
                         title = community.title,
-                        isSubscribed = community.isSubscribed,
-                        onSubscribeClick = { isSubscribed ->
-                            onSubscribeClick(community.id, isSubscribed)
-                        },
+                        subscriptionAction = subscriptionActionForCommunity(community),
                         onCardClick = { onCommunityClick(community.id) },
                     )
                 }

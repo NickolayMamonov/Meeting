@@ -1,5 +1,6 @@
 plugins {
     id("meet.android.application")
+    id("meet.android.serialization")
     alias(libs.plugins.google.services)
     alias(libs.plugins.firebase.crashlytics)
 }
@@ -57,6 +58,12 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.analytics)
+    implementation(libs.firebase.messaging)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.google.tink.android)
+    implementation(libs.kotlinx.serialization.protobuf)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.timber)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
@@ -64,6 +71,7 @@ dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.android)
+    implementation(libs.koin.workmanager)
     implementation(libs.koin.compose)
 
     implementation(libs.androidx.core.ktx)

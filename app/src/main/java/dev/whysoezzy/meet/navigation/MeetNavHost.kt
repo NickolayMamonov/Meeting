@@ -2,6 +2,7 @@ package dev.whysoezzy.meet.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -22,6 +23,7 @@ import org.koin.androidx.compose.koinViewModel
 fun MeetNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    onReady: () -> Unit = {},
 ) {
     val authViewModel: AuthCheckViewModel = koinViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
@@ -40,6 +42,7 @@ fun MeetNavHost(
         pendingAttempt = requireNotNull(pendingAttempt),
         durableSession = requireNotNull(durableSession),
         modifier = modifier,
+        onReady = onReady,
     )
 }
 
@@ -50,6 +53,7 @@ internal fun MeetNavHostContent(
     pendingAttempt: EmailOtpAttemptResult,
     durableSession: AuthSession? = null,
     modifier: Modifier = Modifier,
+    onReady: () -> Unit = {},
 ) {
     // NavHost remembers its graph by the builder lambda. Keep mutable recovery values behind
     // stable state holders so clearing a recovered attempt cannot replace the graph and its
@@ -83,6 +87,7 @@ internal fun MeetNavHostContent(
         builder = graphBuilder,
     )
     LegacyAuthCompatibility.assertIds(navController.graph)
+    SideEffect(onReady)
 
     AuthStateNavigationEffect(
         navController = navController,

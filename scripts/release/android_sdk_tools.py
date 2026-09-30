@@ -196,7 +196,13 @@ def resolve_apksigner(environment: Mapping[str, str] | None = None) -> Path:
     revision, directory = _selected_build_tools(root)
     if _package_revision(directory, containment_roots=(root,)) != revision:
         raise AndroidSdkToolError("Android SDK build-tools package revision does not match directory")
-    executable = _validated_executable(directory, containment_roots=(root,))
+    launcher = "apksigner.bat" if sys.platform == "win32" else "apksigner"
+    executable = _validated_executable(
+        directory,
+        relative_path=launcher,
+        containment_roots=(root,),
+        require_executable=sys.platform != "win32",
+    )
     _validate_tool_version(executable)
     return executable
 

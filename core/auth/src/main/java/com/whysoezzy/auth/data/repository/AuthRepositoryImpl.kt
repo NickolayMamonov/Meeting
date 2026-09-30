@@ -2,12 +2,18 @@ package com.whysoezzy.auth.data.repository
 
 import com.whysoezzy.auth.TokenManager
 import com.whysoezzy.auth.data.api.AuthApi
+import com.whysoezzy.auth.domain.models.AuthCredentialRead
 import com.whysoezzy.auth.domain.models.AuthFailure
+import com.whysoezzy.auth.domain.models.AuthOperationPermit
 import com.whysoezzy.auth.domain.models.AuthOutcome
+import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
 import com.whysoezzy.auth.domain.models.AuthResult
+import com.whysoezzy.auth.domain.models.AuthSaveResult
 import com.whysoezzy.auth.domain.models.AuthSession
+import com.whysoezzy.auth.domain.models.RefreshOutcome
 import com.whysoezzy.auth.domain.repository.AuthRepository
 import com.whysoezzy.auth.domain.repository.AuthSessionRepository
+import com.whysoezzy.common.error.AppException
 import com.whysoezzy.network.error.ApiException
 import com.whysoezzy.network.safeApiCall
 import kotlinx.coroutines.NonCancellable
@@ -93,17 +99,25 @@ internal class AuthRepositoryImpl(
             is AuthOutcome.Failure -> responseOutcome
             is AuthOutcome.Success -> {
                 val response = responseOutcome.value
+                val reservation = tokenManager.reserveOwnerSave()
                 try {
-                    tokenManager.saveAuthenticated(
-                        accessToken = response.accessToken,
-                        refreshToken = response.refreshToken,
-                        userId = response.user.id,
-                        stage = if (response.isNewUser) {
-                            AuthSession.Stage.NeedsName
-                        } else {
-                            AuthSession.Stage.Ready
-                        },
-                    )
+                    when (
+                        tokenManager.saveAuthenticated(
+                            reservation = reservation,
+                            accessToken = response.accessToken,
+                            refreshToken = response.refreshToken,
+                            userId = response.user.id,
+                            stage = if (response.isNewUser) {
+                                AuthSession.Stage.NeedsName
+                            } else {
+                                AuthSession.Stage.Ready
+                            },
+                        )
+                    ) {
+                        AuthSaveResult.Persisted -> Unit
+                        AuthSaveResult.StaleSkipped ->
+                            return AuthOutcome.Failure(AuthFailure.SessionPersistenceFailure)
+                    }
                     AuthOutcome.Success(
                         AuthResult(
                             accessToken = response.accessToken,
@@ -116,29 +130,91 @@ internal class AuthRepositoryImpl(
                     throw e
                 } catch (_: Exception) {
                     withContext(NonCancellable) {
-                        runCatching { sessionRepository?.clear() }
-                        runCatching { tokenManager.clearTokens() }
+                        runCatching {
+                            val clearReservation =
+                                tokenManager.reserveClear(reservation.clearPermit)
+                            if (clearReservation != null) {
+                                tokenManager.clearReserved(clearReservation)
+                            }
+                        }
                     }
                     AuthOutcome.Failure(AuthFailure.SessionPersistenceFailure)
                 }
             }
         }
 
-    override suspend fun refreshToken(): Result<String> {
-        val currentTokens = tokenManager.loadTokens()
-            ?: return Result.failure(ApiException.UnauthorizedError())
-        return safeApiCall {
-            val response = authApi.refreshToken(currentTokens.refreshToken)
-            tokenManager.saveTokens(
-                accessToken = response.accessToken,
-                refreshToken = response.refreshToken ?: currentTokens.refreshToken,
-                userId = tokenManager.getUserId(),
+    override suspend fun refreshToken(operationPermit: AuthOperationPermit): RefreshOutcome {
+        val read = try {
+            tokenManager.readCredentialSnapshot(operationPermit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return RefreshOutcome.TransientFailure(e)
+        }
+        val boundPermit = when (read) {
+            is AuthCredentialRead.Present -> read.permit
+            is AuthCredentialRead.Missing -> return RefreshOutcome.Missing(read.permit)
+            AuthCredentialRead.Stale -> return RefreshOutcome.StaleSkipped
+        }
+        val snapshot = read.snapshot
+
+        return try {
+            safeApiCall {
+                authApi.refreshToken(snapshot.refreshToken)
+            }.fold(
+                onSuccess = { response ->
+                    when (
+                        val saved = tokenManager.saveRefreshedTokens(
+                            permit = boundPermit,
+                            accessToken = response.accessToken,
+                            refreshToken = response.refreshToken ?: snapshot.refreshToken,
+                        )
+                    ) {
+                        is AuthRefreshSaveResult.Persisted ->
+                            RefreshOutcome.Refreshed(saved.pair)
+                        AuthRefreshSaveResult.StaleSkipped -> RefreshOutcome.StaleSkipped
+                        is AuthRefreshSaveResult.Failed ->
+                            RefreshOutcome.TransientFailure(saved.error)
+                    }
+                },
+                onFailure = { error ->
+                    if (error.isUnauthorized()) {
+                        RefreshOutcome.Unauthorized(boundPermit)
+                    } else {
+                        RefreshOutcome.TransientFailure(error)
+                    }
+                },
             )
-            response.accessToken
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (e.isUnauthorized()) {
+                RefreshOutcome.Unauthorized(boundPermit)
+            } else {
+                RefreshOutcome.TransientFailure(e)
+            }
         }
     }
 
     override suspend fun logout() {
+        val operationPermit = tokenManager.captureAuthOperationPermit()
+        var clearPermit = operationPermit
+        try {
+            clearPermit = when (val read = tokenManager.readCredentialSnapshot(operationPermit)) {
+                is AuthCredentialRead.Present -> read.permit
+                is AuthCredentialRead.Missing -> read.permit
+                /*
+                 * Retain the original generation fence. A stale permit is rejected
+                 * by reserveClear if a newer owner won the race, while a current
+                 * permit still gets the one safe fallback clear.
+                 */
+                AuthCredentialRead.Stale -> operationPermit
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Credential read failed during logout, clearing if still current")
+        }
         try {
             authApi.logout()
         } catch (e: CancellationException) {
@@ -147,16 +223,30 @@ internal class AuthRepositoryImpl(
             Timber.w(e, "Server logout failed, clearing local tokens anyway")
         } finally {
             withContext(NonCancellable) {
-                try {
-                    sessionRepository?.clear()
-                } finally {
-                    tokenManager.clearTokens()
+                runCatching {
+                    val clearReservation = tokenManager.reserveClear(clearPermit)
+                    if (clearReservation != null) {
+                        tokenManager.clearReserved(clearReservation)
+                    }
                 }
             }
         }
     }
 
+    override suspend fun requestServerLogout(): Result<Unit> =
+        try {
+            authApi.logout()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
     override val isLoggedInFlow: Flow<Boolean> = tokenManager.isLoggedInFlow
+
+    private fun Throwable.isUnauthorized(): Boolean =
+        this is AppException.UnauthorizedError || this is ApiException.UnauthorizedError
 
     private suspend fun <T> emailApiCall(
         endpoint: AuthEndpoint,

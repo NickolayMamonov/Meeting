@@ -38,7 +38,12 @@ val authModule =
             KtorNetworkModule.provideHttpClient()
         }
 
-        single<AuthApi> { AuthApiKtor(get(named("publicClient"))) }
+        single<AuthApi> {
+            AuthApiKtor(
+                publicClient = get(named("publicClient")),
+                authorizedClient = get(named("authorizedClient")),
+            )
+        }
 
         single<AuthRepository> {
             AuthRepositoryImpl(

@@ -12,7 +12,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.whysoezzy.auth.domain.models.AuthClearResult
+import com.whysoezzy.auth.domain.models.AuthCredentialRead
 import com.whysoezzy.auth.domain.models.AuthOutcome
+import com.whysoezzy.auth.domain.models.AuthRefreshSaveResult
+import com.whysoezzy.auth.domain.models.AuthSaveResult
 import com.whysoezzy.auth.domain.models.AuthSession
 import com.whysoezzy.auth.domain.models.DispatchOutcome
 import com.whysoezzy.auth.domain.models.EmailAddress
@@ -147,6 +151,160 @@ class AuthPersistenceInstrumentationTest {
                     .encodeToByteArray(),
             ),
         )
+    }
+
+    @Test
+    fun legacyCredentialMetadata_migratesAtomically_andSurvivesClear() = runBlocking {
+        val crypto = TokenCrypto(context)
+        writeRawPreferences(TOKEN_STORE) {
+            it[stringPreferencesKey("access_token")] =
+                crypto.encrypt("legacy-access", "access_token")
+            it[stringPreferencesKey("refresh_token")] =
+                crypto.encrypt("legacy-refresh", "refresh_token")
+            it[stringPreferencesKey("user_id")] =
+                crypto.encrypt("42", "user_id")
+            it[stringPreferencesKey("stage")] =
+                crypto.encrypt(AuthSession.Stage.Ready.name, "stage")
+        }
+
+        assertEquals(AuthSession(42L, AuthSession.Stage.Ready), tokenManager.readSession())
+        val migrated = tokenManager.credentialVersion.first()
+        assertTrue(migrated.epoch != "legacy")
+        assertEquals(1L, migrated.revision)
+
+        tokenManager.clearTokens()
+        assertEquals(migrated, tokenManager.credentialVersion.first())
+    }
+
+    @Test
+    fun corruptCredentialMetadata_failsClosed() = runBlocking {
+        val crypto = TokenCrypto(context)
+        writeRawPreferences(TOKEN_STORE) {
+            it[stringPreferencesKey("access_token")] =
+                crypto.encrypt("corrupt-access", "access_token")
+            it[stringPreferencesKey("refresh_token")] =
+                crypto.encrypt("corrupt-refresh", "refresh_token")
+            it[stringPreferencesKey("user_id")] =
+                crypto.encrypt("42", "user_id")
+            it[stringPreferencesKey("stage")] =
+                crypto.encrypt(AuthSession.Stage.Ready.name, "stage")
+            it[stringPreferencesKey("credential_epoch")] =
+                crypto.encrypt("not-a-uuid", "credential_epoch")
+            it[stringPreferencesKey("credential_revision")] =
+                crypto.encrypt("0", "credential_revision")
+        }
+
+        assertEquals(AuthSession.LoggedOut, tokenManager.readSession())
+        assertNull(tokenManager.loadTokens())
+        val repaired = tokenManager.credentialVersion.first()
+        assertTrue(repaired.epoch != "legacy")
+        assertEquals(0L, repaired.revision)
+
+        tokenManager.saveAuthenticated(
+            accessToken = "recovered-access",
+            refreshToken = "recovered-refresh",
+            userId = 42L,
+            stage = AuthSession.Stage.Ready,
+        )
+        assertEquals(1L, tokenManager.credentialVersion.first().revision)
+    }
+
+    @Test
+    fun malformedCredentialCiphertext_failsClosed() = runBlocking {
+        val crypto = TokenCrypto(context)
+        writeRawPreferences(TOKEN_STORE) {
+            it[stringPreferencesKey("access_token")] =
+                crypto.encrypt("access", "access_token")
+            it[stringPreferencesKey("refresh_token")] =
+                crypto.encrypt("refresh", "refresh_token")
+            it[stringPreferencesKey("user_id")] =
+                crypto.encrypt("42", "user_id")
+            it[stringPreferencesKey("stage")] =
+                crypto.encrypt(AuthSession.Stage.Ready.name, "stage")
+            it[stringPreferencesKey("credential_epoch")] = "malformed-ciphertext"
+            it[stringPreferencesKey("credential_revision")] = "also-malformed"
+        }
+
+        assertEquals(AuthSession.LoggedOut, tokenManager.readSession())
+        assertNull(tokenManager.loadTokens())
+        val repaired = tokenManager.credentialVersion.first()
+        assertEquals(0L, repaired.revision)
+        assertTrue(repaired.epoch != "legacy")
+
+        tokenManager.saveAuthenticated(
+            accessToken = "recovered-access",
+            refreshToken = "recovered-refresh",
+            userId = 42L,
+            stage = AuthSession.Stage.Ready,
+        )
+        assertEquals(1L, tokenManager.credentialVersion.first().revision)
+    }
+
+    @Test
+    fun generationBoundRefreshAndClear_preserveLatestOwner() = runBlocking {
+        tokenManager.saveAuthenticated(
+            accessToken = "owner-a-access",
+            refreshToken = "owner-a-refresh",
+            userId = 1L,
+            stage = AuthSession.Stage.Ready,
+        )
+        val aRead = tokenManager.readCredentialSnapshot(
+            tokenManager.captureAuthOperationPermit(),
+        )
+        val aPermit = (aRead as AuthCredentialRead.Present).permit
+
+        val firstOwner = tokenManager.reserveOwnerSave()
+        val latestOwner = tokenManager.reserveOwnerSave()
+        assertEquals(
+            AuthSaveResult.StaleSkipped,
+            tokenManager.saveAuthenticated(
+                firstOwner,
+                "owner-b-stale-access",
+                "owner-b-stale-refresh",
+                2L,
+                AuthSession.Stage.Ready,
+            ),
+        )
+        assertEquals(
+            AuthSaveResult.Persisted,
+            tokenManager.saveAuthenticated(
+                latestOwner,
+                "owner-b-access",
+                "owner-b-refresh",
+                2L,
+                AuthSession.Stage.Ready,
+            ),
+        )
+
+        assertEquals(
+            AuthRefreshSaveResult.StaleSkipped,
+            tokenManager.saveRefreshedTokens(
+                aPermit,
+                "owner-a-late-access",
+                "owner-a-late-refresh",
+            ),
+        )
+        assertNull(tokenManager.reserveClear(aPermit))
+
+        val bRead = tokenManager.readCredentialSnapshot(
+            tokenManager.captureAuthOperationPermit(),
+        )
+        val bPresent = bRead as AuthCredentialRead.Present
+        val bSnapshot = bPresent.snapshot
+        assertEquals(2L, bSnapshot.userId)
+        assertEquals("owner-b-access", bSnapshot.accessToken)
+        assertEquals("owner-b-refresh", bSnapshot.refreshToken)
+        val versionBeforeClear = bSnapshot.credentialVersion
+
+        val clearReservation = requireNotNull(
+            tokenManager.reserveClear(bPresent.permit),
+        )
+        assertEquals(
+            AuthClearResult.Cleared,
+            tokenManager.clearReserved(clearReservation),
+        )
+        assertEquals(versionBeforeClear, tokenManager.credentialVersion.first())
+        assertNull(tokenManager.loadTokens())
     }
 
     private suspend fun authSession_allowsForwardCasAndIdentityReplacement_butRejectsStaleTransitions() {

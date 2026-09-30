@@ -5,10 +5,15 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.union
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.whysoezzy.auth.domain.models.AuthSession
 import dev.whysoezzy.auth.R
+import dev.whysoezzy.auth.presentation.AuthFormLayout
 import dev.whysoezzy.uikit.components.buttons.UIKitButton
 import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.inputs.UIKitInput
@@ -71,6 +77,7 @@ fun NameInputScreen(
             modifier =
                 Modifier
                     .padding(paddingValues)
+                    .consumeWindowInsets(paddingValues)
                     .fillMaxSize(),
             onNameChange = { viewModel.onEvent(NameInputEvent.UpdateName(it)) },
             onSurnameChange = { viewModel.onEvent(NameInputEvent.UpdateSurname(it)) },
@@ -80,73 +87,79 @@ fun NameInputScreen(
 }
 
 @Composable
-private fun NameInputContent(
+internal fun NameInputContent(
     uiState: NameInputUiState,
     modifier: Modifier = Modifier,
     onNameChange: (String) -> Unit = {},
     onSurnameChange: (String) -> Unit = {},
     onContinueClick: () -> Unit = {},
+    windowInsets: WindowInsets = WindowInsets.navigationBars.union(WindowInsets.ime),
 ) {
-    Column(
-        modifier = modifier.padding(SpacingTokens.L),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
-    ) {
-        Spacer(modifier = Modifier.height(60.dp))
+    AuthFormLayout(
+        modifier = modifier,
+        windowInsets = windowInsets,
+        body = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
+            ) {
+                Spacer(modifier = Modifier.height(60.dp))
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-        ) {
-            TextHeading1(
-                text = stringResource(R.string.auth_name_title),
-                color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center,
-            )
-            TextBody2(
-                text = stringResource(R.string.auth_name_subtitle),
-                color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center,
-            )
-        }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
+                ) {
+                    TextHeading1(
+                        text = stringResource(R.string.auth_name_title),
+                        color = ColorTokens.NeutralWeak,
+                        textAlign = TextAlign.Center,
+                    )
+                    TextBody2(
+                        text = stringResource(R.string.auth_name_subtitle),
+                        color = ColorTokens.NeutralWeak,
+                        textAlign = TextAlign.Center,
+                    )
+                }
 
-        Spacer(modifier = Modifier.height(SpacingTokens.L))
+                Spacer(modifier = Modifier.height(SpacingTokens.L))
 
-        Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
-            val nameErr = nameErrorText(uiState.nameError, blankRes = R.string.auth_name_error_blank)
-            val surnameErr = nameErrorText(uiState.surnameError, blankRes = R.string.auth_surname_error_blank)
-            UIKitInput(
-                value = uiState.name,
-                onValueChange = onNameChange,
-                hint = stringResource(R.string.auth_name_hint_first),
-                isError = uiState.nameError != null,
-                errorMessage = nameErr ?: "",
+                Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.M)) {
+                    val nameErr = nameErrorText(uiState.nameError, blankRes = R.string.auth_name_error_blank)
+                    val surnameErr = nameErrorText(uiState.surnameError, blankRes = R.string.auth_surname_error_blank)
+                    UIKitInput(
+                        value = uiState.name,
+                        onValueChange = onNameChange,
+                        hint = stringResource(R.string.auth_name_hint_first),
+                        isError = uiState.nameError != null,
+                        errorMessage = nameErr ?: "",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    UIKitInput(
+                        value = uiState.surname,
+                        onValueChange = onSurnameChange,
+                        hint = stringResource(R.string.auth_name_hint_last),
+                        isError = uiState.surnameError != null,
+                        errorMessage = surnameErr ?: "",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        action = {
+            UIKitButton(
+                text = stringResource(UIKitR.string.action_continue),
+                onClick = onContinueClick,
+                state =
+                    when {
+                        uiState.isLoading -> UIKitButtonState.LOADING
+                        uiState.isValid -> UIKitButtonState.PRIMARY
+                        else -> UIKitButtonState.DISABLED
+                    },
                 modifier = Modifier.fillMaxWidth(),
             )
-            UIKitInput(
-                value = uiState.surname,
-                onValueChange = onSurnameChange,
-                hint = stringResource(R.string.auth_name_hint_last),
-                isError = uiState.surnameError != null,
-                errorMessage = surnameErr ?: "",
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        UIKitButton(
-            text = stringResource(UIKitR.string.action_continue),
-            onClick = onContinueClick,
-            state =
-                when {
-                    uiState.isLoading -> UIKitButtonState.LOADING
-                    uiState.isValid -> UIKitButtonState.PRIMARY
-                    else -> UIKitButtonState.DISABLED
-                },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+        },
+    )
 }
 
 @Preview
