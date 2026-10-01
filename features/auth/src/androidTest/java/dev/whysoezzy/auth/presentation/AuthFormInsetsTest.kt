@@ -18,7 +18,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
@@ -139,7 +139,6 @@ class AuthFormInsetsTest {
             composeTestRule.waitForIdle()
             val input = composeTestRule.onNode(hasSetTextAction(), useUnmergedTree = true)
             input.performTextInput("person@example.com")
-            input.performTextInputSelection(TextRange(7, 7))
             assertEquals("person@example.com", email)
 
             val scroll = composeTestRule.onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
@@ -155,7 +154,13 @@ class AuthFormInsetsTest {
                 .onNode(hasText("person@example.com"), useUnmergedTree = true)
                 .assertIsDisplayed()
 
-            input.performTextInput("X")
+            composeTestRule
+                .onNode(hasSetTextAction(), useUnmergedTree = true)
+                .performTextInputSelection(TextRange(7, 7))
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onNode(hasSetTextAction(), useUnmergedTree = true)
+                .performTextInput("X")
             assertEquals("person@Xexample.com", email)
         }
     }
