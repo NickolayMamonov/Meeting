@@ -95,7 +95,13 @@ class CodeVerificationScreenTest {
         composeTestRule.waitForIdle()
         composeTestRule.runOnIdle {
             check(!state.inputFocusRequestPending)
-            dismissalFocusRequester.requestFocus()
+            check(dismissalFocusRequester.requestFocus())
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag(DISMISSAL_FOCUS_SINK_TAG, useUnmergedTree = true)
+            .assertIsFocused()
+        composeTestRule.runOnIdle {
             keyboard.hide()
             state = state.copy(remainingTime = 58)
         }
@@ -327,7 +333,8 @@ class CodeVerificationScreenTest {
                             Modifier
                                 .size(1.dp)
                                 .focusRequester(requester)
-                                .focusable(),
+                                .focusable()
+                                .testTag(DISMISSAL_FOCUS_SINK_TAG),
                         )
                     }
                 }
@@ -358,3 +365,5 @@ class CodeVerificationScreenTest {
         }
     }
 }
+
+private const val DISMISSAL_FOCUS_SINK_TAG = "CodeVerificationScreenTest.DismissalFocusSink"
