@@ -1,17 +1,18 @@
 package dev.whysoezzy.auth.presentation.code
 
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -26,6 +27,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -78,7 +80,7 @@ class CodeVerificationScreenTest {
     @Test
     fun dismissedFocusDoesNotReopenAfterRecomposition() {
         val keyboard = RecordingKeyboardController()
-        var focusManager: FocusManager? = null
+        val dismissalFocusRequester = FocusRequester()
         var state by mutableStateOf(CodeVerificationUiState(inputFocusRequestPending = true))
 
         composeTestRule.setContent {
@@ -86,16 +88,17 @@ class CodeVerificationScreenTest {
                 state = state,
                 keyboard = keyboard,
                 onAcknowledge = { state = state.copy(inputFocusRequestPending = false) },
-                onFocusManager = { focusManager = it },
+                dismissalFocusRequester = dismissalFocusRequester,
             )
         }
 
         composeTestRule.waitForIdle()
         composeTestRule.runOnIdle {
-            checkNotNull(focusManager).clearFocus(force = true)
+            check(!state.inputFocusRequestPending)
+            dismissalFocusRequester.requestFocus()
             keyboard.hide()
+            state = state.copy(remainingTime = 58)
         }
-        state = state.copy(remainingTime = 58)
         composeTestRule.waitForIdle()
 
         assertInputNotFocused()
@@ -304,22 +307,30 @@ class CodeVerificationScreenTest {
         focusRequester: FocusRequester = remember { FocusRequester() },
         onAcknowledge: () -> Unit = {},
         onResend: () -> Unit = {},
-        onFocusManager: (FocusManager) -> Unit = {},
+        dismissalFocusRequester: FocusRequester? = null,
     ) {
         CompositionLocalProvider(
             LocalSoftwareKeyboardController provides keyboard,
         ) {
-            val focusManager = LocalFocusManager.current
-            SideEffect { onFocusManager(focusManager) }
             UIKitTheme {
-                CodeVerificationContent(
-                    maskedEmail = "p***@example.com",
-                    uiState = state,
-                    modifier = modifier,
-                    focusRequester = focusRequester,
-                    onResendClick = onResend,
-                    onAcknowledgeInputFocusRequest = onAcknowledge,
-                )
+                Box {
+                    CodeVerificationContent(
+                        maskedEmail = "p***@example.com",
+                        uiState = state,
+                        modifier = modifier,
+                        focusRequester = focusRequester,
+                        onResendClick = onResend,
+                        onAcknowledgeInputFocusRequest = onAcknowledge,
+                    )
+                    dismissalFocusRequester?.let { requester ->
+                        Box(
+                            Modifier
+                                .size(1.dp)
+                                .focusRequester(requester)
+                                .focusable(),
+                        )
+                    }
+                }
             }
         }
     }
