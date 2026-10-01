@@ -20,13 +20,21 @@ import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.autofill.contentType
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -36,6 +44,7 @@ import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import dev.whysoezzy.uikit.tokens.ColorTokens
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 import kotlin.math.floor
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
@@ -46,20 +55,25 @@ fun UIKitCodeInput(
     codeLength: Int = 6,
     isError: Boolean = false,
     contentType: ContentType? = ContentType.SmsOtpCode,
+    focusRequester: FocusRequester? = null,
 ) {
     Box(modifier = modifier.heightIn(min = 56.dp)) {
         BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .heightIn(min = 56.dp),
             contentAlignment = Alignment.Center,
         ) {
-            val layout = codeInputLayout(maxWidth, codeLength, LocalDensity.current)
+            val density = LocalDensity.current
+            val textMeasurer = rememberTextMeasurer()
+            val textStyle = UIKitTheme.typography.heading2.copy(fontWeight = FontWeight.SemiBold)
+            val layout = codeInputLayout(maxWidth, codeLength, density, textMeasurer, textStyle)
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .height(layout.cellHeight)
                         .testTag(CODE_INPUT_ROW_TAG),
                 horizontalArrangement = Arrangement.spacedBy(layout.gap, Alignment.CenterHorizontally),
             ) {
@@ -70,33 +84,34 @@ fun UIKitCodeInput(
                         isError = isError,
                         modifier = Modifier.testTag("$CODE_INPUT_CELL_TAG_PREFIX$index"),
                         size = layout.cellSize,
+                        height = layout.cellHeight,
                     )
                 }
             }
+            BasicTextField(
+                value = value,
+                onValueChange = { onValueChange(sanitizeCodeInput(it, codeLength)) },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(layout.cellHeight)
+                        .testTag(CODE_INPUT_INPUT_TAG)
+                        .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+                        .then(
+                            if (contentType != null) {
+                                Modifier.contentType(contentType)
+                            } else {
+                                Modifier
+                            },
+                        ).alpha(0f),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.NumberPassword,
+                        imeAction = ImeAction.Done,
+                    ),
+                cursorBrush = SolidColor(ColorTokens.BrandDark),
+            )
         }
-
-        BasicTextField(
-            value = value,
-            onValueChange = { onValueChange(sanitizeCodeInput(it, codeLength)) },
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .testTag(CODE_INPUT_INPUT_TAG)
-                    .then(
-                        if (contentType != null) {
-                            Modifier.contentType(contentType)
-                        } else {
-                            Modifier
-                        },
-                    ).alpha(0f),
-            keyboardOptions =
-                KeyboardOptions(
-                    keyboardType = KeyboardType.NumberPassword,
-                    imeAction = ImeAction.Done,
-                ),
-            cursorBrush = SolidColor(ColorTokens.BrandDark),
-        )
     }
 }
 
@@ -112,6 +127,7 @@ private fun CodeDigitBox(
     isError: Boolean,
     modifier: Modifier = Modifier,
     size: Dp = 56.dp,
+    height: Dp = size,
 ) {
     val borderColor =
         when {
@@ -130,7 +146,7 @@ private fun CodeDigitBox(
     Box(
         modifier =
             modifier
-                .size(size)
+                .size(width = size, height = height)
                 .clip(RoundedCornerShape(BorderRadiusTokens.M))
                 .background(backgroundColor)
                 .border(
@@ -152,19 +168,26 @@ private fun CodeDigitBox(
 private data class CodeInputLayout(
     val cellSize: Dp,
     val gap: Dp,
+    val cellHeight: Dp,
 )
 
 private fun codeInputLayout(
     maxWidth: Dp,
     codeLength: Int,
     density: Density,
+    textMeasurer: TextMeasurer,
+    textStyle: TextStyle,
 ): CodeInputLayout {
     if (codeLength <= 0) {
-        return CodeInputLayout(0.dp, 0.dp)
+        return CodeInputLayout(0.dp, 0.dp, 56.dp)
     }
 
     if (maxWidth == Dp.Infinity) {
-        return CodeInputLayout(56.dp, SpacingTokens.S)
+        return CodeInputLayout(
+            cellSize = 56.dp,
+            gap = SpacingTokens.S,
+            cellHeight = maxOf(56.dp, adaptiveCellHeight(56.dp, density, textMeasurer, textStyle)),
+        )
     }
 
     val availableWidthPx = with(density) { maxWidth.toPx().roundToInt() }
@@ -176,11 +199,50 @@ private fun codeInputLayout(
             maxCellSizePx,
             ((availableWidthPx - (codeLength - 1) * gapPx) / codeLength).coerceAtLeast(0),
         )
+    val cellHeightPx =
+        max(
+            cellSizePx,
+            adaptiveCellHeightPx(cellSizePx, density, textMeasurer, textStyle),
+        )
 
     return CodeInputLayout(
         cellSize = with(density) { cellSizePx.toDp() },
         gap = with(density) { gapPx.toDp() },
+        cellHeight = with(density) { cellHeightPx.toDp() },
     )
+}
+
+private fun adaptiveCellHeight(
+    cellWidth: Dp,
+    density: Density,
+    textMeasurer: TextMeasurer,
+    textStyle: TextStyle,
+): Dp =
+    with(density) {
+        adaptiveCellHeightPx(cellWidth.roundToPx(), density, textMeasurer, textStyle).toDp()
+    }
+
+private fun adaptiveCellHeightPx(
+    cellWidthPx: Int,
+    density: Density,
+    textMeasurer: TextMeasurer,
+    textStyle: TextStyle,
+): Int {
+    val digitHeightPx =
+        ('0'..'9').maxOf { digit ->
+            textMeasurer
+                .measure(
+                    text = digit.toString(),
+                    style = textStyle,
+                    overflow = TextOverflow.Clip,
+                    maxLines = 1,
+                    constraints = Constraints(
+                        maxWidth = cellWidthPx,
+                        maxHeight = Constraints.Infinity,
+                    ),
+                ).size.height
+        }
+    return digitHeightPx + with(density) { 4.dp.roundToPx() }
 }
 
 private const val CODE_INPUT_ROW_TAG = "UIKitCodeInput.Row"

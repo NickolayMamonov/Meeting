@@ -51,6 +51,7 @@ class CodeVerificationViewModel(
                     deadline = result.attempt.resendAvailableAtEpochMillis
                     _uiState.value = _uiState.value.copy(
                         maskedEmail = result.attempt.maskedEmail,
+                        inputFocusRequestPending = true,
                     )
                     startTimer()
                 }
@@ -69,6 +70,9 @@ class CodeVerificationViewModel(
             is CodeVerificationEvent.UpdateCode -> updateCode(event.code)
             CodeVerificationEvent.VerifyCode -> verifyCode()
             CodeVerificationEvent.ResendCode -> resendCode()
+            CodeVerificationEvent.AcknowledgeInputFocusRequest -> {
+                _uiState.value = _uiState.value.copy(inputFocusRequestPending = false)
+            }
         }
     }
 
@@ -129,6 +133,8 @@ class CodeVerificationViewModel(
                     _uiState.value = _uiState.value.copy(
                         code = if (result is EmailOtpResendOutcome.Confirmed) "" else _uiState.value.code,
                         error = null,
+                        inputFocusRequestPending =
+                            result is EmailOtpResendOutcome.Confirmed,
                     )
                     submittedCode = null
                     deadline = attempt.resendAvailableAtEpochMillis
