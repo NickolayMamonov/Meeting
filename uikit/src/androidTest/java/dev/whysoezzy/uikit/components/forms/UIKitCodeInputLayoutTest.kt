@@ -18,7 +18,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTextInput
@@ -138,7 +138,7 @@ class UIKitCodeInputLayoutTest {
             )
         val repeatedDigits = ('0'..'9').map { digit -> digit.toString().repeat(6) }
 
-        listOf(1f, 1.3f).forEach { fontScale ->
+        listOf(1f, 1.3f, 1.5f, 2f).forEach { fontScale ->
             listOf(1f, 2.625f).forEach { density ->
                 listOf(320.dp, 360.dp, 411.dp).forEach { screenWidth ->
                     states.forEach { state ->
@@ -152,6 +152,7 @@ class UIKitCodeInputLayoutTest {
                             )
                         composeTestRule.waitForIdle()
                         assertAllCellsDisplayed()
+                        assertEqualCellGeometry()
                         assertTextLayoutsContained(fixture)
                     }
                     repeatedDigits.forEach { value ->
@@ -164,6 +165,7 @@ class UIKitCodeInputLayoutTest {
                             )
                         composeTestRule.waitForIdle()
                         assertAllCellsDisplayed()
+                        assertEqualCellGeometry()
                         assertTextLayoutsContained(fixture)
                     }
                 }
@@ -211,6 +213,31 @@ class UIKitCodeInputLayoutTest {
                 .onNodeWithTag("$CODE_INPUT_CELL_TAG_PREFIX$index", useUnmergedTree = true)
                 .assertIsDisplayed()
         }
+    }
+
+    private fun assertEqualCellGeometry() {
+        val rowBounds =
+            composeTestRule
+                .onNodeWithTag(CODE_INPUT_ROW_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val cells =
+            (0 until 6).map { index ->
+                composeTestRule
+                    .onNodeWithTag("$CODE_INPUT_CELL_TAG_PREFIX$index", useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            }
+        assertTrue(cells.all { it.width == cells.first().width })
+        assertTrue(cells.all { it.height == cells.first().height })
+        assertTrue(cells.all { it.left >= rowBounds.left && it.right <= rowBounds.right })
+        assertTrue(
+            composeTestRule
+                .onNodeWithTag(CODE_INPUT_INPUT_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .let { it.top <= rowBounds.top && it.bottom >= rowBounds.bottom },
+        )
     }
 
     private fun assertTextLayoutsContained(fixture: Fixture) {

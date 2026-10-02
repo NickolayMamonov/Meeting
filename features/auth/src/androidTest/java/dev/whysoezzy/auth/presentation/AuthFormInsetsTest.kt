@@ -7,16 +7,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -136,7 +139,6 @@ class AuthFormInsetsTest {
             composeTestRule.waitForIdle()
             val input = composeTestRule.onNode(hasSetTextAction(), useUnmergedTree = true)
             input.performTextInput("person@example.com")
-            input.performTextInputSelection(TextRange(7, 7))
             assertEquals("person@example.com", email)
 
             val scroll = composeTestRule.onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
@@ -152,7 +154,13 @@ class AuthFormInsetsTest {
                 .onNode(hasText("person@example.com"), useUnmergedTree = true)
                 .assertIsDisplayed()
 
-            input.performTextInput("X")
+            composeTestRule
+                .onNode(hasSetTextAction(), useUnmergedTree = true)
+                .performTextInputSelection(TextRange(7, 7))
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onNode(hasSetTextAction(), useUnmergedTree = true)
+                .performTextInput("X")
             assertEquals("person@Xexample.com", email)
         }
     }
@@ -161,7 +169,8 @@ class AuthFormInsetsTest {
     fun codeResendAndTimer_at320And360_remainReachableAfterOverflow() {
         var width by mutableStateOf(AUTH_FORM_WIDTHS.first())
         var canResend by mutableStateOf(true)
-        setContainer(width = { width }, height = 300.dp) {
+        var fontScale by mutableStateOf(1f)
+        setContainer(width = { width }, height = 300.dp, fontScale = { fontScale }) {
             CodeVerificationContent(
                 maskedEmail = "p***@example.com",
                 uiState = CodeVerificationUiState(
@@ -177,24 +186,23 @@ class AuthFormInsetsTest {
 
         listOf(true, false).forEach { resendState ->
             canResend = resendState
-            AUTH_FORM_WIDTHS.forEach { testWidth ->
-                width = testWidth
-                composeTestRule.waitForIdle()
-                val expectedResendText =
-                    if (resendState) {
-                        "Отправить код повторно"
-                    } else {
-                        "Отправить повторно через 45 сек"
-                    }
-                val scroll = composeTestRule.onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
-                scroll.performScrollToNode(hasText(expectedResendText))
-                composeTestRule
-                    .onNode(hasText(expectedResendText), useUnmergedTree = true)
-                    .assertIsDisplayed()
-                scroll.performScrollToNode(hasTestTag(AUTH_FORM_ACTION_TAG))
-                composeTestRule
-                    .onNodeWithTag(AUTH_FORM_ACTION_TAG, useUnmergedTree = true)
-                    .assertIsDisplayed()
+            listOf(1f, 1.5f, 2f).forEach { scale ->
+                fontScale = scale
+                AUTH_FORM_WIDTHS.forEach { testWidth ->
+                    width = testWidth
+                    composeTestRule.waitForIdle()
+                    val expectedResendText =
+                        if (resendState) {
+                            "Отправить код повторно"
+                        } else {
+                            "Отправить повторно через 45 сек"
+                        }
+                    val scroll = composeTestRule.onNodeWithTag(AUTH_FORM_SCROLL_TAG, useUnmergedTree = true)
+                    scroll.performScrollToNode(hasText(expectedResendText))
+                    composeTestRule
+                        .onNode(hasText(expectedResendText), useUnmergedTree = true)
+                        .assertIsDisplayed()
+                }
             }
         }
     }
@@ -228,16 +236,21 @@ class AuthFormInsetsTest {
     private fun setContainer(
         width: () -> Dp = { 360.dp },
         height: Dp,
+        fontScale: () -> Float = { 1f },
         content: @androidx.compose.runtime.Composable () -> Unit,
     ) {
         composeTestRule.setContent {
-            UIKitTheme {
-                Box(
-                    modifier = Modifier
-                        .size(width = width(), height = height)
-                        .testTag(AUTH_FORM_TEST_ROOT_TAG),
-                ) {
-                    content()
+            CompositionLocalProvider(
+                LocalDensity provides Density(composeTestRule.density.density, fontScale()),
+            ) {
+                UIKitTheme {
+                    Box(
+                        modifier = Modifier
+                            .size(width = width(), height = height)
+                            .testTag(AUTH_FORM_TEST_ROOT_TAG),
+                    ) {
+                        content()
+                    }
                 }
             }
         }

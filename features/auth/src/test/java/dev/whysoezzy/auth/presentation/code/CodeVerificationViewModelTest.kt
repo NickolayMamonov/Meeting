@@ -15,6 +15,7 @@ import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -44,6 +45,32 @@ class CodeVerificationViewModelTest {
     )
 
     @Test
+    fun `found attempt queues one acknowledged input focus request`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 60_000, true, DispatchOutcome.Confirmed),
+        )
+        val viewModel = viewModel()
+
+        runCurrent()
+        assertEquals(true, viewModel.uiState.value.inputFocusRequestPending)
+
+        viewModel.onEvent(CodeVerificationEvent.AcknowledgeInputFocusRequest)
+        assertEquals(false, viewModel.uiState.value.inputFocusRequestPending)
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.inputFocusRequestPending)
+    }
+
+    @Test
+    fun `missing attempt does not queue input focus request`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.MissingOrExpired
+        val viewModel = viewModel()
+
+        runCurrent()
+
+        assertEquals(false, viewModel.uiState.value.inputFocusRequestPending)
+    }
+
+    @Test
     fun `six ASCII digits auto submit and navigate for existing user`() = runTest {
         coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
             EmailOtpAttempt("attempt-1", "p***@example.com", 60_000, true, DispatchOutcome.Confirmed),
@@ -60,6 +87,30 @@ class CodeVerificationViewModelTest {
             assertEquals(CodeVerificationNavEvent.NavigateToMain, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `duplicate full code updates do not submit while verification is in flight`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 60_000, true, DispatchOutcome.Confirmed),
+        )
+        val verification = CompletableDeferred<EmailOtpVerifyOutcome>()
+        coEvery { verify("attempt-1", "123456", any(), any()) } coAnswers {
+            verification.await()
+        }
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        viewModel.onEvent(CodeVerificationEvent.VerifyCode)
+        runCurrent()
+
+        coVerify(exactly = 1) { verify("attempt-1", "123456", any(), any()) }
+
+        verification.complete(EmailOtpVerifyOutcome.ExistingUser)
+        advanceUntilIdle()
     }
 
     @Test
@@ -123,7 +174,96 @@ class CodeVerificationViewModelTest {
     }
 
     @Test
-    fun `recoverable verify failure retains code and allows retry`() = runTest {
+    fun `confirmed resend clears populated code and queues first-cell focus`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { resend("attempt-1") } returns EmailOtpResendOutcome.Confirmed(
+            EmailOtpAttempt("attempt-2", "p***@example.com", 60_000, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { verify("attempt-1", "123456", any(), any()) } returns
+            EmailOtpVerifyOutcome.Failed(AuthFailure.Server)
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.AcknowledgeInputFocusRequest)
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        advanceUntilIdle()
+        viewModel.onEvent(CodeVerificationEvent.ResendCode)
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.uiState.value.code)
+        assertEquals(true, viewModel.uiState.value.inputFocusRequestPending)
+    }
+
+    @Test
+    fun `confirmed resend from empty still queues first-cell focus`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { resend("attempt-1") } returns EmailOtpResendOutcome.Confirmed(
+            EmailOtpAttempt("attempt-2", "p***@example.com", 60_000, true, DispatchOutcome.Confirmed),
+        )
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.AcknowledgeInputFocusRequest)
+        viewModel.onEvent(CodeVerificationEvent.ResendCode)
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.uiState.value.code)
+        assertEquals(true, viewModel.uiState.value.inputFocusRequestPending)
+    }
+
+    @Test
+    fun `unconfirmed resend retains code and does not queue focus`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { resend("attempt-1") } returns EmailOtpResendOutcome.Unconfirmed(
+            EmailOtpAttempt("attempt-2", "p***@example.com", 60_000, true, DispatchOutcome.Unconfirmed),
+        )
+        coEvery { verify("attempt-1", "123456", any(), any()) } returns
+            EmailOtpVerifyOutcome.Failed(AuthFailure.Server)
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.AcknowledgeInputFocusRequest)
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        advanceUntilIdle()
+        viewModel.onEvent(CodeVerificationEvent.ResendCode)
+        advanceUntilIdle()
+
+        assertEquals("123456", viewModel.uiState.value.code)
+        assertEquals(false, viewModel.uiState.value.inputFocusRequestPending)
+    }
+
+    @Test
+    fun `resend failure retains code and does not queue focus`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+        )
+        coEvery { resend("attempt-1") } returns EmailOtpResendOutcome.Failed(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
+            AuthFailure.Server,
+        )
+        coEvery { verify("attempt-1", "123456", any(), any()) } returns
+            EmailOtpVerifyOutcome.Failed(AuthFailure.Server)
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.AcknowledgeInputFocusRequest)
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        advanceUntilIdle()
+        viewModel.onEvent(CodeVerificationEvent.ResendCode)
+        advanceUntilIdle()
+
+        assertEquals("123456", viewModel.uiState.value.code)
+        assertEquals(false, viewModel.uiState.value.inputFocusRequestPending)
+    }
+
+    @Test
+    fun `recoverable verify failure retains code and allows edit based retry`() = runTest {
         coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
             EmailOtpAttempt("attempt-1", "p***@example.com", 0, true, DispatchOutcome.Confirmed),
         )
@@ -137,8 +277,10 @@ class CodeVerificationViewModelTest {
         viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
         advanceUntilIdle()
         assertEquals("123456", viewModel.uiState.value.code)
-        viewModel.onEvent(CodeVerificationEvent.VerifyCode)
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("12345"))
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
         advanceUntilIdle()
         assertEquals("123456", viewModel.uiState.value.code)
+        coVerify(exactly = 2) { verify("attempt-1", "123456", any(), any()) }
     }
 }

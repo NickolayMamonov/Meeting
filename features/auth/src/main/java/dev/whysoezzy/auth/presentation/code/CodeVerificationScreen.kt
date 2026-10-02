@@ -12,24 +12,30 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.withResumed
 import com.whysoezzy.auth.domain.models.AuthFailure
 import dev.whysoezzy.auth.R
 import dev.whysoezzy.auth.presentation.AuthFormLayout
-import dev.whysoezzy.uikit.components.buttons.UIKitButton
-import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
 import dev.whysoezzy.uikit.components.forms.UIKitCodeInput
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
@@ -70,8 +76,10 @@ fun CodeVerificationScreen(
                 .consumeWindowInsets(padding)
                 .fillMaxSize(),
             onCodeChange = { viewModel.onEvent(CodeVerificationEvent.UpdateCode(it)) },
-            onVerifyClick = { viewModel.onEvent(CodeVerificationEvent.VerifyCode) },
             onResendClick = { viewModel.onEvent(CodeVerificationEvent.ResendCode) },
+            onAcknowledgeInputFocusRequest = {
+                viewModel.onEvent(CodeVerificationEvent.AcknowledgeInputFocusRequest)
+            },
         )
     }
 }
@@ -82,10 +90,23 @@ internal fun CodeVerificationContent(
     uiState: CodeVerificationUiState,
     modifier: Modifier = Modifier,
     onCodeChange: (String) -> Unit = {},
-    onVerifyClick: () -> Unit = {},
     onResendClick: () -> Unit = {},
+    onAcknowledgeInputFocusRequest: () -> Unit = {},
+    focusRequester: FocusRequester = remember { FocusRequester() },
     windowInsets: WindowInsets = WindowInsets.navigationBars.union(WindowInsets.ime),
 ) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(uiState.inputFocusRequestPending) {
+        if (!uiState.inputFocusRequestPending) return@LaunchedEffect
+        withFrameNanos { }
+        lifecycle.withResumed {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+            onAcknowledgeInputFocusRequest()
+        }
+    }
+
     AuthFormLayout(
         modifier = modifier,
         windowInsets = windowInsets,
@@ -116,7 +137,15 @@ internal fun CodeVerificationContent(
                     onValueChange = onCodeChange,
                     codeLength = 6,
                     isError = uiState.error != null,
+                    focusRequester = focusRequester,
                 )
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = ColorTokens.BrandDefault,
+                        strokeWidth = 2.dp,
+                    )
+                }
                 uiState.error?.let { failure ->
                     TextMetadata1(
                         text = failureMessage(failure),
@@ -140,20 +169,7 @@ internal fun CodeVerificationContent(
                 }
             }
         },
-        action = {
-            UIKitButton(
-                text = stringResource(R.string.auth_code_confirm),
-                onClick = onVerifyClick,
-                state = if (uiState.isLoading) {
-                    UIKitButtonState.LOADING
-                } else if (uiState.isValid) {
-                    UIKitButtonState.PRIMARY
-                } else {
-                    UIKitButtonState.DISABLED
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
+        action = {},
     )
 }
 
