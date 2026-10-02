@@ -15,6 +15,7 @@ import com.whysoezzy.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -86,6 +87,30 @@ class CodeVerificationViewModelTest {
             assertEquals(CodeVerificationNavEvent.NavigateToMain, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `duplicate full code updates do not submit while verification is in flight`() = runTest {
+        coEvery { load("attempt-1") } returns EmailOtpAttemptResult.Found(
+            EmailOtpAttempt("attempt-1", "p***@example.com", 60_000, true, DispatchOutcome.Confirmed),
+        )
+        val verification = CompletableDeferred<EmailOtpVerifyOutcome>()
+        coEvery { verify("attempt-1", "123456", any(), any()) } coAnswers {
+            verification.await()
+        }
+        val viewModel = viewModel()
+
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        runCurrent()
+        viewModel.onEvent(CodeVerificationEvent.UpdateCode("123456"))
+        viewModel.onEvent(CodeVerificationEvent.VerifyCode)
+        runCurrent()
+
+        coVerify(exactly = 1) { verify("attempt-1", "123456", any(), any()) }
+
+        verification.complete(EmailOtpVerifyOutcome.ExistingUser)
+        advanceUntilIdle()
     }
 
     @Test
