@@ -40,6 +40,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class CodeVerificationScreenTest {
@@ -82,18 +83,24 @@ class CodeVerificationScreenTest {
         val keyboard = RecordingKeyboardController()
         val dismissalFocusRequester = FocusRequester()
         var state by mutableStateOf(CodeVerificationUiState(inputFocusRequestPending = true))
+        val acknowledgementCount = AtomicInteger()
 
         composeTestRule.setContent {
             TestContent(
                 state = state,
                 keyboard = keyboard,
-                onAcknowledge = { state = state.copy(inputFocusRequestPending = false) },
+                onAcknowledge = {
+                    acknowledgementCount.incrementAndGet()
+                    state = state.copy(inputFocusRequestPending = false)
+                },
                 dismissalFocusRequester = dismissalFocusRequester,
             )
         }
 
         composeTestRule.waitForIdle()
+        composeTestRule.waitUntil { acknowledgementCount.get() == 1 }
         composeTestRule.runOnIdle {
+            check(acknowledgementCount.get() == 1)
             check(!state.inputFocusRequestPending)
             check(dismissalFocusRequester.requestFocus())
         }
@@ -110,6 +117,7 @@ class CodeVerificationScreenTest {
         assertInputNotFocused()
         assertEquals(1, keyboard.showCount)
         assertEquals(1, keyboard.hideCount)
+        assertEquals(1, acknowledgementCount.get())
     }
 
     @Test
