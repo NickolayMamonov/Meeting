@@ -23,6 +23,7 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
     val baseUrl = publishingInput("BASE_URL_RELEASE")
     val expectedCertificate = publishingInput("ANDROID_RELEASE_CERT_SHA256")
     val snapshotExpectedCertificate = publishingInput("ANDROID_SNAPSHOT_CERT_SHA256")
+    val mapboxReleaseToken = publishingInput("MAPBOX_PUBLIC_TOKEN_RELEASE")
     val signingValues =
         AndroidSigningInputs.propertyNames.associateWith { name ->
             publishingInput(name).orNull
@@ -97,6 +98,13 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
             dependsOn(validateVersion)
         }
 
+    val validateMapboxReleaseToken =
+        tasks.register<ValidateMapboxReleaseTokenTask>("validateMapboxReleaseToken") {
+            group = "verification"
+            description = "Validates the public Mapbox token required for stable packaging."
+            token.convention(mapboxReleaseToken)
+        }
+
     val generateReleaseNetworkConfig =
         tasks.register<GenerateReleaseNetworkSecurityConfigTask>("generateReleaseNetworkSecurityConfig") {
             group = "build"
@@ -160,6 +168,9 @@ internal fun Project.configureAndroidPublishing(applicationExtension: Applicatio
         when {
             name.isPackagingTaskFor("Snapshot") -> dependsOn(validateSnapshot)
             name.isPackagingTaskFor("Release") -> dependsOn(validateRelease)
+        }
+        if (name.isPackagingTaskFor("Release")) {
+            dependsOn(validateMapboxReleaseToken)
         }
     }
 }

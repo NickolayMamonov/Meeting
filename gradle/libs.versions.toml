@@ -31,6 +31,7 @@ firebaseBom = "34.14.0"
 firebaseMessaging = "25.1.1"
 workManager = "2.10.1"
 paging = "3.4.2"
+mapboxMaps = "11.32.0"
 
 # Testing
 mockk = "1.13.13"
@@ -101,6 +102,8 @@ firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashly
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessaging" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
+mapbox-maps-android = { module = "com.mapbox.maps:android-ndk27", version.ref = "mapboxMaps" }
+mapbox-maps-compose = { module = "com.mapbox.extension:maps-compose-ndk27", version.ref = "mapboxMaps" }
 
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
