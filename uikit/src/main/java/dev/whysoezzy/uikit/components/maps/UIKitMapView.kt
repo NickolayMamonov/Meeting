@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.mapbox.common.MapboxOptions
 import com.mapbox.geojson.Point
+import com.mapbox.maps.RenderModeType
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapState
 import com.mapbox.maps.extension.compose.MapboxMap
@@ -81,11 +82,7 @@ private const val MAPBOX_PRIVACY_URL = "https://www.mapbox.com/legal/privacy/"
 private const val OPENSTREETMAP_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
 private const val MAPBOX_FEEDBACK_URL = "https://apps.mapbox.com/feedback/"
 
-internal fun mapFeedbackUrl(
-    longitude: Double,
-    latitude: Double,
-    zoom: Double,
-): String = "$MAPBOX_FEEDBACK_URL#/$longitude/$latitude/$zoom"
+internal fun mapFeedbackUrl(): String = MAPBOX_FEEDBACK_URL
 
 internal enum class MapPreviewStatus {
     LOADING,
@@ -127,7 +124,7 @@ internal class MapPreviewReadiness {
     private var styleLoaded = false
     private var pinInstalled = false
     private var mapLoaded = false
-    private var frameFinishedAfterPin = false
+    private var fullFrameFinishedAfterPin = false
 
     fun onStyleLoaded() {
         if (status == MapPreviewStatus.LOADING) styleLoaded = true
@@ -144,9 +141,12 @@ internal class MapPreviewReadiness {
         updateReady()
     }
 
-    fun onFrameFinished() {
-        if (status == MapPreviewStatus.LOADING && pinInstalled && mapLoaded) {
-            frameFinishedAfterPin = true
+    fun onFrameFinished(renderMode: RenderModeType) {
+        if (status == MapPreviewStatus.LOADING &&
+            pinInstalled &&
+            renderMode == RenderModeType.FULL
+        ) {
+            fullFrameFinishedAfterPin = true
         }
         updateReady()
     }
@@ -170,7 +170,7 @@ internal class MapPreviewReadiness {
             styleLoaded &&
             pinInstalled &&
             mapLoaded &&
-            frameFinishedAfterPin
+            fullFrameFinishedAfterPin
         ) {
             status = MapPreviewStatus.READY
         }
@@ -374,8 +374,8 @@ private fun MapPreviewMap(
                             readiness.onMapLoaded()
                             onStatusChanged(readiness.status)
                         }
-                        subscriptions += map.subscribeRenderFrameFinished {
-                            readiness.onFrameFinished()
+                        subscriptions += map.subscribeRenderFrameFinished { renderFrameFinished ->
+                            readiness.onFrameFinished(renderFrameFinished.renderMode)
                             onStatusChanged(readiness.status)
                         }
                         subscriptions += map.subscribeMapLoadingError {
@@ -442,7 +442,7 @@ private fun MapPreviewMap(
                     )
                 }
             }
-            MapCredits(feedbackUrl = mapFeedbackUrl(longitude, latitude, MAP_PREVIEW_ZOOM))
+            MapCredits(feedbackUrl = mapFeedbackUrl())
         }
     }
 }
@@ -519,7 +519,7 @@ private fun NoMapFallback(
                     textAlign = TextAlign.Center,
                 )
             }
-            MapCredits(feedbackUrl = MAPBOX_FEEDBACK_URL)
+            MapCredits(feedbackUrl = mapFeedbackUrl())
         }
     }
 }

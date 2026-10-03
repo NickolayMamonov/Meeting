@@ -1,5 +1,6 @@
 package dev.whysoezzy.uikit.components.maps
 
+import com.mapbox.maps.RenderModeType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,26 +19,41 @@ class MapPreviewStateTest {
     }
 
     @Test
-    fun `feedback link contains only current map position and zoom`() {
-        assertEquals(
-            "https://apps.mapbox.com/feedback/#/-122.4/37.7/15.0",
-            mapFeedbackUrl(longitude = -122.4, latitude = 37.7, zoom = 15.0),
-        )
+    fun `feedback link is generic and excludes meeting metadata`() {
+        val url = mapFeedbackUrl()
+
+        assertEquals("https://apps.mapbox.com/feedback/", url)
+        assertFalse(url.contains("55.7"))
+        assertFalse(url.contains("37.6"))
+        assertFalse(url.contains("Тверская"))
+        assertFalse(url.contains("12345"))
     }
 
     @Test
-    fun `loading becomes ready only after style pin loaded map and a later complete frame`() {
+    fun `full frame before map loaded is latched and reveals without another frame`() {
         val readiness = MapPreviewReadiness()
 
         readiness.onStyleLoaded()
         readiness.onPinInstalled()
-        readiness.onFrameFinished()
+        readiness.onFrameFinished(RenderModeType.FULL)
         assertEquals(MapPreviewStatus.LOADING, readiness.status)
 
         readiness.onMapLoaded()
-        assertEquals(MapPreviewStatus.LOADING, readiness.status)
-        readiness.onFrameFinished()
         assertEquals(MapPreviewStatus.READY, readiness.status)
+    }
+
+    @Test
+    fun `partial frame cannot reveal the map and timeout is terminal`() {
+        val readiness = MapPreviewReadiness()
+        readiness.onStyleLoaded()
+        readiness.onPinInstalled()
+        readiness.onMapLoaded()
+        readiness.onFrameFinished(RenderModeType.PARTIAL)
+        assertEquals(MapPreviewStatus.LOADING, readiness.status)
+
+        readiness.onDeadline()
+        readiness.onFrameFinished(RenderModeType.FULL)
+        assertEquals(MapPreviewStatus.UNAVAILABLE, readiness.status)
     }
 
     @Test
@@ -48,7 +64,7 @@ class MapPreviewStateTest {
         readiness.onDeadline()
 
         readiness.onMapLoaded()
-        readiness.onFrameFinished()
+        readiness.onFrameFinished(RenderModeType.FULL)
         assertEquals(MapPreviewStatus.UNAVAILABLE, readiness.status)
     }
 
@@ -59,14 +75,14 @@ class MapPreviewStateTest {
         loading.onStyleLoaded()
         loading.onPinInstalled()
         loading.onMapLoaded()
-        loading.onFrameFinished()
+        loading.onFrameFinished(RenderModeType.FULL)
         assertEquals(MapPreviewStatus.UNAVAILABLE, loading.status)
 
         val ready = MapPreviewReadiness()
         ready.onStyleLoaded()
         ready.onPinInstalled()
         ready.onMapLoaded()
-        ready.onFrameFinished()
+        ready.onFrameFinished(RenderModeType.FULL)
         ready.onFailure()
         assertEquals(MapPreviewStatus.UNAVAILABLE, ready.status)
     }
@@ -93,7 +109,7 @@ class MapPreviewStateTest {
         readiness.onStyleLoaded()
         readiness.onPinInstalled()
         readiness.onMapLoaded()
-        readiness.onFrameFinished()
+        readiness.onFrameFinished(RenderModeType.FULL)
         assertEquals(MapPreviewStatus.UNAVAILABLE, readiness.status)
     }
 }

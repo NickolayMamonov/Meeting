@@ -1,6 +1,11 @@
 package dev.whysoezzy.uikit.components.maps
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,9 +18,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.whysoezzy.uikit.BuildConfig
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -30,15 +38,19 @@ class UIKitMapViewTest {
     fun noTokenFallbackPreservesPhysicalSizeCreditsAndIndependentGeoAction() {
         var mapClicks = 0
         val address = "ул. Тверская 15"
+        val context = RecordingContext(InstrumentationRegistry.getInstrumentation().targetContext)
         composeTestRule.setContent {
-            UIKitTheme {
-                UIKitMapView(
-                    address = address,
-                    latitude = 55.7,
-                    longitude = 37.6,
-                    modifier = Modifier.testTag("map-parent"),
-                    onMapClick = { mapClicks++ },
-                )
+            CompositionLocalProvider(LocalContext provides context) {
+                UIKitTheme {
+                    UIKitMapView(
+                        address = address,
+                        latitude = 55.7,
+                        longitude = 37.6,
+                        meetingId = 12345L,
+                        modifier = Modifier.testTag("map-parent"),
+                        onMapClick = { mapClicks++ },
+                    )
+                }
             }
         }
 
@@ -58,6 +70,20 @@ class UIKitMapViewTest {
         composeTestRule.onNodeWithText("© OpenStreetMap").assertHasClickAction()
         composeTestRule.onNodeWithText("Mapbox privacy information").assertHasClickAction()
         composeTestRule.onNodeWithText("Improve this map").assertHasClickAction()
+
+        composeTestRule.onNodeWithText("Improve this map").performClick()
+        val feedbackIntent = requireNotNull(context.startedIntent)
+        val feedbackUrl = requireNotNull(feedbackIntent.data).toString()
+        assertEquals(Intent.ACTION_VIEW, feedbackIntent.action)
+        assertEquals(mapFeedbackUrl(), feedbackUrl)
+        assertFalse(feedbackUrl.contains(address))
+        assertFalse(feedbackUrl.contains("55.7"))
+        assertFalse(feedbackUrl.contains("37.6"))
+        assertFalse(feedbackUrl.contains("12345"))
+        assertNull(feedbackIntent.data?.query)
+        assertNull(feedbackIntent.data?.fragment)
+        assertEquals(0, mapClicks)
+
         composeTestRule.onNodeWithContentDescription("Открыть в картах: $address").performClick()
         assertEquals(1, mapClicks)
     }
@@ -103,5 +129,15 @@ class UIKitMapViewTest {
         }
         composeTestRule.onNodeWithText("© Mapbox").assertIsDisplayed()
         composeTestRule.onNodeWithText("© OpenStreetMap").assertIsDisplayed()
+    }
+
+    private class RecordingContext(
+        base: Context,
+    ) : ContextWrapper(base) {
+        var startedIntent: Intent? = null
+
+        override fun startActivity(intent: Intent) {
+            startedIntent = intent
+        }
     }
 }
