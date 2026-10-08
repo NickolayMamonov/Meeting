@@ -291,6 +291,22 @@ do not claim to be an opt-out. The operator owns the user-facing privacy-notice
 review and must confirm that this disclosure and the SDK's current collection
 and opt-out behavior remain adequate before release.
 
+The built-in SDK Attribution panel's `Improve this map` action is an explicit
+user-activated external disclosure. With the pinned Maps SDK 11.32.0, the SDK
+builds its feedback destination from the displayed map center (longitude and
+latitude), zoom, bearing and pitch (both fixed at zero for this preview), the
+application package as `referrer`, the public extractable `pk.` access token,
+and the active style's `owner` and `id` when present. The SDK may construct and
+hold this URI transiently before the user selects the action; the approval is
+for external dispatch only after activation. It does not use device location
+and must not include the meeting's textual address, meeting ID, profile data,
+private token, or backend metadata. Do not change SDK internals to suppress its
+documented payload. The separate always-visible custom feedback link stays
+generic and contains no query, fragment, or meeting metadata. Application code,
+CI, and retained evidence must never log or persist the SDK-generated URL or
+public token; the instrumentation assertion intercepts the URI in memory only
+and reports sanitized fields without printing its token value or complete URL.
+
 Use only the SDK's unmodified ambient cache behavior. The preview does not
 promise offline rendering or an independently enforced cache TTL; incomplete
 or unavailable resources fall back to the address action. Do not add manual

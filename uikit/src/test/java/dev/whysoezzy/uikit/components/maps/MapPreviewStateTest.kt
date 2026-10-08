@@ -30,6 +30,32 @@ class MapPreviewStateTest {
     }
 
     @Test
+    fun `blank address uses the exact generic map action label`() {
+        assertEquals("Открыть в картах", mapActionContentDescription("", coordinateValid = true))
+        assertEquals("Открыть в картах", mapActionContentDescription(" \t ", coordinateValid = true))
+        assertEquals("Открыть в картах", mapActionContentDescription("улица", coordinateValid = false))
+        assertEquals("Открыть в картах: улица", mapActionContentDescription("улица", coordinateValid = true))
+    }
+
+    @Test
+    fun `initial and live camera gestures are all disabled`() {
+        val settings = disabledMapGesturesSettings()
+
+        assertFalse(settings.rotateEnabled)
+        assertFalse(settings.pinchToZoomEnabled)
+        assertFalse(settings.scrollEnabled)
+        assertFalse(settings.simultaneousRotateAndPinchToZoomEnabled)
+        assertFalse(settings.pitchEnabled)
+        assertFalse(settings.doubleTapToZoomInEnabled)
+        assertFalse(settings.doubleTouchToZoomOutEnabled)
+        assertFalse(settings.quickZoomEnabled)
+        assertFalse(settings.pinchToZoomDecelerationEnabled)
+        assertFalse(settings.rotateDecelerationEnabled)
+        assertFalse(settings.scrollDecelerationEnabled)
+        assertFalse(settings.pinchScrollEnabled)
+    }
+
+    @Test
     fun `full frame before map loaded is latched and reveals without another frame`() {
         val readiness = MapPreviewReadiness()
 

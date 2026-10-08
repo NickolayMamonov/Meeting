@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -77,12 +79,26 @@ private const val MAP_PREVIEW_ZOOM = 15.0
 private const val MAP_RENDER_DEADLINE_MILLIS = 15_000L
 private const val MAP_PREVIEW_TEST_TAG = "uikit-map-preview"
 internal const val MAP_PREVIEW_STATUS_TEST_TAG = "uikit-map-preview-status"
+internal const val MAP_PREVIEW_MASK_TEST_TAG = "uikit-map-preview-imagery-mask"
+internal const val MAP_PREVIEW_LOGO_TEST_TAG = "uikit-map-preview-logo"
+internal const val MAP_PREVIEW_ATTRIBUTION_TEST_TAG = "uikit-map-preview-attribution"
 private const val MAP_PREVIEW_GLES3 = 0x00030000
 private const val MAPBOX_PRIVACY_URL = "https://www.mapbox.com/legal/privacy/"
 private const val OPENSTREETMAP_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
 private const val MAPBOX_FEEDBACK_URL = "https://apps.mapbox.com/feedback/"
+internal val MAP_PREVIEW_FALLBACK_COLOR = Color(0xFFF3F5F7)
 
 internal fun mapFeedbackUrl(): String = MAPBOX_FEEDBACK_URL
+
+internal fun mapActionContentDescription(
+    address: String,
+    coordinateValid: Boolean,
+): String =
+    if (coordinateValid && address.isNotBlank()) {
+        "Открыть в картах: $address"
+    } else {
+        "Открыть в картах"
+    }
 
 internal enum class MapPreviewStatus {
     LOADING,
@@ -214,7 +230,7 @@ fun UIKitMapView(
     val token = BuildConfig.MAPBOX_PUBLIC_TOKEN.takeIf(::isSafePublicMapboxToken).orEmpty()
     val supportsGles3 = remember(context) { deviceSupportsGles3(context) }
     val eligibility = mapPreviewEligibility(latitude, longitude, token.isNotEmpty(), supportsGles3)
-    val displayAddress = address.ifBlank { "Открыть в картах" }
+    val clickLabel = mapActionContentDescription(address, eligibility.coordinateValid)
     val attemptKey =
         remember(meetingId, latitude, longitude) {
             MapPreviewAttemptKey(
@@ -225,7 +241,8 @@ fun UIKitMapView(
             )
         }
     val readiness = remember(attemptKey) { MapPreviewReadiness() }
-    var status by remember(attemptKey) { mutableStateOf(MapPreviewStatus.LOADING) }
+    val statusState = remember(attemptKey) { mutableStateOf(MapPreviewStatus.LOADING) }
+    var status by statusState
     val foregroundDeadline = remember(attemptKey) { ForegroundRenderDeadline() }
 
     DisposableEffect(attemptKey, readiness) {
@@ -273,16 +290,11 @@ fun UIKitMapView(
                     attemptKey = attemptKey,
                     latitude = latitude,
                     longitude = longitude,
-                    status = status,
+                    status = statusState,
                     readiness = readiness,
-                    onStatusChanged = { status = it },
+                    onStatusChanged = { statusState.value = it },
                     onMapClick = onMapClick,
-                    clickLabel =
-                        if (eligibility.coordinateValid) {
-                            "Открыть в картах: $displayAddress"
-                        } else {
-                            "Открыть в картах"
-                        },
+                    clickLabel = clickLabel,
                 )
             } else {
                 NoMapFallback(
@@ -290,12 +302,7 @@ fun UIKitMapView(
                     coordinateValid = eligibility.coordinateValid,
                     previewLatitudeSupported = eligibility.previewLatitudeSupported,
                     onMapClick = onMapClick,
-                    clickLabel =
-                        if (eligibility.coordinateValid) {
-                            "Открыть в картах: $displayAddress"
-                        } else {
-                            "Открыть в картах"
-                        },
+                    clickLabel = clickLabel,
                 )
             }
         }
@@ -307,13 +314,14 @@ private fun MapPreviewMap(
     attemptKey: MapPreviewAttemptKey,
     latitude: Double,
     longitude: Double,
-    status: MapPreviewStatus,
+    status: State<MapPreviewStatus>,
     readiness: MapPreviewReadiness,
     onStatusChanged: (MapPreviewStatus) -> Unit,
     onMapClick: () -> Unit,
     clickLabel: String,
 ) {
     val context = LocalContext.current
+    val currentStatus = status.value
 
     Box(modifier = Modifier.fillMaxSize()) {
         key(attemptKey) {
@@ -331,18 +339,26 @@ private fun MapPreviewMap(
                 modifier = Modifier.fillMaxSize(),
                 mapState = mapState,
                 mapViewportState = mapViewportState,
-                compass = {},
+                // Mapbox 11.32.0 draws logo and attribution after the compass slot.
+                // Mask here so the official ornaments remain visible and interactive.
+                compass = { MapPreviewImageMask(status) },
                 scaleBar = {},
                 logo = {
                     Logo(
                         modifier =
                             Modifier
                                 .clickable(role = Role.Button) { launchSafeUrl(context, "https://www.mapbox.com/") }
+                                .testTag(MAP_PREVIEW_LOGO_TEST_TAG)
                                 .semantics { contentDescription = "Mapbox logo" },
                         alignment = Alignment.TopStart,
                     )
                 },
-                attribution = { Attribution(alignment = Alignment.TopEnd) },
+                attribution = {
+                    Attribution(
+                        modifier = Modifier.testTag(MAP_PREVIEW_ATTRIBUTION_TEST_TAG),
+                        alignment = Alignment.TopEnd,
+                    )
+                },
             ) {
                 MapEffect(attemptKey) { mapView ->
                     val subscriptions = mutableListOf<com.mapbox.common.Cancelable>()
@@ -383,18 +399,7 @@ private fun MapPreviewMap(
                             onStatusChanged(readiness.status)
                         }
                         requireNotNull(mapView.getPlugin<GesturesPlugin>(Plugin.MAPBOX_GESTURES_PLUGIN_ID)).updateSettings {
-                            rotateEnabled = false
-                            pinchToZoomEnabled = false
-                            scrollEnabled = false
-                            simultaneousRotateAndPinchToZoomEnabled = false
-                            pitchEnabled = false
-                            doubleTapToZoomInEnabled = false
-                            doubleTouchToZoomOutEnabled = false
-                            quickZoomEnabled = false
-                            pinchToZoomDecelerationEnabled = false
-                            rotateDecelerationEnabled = false
-                            scrollDecelerationEnabled = false
-                            pinchScrollEnabled = false
+                            disableAllMapGestures()
                         }
                     } catch (_: Exception) {
                         readiness.onFailure()
@@ -426,16 +431,16 @@ private fun MapPreviewMap(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .background(if (status == MapPreviewStatus.READY) Color.Transparent else Color(0xFFF3F5F7))
+                        .background(if (currentStatus == MapPreviewStatus.READY) Color.Transparent else MAP_PREVIEW_FALLBACK_COLOR)
                         .semantics {
                             role = Role.Button
                             contentDescription = clickLabel
                         }.clickable(onClick = onMapClick),
                 contentAlignment = Alignment.Center,
             ) {
-                if (status != MapPreviewStatus.READY) {
+                if (currentStatus != MapPreviewStatus.READY) {
                     Text(
-                        text = if (status == MapPreviewStatus.LOADING) "Загрузка карты…" else "Карта недоступна",
+                        text = if (currentStatus == MapPreviewStatus.LOADING) "Загрузка карты…" else "Карта недоступна",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(16.dp).testTag(MAP_PREVIEW_STATUS_TEST_TAG),
@@ -448,26 +453,45 @@ private fun MapPreviewMap(
 }
 
 @Composable
+internal fun MapPreviewImageMask(status: State<MapPreviewStatus>) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    // Track readiness during drawing so masking never recreates the SDK map host.
+                    if (status.value != MapPreviewStatus.READY) {
+                        drawRect(MAP_PREVIEW_FALLBACK_COLOR)
+                    } else {
+                        drawContent()
+                    }
+                }.testTag(MAP_PREVIEW_MASK_TEST_TAG),
+    )
+}
+
+@Composable
 private fun rememberMapStateWithDisabledGestures(): MapState =
     rememberMapState(MAPBOX_STREETS_V12) {
-        gesturesState.gesturesSettings =
-            GesturesSettings
-                .Builder()
-                .apply {
-                    rotateEnabled = false
-                    pinchToZoomEnabled = false
-                    scrollEnabled = false
-                    simultaneousRotateAndPinchToZoomEnabled = false
-                    pitchEnabled = false
-                    doubleTapToZoomInEnabled = false
-                    doubleTouchToZoomOutEnabled = false
-                    quickZoomEnabled = false
-                    pinchToZoomDecelerationEnabled = false
-                    rotateDecelerationEnabled = false
-                    scrollDecelerationEnabled = false
-                    pinchScrollEnabled = false
-                }.build()
+        gesturesState.gesturesSettings = disabledMapGesturesSettings()
     }
+
+internal fun disabledMapGesturesSettings(): GesturesSettings =
+    GesturesSettings.Builder().apply { disableAllMapGestures() }.build()
+
+private fun GesturesSettings.Builder.disableAllMapGestures() {
+    rotateEnabled = false
+    pinchToZoomEnabled = false
+    scrollEnabled = false
+    simultaneousRotateAndPinchToZoomEnabled = false
+    pitchEnabled = false
+    doubleTapToZoomInEnabled = false
+    doubleTouchToZoomOutEnabled = false
+    quickZoomEnabled = false
+    pinchToZoomDecelerationEnabled = false
+    rotateDecelerationEnabled = false
+    scrollDecelerationEnabled = false
+    pinchScrollEnabled = false
+}
 
 @Composable
 private fun NoMapFallback(
@@ -478,7 +502,7 @@ private fun NoMapFallback(
     clickLabel: String,
 ) {
     val context = LocalContext.current
-    Box(modifier.background(Color(0xFFF3F5F7))) {
+    Box(modifier.background(MAP_PREVIEW_FALLBACK_COLOR)) {
         Column(
             modifier = Modifier.fillMaxSize().padding(12.dp),
             verticalArrangement = Arrangement.Center,
