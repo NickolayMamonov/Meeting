@@ -369,6 +369,7 @@ private fun MeetingContent(
                     longitude = uiState.address.longitude,
                     nearestMetro = uiState.nearestMetro,
                     onMapClick = onMapClick,
+                    meetingId = uiState.meetingId,
                 )
             }
         }

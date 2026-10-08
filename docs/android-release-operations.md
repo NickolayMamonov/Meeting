@@ -272,6 +272,53 @@ configuration and release package identity, but cannot prove production
 dashboard delivery or event attribution without a separately authorized
 console-side check.
 
+## Map preview SDK
+
+The meeting preview uses the Mapbox Maps SDK through the UIKit module. Stable
+packaging requires the protected `MAPBOX_PUBLIC_TOKEN_RELEASE` Actions secret;
+local/debug builds may supply `MAPBOX_PUBLIC_TOKEN_DEBUG`. These are public
+`pk.` read tokens and are extractable from application binaries. Provision a
+dedicated Android token with only verified public map-read scopes, beginning
+with `styles:read` and `fonts:read`; test the Streets style and required
+resources before stable packaging. Never provision an `sk.` secret token, put a
+token in source control, or print a token or authenticated resource URL.
+
+The SDK receives no device location permission or location-provider activation.
+Mapbox's SDK reporting remains enabled as required, and each initialized map
+retains the SDK attribution control and its user telemetry opt-out, including
+when rendering fails. No-map fallbacks provide Mapbox privacy information but
+do not claim to be an opt-out. The operator owns the user-facing privacy-notice
+review and must confirm that this disclosure and the SDK's current collection
+and opt-out behavior remain adequate before release.
+
+The built-in SDK Attribution panel's `Improve this map` action is an explicit
+user-activated external disclosure. With the pinned Maps SDK 11.32.0, the SDK
+builds its feedback destination from the displayed map center (longitude and
+latitude), zoom, bearing and pitch (both fixed at zero for this preview), the
+application package as `referrer`, the public extractable `pk.` access token,
+and the active style's `owner` and `id` when present. The SDK may construct and
+hold this URI transiently before the user selects the action; the approval is
+for external dispatch only after activation. It does not use device location
+and must not include the meeting's textual address, meeting ID, profile data,
+private token, or backend metadata. Do not change SDK internals to suppress its
+documented payload. The separate always-visible custom feedback link stays
+generic and contains no query, fragment, or meeting metadata. Application code,
+CI, and retained evidence must never log or persist the SDK-generated URL or
+public token; the instrumentation assertion intercepts the URI in memory only
+and reports sanitized fields without printing its token value or complete URL.
+
+Use only the SDK's unmodified ambient cache behavior. The preview does not
+promise offline rendering or an independently enforced cache TTL; incomplete
+or unavailable resources fall back to the address action. Do not add manual
+cache clearing, prefetching, a custom cache, offline-region support, or a
+separate retention claim. Recheck applicable Mapbox terms at release.
+
+Mapbox account usage is monitored at the account level by the operator.
+Provisioning the token or building the integration is not authorization for
+paid usage. Confirm expected MAU and request usage, current plan thresholds,
+and billing alerts before distribution; a free tier is not a hard spending cap.
+If forecast use could incur charges, stop for a new explicit cost approval.
+
 Android SDK release tools are selected from one canonical SDK root and one
 highest validated package. Windows uses regular `apksigner.bat` and
 `apkanalyzer.bat` launchers and identity probes without requiring a POSIX
