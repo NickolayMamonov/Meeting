@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -43,9 +44,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -82,6 +85,7 @@ internal const val MAP_PREVIEW_STATUS_TEST_TAG = "uikit-map-preview-status"
 internal const val MAP_PREVIEW_MASK_TEST_TAG = "uikit-map-preview-imagery-mask"
 internal const val MAP_PREVIEW_LOGO_TEST_TAG = "uikit-map-preview-logo"
 internal const val MAP_PREVIEW_ATTRIBUTION_TEST_TAG = "uikit-map-preview-attribution"
+internal const val MAP_PREVIEW_TOP_ACTION_TEST_TAG = "uikit-map-preview-top-action"
 private const val MAP_PREVIEW_GLES3 = 0x00030000
 private const val MAPBOX_PRIVACY_URL = "https://www.mapbox.com/legal/privacy/"
 private const val OPENSTREETMAP_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
@@ -424,6 +428,7 @@ private fun MapPreviewMap(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Box(Modifier.weight(1f))
+                MapPreviewTopAction(onMapClick)
                 Box(Modifier.weight(1f))
             }
             Box(
@@ -450,6 +455,20 @@ private fun MapPreviewMap(
             MapCredits(feedbackUrl = mapFeedbackUrl())
         }
     }
+}
+
+@Composable
+internal fun MapPreviewTopAction(onMapClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .width(48.dp)
+                .height(48.dp)
+                .clickable(onClick = onMapClick)
+                .clearAndSetSemantics {
+                    testTag = MAP_PREVIEW_TOP_ACTION_TEST_TAG
+                },
+    )
 }
 
 @Composable

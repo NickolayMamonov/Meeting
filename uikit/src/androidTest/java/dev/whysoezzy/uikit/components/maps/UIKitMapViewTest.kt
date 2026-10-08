@@ -29,6 +29,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -112,6 +113,21 @@ class UIKitMapViewTest {
 
         composeTestRule.onNodeWithContentDescription("Открыть в картах: $address").performClick()
         assertEquals(1, mapClicks)
+    }
+
+    @Test
+    fun topCenterTapOpensGeoWithoutAddingDuplicateAccessibilityControl() {
+        var mapClicks = 0
+        composeTestRule.setContent {
+            UIKitTheme {
+                MapPreviewTopAction(onMapClick = { mapClicks++ })
+            }
+        }
+
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_TOP_ACTION_TEST_TAG).performTouchInput { click() }
+
+        assertEquals(1, mapClicks)
+        composeTestRule.onAllNodesWithContentDescription("Открыть в картах").assertCountEquals(0)
     }
 
     @Test
