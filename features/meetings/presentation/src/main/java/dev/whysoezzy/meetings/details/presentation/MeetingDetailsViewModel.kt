@@ -7,6 +7,7 @@ import com.whysoezzy.common.dispatcher.DispatcherProvider
 import com.whysoezzy.common.error.toErrorType
 import com.whysoezzy.common.push.MeetingJoinEvents
 import com.whysoezzy.common.utils.AddressUtils.extractMetroFromAddress
+import com.whysoezzy.common.utils.isValidMapCoordinate
 import com.whysoezzy.domain.usecase.GetMeetingByIdUseCase
 import com.whysoezzy.domain.usecase.JoinMeetingUseCase
 import com.whysoezzy.domain.usecase.LeaveMeetingUseCase
@@ -172,7 +173,7 @@ class MeetingDetailsViewModel(
     private fun openMap() {
         val state = _uiState.value as? MeetingDetailsUiState.Success ?: return
         viewModelScope.launch {
-            if (state.address.latitude != 0.0 && state.address.longitude != 0.0) {
+            if (isValidMapCoordinate(state.address.latitude, state.address.longitude)) {
                 _navEvent.emit(
                     MeetingDetailsNavEvent.OpenMap(
                         latitude = state.address.latitude,

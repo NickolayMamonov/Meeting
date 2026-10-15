@@ -1,67 +1,292 @@
 package dev.whysoezzy.uikit.components.maps
 
-import android.graphics.Paint
-import android.graphics.Typeface
-import androidx.compose.foundation.Canvas
+import android.app.ActivityManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.SystemClock
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import com.whysoezzy.common.utils.isValidMapCoordinate
+import dev.whysoezzy.uikit.BuildConfig
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
-import dev.whysoezzy.uikit.tokens.ColorTokens
-import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.min
 
-private val MapLand = Color(0xFFF4F1EB)
-private val MapBuilding = Color(0xFFE4DFD5)
-private val MapBuildingOutline = Color(0xFFD5CFC3)
-private val MapPark = Color(0xFFD5E6CA)
-private val MapWater = Color(0xFFB9DDE6)
-private val MapInk = Color(0xFF56605C)
+private const val MAP_RENDER_DEADLINE_MILLIS = 15_000L
+private const val MAP_PREVIEW_TEST_TAG = "uikit-map-preview"
+internal const val MAP_PREVIEW_IMAGE_TEST_TAG = "uikit-map-preview-image"
+internal const val MAP_PREVIEW_STATUS_TEST_TAG = "uikit-map-preview-status"
+internal const val MAP_PREVIEW_LOGO_TEST_TAG = "uikit-map-preview-logo"
+internal const val MAP_PREVIEW_TOP_ACTION_TEST_TAG = "uikit-map-preview-top-action"
+internal const val MAP_PREVIEW_TELEMETRY_TEST_TAG = "uikit-map-preview-telemetry"
+private const val MAP_PREVIEW_GLES3 = 0x00030000
+private const val MAPBOX_URL = "https://www.mapbox.com/"
+private const val MAPBOX_PRIVACY_URL = "https://www.mapbox.com/legal/privacy/"
+private const val OPENSTREETMAP_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
+private const val MAPBOX_FEEDBACK_URL = "https://apps.mapbox.com/feedback/"
+internal val MAP_PREVIEW_FALLBACK_COLOR = Color(0xFFF3F5F7)
 
-/**
- * Deterministic illustrative map, not a geographic tile or a navigation service.
- * The supplied coordinates describe the meeting, not the fictional street layout.
- */
+internal fun mapFeedbackUrl(): String = MAPBOX_FEEDBACK_URL
+
+internal fun mapActionContentDescription(
+    address: String,
+    coordinateValid: Boolean,
+): String =
+    if (coordinateValid && address.isNotBlank()) {
+        "Открыть в картах: $address"
+    } else {
+        "Открыть в картах"
+    }
+
+internal enum class MapPreviewStatus {
+    LOADING,
+    READY,
+    UNAVAILABLE,
+}
+
+internal data class MapPreviewEligibility(
+    val showMap: Boolean,
+    val coordinateValid: Boolean,
+    val previewLatitudeSupported: Boolean,
+)
+
+internal fun mapPreviewEligibility(
+    latitude: Double,
+    longitude: Double,
+    hasPublicToken: Boolean,
+    supportsGles3: Boolean,
+): MapPreviewEligibility {
+    val coordinateValid = isValidMapCoordinate(latitude, longitude)
+    val previewLatitudeSupported = latitude in -85.0511..85.0511
+    return MapPreviewEligibility(
+        showMap = coordinateValid && previewLatitudeSupported && hasPublicToken && supportsGles3,
+        coordinateValid = coordinateValid,
+        previewLatitudeSupported = previewLatitudeSupported,
+    )
+}
+
+internal class ForegroundRenderDeadline(
+    private val timeoutMillis: Long = MAP_RENDER_DEADLINE_MILLIS,
+) {
+    private var elapsedForegroundMillis = 0L
+    private var foregroundStartedAt: Long? = null
+
+    fun resume(nowMillis: Long) {
+        if (foregroundStartedAt == null) foregroundStartedAt = nowMillis
+    }
+
+    fun pause(nowMillis: Long) {
+        foregroundStartedAt?.let { startedAt ->
+            elapsedForegroundMillis += nowMillis - startedAt
+            foregroundStartedAt = null
+        }
+    }
+
+    fun remainingMillis(nowMillis: Long): Long {
+        val currentRun = foregroundStartedAt?.let { nowMillis - it } ?: 0L
+        return (timeoutMillis - elapsedForegroundMillis - currentRun).coerceAtLeast(0L)
+    }
+}
+
+internal data class MapPreviewDependencies(
+    val hasPublicToken: Boolean,
+    val snapshotClientFactory: () -> MapPreviewSnapshotClient,
+    val telemetryPreference: MapTelemetryPreference,
+    val supportsGles3: Boolean,
+)
+
 @Composable
 fun UIKitMapView(
     address: String,
     latitude: Double,
     longitude: Double,
     modifier: Modifier = Modifier,
+    meetingId: Long? = null,
     onMapClick: () -> Unit = {},
 ) {
-    val coordinates = String.format(Locale.ROOT, "%.4f, %.4f", latitude, longitude)
-    val labelPaint =
+    val context = LocalContext.current
+    val token = BuildConfig.MAPBOX_PUBLIC_TOKEN.takeIf(::isSafePublicMapboxToken).orEmpty()
+    val dependencies =
+        remember(context, token) {
+            MapPreviewDependencies(
+                hasPublicToken = token.isNotEmpty(),
+                snapshotClientFactory = {
+                    MapboxMapPreviewSnapshotClient(context, token)
+                },
+                telemetryPreference = MapboxTelemetryPreference,
+                supportsGles3 = deviceSupportsGles3(context),
+            )
+        }
+    UIKitMapViewContent(
+        address = address,
+        latitude = latitude,
+        longitude = longitude,
+        modifier = modifier,
+        meetingId = meetingId,
+        onMapClick = onMapClick,
+        dependencies = dependencies,
+    )
+}
+
+@Composable
+internal fun UIKitMapViewContent(
+    address: String,
+    latitude: Double,
+    longitude: Double,
+    modifier: Modifier = Modifier,
+    meetingId: Long? = null,
+    onMapClick: () -> Unit = {},
+    dependencies: MapPreviewDependencies,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val density = LocalDensity.current.density
+    val coroutineScope = rememberCoroutineScope()
+    val eligibility =
+        mapPreviewEligibility(
+            latitude = latitude,
+            longitude = longitude,
+            hasPublicToken = dependencies.hasPublicToken,
+            supportsGles3 = dependencies.supportsGles3,
+        )
+    val clickLabel = mapActionContentDescription(address, eligibility.coordinateValid)
+    var viewportWidthPx by remember { mutableIntStateOf(0) }
+    var viewportHeightPx by remember { mutableIntStateOf(0) }
+    var snapshotState by remember {
+        mutableStateOf(
+            MapPreviewSnapshotUiState(
+                if (eligibility.showMap) MapPreviewStatus.LOADING else MapPreviewStatus.UNAVAILABLE,
+            ),
+        )
+    }
+    val engine =
         remember {
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.rgb(86, 96, 92)
-                textSize = 9f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            MapPreviewSnapshotEngine(dependencies.snapshotClientFactory) { newState ->
+                coroutineScope.launch { snapshotState = newState }
+            }
+        }
+    val viewportEligible =
+        isSnapshotViewportEligible(
+            widthPx = viewportWidthPx,
+            heightPx = viewportHeightPx,
+            pixelRatio = density,
+        )
+    val request =
+        remember(
+            meetingId,
+            latitude,
+            longitude,
+            viewportWidthPx,
+            viewportHeightPx,
+            density,
+            eligibility.showMap,
+            viewportEligible,
+        ) {
+            if (eligibility.showMap && viewportEligible) {
+                mapPreviewSnapshotRequest(
+                    meetingId = meetingId,
+                    latitude = latitude,
+                    longitude = longitude,
+                    widthPx = viewportWidthPx,
+                    heightPx = viewportHeightPx,
+                    pixelRatio = density,
+                )
+            } else {
+                null
+            }
+        }
+    val displayStatus =
+        when {
+            !eligibility.showMap -> MapPreviewStatus.UNAVAILABLE
+            viewportWidthPx == 0 || viewportHeightPx == 0 -> MapPreviewStatus.LOADING
+            !viewportEligible -> MapPreviewStatus.UNAVAILABLE
+            snapshotState.request != request -> MapPreviewStatus.LOADING
+            else -> snapshotState.status
+        }
+
+    DisposableEffect(engine) {
+        onDispose { engine.dispose() }
+    }
+    val foregroundDeadline = remember(request) { ForegroundRenderDeadline() }
+    LaunchedEffect(engine, request, lifecycleOwner) {
+        engine.update(request)
+        if (request != null) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                foregroundDeadline.resume(SystemClock.elapsedRealtime())
+                try {
+                    while (engine.state.status == MapPreviewStatus.LOADING) {
+                        val now = SystemClock.elapsedRealtime()
+                        val remaining = foregroundDeadline.remainingMillis(now)
+                        if (remaining == 0L) {
+                            engine.onDeadline(request)
+                            break
+                        }
+                        delay(min(remaining, 100L))
+                    }
+                } finally {
+                    foregroundDeadline.pause(SystemClock.elapsedRealtime())
+                }
+            }
+        }
+    }
+
+    var telemetryDialogVisible by remember { mutableStateOf(false) }
+    var telemetryState by remember { mutableStateOf(MapTelemetryUiState.UNAVAILABLE) }
+    val telemetryController =
+        remember {
+            MapTelemetryController(dependencies.telemetryPreference) { newState ->
+                coroutineScope.launch { telemetryState = newState }
             }
         }
 
@@ -71,153 +296,252 @@ fun UIKitMapView(
                 .fillMaxWidth()
                 .height(240.dp)
                 .clip(RoundedCornerShape(BorderRadiusTokens.M))
-                .background(MapLand)
-                .semantics(mergeDescendants = true) {
-                    contentDescription = "Демонстрационная схема. $address. Координаты: $coordinates"
-                }.clickable(onClickLabel = "Открыть место встречи", onClick = onMapClick),
+                .background(MAP_PREVIEW_FALLBACK_COLOR)
+                .testTag(MAP_PREVIEW_TEST_TAG),
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            // A fixed artboard makes every device and recording show the same district.
-            withTransform({
-                scale(size.width / 400f, size.height / 240f, pivot = Offset.Zero)
-            }) {
-                drawRect(MapLand, size = Size(400f, 240f))
-
-                val park =
-                    Path().apply {
-                        moveTo(270f, 0f)
-                        lineTo(400f, 0f)
-                        lineTo(400f, 132f)
-                        lineTo(326f, 110f)
-                        close()
-                    }
-                drawPath(park, MapPark)
-                val river =
-                    Path().apply {
-                        moveTo(285f, 240f)
-                        cubicTo(290f, 197f, 343f, 210f, 357f, 168f)
-                        cubicTo(371f, 133f, 394f, 146f, 414f, 119f)
-                    }
-                drawPath(river, MapWater, style = Stroke(width = 34f))
-
-                val blocks =
-                    listOf(
-                        Offset(17f, 42f) to Size(44f, 27f),
-                        Offset(76f, 40f) to Size(50f, 30f),
-                        Offset(18f, 88f) to Size(42f, 42f),
-                        Offset(77f, 87f) to Size(48f, 23f),
-                        Offset(78f, 120f) to Size(45f, 32f),
-                        Offset(165f, 24f) to Size(39f, 40f),
-                        Offset(218f, 25f) to Size(38f, 22f),
-                        Offset(166f, 85f) to Size(29f, 20f),
-                        Offset(220f, 75f) to Size(41f, 36f),
-                        Offset(169f, 149f) to Size(33f, 33f),
-                        Offset(219f, 146f) to Size(39f, 22f),
-                        Offset(274f, 127f) to Size(36f, 31f),
-                        Offset(19f, 182f) to Size(42f, 24f),
-                        Offset(78f, 180f) to Size(48f, 27f),
-                        Offset(218f, 186f) to Size(39f, 33f),
-                    )
-                blocks.forEach { (position, dimensions) ->
-                    drawRoundRect(
-                        MapBuilding,
-                        topLeft = position,
-                        size = dimensions,
-                        cornerRadius = CornerRadius(3f),
-                    )
-                    drawRoundRect(
-                        MapBuildingOutline,
-                        topLeft = position,
-                        size = dimensions,
-                        cornerRadius = CornerRadius(3f),
-                        style = Stroke(0.8f),
-                    )
-                }
-
-                val boulevard =
-                    Path().apply {
-                        moveTo(143f, -10f)
-                        cubicTo(153f, 76f, 139f, 160f, 163f, 250f)
-                    }
-                val crossStreet =
-                    Path().apply {
-                        moveTo(-10f, 163f)
-                        cubicTo(122f, 165f, 242f, 111f, 410f, 122f)
-                    }
-                listOf(boulevard, crossStreet).forEach { road ->
-                    drawPath(road, Color(0xFFDDD6C7), style = Stroke(19f))
-                    drawPath(road, Color.White, style = Stroke(16f))
-                }
-                drawLine(Color.White, Offset(0f, 78f), Offset(129f, 78f), 9f)
-                drawLine(Color.White, Offset(68f, 25f), Offset(68f, 230f), 8f)
-                drawLine(Color.White, Offset(210f, 0f), Offset(210f, 240f), 9f)
-                drawLine(Color.White, Offset(158f, 70f), Offset(275f, 60f), 9f)
-                drawLine(Color(0xFFF9F8EF), Offset(284f, 18f), Offset(369f, 111f), 5f)
-                drawLine(Color(0xFFF9F8EF), Offset(328f, 13f), Offset(302f, 89f), 4f)
-
-                listOf(
-                    Offset(289f, 30f),
-                    Offset(341f, 28f),
-                    Offset(371f, 39f),
-                    Offset(310f, 59f),
-                    Offset(358f, 75f),
-                    Offset(384f, 92f),
-                    Offset(282f, 90f),
-                ).forEach { tree ->
-                    drawCircle(Color(0xFFB8D3AA), 8f, tree + Offset(1f, 2f))
-                    drawCircle(Color(0xFFC1DDB2), 7f, tree)
-                }
-                drawIntoCanvas { canvas ->
-                    canvas.nativeCanvas.drawText("СКВЕР", 327f, 59f, labelPaint)
-                    canvas.nativeCanvas.drawText("Бульвар", 158f, 213f, labelPaint)
-                    canvas.nativeCanvas.drawText("Пешеходная улица", 22f, 151f, labelPaint)
-                    canvas.nativeCanvas.drawText("Кофейня", 81f, 137f, labelPaint)
-                }
-
-                // The pin tip marks the meeting; the surrounding halo stays unobtrusive.
-                val destination = Offset(201f, 130f)
-                drawCircle(ColorTokens.BrandDefault.copy(alpha = 0.12f), 27f, destination)
-                drawCircle(ColorTokens.BrandDefault.copy(alpha = 0.16f), 17f, destination)
-                drawOval(
-                    MapInk.copy(alpha = 0.16f),
-                    topLeft = destination + Offset(-11f, -3f),
-                    size = Size(22f, 7f),
-                )
-                val pin =
-                    Path().apply {
-                        moveTo(201f, 131f)
-                        cubicTo(196f, 123f, 183f, 111f, 183f, 100f)
-                        cubicTo(183f, 76f, 219f, 76f, 219f, 100f)
-                        cubicTo(219f, 111f, 206f, 123f, 201f, 131f)
-                        close()
-                    }
-                drawPath(pin, Color.White, style = Stroke(4f))
-                drawPath(pin, ColorTokens.BrandDark)
-                drawCircle(Color.White, 6f, Offset(201f, 99f))
-            }
+        Column(modifier = Modifier.fillMaxSize()) {
+            MapImageViewport(
+                modifier = Modifier.weight(1f),
+                status = displayStatus,
+                bitmap = snapshotState.bitmap.takeIf { snapshotState.request == request },
+                eligibility = eligibility,
+                clickLabel = clickLabel,
+                onMapClick = onMapClick,
+                onSizeChanged = { width, height ->
+                    viewportWidthPx = width
+                    viewportHeightPx = height
+                },
+            )
+            MapCredits(
+                onOpenTelemetry = {
+                    telemetryDialogVisible = true
+                    telemetryController.open()
+                },
+            )
         }
-        Text(
-            text = "Схема района · демо",
-            color = MapInk,
-            fontSize = 11.sp,
+    }
+
+    if (telemetryDialogVisible) {
+        MapTelemetryDialog(
+            state = telemetryState,
+            onSet = telemetryController::set,
+            onDismiss = { telemetryDialogVisible = false },
+        )
+    }
+}
+
+@Composable
+private fun MapImageViewport(
+    modifier: Modifier,
+    status: MapPreviewStatus,
+    bitmap: MapPreviewBitmap?,
+    eligibility: MapPreviewEligibility,
+    clickLabel: String,
+    onMapClick: () -> Unit,
+    onSizeChanged: (Int, Int) -> Unit,
+) {
+    val context = LocalContext.current
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(MAP_PREVIEW_FALLBACK_COLOR)
+                .onSizeChanged { onSizeChanged(it.width, it.height) }
+                .semantics {
+                    role = if (eligibility.coordinateValid) Role.Button else Role.Image
+                    contentDescription = clickLabel
+                }.clickable(enabled = eligibility.coordinateValid, onClick = onMapClick)
+                .testTag(MAP_PREVIEW_IMAGE_TEST_TAG),
+    ) {
+        val readyBitmap = (bitmap as? AndroidMapPreviewBitmap)?.bitmap
+        if (status == MapPreviewStatus.READY && readyBitmap != null && !readyBitmap.isRecycled) {
+            Image(
+                bitmap = readyBitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.FillBounds,
+            )
+        } else {
+            Text(
+                text =
+                    when {
+                        !eligibility.coordinateValid -> "Местоположение недоступно"
+                        status == MapPreviewStatus.LOADING -> "Загрузка карты…"
+                        else -> "Карта недоступна"
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp)
+                        .testTag(MAP_PREVIEW_STATUS_TEST_TAG),
+            )
+        }
+
+        Image(
+            painter = painterResource(com.mapbox.maps.plugin.logo.R.drawable.mapbox_logo_icon),
+            contentDescription = "Mapbox logo",
+            contentScale = ContentScale.Fit,
             modifier =
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .background(Color.White.copy(alpha = 0.94f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(8.dp)
+                    .height(24.dp)
+                    .clickable(role = Role.Button) { launchSafeUrl(context, MAPBOX_URL) }
+                    .testTag(MAP_PREVIEW_LOGO_TEST_TAG),
         )
-        Text(
-            text = coordinates,
-            color = MapInk,
-            fontSize = 10.sp,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(10.dp)
-                    .background(Color.White.copy(alpha = 0.94f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            MapPreviewTopAction(
+                enabled = eligibility.coordinateValid,
+                onMapClick = onMapClick,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun MapPreviewTopAction(
+    enabled: Boolean = true,
+    onMapClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .width(48.dp)
+                .height(48.dp)
+                .clickable(enabled = enabled, onClick = onMapClick)
+                .clearAndSetSemantics {
+                    testTag = MAP_PREVIEW_TOP_ACTION_TEST_TAG
+                },
+    )
+}
+
+@Composable
+private fun MapCredits(onOpenTelemetry: () -> Unit) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = 144.dp)
+                .background(Color.White),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MapLink(Modifier.weight(1f), "© Mapbox", MAPBOX_URL)
+            MapLink(Modifier.weight(1f), "© OpenStreetMap", OPENSTREETMAP_COPYRIGHT_URL)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MapLink(Modifier.weight(1f), "Mapbox privacy information", MAPBOX_PRIVACY_URL)
+            MapLink(Modifier.weight(1f), "Improve this map", mapFeedbackUrl())
+        }
+        Box(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Настройки телеметрии Mapbox",
+                color = Color(0xFF172B3A),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(role = Role.Button, onClick = onOpenTelemetry)
+                        .heightIn(min = 48.dp)
+                        .padding(horizontal = 6.dp)
+                        .semantics { contentDescription = "Настройки телеметрии Mapbox" }
+                        .testTag(MAP_PREVIEW_TELEMETRY_TEST_TAG),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MapTelemetryDialog(
+    state: MapTelemetryUiState,
+    onSet: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Настройки телеметрии Mapbox") },
+        text = {
+            Text(
+                when (state) {
+                    MapTelemetryUiState.ENABLED -> "Сбор телеметрии включён."
+                    MapTelemetryUiState.DISABLED -> "Сбор телеметрии выключен."
+                    MapTelemetryUiState.SAVING -> "Сохранение настройки…"
+                    MapTelemetryUiState.UNAVAILABLE -> "Настройка телеметрии недоступна."
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = state == MapTelemetryUiState.ENABLED || state == MapTelemetryUiState.DISABLED,
+                onClick = {
+                    onSet(state != MapTelemetryUiState.ENABLED)
+                },
+            ) {
+                Text(if (state == MapTelemetryUiState.ENABLED) "Выключить" else "Включить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Закрыть")
+            }
+        },
+    )
+}
+
+@Composable
+private fun MapLink(
+    modifier: Modifier,
+    text: String,
+    url: String,
+) {
+    val context = LocalContext.current
+    Text(
+        text = text,
+        color = Color(0xFF172B3A),
+        style = MaterialTheme.typography.labelSmall,
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable(role = Role.Button) { launchSafeUrl(context, url) }
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 6.dp)
+                .semantics { contentDescription = text },
+        textAlign = TextAlign.Center,
+    )
+}
+
+private fun isSafePublicMapboxToken(token: String): Boolean =
+    token.startsWith("pk.") && token.matches(Regex("pk\\.[A-Za-z0-9._-]+"))
+
+private fun deviceSupportsGles3(context: Context): Boolean {
+    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+    return activityManager.deviceConfigurationInfo.reqGlEsVersion >= MAP_PREVIEW_GLES3
+}
+
+private fun launchSafeUrl(
+    context: Context,
+    url: String,
+) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    } catch (_: android.content.ActivityNotFoundException) {
+        // External links are optional when the device has no handler.
     }
 }
 
@@ -226,9 +550,9 @@ fun UIKitMapView(
 private fun UIKitMapViewPreview() {
     UIKitTheme {
         UIKitMapView(
-            address = "Москва, ул. Покровка, 27",
-            latitude = 55.7617,
-            longitude = 37.6475,
+            address = "Кожевенная линия, 40",
+            latitude = 59.9279,
+            longitude = 30.2584,
         )
     }
 }

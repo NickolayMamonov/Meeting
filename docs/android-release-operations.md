@@ -295,3 +295,79 @@ returns status `97` only for the intentional post-install failure after
 uninstall and package-absence verification. Normal startup performs the same
 cleanup proof. `dev.whysoezzy.meet` must be absent after every probe and after
 successful execution; a cleanup query failure is itself a gate failure.
+
+## Mapbox meeting preview
+
+The meeting preview uses the Mapbox Maps SDK through UIKit. Stable packaging
+requires the protected `MAPBOX_PUBLIC_TOKEN_RELEASE` Actions secret; optional
+local/debug configuration uses `MAPBOX_PUBLIC_TOKEN_DEBUG`. These must be
+dedicated public `pk.` read tokens and are extractable from application binaries.
+Start with verified public map-read scopes (`styles:read` and `fonts:read`) and
+separately verify Streets and its resources before distribution. Never provision
+an `sk.` token, commit a token, or print a token or authenticated resource URL.
+Blank debug configuration intentionally renders the address fallback.
+
+The card uses SDK `Snapshotter`, not an embedded `MapView`, Maps Compose,
+`TextureView`, or `SurfaceView`. One fixed Streets-v12 request uses the meeting
+coordinate, zoom 15, bearing/pitch zero, and an application-drawn exact-coordinate
+pin. The bitmap is memory-only; no custom cache, offline region, prefetch, purge,
+bitmap persistence or `Snapshotter.clearData` is added. A viewport below 200dp
+by 96dp does not construct a snapshot request. SDK resources may be unavailable
+offline; the address, independent geo action and credits remain usable.
+
+The preview requests no location permission or location-provider activation.
+The exact pinned SDK logo and readable Mapbox/OpenStreetMap attribution remain
+visible independently of snapshot readiness. Privacy and generic feedback links
+are app-owned. Feedback uses exactly `https://apps.mapbox.com/feedback/`, without
+meeting coordinates, address, identifier, profile, token or backend metadata.
+
+Snapshotter does not supply an interactive Attribution control. The app-owned
+`Настройки телеметрии Mapbox` dialog reads and changes only the Common SDK
+event-collection preference via `TelemetryUtils`. Unknown and saving states
+cannot initiate a write. Success requires the SDK callback and matching getter
+readback. Fake-only token-free tests never mutate native telemetry. Separately
+authorize initial-state read, opposite write/readback and restoration in
+`finally`; failed restoration blocks distribution. Do not log or retain raw
+SDK errors, reporting identifiers, tokens or telemetry events. User-facing
+privacy disclosure and current collection behavior require operator assessment.
+The address block explicitly states that loading the map sends the meeting
+coordinates to Mapbox. This notice does not imply that disabling telemetry
+also disables the map request. Production distribution still requires the
+operator's privacy-policy and collection-behavior assessment.
+
+Pinned Common 24.32.0 exposes these methods in public bytecode but annotates
+them `RestrictTo(LIBRARY_GROUP_PREFIX)`. The operator approved exactly one narrow
+`RestrictedApi` suppression on `MapboxTelemetryPreference`. No internal
+`MapProvider`, visibility shim, reflection or broader suppression is permitted.
+Re-evaluate this exception on every Maps/Common SDK upgrade.
+
+Use only unmodified SDK ambient caching. Do not claim guaranteed offline maps,
+an independently enforced TTL or a separate retention policy. Recheck applicable
+Mapbox terms before release. Official Android pricing guidance explicitly counts
+snapshot creation as Maps SDKs for Mobile MAU usage. Operator-managed usage,
+current thresholds and billing alerts require confirmation before distribution;
+a free tier is not a spending cap or authorization for paid use.
+
+Official references checked October 15, 2026:
+- https://docs.mapbox.com/android/maps/guides/pricing/
+- https://docs.mapbox.com/android/maps/guides/#attribution
+- https://docs.mapbox.com/android/maps/guides/#telemetry-opt-out
+- https://www.mapbox.com/legal/product-terms
+- https://www.mapbox.com/pricing
+
+Local blank-token unit tests, lint and test-APK assembly are source-only evidence.
+Fake-device tests, configured builds, native telemetry verification, guarded live
+Snapshotter acceptance, native page/ABI/runtime-size checks, hosted CI and
+integration/release require their separately authorized gates. Preserve all ABIs,
+existing signing/provenance contracts and the optional GLES3 installation filter.
+The README GIF remains historical illustrative artwork, not SDK runtime proof.
+
+Dev integration does not certify the full guarded live-runtime gate. The
+disposable-emulator runs produced partial Snapshotter callback/bitmap/style/pin
+evidence and verified telemetry-preference restoration, but the replacement
+HTTP-service guard did not observe the Snapshotter request. The experimental
+guard harness was removed because it depended on restricted factory APIs.
+The operator accepted this limitation for dev integration only; it is not a
+passing live gate, a spending-cap guarantee, or stable-distribution approval.
+Further provider tests require a separately reviewed containment plan and
+explicit authorization.
