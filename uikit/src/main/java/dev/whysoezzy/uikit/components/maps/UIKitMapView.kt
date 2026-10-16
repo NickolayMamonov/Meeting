@@ -17,9 +17,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,6 +62,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.whysoezzy.common.utils.isValidMapCoordinate
 import dev.whysoezzy.uikit.BuildConfig
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.AppIcons
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -70,6 +75,7 @@ internal const val MAP_PREVIEW_STATUS_TEST_TAG = "uikit-map-preview-status"
 internal const val MAP_PREVIEW_LOGO_TEST_TAG = "uikit-map-preview-logo"
 internal const val MAP_PREVIEW_TOP_ACTION_TEST_TAG = "uikit-map-preview-top-action"
 internal const val MAP_PREVIEW_TELEMETRY_TEST_TAG = "uikit-map-preview-telemetry"
+internal const val MAP_PREVIEW_INFO_TEST_TAG = "uikit-map-preview-info"
 private const val MAP_PREVIEW_GLES3 = 0x00030000
 private const val MAPBOX_URL = "https://www.mapbox.com/"
 private const val MAPBOX_PRIVACY_URL = "https://www.mapbox.com/legal/privacy/"
@@ -281,6 +287,7 @@ internal fun UIKitMapViewContent(
         }
     }
 
+    var informationDialogVisible by remember { mutableStateOf(false) }
     var telemetryDialogVisible by remember { mutableStateOf(false) }
     var telemetryState by remember { mutableStateOf(MapTelemetryUiState.UNAVAILABLE) }
     val telemetryController =
@@ -294,31 +301,54 @@ internal fun UIKitMapViewContent(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(240.dp)
+                .height(220.dp)
                 .clip(RoundedCornerShape(BorderRadiusTokens.M))
                 .background(MAP_PREVIEW_FALLBACK_COLOR)
                 .testTag(MAP_PREVIEW_TEST_TAG),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            MapImageViewport(
-                modifier = Modifier.weight(1f),
-                status = displayStatus,
-                bitmap = snapshotState.bitmap.takeIf { snapshotState.request == request },
-                eligibility = eligibility,
-                clickLabel = clickLabel,
-                onMapClick = onMapClick,
-                onSizeChanged = { width, height ->
-                    viewportWidthPx = width
-                    viewportHeightPx = height
-                },
-            )
-            MapCredits(
-                onOpenTelemetry = {
-                    telemetryDialogVisible = true
-                    telemetryController.open()
-                },
-            )
+        MapImageViewport(
+            modifier = Modifier.fillMaxSize(),
+            status = displayStatus,
+            bitmap = snapshotState.bitmap.takeIf { snapshotState.request == request },
+            eligibility = eligibility,
+            clickLabel = clickLabel,
+            onMapClick = onMapClick,
+            onSizeChanged = { width, height ->
+                viewportWidthPx = width
+                viewportHeightPx = height
+            },
+        )
+        IconButton(
+            onClick = { informationDialogVisible = true },
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .testTag(MAP_PREVIEW_INFO_TEST_TAG),
+        ) {
+            Box(
+                modifier = Modifier.size(28.dp).background(Color.White.copy(alpha = 0.55f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    AppIcons.Info,
+                    contentDescription = "Информация о карте",
+                    modifier = Modifier.size(18.dp),
+                    tint = Color(0xFF172B3A).copy(alpha = 0.8f),
+                )
+            }
         }
+    }
+
+    if (informationDialogVisible) {
+        MapInformationDialog(
+            onDismiss = { informationDialogVisible = false },
+            onOpenTelemetry = {
+                informationDialogVisible = false
+                telemetryDialogVisible = true
+                telemetryController.open()
+            },
+        )
     }
 
     if (telemetryDialogVisible) {
@@ -421,50 +451,33 @@ internal fun MapPreviewTopAction(
 }
 
 @Composable
-private fun MapCredits(onOpenTelemetry: () -> Unit) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(max = 144.dp)
-                .background(Color.White),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MapLink(Modifier.weight(1f), "© Mapbox", MAPBOX_URL)
-            MapLink(Modifier.weight(1f), "© OpenStreetMap", OPENSTREETMAP_COPYRIGHT_URL)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MapLink(Modifier.weight(1f), "Mapbox privacy information", MAPBOX_PRIVACY_URL)
-            MapLink(Modifier.weight(1f), "Improve this map", mapFeedbackUrl())
-        }
-        Box(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Настройки телеметрии Mapbox",
-                color = Color(0xFF172B3A),
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable(role = Role.Button, onClick = onOpenTelemetry)
-                        .heightIn(min = 48.dp)
-                        .padding(horizontal = 6.dp)
-                        .semantics { contentDescription = "Настройки телеметрии Mapbox" }
-                        .testTag(MAP_PREVIEW_TELEMETRY_TEST_TAG),
-            )
-        }
-    }
+private fun MapInformationDialog(
+    onDismiss: () -> Unit,
+    onOpenTelemetry: () -> Unit,
+) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Информация о карте") },
+        text = {
+            Column {
+                // Snapshotter renders attribution into the bitmap; these links remain accessible.
+                MapLink(Modifier.fillMaxWidth(), "© Mapbox") { launchSafeUrl(context, MAPBOX_URL) }
+                MapLink(Modifier.fillMaxWidth(), "© OpenStreetMap") { launchSafeUrl(context, OPENSTREETMAP_COPYRIGHT_URL) }
+                MapLink(Modifier.fillMaxWidth(), "Исправить карту") { launchSafeUrl(context, mapFeedbackUrl()) }
+                MapLink(Modifier.fillMaxWidth(), "Конфиденциальность Mapbox") { launchSafeUrl(context, MAPBOX_PRIVACY_URL) }
+                TextButton(
+                    onClick = onOpenTelemetry,
+                    modifier = Modifier.testTag(MAP_PREVIEW_TELEMETRY_TEST_TAG),
+                ) {
+                    Text("Настройки телеметрии Mapbox")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Закрыть") }
+        },
+    )
 }
 
 @Composable
@@ -508,9 +521,8 @@ private fun MapTelemetryDialog(
 private fun MapLink(
     modifier: Modifier,
     text: String,
-    url: String,
+    onClick: () -> Unit,
 ) {
-    val context = LocalContext.current
     Text(
         text = text,
         color = Color(0xFF172B3A),
@@ -518,9 +530,9 @@ private fun MapLink(
         modifier =
             modifier
                 .clip(RoundedCornerShape(4.dp))
-                .clickable(role = Role.Button) { launchSafeUrl(context, url) }
+                .clickable(role = Role.Button, onClick = onClick)
                 .heightIn(min = 48.dp)
-                .padding(horizontal = 6.dp)
+                .padding(horizontal = 6.dp, vertical = 12.dp)
                 .semantics { contentDescription = text },
         textAlign = TextAlign.Center,
     )
