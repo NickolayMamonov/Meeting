@@ -455,16 +455,17 @@ private fun MapInformationDialog(
     onDismiss: () -> Unit,
     onOpenTelemetry: () -> Unit,
 ) {
+    val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Информация о карте") },
         text = {
             Column {
                 // Snapshotter renders attribution into the bitmap; these links remain accessible.
-                MapLink(Modifier.fillMaxWidth(), "© Mapbox", MAPBOX_URL)
-                MapLink(Modifier.fillMaxWidth(), "© OpenStreetMap", OPENSTREETMAP_COPYRIGHT_URL)
-                MapLink(Modifier.fillMaxWidth(), "Исправить карту", mapFeedbackUrl())
-                MapLink(Modifier.fillMaxWidth(), "Конфиденциальность Mapbox", MAPBOX_PRIVACY_URL)
+                MapLink(Modifier.fillMaxWidth(), "© Mapbox") { launchSafeUrl(context, MAPBOX_URL) }
+                MapLink(Modifier.fillMaxWidth(), "© OpenStreetMap") { launchSafeUrl(context, OPENSTREETMAP_COPYRIGHT_URL) }
+                MapLink(Modifier.fillMaxWidth(), "Исправить карту") { launchSafeUrl(context, mapFeedbackUrl()) }
+                MapLink(Modifier.fillMaxWidth(), "Конфиденциальность Mapbox") { launchSafeUrl(context, MAPBOX_PRIVACY_URL) }
                 TextButton(
                     onClick = onOpenTelemetry,
                     modifier = Modifier.testTag(MAP_PREVIEW_TELEMETRY_TEST_TAG),
@@ -520,9 +521,8 @@ private fun MapTelemetryDialog(
 private fun MapLink(
     modifier: Modifier,
     text: String,
-    url: String,
+    onClick: () -> Unit,
 ) {
-    val context = LocalContext.current
     Text(
         text = text,
         color = Color(0xFF172B3A),
@@ -530,7 +530,7 @@ private fun MapLink(
         modifier =
             modifier
                 .clip(RoundedCornerShape(4.dp))
-                .clickable(role = Role.Button) { launchSafeUrl(context, url) }
+                .clickable(role = Role.Button, onClick = onClick)
                 .heightIn(min = 48.dp)
                 .padding(horizontal = 6.dp, vertical = 12.dp)
                 .semantics { contentDescription = text },
