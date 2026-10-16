@@ -63,7 +63,7 @@ class MapPreviewSnapshotterTest {
             listOf(
                 MapPreviewSnapshotCompletion(null, false, true, true),
                 MapPreviewSnapshotCompletion(FakeBitmap(640, 256), true, true, true),
-                MapPreviewSnapshotCompletion(FakeBitmap(639, 256), false, true, true),
+                MapPreviewSnapshotCompletion(FakeBitmap(637, 256), false, true, true),
                 MapPreviewSnapshotCompletion(FakeBitmap(640, 256), false, false, true),
                 MapPreviewSnapshotCompletion(FakeBitmap(640, 256), false, true, false),
             )
@@ -347,6 +347,70 @@ class MapPreviewSnapshotterTest {
         assertEquals(listOf(false), writes)
     }
 
+    @Test
+    fun `bounded undershoot retains original bitmap until disposed once`() {
+        val fractional = request().copy(widthPx = 954, heightPx = 252, pixelRatio = 2.625f)
+        val cases =
+            listOf(
+                Triple(request(), 639, 256),
+                Triple(request(), 638, 254),
+                Triple(request().copy(widthPx = 986, heightPx = 192), 986, 192),
+                Triple(fractional, 952, 252),
+                Triple(fractional, 954, 250),
+                Triple(fractional, 952, 250),
+            )
+        cases.forEach { (request, width, height) ->
+            val client = FakeSnapshotClient()
+            val engine = MapPreviewSnapshotEngine({ client }) {}
+            val bitmap = FakeBitmap(width, height)
+            engine.update(request)
+            client.complete(success(bitmap))
+
+            assertEquals(MapPreviewStatus.READY, engine.state.status)
+            assertSame(bitmap, engine.state.bitmap)
+            assertEquals(0, bitmap.recycleCount)
+            engine.dispose()
+            engine.dispose()
+            assertEquals(1, bitmap.recycleCount)
+        }
+    }
+
+    @Test
+    fun `invalid dimensions ratios oversize and excessive per axis gaps are rejected once`() {
+        val fractional = request().copy(widthPx = 954, heightPx = 252, pixelRatio = 2.625f)
+        val cases =
+            listOf(
+                Triple(fractional, 951, 252),
+                Triple(fractional, 954, 249),
+                Triple(fractional, 955, 252),
+                Triple(fractional, 954, 253),
+                Triple(fractional, 640, 200),
+                Triple(fractional, 0, 252),
+                Triple(fractional, 954, 0),
+                Triple(fractional, -1, 252),
+                Triple(fractional, 954, -1),
+                Triple(fractional.copy(widthPx = 0), 1, 252),
+                Triple(fractional.copy(widthPx = -1), 1, 252),
+                Triple(fractional.copy(heightPx = 0), 954, 1),
+                Triple(fractional.copy(heightPx = -1), 954, 1),
+            ) +
+                listOf(0f, -1f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY).map {
+                    Triple(fractional.copy(pixelRatio = it), 954, 252)
+                }
+        cases.forEach { (request, width, height) ->
+            val client = FakeSnapshotClient()
+            val engine = MapPreviewSnapshotEngine({ client }) {}
+            val bitmap = FakeBitmap(width, height)
+            engine.update(request)
+            client.complete(success(bitmap))
+
+            assertEquals(MapPreviewStatus.UNAVAILABLE, engine.state.status)
+            assertEquals(1, bitmap.recycleCount)
+            engine.dispose()
+            assertEquals(1, bitmap.recycleCount)
+        }
+    }
+
     private fun request(): MapPreviewSnapshotRequest =
         mapPreviewSnapshotRequest(
             meetingId = 1L,
@@ -388,10 +452,13 @@ class MapPreviewSnapshotterTest {
         override val widthPx: Int,
         override val heightPx: Int,
     ) : MapPreviewBitmap {
+        var recycleCount: Int = 0
+            private set
         override var isRecycled: Boolean = false
             private set
 
         override fun recycle() {
+            recycleCount += 1
             isRecycled = true
         }
     }
