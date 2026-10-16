@@ -88,9 +88,9 @@ class UIKitMapViewTest {
             .onNodeWithText("При загрузке карты координаты встречи передаются Mapbox.")
             .assertIsDisplayed()
         assertBrandingAndCredits()
-        composeTestRule.onNodeWithText("Настройки телеметрии Mapbox").assertHasClickAction()
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertHasClickAction()
 
-        composeTestRule.onNodeWithText("Improve this map").performClick()
+        composeTestRule.onNodeWithText("Исправить карту").performClick()
         val feedbackIntent = requireNotNull(context.startedIntent)
         val feedbackUrl = requireNotNull(feedbackIntent.data).toString()
         assertEquals(Intent.ACTION_VIEW, feedbackIntent.action)
@@ -130,7 +130,8 @@ class UIKitMapViewTest {
         composeTestRule.onAllNodesWithText("Карта недоступна").assertCountEquals(0)
         val pixels = composeTestRule.onNodeWithTag(MAP_PREVIEW_IMAGE_TEST_TAG).captureToImage().toPixelMap()
         assertEquals(Color.Red, pixels[pixels.width / 2, pixels.height / 2])
-        assertEquals(Color(0xFF4CAF50), pixels[pixels.width - 4, pixels.height - 4])
+        assertEquals(Color(0xFF4CAF50), pixels[pixels.width - 4, pixels.height / 2])
+        assertPreviewHeight(MAP_PREVIEW_IMAGE_TEST_TAG)
         assertEquals(1, client.startCount)
 
         val decor = composeTestRule.activity.window.decorView
@@ -158,7 +159,7 @@ class UIKitMapViewTest {
         composeTestRule.onNodeWithText("Карта недоступна").assertIsDisplayed()
         assertEquals(0, client.startCount)
         assertBrandingAndCredits()
-        composeTestRule.onNodeWithText("Настройки телеметрии Mapbox").assertHasClickAction()
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertHasClickAction()
     }
 
     @Test
@@ -209,7 +210,7 @@ class UIKitMapViewTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Настройки телеметрии Mapbox").performClick()
+        openTelemetry()
         composeTestRule.onNodeWithText("Настройка телеметрии недоступна.").assertIsDisplayed()
         composeTestRule.onNodeWithText("Включить").assertIsNotEnabled()
         assertEquals(emptyList<Boolean>(), telemetry.requestedStates)
@@ -288,9 +289,10 @@ class UIKitMapViewTest {
         }
 
         composeTestRule.onNodeWithText("Местоположение недоступно").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Mapbox privacy information").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Настройки телеметрии Mapbox").assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("Открыть в картах").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).performClick()
+        composeTestRule.onNodeWithText("Конфиденциальность Mapbox").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Настройки телеметрии Mapbox").assertIsDisplayed()
         assertEquals(0, mapClicks)
     }
 
@@ -318,12 +320,20 @@ class UIKitMapViewTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Настройки телеметрии Mapbox").performClick()
+        openTelemetry()
         composeTestRule.onNodeWithText("Сбор телеметрии включён.").assertIsDisplayed()
         composeTestRule.onNodeWithText("Выключить").performClick()
         composeTestRule.onNodeWithText("Сбор телеметрии выключен.").assertIsDisplayed()
         composeTestRule.onNodeWithText("Закрыть").performClick()
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertIsDisplayed()
         assertEquals(listOf(false), telemetry.requestedStates)
+    }
+
+    private fun openTelemetry() {
+        composeTestRule.onAllNodesWithText("Настройки телеметрии Mapbox").assertCountEquals(0)
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).performClick()
+        composeTestRule.onNodeWithText("Конфиденциальность Mapbox").assertIsDisplayed().assertHasClickAction()
+        composeTestRule.onNodeWithText("Настройки телеметрии Mapbox").performClick()
     }
 
     private fun assertPreviewHeight(testTag: String = "uikit-map-preview") {
@@ -332,15 +342,16 @@ class UIKitMapViewTest {
                 .onNodeWithTag(testTag)
                 .fetchSemanticsNode()
                 .boundsInRoot
-        assertEquals(240.dp.value, bounds.height / composeTestRule.density.density, 0.5f)
+        assertEquals(220.dp.value, bounds.height / composeTestRule.density.density, 0.5f)
     }
 
     private fun assertBrandingAndCredits() {
         composeTestRule.onNodeWithTag(MAP_PREVIEW_LOGO_TEST_TAG).assertIsDisplayed().assertHasClickAction()
         composeTestRule.onNodeWithText("© Mapbox").assertIsDisplayed().assertHasClickAction()
         composeTestRule.onNodeWithText("© OpenStreetMap").assertIsDisplayed().assertHasClickAction()
-        composeTestRule.onNodeWithText("Improve this map").assertIsDisplayed().assertHasClickAction()
-        composeTestRule.onNodeWithText("Mapbox privacy information").assertIsDisplayed().assertHasClickAction()
+        composeTestRule.onNodeWithText("Исправить карту").assertIsDisplayed().assertHasClickAction()
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertIsDisplayed().assertHasClickAction()
+        composeTestRule.onAllNodesWithText("Конфиденциальность Mapbox").assertCountEquals(0)
     }
 
     private open class ImmediateSnapshotClient(

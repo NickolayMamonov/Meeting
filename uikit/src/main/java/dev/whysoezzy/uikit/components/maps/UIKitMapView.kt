@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,6 +61,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.whysoezzy.common.utils.isValidMapCoordinate
 import dev.whysoezzy.uikit.BuildConfig
 import dev.whysoezzy.uikit.theme.UIKitTheme
+import dev.whysoezzy.uikit.tokens.AppIcons
 import dev.whysoezzy.uikit.tokens.BorderRadiusTokens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -70,6 +74,7 @@ internal const val MAP_PREVIEW_STATUS_TEST_TAG = "uikit-map-preview-status"
 internal const val MAP_PREVIEW_LOGO_TEST_TAG = "uikit-map-preview-logo"
 internal const val MAP_PREVIEW_TOP_ACTION_TEST_TAG = "uikit-map-preview-top-action"
 internal const val MAP_PREVIEW_TELEMETRY_TEST_TAG = "uikit-map-preview-telemetry"
+internal const val MAP_PREVIEW_INFO_TEST_TAG = "uikit-map-preview-info"
 private const val MAP_PREVIEW_GLES3 = 0x00030000
 private const val MAPBOX_URL = "https://www.mapbox.com/"
 private const val MAPBOX_PRIVACY_URL = "https://www.mapbox.com/legal/privacy/"
@@ -281,6 +286,7 @@ internal fun UIKitMapViewContent(
         }
     }
 
+    var informationDialogVisible by remember { mutableStateOf(false) }
     var telemetryDialogVisible by remember { mutableStateOf(false) }
     var telemetryState by remember { mutableStateOf(MapTelemetryUiState.UNAVAILABLE) }
     val telemetryController =
@@ -294,31 +300,46 @@ internal fun UIKitMapViewContent(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(240.dp)
+                .height(220.dp)
                 .clip(RoundedCornerShape(BorderRadiusTokens.M))
                 .background(MAP_PREVIEW_FALLBACK_COLOR)
                 .testTag(MAP_PREVIEW_TEST_TAG),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            MapImageViewport(
-                modifier = Modifier.weight(1f),
-                status = displayStatus,
-                bitmap = snapshotState.bitmap.takeIf { snapshotState.request == request },
-                eligibility = eligibility,
-                clickLabel = clickLabel,
-                onMapClick = onMapClick,
-                onSizeChanged = { width, height ->
-                    viewportWidthPx = width
-                    viewportHeightPx = height
-                },
-            )
-            MapCredits(
-                onOpenTelemetry = {
-                    telemetryDialogVisible = true
-                    telemetryController.open()
-                },
-            )
+        MapImageViewport(
+            modifier = Modifier.fillMaxSize(),
+            status = displayStatus,
+            bitmap = snapshotState.bitmap.takeIf { snapshotState.request == request },
+            eligibility = eligibility,
+            clickLabel = clickLabel,
+            onMapClick = onMapClick,
+            onSizeChanged = { width, height ->
+                viewportWidthPx = width
+                viewportHeightPx = height
+            },
+        )
+        MapCredits(Modifier.align(Alignment.BottomCenter))
+        IconButton(
+            onClick = { informationDialogVisible = true },
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(50))
+                    .testTag(MAP_PREVIEW_INFO_TEST_TAG),
+        ) {
+            Icon(AppIcons.Info, contentDescription = "Информация о карте")
         }
+    }
+
+    if (informationDialogVisible) {
+        MapInformationDialog(
+            onDismiss = { informationDialogVisible = false },
+            onOpenTelemetry = {
+                informationDialogVisible = false
+                telemetryDialogVisible = true
+                telemetryController.open()
+            },
+        )
     }
 
     if (telemetryDialogVisible) {
@@ -421,50 +442,43 @@ internal fun MapPreviewTopAction(
 }
 
 @Composable
-private fun MapCredits(onOpenTelemetry: () -> Unit) {
-    Column(
+private fun MapCredits(modifier: Modifier = Modifier) {
+    FlowRow(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
-                .heightIn(max = 144.dp)
-                .background(Color.White),
+                .background(Color.White.copy(alpha = 0.95f)),
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MapLink(Modifier.weight(1f), "© Mapbox", MAPBOX_URL)
-            MapLink(Modifier.weight(1f), "© OpenStreetMap", OPENSTREETMAP_COPYRIGHT_URL)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MapLink(Modifier.weight(1f), "Mapbox privacy information", MAPBOX_PRIVACY_URL)
-            MapLink(Modifier.weight(1f), "Improve this map", mapFeedbackUrl())
-        }
-        Box(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Настройки телеметрии Mapbox",
-                color = Color(0xFF172B3A),
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable(role = Role.Button, onClick = onOpenTelemetry)
-                        .heightIn(min = 48.dp)
-                        .padding(horizontal = 6.dp)
-                        .semantics { contentDescription = "Настройки телеметрии Mapbox" }
-                        .testTag(MAP_PREVIEW_TELEMETRY_TEST_TAG),
-            )
-        }
+        MapLink(Modifier, "© Mapbox", MAPBOX_URL)
+        MapLink(Modifier, "© OpenStreetMap", OPENSTREETMAP_COPYRIGHT_URL)
+        MapLink(Modifier, "Исправить карту", mapFeedbackUrl())
     }
+}
+
+@Composable
+private fun MapInformationDialog(
+    onDismiss: () -> Unit,
+    onOpenTelemetry: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Информация о карте") },
+        text = {
+            Column {
+                MapLink(Modifier.fillMaxWidth(), "Конфиденциальность Mapbox", MAPBOX_PRIVACY_URL)
+                TextButton(
+                    onClick = onOpenTelemetry,
+                    modifier = Modifier.testTag(MAP_PREVIEW_TELEMETRY_TEST_TAG),
+                ) {
+                    Text("Настройки телеметрии Mapbox")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Закрыть") }
+        },
+    )
 }
 
 @Composable
@@ -520,7 +534,7 @@ private fun MapLink(
                 .clip(RoundedCornerShape(4.dp))
                 .clickable(role = Role.Button) { launchSafeUrl(context, url) }
                 .heightIn(min = 48.dp)
-                .padding(horizontal = 6.dp)
+                .padding(horizontal = 6.dp, vertical = 12.dp)
                 .semantics { contentDescription = text },
         textAlign = TextAlign.Center,
     )
