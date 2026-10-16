@@ -11,14 +11,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -317,17 +318,25 @@ internal fun UIKitMapViewContent(
                 viewportHeightPx = height
             },
         )
-        MapCredits(Modifier.align(Alignment.BottomCenter))
         IconButton(
             onClick = { informationDialogVisible = true },
             modifier =
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(4.dp)
-                    .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(50))
                     .testTag(MAP_PREVIEW_INFO_TEST_TAG),
         ) {
-            Icon(AppIcons.Info, contentDescription = "Информация о карте")
+            Box(
+                modifier = Modifier.size(28.dp).background(Color.White.copy(alpha = 0.55f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    AppIcons.Info,
+                    contentDescription = "Информация о карте",
+                    modifier = Modifier.size(18.dp),
+                    tint = Color(0xFF172B3A).copy(alpha = 0.8f),
+                )
+            }
         }
     }
 
@@ -442,21 +451,6 @@ internal fun MapPreviewTopAction(
 }
 
 @Composable
-private fun MapCredits(modifier: Modifier = Modifier) {
-    FlowRow(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.95f)),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        MapLink(Modifier, "© Mapbox", MAPBOX_URL)
-        MapLink(Modifier, "© OpenStreetMap", OPENSTREETMAP_COPYRIGHT_URL)
-        MapLink(Modifier, "Исправить карту", mapFeedbackUrl())
-    }
-}
-
-@Composable
 private fun MapInformationDialog(
     onDismiss: () -> Unit,
     onOpenTelemetry: () -> Unit,
@@ -466,6 +460,10 @@ private fun MapInformationDialog(
         title = { Text("Информация о карте") },
         text = {
             Column {
+                // Snapshotter renders attribution into the bitmap; these links remain accessible.
+                MapLink(Modifier.fillMaxWidth(), "© Mapbox", MAPBOX_URL)
+                MapLink(Modifier.fillMaxWidth(), "© OpenStreetMap", OPENSTREETMAP_COPYRIGHT_URL)
+                MapLink(Modifier.fillMaxWidth(), "Исправить карту", mapFeedbackUrl())
                 MapLink(Modifier.fillMaxWidth(), "Конфиденциальность Mapbox", MAPBOX_PRIVACY_URL)
                 TextButton(
                     onClick = onOpenTelemetry,

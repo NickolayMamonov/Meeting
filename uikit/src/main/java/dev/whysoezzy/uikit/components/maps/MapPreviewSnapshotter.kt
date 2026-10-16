@@ -324,7 +324,7 @@ internal class MapboxMapPreviewSnapshotClient(
                 Snapshotter(
                     applicationContext,
                     options,
-                    SnapshotOverlayOptions(showLogo = false, showAttributes = false),
+                    SnapshotOverlayOptions(showLogo = false, showAttributes = true),
                 )
             snapshotter.set(createdSnapshotter)
             createdSnapshotter.setStyleListener(

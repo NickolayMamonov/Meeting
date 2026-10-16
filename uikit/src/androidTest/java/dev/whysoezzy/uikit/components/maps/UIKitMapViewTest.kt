@@ -90,6 +90,7 @@ class UIKitMapViewTest {
         assertBrandingAndCredits()
         composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertHasClickAction()
 
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).performClick()
         composeTestRule.onNodeWithText("Исправить карту").performClick()
         val feedbackIntent = requireNotNull(context.startedIntent)
         val feedbackUrl = requireNotNull(feedbackIntent.data).toString()
@@ -103,6 +104,7 @@ class UIKitMapViewTest {
         assertNull(feedbackIntent.data?.fragment)
         assertEquals(0, mapClicks)
 
+        composeTestRule.onNodeWithText("Закрыть").performClick()
         composeTestRule.onNodeWithContentDescription("Открыть в картах: $address").performClick()
         assertEquals(1, mapClicks)
     }
@@ -131,7 +133,10 @@ class UIKitMapViewTest {
         val pixels = composeTestRule.onNodeWithTag(MAP_PREVIEW_IMAGE_TEST_TAG).captureToImage().toPixelMap()
         assertEquals(Color.Red, pixels[pixels.width / 2, pixels.height / 2])
         assertEquals(Color(0xFF4CAF50), pixels[pixels.width - 4, pixels.height / 2])
+        assertEquals(Color(0xFF4CAF50), pixels[pixels.width / 2, pixels.height - 4])
         assertPreviewHeight(MAP_PREVIEW_IMAGE_TEST_TAG)
+        assertEquals(1, client.startCount)
+        assertBrandingAndCredits()
         assertEquals(1, client.startCount)
 
         val decor = composeTestRule.activity.window.decorView
@@ -347,10 +352,14 @@ class UIKitMapViewTest {
 
     private fun assertBrandingAndCredits() {
         composeTestRule.onNodeWithTag(MAP_PREVIEW_LOGO_TEST_TAG).assertIsDisplayed().assertHasClickAction()
+        composeTestRule.onAllNodesWithText("Исправить карту").assertCountEquals(0)
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertIsDisplayed().assertHasClickAction()
+        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).performClick()
         composeTestRule.onNodeWithText("© Mapbox").assertIsDisplayed().assertHasClickAction()
         composeTestRule.onNodeWithText("© OpenStreetMap").assertIsDisplayed().assertHasClickAction()
         composeTestRule.onNodeWithText("Исправить карту").assertIsDisplayed().assertHasClickAction()
-        composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertIsDisplayed().assertHasClickAction()
+        composeTestRule.onNodeWithText("Конфиденциальность Mapbox").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Закрыть").performClick()
         composeTestRule.onAllNodesWithText("Конфиденциальность Mapbox").assertCountEquals(0)
     }
 
