@@ -109,6 +109,19 @@ internal class AndroidMapPreviewBitmap(
     }
 }
 
+private fun MapPreviewSnapshotRequest.acceptsDimensions(bitmap: MapPreviewBitmap): Boolean {
+    if (!pixelRatio.isFinite() || pixelRatio <= 0f || widthPx <= 0 || heightPx <= 0) return false
+
+    fun acceptsAxis(requested: Int, actual: Int): Boolean =
+        actual > 0 &&
+            actual <= requested &&
+            (requested - actual).toDouble() / pixelRatio <= 1.0
+
+    // Fractional-density native output can undershoot the requested platform size.
+    // This bounds acceptance to one logical pixel per axis, not an SDK rounding formula.
+    return acceptsAxis(widthPx, bitmap.widthPx) && acceptsAxis(heightPx, bitmap.heightPx)
+}
+
 internal data class MapPreviewSnapshotCompletion(
     val bitmap: MapPreviewBitmap?,
     val hasSdkError: Boolean,
@@ -231,8 +244,7 @@ internal class MapPreviewSnapshotEngine(
                 !completion.hasSdkError &&
                 completion.exactStyleLoaded &&
                 completion.pinOverlaySucceeded &&
-                bitmap.widthPx == request.widthPx &&
-                bitmap.heightPx == request.heightPx &&
+                request.acceptsDimensions(bitmap) &&
                 !bitmap.isRecycled
 
         if (accepted) {
