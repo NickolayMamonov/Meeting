@@ -549,7 +549,7 @@ jobs:
     if: ${{ needs.stable-public-probe.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
-      name: android-release
+      name: android-publication
     permissions:
       contents: read
       attestations: read
