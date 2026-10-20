@@ -10,9 +10,17 @@
   literals and generated metadata are checked against these two roles.
 - Release Please uses the repository `RELEASE_PLEASE_TOKEN` for its draft
   release, tag, and pull-request operations.
-- The protected `android-release` environment is used by stable build, signing,
-  public probe, final publication, and the non-publishing release proof. Its
-  administrator bypass remains disabled and its branch policy remains `master`.
+- The `android-release` environment is used by stable build, signing, public
+  probe, and the non-publishing release proof. The stable publication mutation
+  job alone uses the separate `android-publication` environment.
+- `android-publication` is an expected environment name in source, not proof of
+  protection. It was absent when this source change was prepared. Before any
+  future merge or workflow dispatch, separately authorized operators must
+  configure and read back that environment with reviewer/master-only deployment
+  restrictions and administrator bypass disabled. A missing environment does
+  not provide a protective approval gate. Reviewer identity and self-review
+  policy remain unresolved and must be explicitly decided; this change does
+  not infer them.
 - No backend, VPS, Nginx, certificate, Google Play, device, or USB operation
   is part of Android publication.
 
@@ -53,6 +61,9 @@ The `android-release` environment contains:
 - Non-secret `BASE_URL_RELEASE`, exactly
   `https://api.whysoezzy.online`.
 
+The stable publication mutation uses the `android-publication` environment for
+its existing release API token access and final upload/publish operations. No
+environment, secret, or variable is created or migrated by this source change.
 The stable publication workflow gives signing secrets only to the isolated
 `stable-sign` job. Its build, evidence, public-probe, and publication jobs do
 not reference signing material. The dispatch-only `Android release proof`
