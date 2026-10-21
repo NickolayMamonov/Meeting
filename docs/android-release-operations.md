@@ -361,6 +361,7 @@ SDK attribution is rendered in the Snapshotter image. Mapbox and
 OpenStreetMap links are accessible through the map information dialog during
 loading and fallback states, but are not continuously visible there. Preserve
 the independent geo action, privacy disclosure and generic feedback controls.
+Privacy and generic feedback links are app-owned.
 Feedback uses exactly `https://apps.mapbox.com/feedback/`, without meeting
 coordinates, address, identifier, profile, token or backend metadata. This
 source description does not claim that any external link was opened or
