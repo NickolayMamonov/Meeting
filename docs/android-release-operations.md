@@ -356,10 +356,15 @@ by 96dp does not construct a snapshot request. SDK resources may be unavailable
 offline; the address, independent geo action and credits remain usable.
 
 The preview requests no location permission or location-provider activation.
-The exact pinned SDK logo and readable Mapbox/OpenStreetMap attribution remain
-visible independently of snapshot readiness. Privacy and generic feedback links
-are app-owned. Feedback uses exactly `https://apps.mapbox.com/feedback/`, without
-meeting coordinates, address, identifier, profile, token or backend metadata.
+The pinned Mapbox logo remains visible independently of snapshot readiness;
+SDK attribution is rendered in the Snapshotter image. Mapbox and
+OpenStreetMap links are accessible through the map information dialog during
+loading and fallback states, but are not continuously visible there. Preserve
+the independent geo action, privacy disclosure and generic feedback controls.
+Feedback uses exactly `https://apps.mapbox.com/feedback/`, without meeting
+coordinates, address, identifier, profile, token or backend metadata. This
+source description does not claim that any external link was opened or
+delivered.
 
 Snapshotter does not supply an interactive Attribution control. The app-owned
 `Настройки телеметрии Mapbox` dialog reads and changes only the Common SDK
