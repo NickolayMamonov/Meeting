@@ -4,6 +4,10 @@ plugins {
 
 android {
     namespace = "dev.whysoezzy.profile"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
@@ -20,6 +24,7 @@ dependencies {
 
     implementation(libs.timber)
 
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.lifecycle.runtime.compose.android)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

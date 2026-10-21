@@ -4,26 +4,38 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.withResumed
 import com.whysoezzy.auth.domain.models.AuthFailure
 import dev.whysoezzy.auth.R
-import dev.whysoezzy.uikit.components.buttons.UIKitButton
-import dev.whysoezzy.uikit.components.buttons.UIKitButtonState
+import dev.whysoezzy.auth.presentation.AuthFormLayout
 import dev.whysoezzy.uikit.components.forms.UIKitCodeInput
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading1
@@ -59,85 +71,106 @@ fun CodeVerificationScreen(
         CodeVerificationContent(
             maskedEmail = state.maskedEmail,
             uiState = state,
-            modifier = Modifier.padding(padding).fillMaxSize(),
+            modifier = Modifier
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .fillMaxSize(),
             onCodeChange = { viewModel.onEvent(CodeVerificationEvent.UpdateCode(it)) },
-            onVerifyClick = { viewModel.onEvent(CodeVerificationEvent.VerifyCode) },
             onResendClick = { viewModel.onEvent(CodeVerificationEvent.ResendCode) },
+            onAcknowledgeInputFocusRequest = {
+                viewModel.onEvent(CodeVerificationEvent.AcknowledgeInputFocusRequest)
+            },
         )
     }
 }
 
 @Composable
-private fun CodeVerificationContent(
+internal fun CodeVerificationContent(
     maskedEmail: String,
     uiState: CodeVerificationUiState,
     modifier: Modifier = Modifier,
     onCodeChange: (String) -> Unit = {},
-    onVerifyClick: () -> Unit = {},
     onResendClick: () -> Unit = {},
+    onAcknowledgeInputFocusRequest: () -> Unit = {},
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    windowInsets: WindowInsets = WindowInsets.navigationBars.union(WindowInsets.ime),
 ) {
-    Column(
-        modifier = modifier.padding(SpacingTokens.L),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
-    ) {
-        Spacer(Modifier.height(60.dp))
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
-        ) {
-            TextHeading1(
-                text = stringResource(R.string.auth_code_title),
-                color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center,
-            )
-            TextBody2(
-                text = stringResource(R.string.auth_code_subtitle, maskedEmail),
-                color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center,
-            )
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(uiState.inputFocusRequestPending) {
+        if (!uiState.inputFocusRequestPending) return@LaunchedEffect
+        withFrameNanos { }
+        lifecycle.withResumed {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+            onAcknowledgeInputFocusRequest()
         }
-        UIKitCodeInput(
-            value = uiState.code,
-            onValueChange = onCodeChange,
-            codeLength = 6,
-            isError = uiState.error != null,
-        )
-        uiState.error?.let { failure ->
-            TextMetadata1(
-                text = failureMessage(failure),
-                color = ColorTokens.AccentDanger,
-                textAlign = TextAlign.Center,
-            )
-        }
-        if (uiState.canResend) {
-            TextButton(onClick = onResendClick) {
-                TextMetadata1(
-                    text = stringResource(R.string.auth_code_resend),
-                    color = ColorTokens.BrandDefault,
-                )
-            }
-        } else {
-            TextMetadata1(
-                text = stringResource(R.string.auth_code_resend_timer, uiState.remainingTime),
-                color = ColorTokens.NeutralWeak,
-                textAlign = TextAlign.Center,
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        UIKitButton(
-            text = stringResource(R.string.auth_code_confirm),
-            onClick = onVerifyClick,
-            state = if (uiState.isLoading) {
-                UIKitButtonState.LOADING
-            } else if (uiState.isValid) {
-                UIKitButtonState.PRIMARY
-            } else {
-                UIKitButtonState.DISABLED
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
+
+    AuthFormLayout(
+        modifier = modifier,
+        windowInsets = windowInsets,
+        body = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(SpacingTokens.L),
+            ) {
+                Spacer(Modifier.height(60.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(SpacingTokens.M),
+                ) {
+                    TextHeading1(
+                        text = stringResource(R.string.auth_code_title),
+                        color = ColorTokens.NeutralWeak,
+                        textAlign = TextAlign.Center,
+                    )
+                    TextBody2(
+                        text = stringResource(R.string.auth_code_subtitle, maskedEmail),
+                        color = ColorTokens.NeutralWeak,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                UIKitCodeInput(
+                    value = uiState.code,
+                    onValueChange = onCodeChange,
+                    codeLength = 6,
+                    isError = uiState.error != null,
+                    focusRequester = focusRequester,
+                )
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = ColorTokens.BrandDefault,
+                        strokeWidth = 2.dp,
+                    )
+                }
+                uiState.error?.let { failure ->
+                    TextMetadata1(
+                        text = failureMessage(failure),
+                        color = ColorTokens.AccentDanger,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                if (uiState.canResend) {
+                    TextButton(onClick = onResendClick) {
+                        TextMetadata1(
+                            text = stringResource(R.string.auth_code_resend),
+                            color = ColorTokens.BrandDefault,
+                        )
+                    }
+                } else {
+                    TextMetadata1(
+                        text = stringResource(R.string.auth_code_resend_timer, uiState.remainingTime),
+                        color = ColorTokens.NeutralWeak,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        },
+        action = {},
+    )
 }
 
 private fun failureMessage(failure: AuthFailure): String = when (failure) {

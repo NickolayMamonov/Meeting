@@ -22,6 +22,7 @@ import dev.whysoezzy.uikit.components.text.TextBody1
 import dev.whysoezzy.uikit.components.text.TextBody2
 import dev.whysoezzy.uikit.components.text.TextHeading2
 import dev.whysoezzy.uikit.models.UIKitAdBlock
+import dev.whysoezzy.uikit.models.UIKitCommunitySubscriptionAction
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import dev.whysoezzy.uikit.tokens.SpacingTokens
 
@@ -90,10 +91,12 @@ private fun CommunitiesAdBlock(
                 UIKitCommunityCard(
                     imageUrl = community.imageUrl,
                     title = community.title,
-                    isSubscribed = community.isSubscribed,
-                    onSubscribeClick = { isSubscribed ->
-                        onCommunitySubscribe(community.id, isSubscribed)
-                    },
+                    subscriptionAction = UIKitCommunitySubscriptionAction.Actionable(
+                        isSubscribed = community.isSubscribed,
+                        onSubscribeClick = { isSubscribed ->
+                            onCommunitySubscribe(community.id, isSubscribed)
+                        },
+                    ),
                     onCardClick = { onCommunityClick(community.id) },
                 )
             }

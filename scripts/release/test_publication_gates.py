@@ -219,8 +219,13 @@ class PublicationGateTest(unittest.TestCase):
         workflow = (
             Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
         ).read_text(encoding="utf-8")
-        self.assertIn("stable-public-probe", workflow)
-        self.assertIn("android-release", workflow)
+        probe = workflow[
+            workflow.index("  stable-public-probe:") : workflow.index("  stable-mutate:")
+        ]
+        mutation = workflow[workflow.index("  stable-mutate:") :]
+        self.assertIn("environment:\n      name: android-release", probe)
+        self.assertIn("environment:\n      name: android-publication", mutation)
+        self.assertNotIn("android-publication", workflow[: workflow.index("  stable-mutate:")])
         self.assertLess(
             workflow.index("stable-public-probe"),
             workflow.index("stable-mutate"),
@@ -446,10 +451,13 @@ class PublicationGateTest(unittest.TestCase):
             Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
         ).read_text(encoding="utf-8")
         mutation = workflow[workflow.index("  stable-mutate:") :]
+        self.assertIn("environment:\n      name: android-publication", mutation)
         self.assertIn("python release-tooling/scripts/release/publish_release.py", mutation)
         self.assertIn("ATTESTATION_TOKEN: ${{ github.token }}", mutation)
         self.assertIn("--evidence-directory release-output", mutation)
         self.assertIn("--rendered-body", mutation)
+        self.assertIn('--attestation-run-id "$GITHUB_RUN_ID"', mutation)
+        self.assertIn('--attestation-run-attempt "$GITHUB_RUN_ATTEMPT"', mutation)
 
     def test_every_production_chain_admission_passes_complete_identity_policy(self):
         workflows = (

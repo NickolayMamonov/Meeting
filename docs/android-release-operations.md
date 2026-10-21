@@ -10,31 +10,44 @@
   literals and generated metadata are checked against these two roles.
 - Release Please uses the repository `RELEASE_PLEASE_TOKEN` for its draft
   release, tag, and pull-request operations.
-- The protected `android-release` environment is used by stable build, signing,
-  public probe, final publication, and the non-publishing release proof. Its
-  administrator bypass remains disabled and its branch policy remains `master`.
+- The `android-release` environment is used by stable build, signing, public
+  probe, and the non-publishing release proof. The stable publication mutation
+  job alone uses the separate `android-publication` environment.
+- `android-publication` is an expected environment name in source, not proof of
+  protection. The operator reports that it has been separately configured and
+  read back as master-only, with reviewer Nickolay Mamonov, self-review allowed,
+  and administrator bypass disabled. This configuration is external to source;
+  independently read it back before use. A missing or misconfigured environment
+  is not a protective approval gate. Source does not establish or enforce the
+  reviewer or self-review policy.
 - No backend, VPS, Nginx, certificate, Google Play, device, or USB operation
   is part of Android publication.
 
-## Three-stage promotion
+## Promotion and release authority
 
-The source-controlled contract has three ordered stages:
+The source-controlled branch roles remain:
 
 1. **`dev` integration:** feature work, normal CI, signed snapshots, beta use,
-   and pre-promotion smoke verification remain on `dev`. A snapshot is admitted
-   only for a successful push whose exact ref is `refs/heads/dev`.
-2. **MEE3-64 promotion gate:** a separately reviewed operator process selects
-   an exact `dev` candidate and performs the one-time protected promotion.
-   MEE3-63 does not move or create refs, change protections or credentials,
-   dispatch workflows, prove a release, or mutate release state.
+   and integration work remain on `dev`. A snapshot is admitted only for a
+   successful push whose exact ref is `refs/heads/dev`.
+2. **Reviewed promotion:** a normal reviewed promotion selects an exact
+   `dev` candidate for `master`. The completed historical MEE3-63/MEE3-64
+   migration is not repeated. Preserve master-owned Release Please metadata
+   and changelog history during promotion; do not copy stale dev version state
+   over it.
 3. **`master` stable release:** only the exact reviewed commit present on
    `master` can enter stable Release Please, production build/signing,
    evidence, proof, or later publication. A commit that exists only on `dev`
    remains ineligible for every stable path.
 
-Merging this code-only contract into `dev` does not itself publish or mutate
-stable state. No live mutation is part of this task; failures stop at the
-applicable reviewed gate for manual investigation.
+Promotion alone is not the normal Release Please version change or release
+authorization. Keep master at its existing version and history until Release
+Please generates and its normal reviewed version change reaches `master`.
+Release Please is configured to produce drafts and target `master`; the planned
+next version/code are `1.2.0`/`1002000`, generated through the normal Release
+Please and Android version process, not manually by promotion. A source merge
+or version change does not itself authorize proof execution, functional
+acceptance, or publication.
 
 ## Exact protected inventory
 
@@ -53,6 +66,9 @@ The `android-release` environment contains:
 - Non-secret `BASE_URL_RELEASE`, exactly
   `https://api.whysoezzy.online`.
 
+The stable publication mutation uses the `android-publication` environment for
+its existing release API token access and final upload/publish operations. No
+environment, secret, or variable is created or migrated by this source change.
 The stable publication workflow gives signing secrets only to the isolated
 `stable-sign` job. Its build, evidence, public-probe, and publication jobs do
 not reference signing material. The dispatch-only `Android release proof`
@@ -101,6 +117,28 @@ and expected RSA-4096 certificate fingerprint.
 
 ## Ordered publication
 
+After the normal Release Please version change is on `master`, the exact-version
+stable producer and the separately authorized non-publishing proof may run in
+either order or in parallel. The workflows do not automatically enforce the
+combined release-acceptance policy: `stable-mutate` is gated by the producer's
+evidence and public probe, not by the separate proof run or functional APK
+acceptance. Do not approve the `android-publication` environment until all of
+the following are satisfied:
+
+- the exact-SHA non-publishing proof completes successfully with every required
+  job successful and non-skipped;
+- the exact signed `Meet.apk` intended for public release, from the stable
+  producer, is accepted for the single functional/native Mapbox smoke and the
+  other release gates, including
+  authentication, push, catalog, and cleanup requirements; and
+- a separate operator approves publication of that same APK digest, source SHA,
+  producer workflow/run ID, and run attempt.
+
+The proof artifact is not a substitute for the producer APK and cannot transfer
+its proof result to different APK bytes. Withhold publication approval unless
+the proof, exact producer artifact, functional acceptance, cleanup, and other
+release criteria are all satisfied.
+
 1. Release Please creates the intended draft and stable build verifies the
    tag, source commit, version, exact HTTPS origin, and empty draft.
 2. Stable build provisions raw `GOOGLE_SERVICES_JSON` only for the build,
@@ -139,8 +177,9 @@ investigation, with no retry, repair, delete, or rollback request.
 
 ## Non-publishing exact release proof
 
-After MEE3-64 promotes the exact reviewed candidate, operators may dispatch the
-protected proof from `master` with the exact accepted application commit:
+After the normal reviewed promotion and Release Please version change are on
+`master`, a separately authorized proof may be dispatched from `master` with
+the exact application commit:
 
 ```text
 gh workflow run release-proof.yml --ref master -f application_sha=<accepted-40-hex-sha>
@@ -240,13 +279,14 @@ release metadata, checksums, and attestation references. Search active
 source, workflows, tests, and docs for stale pin, device-evidence,
 or alternate-credential contracts.
 
-For MEE3-63, run only repository-local and exact-head verification. Review and
-merge the code-only change into `dev`; do not dispatch proof, publish, mutate
-the existing draft/releases/assets, move refs, or change repository settings.
-MEE3-64 must separately establish the protected promotion and master producer
-before any stable proof or publication. After that gate, a future stable run
-must confirm package `dev.whysoezzy.meet`, version name/code,
-non-debuggable release state, the existing RSA-4096 certificate fingerprint
+For a promotion candidate, run repository-local source checks and exact-head
+review; preserve master-owned release metadata until normal Release Please
+version generation. Do not repeat the completed historical migration. Before
+publication approval, require the exact-version producer and protected proof,
+the exact producer APK acceptance described below, cleanup, and all other
+release criteria. Confirm package `dev.whysoezzy.meet`, generated version
+name/code, non-debuggable release state, the existing RSA-4096 certificate
+fingerprint
 `b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f`, exact
 checksums, manifests, optional outputs, attestations, and production URL.
 
@@ -295,3 +335,98 @@ returns status `97` only for the intentional post-install failure after
 uninstall and package-absence verification. Normal startup performs the same
 cleanup proof. `dev.whysoezzy.meet` must be absent after every probe and after
 successful execution; a cleanup query failure is itself a gate failure.
+
+## Mapbox meeting preview
+
+The meeting preview uses the Mapbox Maps SDK through UIKit. Stable packaging
+requires the protected `MAPBOX_PUBLIC_TOKEN_RELEASE` Actions secret; optional
+local/debug configuration uses `MAPBOX_PUBLIC_TOKEN_DEBUG`. These must be
+dedicated public `pk.` read tokens and are extractable from application binaries.
+Start with verified public map-read scopes (`styles:read` and `fonts:read`) and
+separately verify Streets and its resources before distribution. Never provision
+an `sk.` token, commit a token, or print a token or authenticated resource URL.
+Blank debug configuration intentionally renders the address fallback.
+
+The card uses SDK `Snapshotter`, not an embedded `MapView`, Maps Compose,
+`TextureView`, or `SurfaceView`. One fixed Streets-v12 request uses the meeting
+coordinate, zoom 15, bearing/pitch zero, and an application-drawn exact-coordinate
+pin. The bitmap is memory-only; no custom cache, offline region, prefetch, purge,
+bitmap persistence or `Snapshotter.clearData` is added. A viewport below 200dp
+by 96dp does not construct a snapshot request. SDK resources may be unavailable
+offline; the address, independent geo action and credits remain usable.
+
+The preview requests no location permission or location-provider activation.
+The pinned Mapbox logo remains visible independently of snapshot readiness;
+SDK attribution is rendered in the Snapshotter image. Mapbox and
+OpenStreetMap links are accessible through the map information dialog during
+loading and fallback states, but are not continuously visible there. Preserve
+the independent geo action, privacy disclosure and generic feedback controls.
+Privacy and generic feedback links are app-owned.
+Feedback uses exactly `https://apps.mapbox.com/feedback/`, without meeting
+coordinates, address, identifier, profile, token or backend metadata. This
+source description does not claim that any external link was opened or
+delivered.
+
+Snapshotter does not supply an interactive Attribution control. The app-owned
+`Настройки телеметрии Mapbox` dialog reads and changes only the Common SDK
+event-collection preference via `TelemetryUtils`. Unknown and saving states
+cannot initiate a write. Success requires the SDK callback and matching getter
+readback. Fake-only token-free tests never mutate native telemetry. Separately
+authorize initial-state read, opposite write/readback and restoration in
+`finally`; failed restoration blocks distribution. Do not log or retain raw
+SDK errors, reporting identifiers, tokens or telemetry events. User-facing
+privacy disclosure and current collection behavior require operator assessment.
+The address block explicitly states that loading the map sends the meeting
+coordinates to Mapbox. This notice does not imply that disabling telemetry
+also disables the map request. Production distribution still requires the
+operator's privacy-policy and collection-behavior assessment.
+
+Pinned Common 24.32.0 exposes these methods in public bytecode but annotates
+them `RestrictTo(LIBRARY_GROUP_PREFIX)`. The operator approved exactly one narrow
+`RestrictedApi` suppression on `MapboxTelemetryPreference`. No internal
+`MapProvider`, visibility shim, reflection or broader suppression is permitted.
+Re-evaluate this exception on every Maps/Common SDK upgrade.
+
+Use only unmodified SDK ambient caching. Do not claim guaranteed offline maps,
+an independently enforced TTL or a separate retention policy. Recheck applicable
+Mapbox terms before release. Official Android pricing guidance explicitly counts
+snapshot creation as Maps SDKs for Mobile MAU usage. Operator-managed usage,
+current thresholds and billing alerts require confirmation before distribution;
+a free tier is not a spending cap or authorization for paid use.
+
+Official references checked October 15, 2026:
+- https://docs.mapbox.com/android/maps/guides/pricing/
+- https://docs.mapbox.com/android/maps/guides/#attribution
+- https://docs.mapbox.com/android/maps/guides/#telemetry-opt-out
+- https://www.mapbox.com/legal/product-terms
+- https://www.mapbox.com/pricing
+
+Local blank-token unit tests, lint and test-APK assembly are source-only evidence.
+Fake-device tests, configured builds, native telemetry verification, guarded live
+Snapshotter acceptance, native page/ABI/runtime-size checks, hosted CI and
+integration/release require their separately authorized gates. Preserve all ABIs,
+existing signing/provenance contracts and the optional GLES3 installation filter.
+The README GIF remains historical illustrative artwork, not SDK runtime proof.
+
+The historical disposable-emulator run produced only partial Snapshotter
+callback/bitmap/style/pin evidence. It is not the planned functional acceptance
+and is not a stable-release PASS. The completed migration and that historical
+run are not to be repeated. The one planned live acceptance is one natural
+Snapshotter preview on the exact signed `Meet.apk` from the stable producer,
+after separate execution authorization. It must reach natural READY/nonfallback
+within the production 15-second accumulated foreground deadline and satisfy
+the existing style, exact-coordinate pin, dimensions, branding, privacy,
+telemetry, lifecycle, and cleanup contracts. Do not retry or open another
+preview in that attempt; 30 seconds is only an observation/stop window, not a
+network limit.
+
+Preserve telemetry-roundtrip applicability review and restoration/readback when
+that native check is authorized; failed or unconfirmed restoration blocks
+acceptance. Preserve tester/user data: do not clear data or uninstall an
+existing package without specific authorization. After the approved attempt,
+confirm the attempt-installed package is absent. Do not retain screenshots,
+bitmaps, raw SDK/log output, coordinates, tokens, or identifying fixture data.
+Recheck applicable terms before live execution. This plan claims no hard
+traffic/request/byte/quota/cost cap; the historical 64-request and kernel gates
+are not PASS. The VM and all VM tooling remain frozen; no new infrastructure,
+provider-test plan, migration, or additional attempt is implied.

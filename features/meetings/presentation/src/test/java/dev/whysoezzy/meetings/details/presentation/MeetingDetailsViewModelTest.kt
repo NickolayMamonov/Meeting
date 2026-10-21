@@ -239,7 +239,7 @@ class MeetingDetailsViewModelTest {
     }
 
     @Test
-    fun `OpenMap with zero coordinates emits nothing`() = runTest {
+    fun `OpenMap with unset zero pair emits nothing`() = runTest {
         coEvery { getMeetingByIdUseCase(MEETING_ID) } returns Result.success(sampleMeeting)
         // sampleMeeting.address имеет latitude=0.0, longitude=0.0
 
@@ -251,6 +251,42 @@ class MeetingDetailsViewModelTest {
             vm.onEvent(MeetingDetailsEvent.OpenMap)
             advanceUntilIdle()
 
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `OpenMap with a zero latitude and valid longitude emits event`() = runTest {
+        coEvery { getMeetingByIdUseCase(MEETING_ID) } returns
+            Result.success(sampleMeeting.copy(address = addressWithCoords.copy(latitude = 0.0)))
+
+        val vm = viewModel()
+        vm.onEvent(MeetingDetailsEvent.LoadMeeting(MEETING_ID))
+        advanceUntilIdle()
+
+        vm.navEvent.test {
+            vm.onEvent(MeetingDetailsEvent.OpenMap)
+            advanceUntilIdle()
+            val event = awaitItem() as MeetingDetailsNavEvent.OpenMap
+            assertEquals(0.0, event.latitude, 0.0)
+            assertEquals(37.6, event.longitude, 0.001)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `OpenMap rejects coordinates outside geographic range`() = runTest {
+        coEvery { getMeetingByIdUseCase(MEETING_ID) } returns
+            Result.success(sampleMeeting.copy(address = addressWithCoords.copy(latitude = 91.0)))
+
+        val vm = viewModel()
+        vm.onEvent(MeetingDetailsEvent.LoadMeeting(MEETING_ID))
+        advanceUntilIdle()
+
+        vm.navEvent.test {
+            vm.onEvent(MeetingDetailsEvent.OpenMap)
+            advanceUntilIdle()
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }

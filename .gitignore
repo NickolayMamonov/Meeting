@@ -1,5 +1,6 @@
 *.iml
 .gradle
+.kotlin/
 .idea
 /local.properties
 /.idea/caches
@@ -33,3 +34,7 @@ scripts/release/*password*
 release-output/
 snapshot-output/
 scripts/release/__pycache__/
+
+# Local agent working notes, not project documentation
+/.kent-*-checklist.md
+/IMPLEMENTATION_CHECKLIST.md

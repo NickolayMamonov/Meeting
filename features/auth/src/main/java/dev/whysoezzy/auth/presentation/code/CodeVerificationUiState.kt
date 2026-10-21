@@ -11,6 +11,7 @@ data class CodeVerificationUiState(
     val error: AuthFailure? = null,
     val remainingTime: Int = 60,
     val canResend: Boolean = false,
+    val inputFocusRequestPending: Boolean = false,
 ) {
     val isValid: Boolean
         get() = code.length == 6 && !isLoading
@@ -24,4 +25,6 @@ sealed interface CodeVerificationEvent {
     data object VerifyCode : CodeVerificationEvent
 
     data object ResendCode : CodeVerificationEvent
+
+    data object AcknowledgeInputFocusRequest : CodeVerificationEvent
 }

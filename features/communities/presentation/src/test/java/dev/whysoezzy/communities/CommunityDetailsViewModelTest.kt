@@ -1,5 +1,6 @@
 package dev.whysoezzy.communities
 
+import app.cash.turbine.test
 import com.whysoezzy.domain.models.Community
 import com.whysoezzy.domain.models.Meeting
 import com.whysoezzy.domain.models.MeetingAddress
@@ -16,11 +17,13 @@ import dev.whysoezzy.communities.details.presentation.CommunityDetailsEvent
 import dev.whysoezzy.communities.details.presentation.CommunityDetailsUiState
 import dev.whysoezzy.communities.details.presentation.CommunityDetailsViewModel
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -78,6 +81,114 @@ class CommunityDetailsViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value is CommunityDetailsUiState.Error)
+    }
+
+    @Test
+    fun `successful subscribe and unsubscribe use the community id and update count`() = runTest {
+        stubSuccessfulLoad(sampleCommunity.copy(subscribersCount = 2, isSubscribed = false))
+        coEvery { subscribeToCommunityUseCase(COMMUNITY_ID) } returns Result.success(Unit)
+        coEvery { unsubscribeFromCommunityUseCase(COMMUNITY_ID) } returns Result.success(Unit)
+
+        val vm = viewModel()
+        load(vm)
+        advanceUntilIdle()
+
+        vm.onEvent(CommunityDetailsEvent.ToggleSubscription)
+        advanceUntilIdle()
+        val subscribed = vm.uiState.value as CommunityDetailsUiState.Success
+        assertTrue(subscribed.isSubscribed)
+        assertEquals(3, subscribed.subscribersCount)
+        coVerify(exactly = 1) { subscribeToCommunityUseCase(COMMUNITY_ID) }
+
+        vm.onEvent(CommunityDetailsEvent.ToggleSubscription)
+        advanceUntilIdle()
+        val unsubscribed = vm.uiState.value as CommunityDetailsUiState.Success
+        assertFalse(unsubscribed.isSubscribed)
+        assertEquals(2, unsubscribed.subscribersCount)
+        coVerify(exactly = 1) { unsubscribeFromCommunityUseCase(COMMUNITY_ID) }
+    }
+
+    @Test
+    fun `failed subscribe restores prior state and count`() = runTest {
+        stubSuccessfulLoad(sampleCommunity.copy(subscribersCount = 0, isSubscribed = false))
+        coEvery { subscribeToCommunityUseCase(COMMUNITY_ID) } returns
+            Result.failure(RuntimeException("subscribe failed"))
+
+        val vm = viewModel()
+        load(vm)
+        advanceUntilIdle()
+        vm.onEvent(CommunityDetailsEvent.ToggleSubscription)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as CommunityDetailsUiState.Success
+        assertFalse(state.isSubscribed)
+        assertEquals(0, state.subscribersCount)
+        coVerify(exactly = 1) { subscribeToCommunityUseCase(COMMUNITY_ID) }
+    }
+
+    @Test
+    fun `failed unsubscribe restores prior state and never decrements below zero`() = runTest {
+        stubSuccessfulLoad(sampleCommunity.copy(subscribersCount = 0, isSubscribed = true))
+        coEvery { unsubscribeFromCommunityUseCase(COMMUNITY_ID) } returns
+            Result.failure(RuntimeException("unsubscribe failed"))
+
+        val vm = viewModel()
+        load(vm)
+        advanceUntilIdle()
+        vm.onEvent(CommunityDetailsEvent.ToggleSubscription)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as CommunityDetailsUiState.Success
+        assertTrue(state.isSubscribed)
+        assertEquals(0, state.subscribersCount)
+        coVerify(exactly = 1) { unsubscribeFromCommunityUseCase(COMMUNITY_ID) }
+    }
+
+    @Test
+    fun `share and navigation events retain their existing payloads`() = runTest {
+        stubSuccessfulLoad(sampleCommunity.copy(name = "Synthetic community"))
+        val vm = viewModel()
+        load(vm)
+        advanceUntilIdle()
+
+        vm.navEvent.test {
+            vm.onEvent(CommunityDetailsEvent.ShareCommunity)
+            advanceUntilIdle()
+            val share = awaitItem() as dev.whysoezzy.communities.details.presentation
+                .CommunityDetailsNavEvent.ShareCommunity
+            assertEquals("Synthetic community", share.title)
+            assertTrue(share.shareText.contains("Synthetic community"))
+
+            vm.onEvent(CommunityDetailsEvent.NavigateToMeeting(101L))
+            assertEquals(
+                dev.whysoezzy.communities.details.presentation.CommunityDetailsNavEvent
+                    .NavigateToMeeting(101L),
+                awaitItem(),
+            )
+            vm.onEvent(CommunityDetailsEvent.NavigateToProfile(202L))
+            assertEquals(
+                dev.whysoezzy.communities.details.presentation.CommunityDetailsNavEvent
+                    .NavigateToProfile(202L),
+                awaitItem(),
+            )
+            vm.onEvent(CommunityDetailsEvent.NavigateToSubscribers)
+            assertEquals(
+                dev.whysoezzy.communities.details.presentation.CommunityDetailsNavEvent
+                    .NavigateToSubscribers,
+                awaitItem(),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    private fun stubSuccessfulLoad(community: Community) {
+        coEvery { getCommunityByIdUseCase(COMMUNITY_ID) } returns Result.success(community)
+        coEvery { getCommunityMeetingsUseCase(COMMUNITY_ID) } returns Result.success(emptyList())
+        coEvery { getCommunitySubscribersUseCase(COMMUNITY_ID) } returns Result.success(emptyList())
+    }
+
+    private fun load(viewModel: CommunityDetailsViewModel) {
+        viewModel.onEvent(CommunityDetailsEvent.LoadCommunity(COMMUNITY_ID))
     }
 
     private companion object {
