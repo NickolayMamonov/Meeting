@@ -10,9 +10,17 @@
   literals and generated metadata are checked against these two roles.
 - Release Please uses the repository `RELEASE_PLEASE_TOKEN` for its draft
   release, tag, and pull-request operations.
-- The protected `android-release` environment is used by stable build, signing,
-  public probe, final publication, and the non-publishing release proof. Its
-  administrator bypass remains disabled and its branch policy remains `master`.
+- The `android-release` environment is used by stable build, signing, public
+  probe, and the non-publishing release proof. The stable publication mutation
+  job alone uses the separate `android-publication` environment.
+- `android-publication` is an expected environment name in source, not proof of
+  protection. It was absent when this source change was prepared. Before any
+  future merge or workflow dispatch, separately authorized operators must
+  configure and read back that environment with reviewer/master-only deployment
+  restrictions and administrator bypass disabled. A missing environment does
+  not provide a protective approval gate. Reviewer identity and self-review
+  policy remain unresolved and must be explicitly decided; this change does
+  not infer them.
 - No backend, VPS, Nginx, certificate, Google Play, device, or USB operation
   is part of Android publication.
 
@@ -53,6 +61,9 @@ The `android-release` environment contains:
 - Non-secret `BASE_URL_RELEASE`, exactly
   `https://api.whysoezzy.online`.
 
+The stable publication mutation uses the `android-publication` environment for
+its existing release API token access and final upload/publish operations. No
+environment, secret, or variable is created or migrated by this source change.
 The stable publication workflow gives signing secrets only to the isolated
 `stable-sign` job. Its build, evidence, public-probe, and publication jobs do
 not reference signing material. The dispatch-only `Android release proof`
@@ -243,10 +254,16 @@ or alternate-credential contracts.
 For MEE3-63, run only repository-local and exact-head verification. Review and
 merge the code-only change into `dev`; do not dispatch proof, publish, mutate
 the existing draft/releases/assets, move refs, or change repository settings.
-MEE3-64 must separately establish the protected promotion and master producer
-before any stable proof or publication. After that gate, a future stable run
-must confirm package `dev.whysoezzy.meet`, version name/code,
-non-debuggable release state, the existing RSA-4096 certificate fingerprint
+After the separately authorized promotion and normal Release Please version
+change, the exact-version stable producer and non-publishing proof may run in
+either order or in parallel. Before separately approving the
+`android-publication` environment, require both the complete successful proof
+and acceptance of the producer's exact signed `Meet.apk` for the functional,
+native Mapbox, and other release criteria. The proof artifact is not a
+substitute for the producer APK; approval remains a separate operator decision.
+The accepted candidate must confirm package `dev.whysoezzy.meet`, generated
+version name/code, non-debuggable release state, the existing RSA-4096
+certificate fingerprint
 `b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f`, exact
 checksums, manifests, optional outputs, attestations, and production URL.
 
@@ -295,3 +312,79 @@ returns status `97` only for the intentional post-install failure after
 uninstall and package-absence verification. Normal startup performs the same
 cleanup proof. `dev.whysoezzy.meet` must be absent after every probe and after
 successful execution; a cleanup query failure is itself a gate failure.
+
+## Mapbox meeting preview
+
+The meeting preview uses the Mapbox Maps SDK through UIKit. Stable packaging
+requires the protected `MAPBOX_PUBLIC_TOKEN_RELEASE` Actions secret; optional
+local/debug configuration uses `MAPBOX_PUBLIC_TOKEN_DEBUG`. These must be
+dedicated public `pk.` read tokens and are extractable from application binaries.
+Start with verified public map-read scopes (`styles:read` and `fonts:read`) and
+separately verify Streets and its resources before distribution. Never provision
+an `sk.` token, commit a token, or print a token or authenticated resource URL.
+Blank debug configuration intentionally renders the address fallback.
+
+The card uses SDK `Snapshotter`, not an embedded `MapView`, Maps Compose,
+`TextureView`, or `SurfaceView`. One fixed Streets-v12 request uses the meeting
+coordinate, zoom 15, bearing/pitch zero, and an application-drawn exact-coordinate
+pin. The bitmap is memory-only; no custom cache, offline region, prefetch, purge,
+bitmap persistence or `Snapshotter.clearData` is added. A viewport below 200dp
+by 96dp does not construct a snapshot request. SDK resources may be unavailable
+offline; the address, independent geo action and credits remain usable.
+
+The preview requests no location permission or location-provider activation.
+The exact pinned SDK logo and readable Mapbox/OpenStreetMap attribution remain
+visible independently of snapshot readiness. Privacy and generic feedback links
+are app-owned. Feedback uses exactly `https://apps.mapbox.com/feedback/`, without
+meeting coordinates, address, identifier, profile, token or backend metadata.
+
+Snapshotter does not supply an interactive Attribution control. The app-owned
+`Настройки телеметрии Mapbox` dialog reads and changes only the Common SDK
+event-collection preference via `TelemetryUtils`. Unknown and saving states
+cannot initiate a write. Success requires the SDK callback and matching getter
+readback. Fake-only token-free tests never mutate native telemetry. Separately
+authorize initial-state read, opposite write/readback and restoration in
+`finally`; failed restoration blocks distribution. Do not log or retain raw
+SDK errors, reporting identifiers, tokens or telemetry events. User-facing
+privacy disclosure and current collection behavior require operator assessment.
+The address block explicitly states that loading the map sends the meeting
+coordinates to Mapbox. This notice does not imply that disabling telemetry
+also disables the map request. Production distribution still requires the
+operator's privacy-policy and collection-behavior assessment.
+
+Pinned Common 24.32.0 exposes these methods in public bytecode but annotates
+them `RestrictTo(LIBRARY_GROUP_PREFIX)`. The operator approved exactly one narrow
+`RestrictedApi` suppression on `MapboxTelemetryPreference`. No internal
+`MapProvider`, visibility shim, reflection or broader suppression is permitted.
+Re-evaluate this exception on every Maps/Common SDK upgrade.
+
+Use only unmodified SDK ambient caching. Do not claim guaranteed offline maps,
+an independently enforced TTL or a separate retention policy. Recheck applicable
+Mapbox terms before release. Official Android pricing guidance explicitly counts
+snapshot creation as Maps SDKs for Mobile MAU usage. Operator-managed usage,
+current thresholds and billing alerts require confirmation before distribution;
+a free tier is not a spending cap or authorization for paid use.
+
+Official references checked October 15, 2026:
+- https://docs.mapbox.com/android/maps/guides/pricing/
+- https://docs.mapbox.com/android/maps/guides/#attribution
+- https://docs.mapbox.com/android/maps/guides/#telemetry-opt-out
+- https://www.mapbox.com/legal/product-terms
+- https://www.mapbox.com/pricing
+
+Local blank-token unit tests, lint and test-APK assembly are source-only evidence.
+Fake-device tests, configured builds, native telemetry verification, guarded live
+Snapshotter acceptance, native page/ABI/runtime-size checks, hosted CI and
+integration/release require their separately authorized gates. Preserve all ABIs,
+existing signing/provenance contracts and the optional GLES3 installation filter.
+The README GIF remains historical illustrative artwork, not SDK runtime proof.
+
+Dev integration does not certify the full guarded live-runtime gate. The
+disposable-emulator runs produced partial Snapshotter callback/bitmap/style/pin
+evidence and verified telemetry-preference restoration, but the replacement
+HTTP-service guard did not observe the Snapshotter request. The experimental
+guard harness was removed because it depended on restricted factory APIs.
+The operator accepted this limitation for dev integration only; it is not a
+passing live gate, a spending-cap guarantee, or stable-distribution approval.
+Further provider tests require a separately reviewed containment plan and
+explicit authorization.

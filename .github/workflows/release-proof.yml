@@ -90,6 +90,7 @@ jobs:
         env:
           ORG_GRADLE_PROJECT_BASE_URL_RELEASE: ${{ vars.BASE_URL_RELEASE }}
           ORG_GRADLE_PROJECT_ANDROID_RELEASE_CERT_SHA256: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
+          ORG_GRADLE_PROJECT_MAPBOX_PUBLIC_TOKEN_RELEASE: ${{ secrets.MAPBOX_PUBLIC_TOKEN_RELEASE }}
           ORG_GRADLE_PROJECT_RELEASE_COMMIT_SHA: ${{ inputs.application_sha }}
           ORG_GRADLE_PROJECT_RELEASE_PUBLISHING: "true"
         working-directory: application-source

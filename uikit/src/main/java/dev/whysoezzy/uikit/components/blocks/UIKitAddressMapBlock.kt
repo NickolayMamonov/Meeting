@@ -35,6 +35,7 @@ fun UIKitAddressMapBlock(
     longitude: Double,
     nearestMetro: String,
     onMapClick: () -> Unit,
+    meetingId: Long? = null,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -61,7 +62,12 @@ fun UIKitAddressMapBlock(
             address = address,
             latitude = latitude,
             longitude = longitude,
+            meetingId = meetingId,
             onMapClick = onMapClick,
+        )
+        Text(
+            text = "При загрузке карты координаты встречи передаются Mapbox.",
+            style = MaterialTheme.typography.bodySmall,
         )
     }
 }
