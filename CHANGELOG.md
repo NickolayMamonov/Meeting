@@ -2,6 +2,29 @@
 
 All notable Android releases are documented here.
 
+## [1.2.0](https://github.com/NickolayMamonov/Meeting/compare/v1.1.0...v1.2.0) (2026-10-21)
+
+
+### Features
+
+* **auth:** simplify OTP entry ([1683e50](https://github.com/NickolayMamonov/Meeting/commit/1683e503a76801129573ea743d579c247fb5169f))
+* promote reviewed Android updates for v1.2.0 ([bbf85d6](https://github.com/NickolayMamonov/Meeting/commit/bbf85d6b43f31d1e7e3a6b3a0976d053621da684))
+* render meeting location with Mapbox Snapshotter ([3d14c6f](https://github.com/NickolayMamonov/Meeting/commit/3d14c6f1909ebe5ab8d387dd9dfc710bb27153f8))
+
+
+### Bug Fixes
+
+* **auth:** keep form actions above IME ([0f8fb34](https://github.com/NickolayMamonov/Meeting/commit/0f8fb34691feaf7b86ed5e60086938726e039d34))
+* make OTP cells responsive ([cf66224](https://github.com/NickolayMamonov/Meeting/commit/cf66224081edfddfb9116a5fc79a7b57030be0f8))
+* **maps:** accept bounded fractional-density snapshot dimensions ([eefcd92](https://github.com/NickolayMamonov/Meeting/commit/eefcd92b89ea5be0b8c7bc6f268b7bb01b61f869))
+* **maps:** accept fractional-density Snapshotter output ([01b98d0](https://github.com/NickolayMamonov/Meeting/commit/01b98d0d8e0f7a65381ddffb0bfa8c9bc336795c))
+* **meetings:** complete inset coverage ([57db3f8](https://github.com/NickolayMamonov/Meeting/commit/57db3f8782ae2d9cc958418979d201a5de23c0ea))
+* **meetings:** respect navigation inset ([858fca0](https://github.com/NickolayMamonov/Meeting/commit/858fca0b66dc1c102b28aa5e33522aa3952eb36d))
+* refine map preview layout and refresh README demo ([db7e8cc](https://github.com/NickolayMamonov/Meeting/commit/db7e8ccb3b69e588fe11f7aec44ed4db7a8383d5))
+* **uikit:** give map preview full height and compact controls ([947ff81](https://github.com/NickolayMamonov/Meeting/commit/947ff8126a82d1775627582616cd5d92a6c50173))
+* **uikit:** make OTP cells responsive ([b9c5893](https://github.com/NickolayMamonov/Meeting/commit/b9c5893bbe6338ca83cb956e89cb9060d3d383dc))
+* **uikit:** measure OTP digits across full cells ([ca5a64a](https://github.com/NickolayMamonov/Meeting/commit/ca5a64a477aa97f18eba389bace9b5eb7353670f))
+
 ## [1.1.0](https://github.com/NickolayMamonov/Meeting/compare/v1.0.0...v1.1.0) (2026-09-25)
 
 
