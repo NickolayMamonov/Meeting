@@ -14,35 +14,40 @@
   probe, and the non-publishing release proof. The stable publication mutation
   job alone uses the separate `android-publication` environment.
 - `android-publication` is an expected environment name in source, not proof of
-  protection. It was absent when this source change was prepared. Before any
-  future merge or workflow dispatch, separately authorized operators must
-  configure and read back that environment with reviewer/master-only deployment
-  restrictions and administrator bypass disabled. A missing environment does
-  not provide a protective approval gate. Reviewer identity and self-review
-  policy remain unresolved and must be explicitly decided; this change does
-  not infer them.
+  protection. The operator reports that it has been separately configured and
+  read back as master-only, with reviewer Nickolay Mamonov, self-review allowed,
+  and administrator bypass disabled. This configuration is external to source;
+  independently read it back before use. A missing or misconfigured environment
+  is not a protective approval gate. Source does not establish or enforce the
+  reviewer or self-review policy.
 - No backend, VPS, Nginx, certificate, Google Play, device, or USB operation
   is part of Android publication.
 
-## Three-stage promotion
+## Promotion and release authority
 
-The source-controlled contract has three ordered stages:
+The source-controlled branch roles remain:
 
 1. **`dev` integration:** feature work, normal CI, signed snapshots, beta use,
-   and pre-promotion smoke verification remain on `dev`. A snapshot is admitted
-   only for a successful push whose exact ref is `refs/heads/dev`.
-2. **MEE3-64 promotion gate:** a separately reviewed operator process selects
-   an exact `dev` candidate and performs the one-time protected promotion.
-   MEE3-63 does not move or create refs, change protections or credentials,
-   dispatch workflows, prove a release, or mutate release state.
+   and integration work remain on `dev`. A snapshot is admitted only for a
+   successful push whose exact ref is `refs/heads/dev`.
+2. **Reviewed promotion:** a normal reviewed promotion selects an exact
+   `dev` candidate for `master`. The completed historical MEE3-63/MEE3-64
+   migration is not repeated. Preserve master-owned Release Please metadata
+   and changelog history during promotion; do not copy stale dev version state
+   over it.
 3. **`master` stable release:** only the exact reviewed commit present on
    `master` can enter stable Release Please, production build/signing,
    evidence, proof, or later publication. A commit that exists only on `dev`
    remains ineligible for every stable path.
 
-Merging this code-only contract into `dev` does not itself publish or mutate
-stable state. No live mutation is part of this task; failures stop at the
-applicable reviewed gate for manual investigation.
+Promotion alone is not the normal Release Please version change or release
+authorization. Keep master at its existing version and history until Release
+Please generates and its normal reviewed version change reaches `master`.
+Release Please is configured to produce drafts and target `master`; the planned
+next version/code are `1.2.0`/`1002000`, generated through the normal Release
+Please and Android version process, not manually by promotion. A source merge
+or version change does not itself authorize proof execution, functional
+acceptance, or publication.
 
 ## Exact protected inventory
 
@@ -112,6 +117,28 @@ and expected RSA-4096 certificate fingerprint.
 
 ## Ordered publication
 
+After the normal Release Please version change is on `master`, the exact-version
+stable producer and the separately authorized non-publishing proof may run in
+either order or in parallel. The workflows do not automatically enforce the
+combined release-acceptance policy: `stable-mutate` is gated by the producer's
+evidence and public probe, not by the separate proof run or functional APK
+acceptance. Do not approve the `android-publication` environment until all of
+the following are satisfied:
+
+- the exact-SHA non-publishing proof completes successfully with every required
+  job successful and non-skipped;
+- the exact signed `Meet.apk` intended for public release, from the stable
+  producer, is accepted for the single functional/native Mapbox smoke and the
+  other release gates, including
+  authentication, push, catalog, and cleanup requirements; and
+- a separate operator approves publication of that same APK digest, source SHA,
+  producer workflow/run ID, and run attempt.
+
+The proof artifact is not a substitute for the producer APK and cannot transfer
+its proof result to different APK bytes. Withhold publication approval unless
+the proof, exact producer artifact, functional acceptance, cleanup, and other
+release criteria are all satisfied.
+
 1. Release Please creates the intended draft and stable build verifies the
    tag, source commit, version, exact HTTPS origin, and empty draft.
 2. Stable build provisions raw `GOOGLE_SERVICES_JSON` only for the build,
@@ -150,8 +177,9 @@ investigation, with no retry, repair, delete, or rollback request.
 
 ## Non-publishing exact release proof
 
-After MEE3-64 promotes the exact reviewed candidate, operators may dispatch the
-protected proof from `master` with the exact accepted application commit:
+After the normal reviewed promotion and Release Please version change are on
+`master`, a separately authorized proof may be dispatched from `master` with
+the exact application commit:
 
 ```text
 gh workflow run release-proof.yml --ref master -f application_sha=<accepted-40-hex-sha>
@@ -251,19 +279,14 @@ release metadata, checksums, and attestation references. Search active
 source, workflows, tests, and docs for stale pin, device-evidence,
 or alternate-credential contracts.
 
-For MEE3-63, run only repository-local and exact-head verification. Review and
-merge the code-only change into `dev`; do not dispatch proof, publish, mutate
-the existing draft/releases/assets, move refs, or change repository settings.
-After the separately authorized promotion and normal Release Please version
-change, the exact-version stable producer and non-publishing proof may run in
-either order or in parallel. Before separately approving the
-`android-publication` environment, require both the complete successful proof
-and acceptance of the producer's exact signed `Meet.apk` for the functional,
-native Mapbox, and other release criteria. The proof artifact is not a
-substitute for the producer APK; approval remains a separate operator decision.
-The accepted candidate must confirm package `dev.whysoezzy.meet`, generated
-version name/code, non-debuggable release state, the existing RSA-4096
-certificate fingerprint
+For a promotion candidate, run repository-local source checks and exact-head
+review; preserve master-owned release metadata until normal Release Please
+version generation. Do not repeat the completed historical migration. Before
+publication approval, require the exact-version producer and protected proof,
+the exact producer APK acceptance described below, cleanup, and all other
+release criteria. Confirm package `dev.whysoezzy.meet`, generated version
+name/code, non-debuggable release state, the existing RSA-4096 certificate
+fingerprint
 `b643fc0e49f572d3b7202c1e28e0ded1eb50228c70ae7531a573c97c5763536f`, exact
 checksums, manifests, optional outputs, attestations, and production URL.
 
@@ -379,12 +402,25 @@ integration/release require their separately authorized gates. Preserve all ABIs
 existing signing/provenance contracts and the optional GLES3 installation filter.
 The README GIF remains historical illustrative artwork, not SDK runtime proof.
 
-Dev integration does not certify the full guarded live-runtime gate. The
-disposable-emulator runs produced partial Snapshotter callback/bitmap/style/pin
-evidence and verified telemetry-preference restoration, but the replacement
-HTTP-service guard did not observe the Snapshotter request. The experimental
-guard harness was removed because it depended on restricted factory APIs.
-The operator accepted this limitation for dev integration only; it is not a
-passing live gate, a spending-cap guarantee, or stable-distribution approval.
-Further provider tests require a separately reviewed containment plan and
-explicit authorization.
+The historical disposable-emulator run produced only partial Snapshotter
+callback/bitmap/style/pin evidence. It is not the planned functional acceptance
+and is not a stable-release PASS. The completed migration and that historical
+run are not to be repeated. The one planned live acceptance is one natural
+Snapshotter preview on the exact signed `Meet.apk` from the stable producer,
+after separate execution authorization. It must reach natural READY/nonfallback
+within the production 15-second accumulated foreground deadline and satisfy
+the existing style, exact-coordinate pin, dimensions, branding, privacy,
+telemetry, lifecycle, and cleanup contracts. Do not retry or open another
+preview in that attempt; 30 seconds is only an observation/stop window, not a
+network limit.
+
+Preserve telemetry-roundtrip applicability review and restoration/readback when
+that native check is authorized; failed or unconfirmed restoration blocks
+acceptance. Preserve tester/user data: do not clear data or uninstall an
+existing package without specific authorization. After the approved attempt,
+confirm the attempt-installed package is absent. Do not retain screenshots,
+bitmaps, raw SDK/log output, coordinates, tokens, or identifying fixture data.
+Recheck applicable terms before live execution. This plan claims no hard
+traffic/request/byte/quota/cost cap; the historical 64-request and kernel gates
+are not PASS. The VM and all VM tooling remain frozen; no new infrastructure,
+provider-test plan, migration, or additional attempt is implied.
