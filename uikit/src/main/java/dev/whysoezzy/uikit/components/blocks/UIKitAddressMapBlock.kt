@@ -73,28 +73,27 @@ fun UIKitAddressMapBlock(
             }
         }
 
-        // Карта (без overlay)
-        UIKitMapView(
-            address = address,
-            latitude = latitude,
-            longitude = longitude,
-            meetingId = meetingId,
-            onMapClick = onMapClick,
-        )
         val context = LocalContext.current
-        Text(
-            text = stringResource(R.string.uikit_locationiq_credit),
-            color = locationIqCreditColor(MaterialTheme.colorScheme.surface),
-            style = MaterialTheme.typography.bodySmall,
-            modifier =
-                Modifier
-                    .padding(top = SpacingTokens.S)
-                    .padding(vertical = 12.dp)
-                    .testTag(LOCATIONIQ_CREDIT_TEST_TAG)
-                    .clickable {
-                        launchSafeUrl(context, LOCATIONIQ_URL)
-                    },
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.S)) {
+            // Карта (без overlay)
+            UIKitMapView(
+                address = address,
+                latitude = latitude,
+                longitude = longitude,
+                meetingId = meetingId,
+                onMapClick = onMapClick,
+            )
+            Text(
+                text = stringResource(R.string.uikit_locationiq_credit),
+                color = locationIqCreditColor(MaterialTheme.colorScheme.surface),
+                style = MaterialTheme.typography.bodySmall,
+                modifier =
+                    Modifier
+                        .clickable(onClick = { launchSafeUrl(context, LOCATIONIQ_URL) })
+                        .padding(vertical = 12.dp)
+                        .testTag(LOCATIONIQ_CREDIT_TEST_TAG),
+            )
+        }
         Text(
             text = "При загрузке карты координаты встречи передаются Mapbox.",
             style = MaterialTheme.typography.bodySmall,
