@@ -69,7 +69,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.min
 
 private const val MAP_RENDER_DEADLINE_MILLIS = 15_000L
-private const val MAP_PREVIEW_TEST_TAG = "uikit-map-preview"
+internal const val MAP_PREVIEW_TEST_TAG = "uikit-map-preview"
 internal const val MAP_PREVIEW_IMAGE_TEST_TAG = "uikit-map-preview-image"
 internal const val MAP_PREVIEW_STATUS_TEST_TAG = "uikit-map-preview-status"
 internal const val MAP_PREVIEW_LOGO_TEST_TAG = "uikit-map-preview-logo"
@@ -546,7 +546,7 @@ private fun deviceSupportsGles3(context: Context): Boolean {
     return activityManager.deviceConfigurationInfo.reqGlEsVersion >= MAP_PREVIEW_GLES3
 }
 
-private fun launchSafeUrl(
+internal fun launchSafeUrl(
     context: Context,
     url: String,
 ) {
