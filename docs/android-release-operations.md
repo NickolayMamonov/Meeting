@@ -328,9 +328,13 @@ offline; the address, independent geo action and credits remain usable.
 
 The preview requests no location permission or location-provider activation.
 The exact pinned SDK logo and readable Mapbox/OpenStreetMap attribution remain
-visible independently of snapshot readiness. Privacy and generic feedback links
-are app-owned. Feedback uses exactly `https://apps.mapbox.com/feedback/`, without
-meeting coordinates, address, identifier, profile, token or backend metadata.
+visible independently of snapshot readiness. The meeting address block displays
+a separate `Search by LocationIQ` link below the map, linking to
+`https://locationiq.com`; this is distinct from Mapbox/OSM map attribution and
+does not claim any geocoded result was verified. Privacy and generic feedback
+links are app-owned. Feedback uses exactly `https://apps.mapbox.com/feedback/`,
+without meeting coordinates, address, identifier, profile, token or backend
+metadata.
 
 Snapshotter does not supply an interactive Attribution control. The app-owned
 `Настройки телеметрии Mapbox` dialog reads and changes only the Common SDK
