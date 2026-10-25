@@ -94,7 +94,11 @@ class UIKitMapViewTest {
                 .assertIsDisplayed()
                 .assertHasClickAction()
         val locationIqBounds = locationIqNode.fetchSemanticsNode().boundsInRoot
-        assertTrue(locationIqBounds.top >= mapBounds.bottom)
+        val creditGap = locationIqBounds.top - mapBounds.bottom
+        assertTrue(creditGap >= 0f)
+        with(composeTestRule.density) {
+            assertTrue(creditGap <= 8.dp.toPx())
+        }
         locationIqNode.performClick()
         val locationIqIntent = requireNotNull(context.startedIntent)
         assertEquals(Intent.ACTION_VIEW, locationIqIntent.action)
@@ -369,7 +373,6 @@ class UIKitMapViewTest {
     }
 
     private fun assertBrandingAndCredits() {
-        composeTestRule.onNodeWithTag(LOCATIONIQ_CREDIT_TEST_TAG).assertIsDisplayed().assertHasClickAction()
         composeTestRule.onNodeWithTag(MAP_PREVIEW_LOGO_TEST_TAG).assertIsDisplayed().assertHasClickAction()
         composeTestRule.onAllNodesWithText("Исправить карту").assertCountEquals(0)
         composeTestRule.onNodeWithTag(MAP_PREVIEW_INFO_TEST_TAG).assertIsDisplayed().assertHasClickAction()
