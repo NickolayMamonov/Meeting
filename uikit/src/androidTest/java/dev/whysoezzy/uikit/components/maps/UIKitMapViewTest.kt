@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.whysoezzy.uikit.BuildConfig
+import dev.whysoezzy.uikit.components.blocks.LOCATIONIQ_CREDIT_TEST_TAG
 import dev.whysoezzy.uikit.components.blocks.UIKitAddressMapBlock
+import dev.whysoezzy.uikit.components.maps.MAP_PREVIEW_TEST_TAG
 import dev.whysoezzy.uikit.theme.UIKitTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -84,6 +86,26 @@ class UIKitMapViewTest {
         }
 
         assertPreviewHeight()
+        val mapBounds =
+            composeTestRule.onNodeWithTag(MAP_PREVIEW_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val locationIqNode =
+            composeTestRule
+                .onNodeWithTag(LOCATIONIQ_CREDIT_TEST_TAG)
+                .assertIsDisplayed()
+                .assertHasClickAction()
+        val locationIqBounds = locationIqNode.fetchSemanticsNode().boundsInRoot
+        val creditGap = locationIqBounds.top - mapBounds.bottom
+        assertTrue(creditGap >= 0f)
+        with(composeTestRule.density) {
+            assertTrue(creditGap <= 8.dp.toPx())
+        }
+        locationIqNode.performClick()
+        val locationIqIntent = requireNotNull(context.startedIntent)
+        assertEquals(Intent.ACTION_VIEW, locationIqIntent.action)
+        assertEquals("https://locationiq.com", locationIqIntent.data.toString())
+        assertNull(locationIqIntent.data?.query)
+        assertNull(locationIqIntent.data?.fragment)
+
         composeTestRule
             .onNodeWithText("При загрузке карты координаты встречи передаются Mapbox.")
             .assertIsDisplayed()
