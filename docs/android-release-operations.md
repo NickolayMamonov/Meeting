@@ -357,8 +357,10 @@ offline; the address, independent geo action and credits remain usable.
 
 The preview requests no location permission or location-provider activation.
 The pinned Mapbox logo remains visible independently of snapshot readiness;
-SDK attribution is rendered in the Snapshotter image. Mapbox and
-OpenStreetMap links are accessible through the map information dialog during
+SDK attribution is rendered in the Snapshotter image. The meeting address block
+also displays a separate `Search by LocationIQ` link below the map; it links to
+`https://locationiq.com` and is not a Mapbox/OSM map attribution or a claim that
+any geocoded result was verified. Mapbox and OpenStreetMap links are accessible through the map information dialog during
 loading and fallback states, but are not continuously visible there. Preserve
 the independent geo action, privacy disclosure and generic feedback controls.
 Privacy and generic feedback links are app-owned.
