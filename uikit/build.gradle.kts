@@ -45,7 +45,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation("androidx.startup:startup-runtime:1.1.1")
+    androidTestImplementation("androidx.startup:startup-runtime:1.2.0")
 }
 
 private fun safeMapboxPublicToken(token: String?): String? =
